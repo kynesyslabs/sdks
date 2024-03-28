@@ -1,0 +1,67 @@
+# DEMOS SDKs
+
+This repo contains all the Demos SDKs
+
+## Organization
+
+The packages look like this:
+
+```sh
+.
+├── core # blockchain interface stuff <todo: port from frontend>
+│
+├── multichain
+│   ├── core     # default chain sdk implementation for all chains
+│   ├── localsdk # local sdks for all chains
+│   └── websdk   # web sdks for all chains
+```
+
+# Setup
+
+> [!TIP]
+> Quick setup (installs dependencies for all packages)
+>
+> ```sh
+> yarn install
+> ```
+
+This monorepo uses the [yarn workspaces](https://yarnpkg.com/features/workspaces) feature which is only available on the non-classic Yarn version `>2.x` to organize packages. Yarn binaries and friends are installed in the `.yarn` directory, so you don't need to worry about it.
+
+To install dependencies for all packages, run:
+
+```sh
+yarn install
+```
+
+To run a command in a specific package, eg. install dependencies, use:
+
+```sh
+yarn workspace <package-name> <command-name>
+
+# yarn workspace @demos/mx-core install
+# yarn workspace @demos/mx-core add @somepackage
+```
+
+Dependencies for packages are installed in a shared `node_modules` directory at the root of this repo. Linking to the node modules is automatically handled by the yarn workspace.
+
+To install a local package in a package, define it as a workspace dependency in its `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@demos/sdk-name": "workspace:^"
+  }
+}
+```
+
+## Running tests
+
+```sh
+# multichain
+yarn test:mx
+```
+
+## Publishing on NPM
+
+> [!WARN]
+> TODO!

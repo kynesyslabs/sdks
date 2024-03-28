@@ -1,0 +1,27 @@
+{
+  "name": "@demos/mx-core",
+  "version": "1.0.0",
+  "private": true,
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "files": [
+    "build/",
+    "*.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/??"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "build": "rm -rf ./build && tsc"
+  },
+  "dependencies": {
+    "@cosmjs/stargate": "^0.32.3",
+    "ethers": "^6.11.1"
+  },
+  "packageManager": "yarn@3.8.0"
+}

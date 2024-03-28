@@ -1,0 +1,19 @@
+{
+  "name": "@demos/sdks",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Kynesys Labs <email here>",
+  "license": "MIT",
+  "private": true,
+  "workspaces": [
+    "multichain/*"
+  ],
+  "scripts": {
+    "build": "yarn workspaces foreach --topological-dev --parallel --verbose run build",
+    "publish-latest": "yarn workspaces foreach --no-private exec yarn npm publish"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.3"
+  },
+  "packageManager": "yarn@3.8.0"
+}
