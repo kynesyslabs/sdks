@@ -63,5 +63,6 @@ yarn test:mx
 
 ## Publishing on NPM
 
-> [!WARN]
+> [!NOTE]
+> 
 > TODO!
