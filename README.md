@@ -4,10 +4,10 @@ This repo contains all the Demos SDKs
 
 ## Organization
 
-The packages look like this:
+The packages are structured like this:
 
-```sh
-.
+```
+~
 ├── core # blockchain interface stuff <todo: port from frontend>
 │
 ├── multichain
@@ -42,27 +42,36 @@ yarn workspace <package-name> <command-name>
 # yarn workspace @demos/mx-core add @somepackage
 ```
 
-Dependencies for packages are installed in a shared `node_modules` directory at the root of this repo. Linking to the node modules is automatically handled by the yarn workspace.
+Dependencies for packages are installed in a shared `node_modules` directory at the root of the monorepo. Linking to the node modules is automatically handled by the yarn workspace.
 
 To install a local package in a package, define it as a workspace dependency in its `package.json`:
 
 ```json
 {
-  "dependencies": {
-    "@demos/sdk-name": "workspace:^"
-  }
+    "dependencies": {
+        "@demos/sdk-name": "workspace:^"
+    }
 }
 ```
 
 ## Running tests
 
 ```sh
+# IS TODO!
 # multichain
-yarn test:mx
+# yarn test:mx
 ```
 
 ## Publishing on NPM
 
 > [!NOTE]
-> 
+>
 > TODO!
+
+## What has Changed?
+
+### EVM Web sdk
+
+1. Constructor parameter order: \
+    previous: `rpc_url`, `isEIP1559`, `chain_id` \
+    new: `rpc_url`, `chain_id`, `isEIP1559`

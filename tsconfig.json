@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "strict": true,
     "baseUrl": ".",
     "declaration": true,
     "esModuleInterop": true,
@@ -18,7 +19,6 @@
     "pretty": true,
     "removeComments": false,
     "resolveJsonModule": true,
-    "sourceMap": true,
-    "strict": true
+    "sourceMap": true
   }
 }
