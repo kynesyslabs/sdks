@@ -1,15 +1,15 @@
 import {
-    Wallet,
     Contract,
-    TransactionReceipt,
-    parseEther,
-    formatEther,
     JsonRpcProvider,
+    TransactionReceipt,
     TransactionRequest,
+    Wallet,
+    formatEther,
+    parseEther,
 } from 'ethers'
+import { DefaultChain } from './types/defaultChain'
 import { IPayOptions } from './types/interfaces'
 import { required } from './utils'
-import { DefaultChain } from './types/defaultChain'
 
 /**
  * Base methods for the EVM Default Chain SDK
@@ -76,17 +76,17 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         return this.connected
     }
 
-    static override async create(
-        rpc_url: string = '',
-        eip1559: boolean = true,
-        chainId: number = 11155111
-    ): Promise<EVM> {
-        const instance = new EVM(rpc_url, eip1559, chainId)
-        if (rpc_url) {
-            await instance.connect()
-        }
-        return instance
-    }
+    // static override async create(
+    //     rpc_url: string = '',
+    //     eip1559: boolean = true,
+    //     chainId: number = 11155111
+    // ): Promise<EVM> {
+    //     const instance = new EVM(rpc_url, eip1559, chainId)
+    //     if (rpc_url) {
+    //         await instance.connect()
+    //     }
+    //     return instance
+    // }
 
     // INFO Connecting a wallet through a private key (string)
     // REVIEW should private key be a string or a Buffer?

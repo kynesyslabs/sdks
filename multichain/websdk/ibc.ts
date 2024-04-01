@@ -1,4 +1,10 @@
-import { IBC } from "@demos/mx-core";
+import { IBC as IBCCoreSDK, IDefaultChainWeb } from "@demos/mx-core";
 
 // INFO: Websdk is the same as the core sdk
-export default IBC;
+export class IBC extends IBCCoreSDK implements IDefaultChainWeb {
+    constructor(rpc_url: string) {
+        super(rpc_url);
+    }
+
+    // INFO: Add custom methods here
+}

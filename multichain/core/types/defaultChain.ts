@@ -4,65 +4,6 @@ interface Options {
     [key: string]: any
 }
 
-// SECTION: Interfaces
-
-/**
- * Core interface for all SDKs
- */
-// export interface IDefaultChain {
-//     provider: any
-//     wallet: any
-//     rpc_url: string
-//     connected: boolean
-
-//     setRpc: (rpc_url: string) => any
-//     getAddress: () => string
-
-//     // Wallets
-//     connect: (url: string) => Promise<any>
-//     connectWallet: (privateKey: string, options?: Options) => any
-//     getBalance: (address: string, options?: Options) => Promise<string>
-
-//     // INFO: preparePay and prepareTransfer are the same
-//     preparePay: (
-//         receiver: string,
-//         amount: string,
-//         options: Options
-//     ) => Promise<any>
-//     prepareTransfer: (
-//         receiver: string,
-//         amount: string,
-//         options: Options
-//     ) => Promise<any>
-
-//     // Transactions
-//     getEmptyTransaction: () => any
-//     signTransaction: (
-//         raw_transaction: any,
-//         options?: {
-//             privateKey?: string
-//         }
-//     ) => Promise<any>
-//     signTransactions: (
-//         raw_transaction: any[],
-//         options?: {
-//             privateKey?: string
-//         }
-//     ) => Promise<any>
-// }
-
-// /**
-//  * The default Local SDK interface
-//  */
-// export interface IDefaultChainLocal extends IDefaultChain {
-//     getInfo: () => Promise<string>
-//     sendTransaction: (tx: any) => Promise<any>
-// }
-
-// !SECTION
-
-// SECTION: Abstract Classes
-
 export abstract class DefaultChain {
     provider: any = null
     name: string = ''
@@ -71,6 +12,10 @@ export abstract class DefaultChain {
     rpc_url: string = ''
     connected: boolean = false
 
+    // NOTE We init chain with await CHAIN.create(rpc_url)
+    // This is necessary to ensure that the provider is connected
+    // if the user specifies the rpc_url in the constructor,
+    // as we cannot use await in the constructor
     constructor(rpc_url: string) {
         this.setRpc(rpc_url)
     }
@@ -88,10 +33,23 @@ export abstract class DefaultChain {
      * @param rpc_url The RPC URL
      * @returns The sdk instance connected to the RPC provider
      */
-    static async create(rpc_url: string): Promise<any> {
-        throw new Error('Method not implemented.')
+    static async create<T extends DefaultChain>(
+        this: new (rpc_url: string) => T,
+        rpc_url: string = ''
+    ): Promise<T> {
+        const instance = new this(rpc_url)
+        instance.setRpc(rpc_url)
+
+        if (rpc_url) {
+            await instance.connect()
+        }
+
+        return instance
     }
 
+    /**
+     * Resets the instance provider, wallet and rpc_url
+     */
     protected resetInstance() {
         this.provider = null
         this.wallet = null
@@ -208,12 +166,15 @@ export abstract class DefaultChain {
     ): Promise<any[]>
 }
 
+/**
+ * Interface for web sdk exclusive methods
+ */
 export interface IDefaultChainWeb extends DefaultChain {
     // nothing here at the moment
 }
 
 /**
- * Interface for the Default Chain LocalSDK
+ * Interface for local sdk exclusive methods
  */
 export interface IDefaultChainLocal extends DefaultChain {
     /**

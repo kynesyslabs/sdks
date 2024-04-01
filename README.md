@@ -72,6 +72,12 @@ To install a local package in a package, define it as a workspace dependency in 
 
 ### EVM Web sdk
 
-1. Constructor parameter order: \
-    previous: `rpc_url`, `isEIP1559`, `chain_id` \
-    new: `rpc_url`, `chain_id`, `isEIP1559`
+#### 1. Constructor parameter order:
+
+previous: `rpc_url`, `isEIP1559`, `chain_id` \
+new: `rpc_url`, `chain_id`, `isEIP1559`
+
+
+## TODOs
+- Review `getBalance` return type. Should it be a string or an object?
+- 

@@ -1,4 +1,9 @@
-import { EVM } from '@demos/mx-core'
+import { EVM as EVMCoreSDK, IDefaultChainWeb } from '@demos/mx-core'
 
-// NOTE: EVM Web == EVM Core (at the moment)
-export default EVM
+export class EVM extends EVMCoreSDK implements IDefaultChainWeb {
+    constructor(rpc_url: string) {
+        super(rpc_url)
+    }
+
+    // INFO: Add custom methods here
+}

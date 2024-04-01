@@ -1,2 +1,3 @@
-export { default as IBC } from './ibc'
-export { default as EVM } from './evm'
+export * from './xrp'
+export * from './evm'
+export * from './ibc'

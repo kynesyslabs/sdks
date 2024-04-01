@@ -9,6 +9,7 @@
     "multichain/*"
   ],
   "scripts": {
+    "reset": "exec rm -rf node_modules && find . -type d -name 'build' -exec rm -rf {} +",
     "build": "yarn workspaces foreach --topological-dev --parallel --verbose run build",
     "publish-latest": "yarn workspaces foreach --no-private exec yarn npm publish"
   },

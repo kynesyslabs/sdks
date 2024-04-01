@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@cosmjs/stargate": "^0.32.3",
-    "ethers": "^6.11.1"
+    "ethers": "^6.11.1",
+    "xrpl": "^3.0.0"
   },
   "packageManager": "yarn@3.8.0"
 }
