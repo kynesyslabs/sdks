@@ -14,19 +14,8 @@ import { INetworkProvider } from '@multiversx/sdk-network-providers/out/interfac
 
 // import { _required as required } from '$lib/demos_libs/utils/required'
 
-import { DefaultChain, IPayOptions, required } from '@demos/mx-core'
+import { DefaultChain, EGLDSignTxOptions, IPayOptions, required } from '@demos/mx-core'
 // import DefaultChainAsync from './types/defaultChainAsync'
-
-export interface EGLDSignTxOptions {
-    /**
-     * The private key to override the connected wallet
-     */
-    privateKey: string
-    /**
-     * The password of the override wallet
-     */
-    password: string
-}
 
 export class MULTIVERSX extends DefaultChain {
     declare provider: INetworkProvider

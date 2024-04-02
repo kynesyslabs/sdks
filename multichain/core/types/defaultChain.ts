@@ -1,8 +1,5 @@
-import { IPayOptions } from './interfaces'
-
-interface Options {
-    [key: string]: any
-}
+import { Contract, TransactionReceipt } from 'ethers'
+import { IBCConnectWalletOptions, IPayOptions } from './interfaces'
 
 export abstract class DefaultChain {
     provider: any = null
@@ -194,4 +191,36 @@ export interface IDefaultChainLocal extends DefaultChain {
      * @returns The transaction hash
      */
     sendTransaction: (signed_tx: any) => Promise<any>
+}
+
+
+/**
+ * Base methods for the EVM Default Chain SDK
+ */
+export interface IEVMDefaultChain {
+    contracts: Map<string, Contract>
+    isEIP1559: boolean
+    chainId: number
+
+    prepareBaseTxWithType: () => Promise<any>
+    getContractInstance: (address: string, abi: string) => Promise<Contract>
+    createRawTransaction: (tx_data: any) => Promise<any>
+    readFromContract: (contract: any, method: string, args: any) => Promise<any>
+    writeToContract: (contract: any, method: string, args: any) => Promise<any>
+    listenForEvent: (
+        event: string,
+        contract: string,
+        abi: any[]
+    ) => Promise<any>
+    listenForAllEvents: (contract: string, abi: any[]) => Promise<any>
+    waitForReceipt: (tx_hash: string) => Promise<TransactionReceipt>
+}
+
+
+export interface IBCDefaultChain extends DefaultChain {
+    connectWallet(
+        privateKey: string,
+        options: IBCConnectWalletOptions
+    ): Promise<any>
+    ibcSend: () => Promise<any>
 }

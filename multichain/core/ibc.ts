@@ -3,68 +3,22 @@ import {
     DirectSecp256k1Wallet,
 } from '@cosmjs/proto-signing'
 import {
-    MsgSendEncodeObject,
     SigningStargateClient,
     StargateClient,
-    StdFee,
     calculateFee,
 } from '@cosmjs/stargate'
 import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx'
 
-import { DefaultChain } from './types/defaultChain'
-import { IPayOptions } from './types/interfaces'
+import { DefaultChain, IBCDefaultChain } from './types/defaultChain'
+import {
+    IBCConnectWalletOptions,
+    IBCGetBalanceOptions,
+    IBCPreparePayOptions,
+    IBCSignTxOptions,
+    IBCTransaction,
+    IPayOptions,
+} from './types/interfaces'
 import { required } from './utils'
-
-// IBC TRANSACTION //
-export interface IBCTransaction {
-    signerAddress: string
-    messages: MsgSendEncodeObject[]
-    fee: StdFee | null
-    memo: string
-}
-
-export interface IBCConnectWalletOptions {
-    /**
-     * The address prefix
-     */
-    prefix: string
-
-    /**
-     * The the price of a single unit of gas. This is typically a fraction of the smallest fee token unit, such as 0.012utoken
-     */
-    gasPrice: string
-
-    /**
-     * The multiplier to apply to the estimated gas price. Used to make sure transactions do not run out of gas.
-     *
-     * @default 2.0
-     */
-    multiplier?: number
-}
-
-export interface IBCGetBalanceOptions {
-    /**
-     * The denomination of the token
-     */
-    denom: string
-}
-
-export interface IBCDefaultChain extends DefaultChain {
-    connectWallet(
-        privateKey: string,
-        options: IBCConnectWalletOptions
-    ): Promise<any>
-    ibcSend: () => Promise<any>
-}
-
-interface IBCPreparePayOptions extends IBCGetBalanceOptions {}
-
-interface IBCSignTxOptions extends IBCConnectWalletOptions {
-    /**
-     * The private key to override the connected wallet
-     */
-    privateKey?: string
-}
 
 export class IBC extends DefaultChain implements IBCDefaultChain {
     address: string = ''
