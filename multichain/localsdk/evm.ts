@@ -1,7 +1,7 @@
 import { TransactionRequest } from 'ethers'
 import { IDefaultChainLocal, EVM as EVMCore, required } from '@demos/mx-core'
 
-export default class EVM extends EVMCore implements IDefaultChainLocal {
+export class EVM extends EVMCore implements IDefaultChainLocal {
     private static instances: Map<number, EVM> = new Map<number, EVM>()
 
     constructor(

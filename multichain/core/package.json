@@ -21,6 +21,10 @@
   },
   "dependencies": {
     "@cosmjs/stargate": "^0.32.3",
+    "@multiversx/sdk-core": "^12.19.2",
+    "@multiversx/sdk-extension-provider": "^3.0.0",
+    "@multiversx/sdk-network-providers": "^2.4.3",
+    "@multiversx/sdk-wallet": "^4.4.0",
     "ethers": "^6.11.1",
     "xrpl": "^3.0.0"
   },

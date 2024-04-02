@@ -1,7 +1,7 @@
 import * as xrpl from 'xrpl'
 import { IDefaultChainLocal, XRPL as XRPLSdkCore } from '@demos/mx-core'
 
-export default class XRPL extends XRPLSdkCore implements IDefaultChainLocal {
+export class XRPL extends XRPLSdkCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {
         super(rpc_url)
     }

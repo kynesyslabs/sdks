@@ -356,8 +356,4 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
         // REFERENCE: https://github.com/cosmos/cosmjs/blob/33271bc51c/packages/stargate/src/signingstargateclient.ts#L246
         throw new Error('Method not implemented')
     }
-
-    async createWallet(password?: string) {
-        throw new Error('Method not implemented.')
-    }
 }
