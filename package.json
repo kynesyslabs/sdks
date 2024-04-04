@@ -9,11 +9,17 @@
     "multichain/*"
   ],
   "scripts": {
-    "reset": "exec rm -rf node_modules && find . -type d -name 'build' -exec rm -rf {} +",
+    "clean": "yarn exec find ./multichain -type d -name 'build' -exec rm -rf {} +",
     "build": "yarn workspaces foreach --topological-dev --parallel --verbose run build",
-    "publish-latest": "yarn workspaces foreach --no-private exec yarn npm publish"
+    "publish-latest": "yarn workspaces foreach --no-private exec yarn npm publish",
+    "test:chains": "yarn clean && jest --testMatch '**/tests/**/*.ts' --testPathIgnorePatterns tests/**/chainProvider* tests/utils/* tests/**/template*  --verbose"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.12.4",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.3"
   },
   "packageManager": "yarn@3.8.0"

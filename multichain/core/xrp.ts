@@ -1,21 +1,19 @@
 import {
-    Transaction,
+    AccountInfoRequest,
     Client,
+    Transaction,
     Wallet,
     xrpToDrops,
-    AccountInfoRequest,
 } from 'xrpl'
 
-import { IPayOptions } from '@demos/mx-core'
-import { DefaultChain } from '@demos/mx-core'
-import { required } from '@demos/mx-core'
+import { DefaultChain, IPayOptions, required } from '@demos/mx-core'
 
 /**
  * Get the last sequence number of an address
  * @param address The address
  * @returns The last sequence number
  */
-export async function getLastSequence(provider: Client, address: string) {
+export async function xrplGetLastSequence(provider: Client, address: string) {
     // INFO: Get user's current sequence
     // Code extracted from the xrpl library
     // By following this.provider.autofill
@@ -54,34 +52,23 @@ export class XRPL extends DefaultChain {
         })
     }
 
-    async connect() {
+    async connect(with_reconnect: boolean = true) {
         // INFO Connects to the provider with error handling
         let trial_index = 0
         let maxTrials = 3
 
         const providerConnect = async () => {
-            console.log(`[XRPL] ${maxTrials - trial_index} retries left`)
-
             try {
                 await this.provider.connect()
-                console.log(
-                    `[XRPL] Connected to RPC on ${trial_index + 1}th trial`
-                )
-
                 return true
             } catch (error) {
-                console.log('[XRPL] Error connecting to RPC')
-                console.log(error)
-
                 trial_index++
                 if (trial_index == maxTrials) {
                     // INFO: Return false if we failed to connect
-                    console.log('[XRPL] Failed to connect to RPC')
                     return false
                 }
 
                 // INFO: Retry for the Nth time
-                console.log('[XRPL] Retrying ...')
                 await providerConnect()
             }
 
@@ -95,15 +82,17 @@ export class XRPL extends DefaultChain {
         })
 
         // Handle disconnection events
-        this.provider.on('disconnected', async (code) => {
-            // Handle the disconnection event (e.g., attempt to reconnect)
-            console.log(
-                `Disconnected from XRPL with code: ${code}, attempting to reconnect...`
-            )
-            this.connected = false
-
-            this.connected = await providerConnect()
-        })
+        // INFO: with_reconnect = false is used to exit tests without open handles
+        if (with_reconnect) {
+            this.provider.on('disconnected', async (code) => {
+                // Handle the disconnection event (e.g., attempt to reconnect)
+                console.log(
+                    `Disconnected from XRPL with code: ${code}, attempting to reconnect...`
+                )
+                this.connected = false
+                this.connected = await providerConnect()
+            })
+        }
 
         // Handle errors
         this.provider.on('error', (errorCode, errorMessage, data) => {
@@ -186,7 +175,7 @@ export class XRPL extends DefaultChain {
         // INFO: Check if wallet is connected
         required(this.wallet, 'Wallet not connected')
 
-        let currentSequence = await getLastSequence(
+        let currentSequence = await xrplGetLastSequence(
             this.provider,
             this.getAddress()
         )

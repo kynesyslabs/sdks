@@ -41,9 +41,9 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
         // }
     }
 
-    async setRPC(rpc_url: string) {
-        this.provider = await StargateClient.connect(rpc_url)
-    }
+    // override async setRpc(rpc_url: string) {
+    //     this.provider = await StargateClient.connect(rpc_url)
+    // }
 
     // static override async create(rpc_url: string): Promise<IBC> {
     //     const instance = new IBC(rpc_url)
@@ -58,6 +58,8 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
     // }
 
     async connect() {
+        this.provider = await StargateClient.connect(this.rpc_url)
+
         try {
             const chain_id = await this.provider.getChainId()
             this.chainID = chain_id
