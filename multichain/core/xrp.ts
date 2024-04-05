@@ -87,7 +87,7 @@ export class XRPL extends DefaultChain {
             this.provider.on('disconnected', async (code) => {
                 // Handle the disconnection event (e.g., attempt to reconnect)
                 console.log(
-                    `Disconnected from XRPL with code: ${code}, attempting to reconnect...`
+                    `Disconnected from XRPL with code: ${code}, reconnecting: ${with_reconnect}`
                 )
                 this.connected = false
                 this.connected = await providerConnect()

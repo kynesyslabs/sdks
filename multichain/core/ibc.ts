@@ -57,8 +57,11 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
     //     return instance
     // }
 
-    async connect() {
-        this.provider = await StargateClient.connect(this.rpc_url)
+    // INFO: rpc_url used to avoid overwriting this.provider for test mocking
+    async connect(rpc_url?: string) {
+        if (rpc_url !== this.rpc_url) {
+            this.provider = await StargateClient.connect(this.rpc_url)
+        }
 
         try {
             const chain_id = await this.provider.getChainId()

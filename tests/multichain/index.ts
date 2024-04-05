@@ -14,26 +14,26 @@ import { EVM, IBC, MULTIVERSX, XRPL } from '@demos/mx-core'
 
 // INFO: Chains and their RPCs
 const chains = [
-    // {
-    //     name: 'EGLD',
-    //     sdk: MULTIVERSX,
-    //     rpc: chainProviders.egld.testnet,
-    // },
+    {
+        name: 'EGLD',
+        sdk: MULTIVERSX,
+        rpc: chainProviders.egld.testnet,
+    },
     {
         name: 'XRPL',
         sdk: XRPL,
         rpc: chainProviders.xrpl.testnet,
     },
-    // {
-    //     name: 'EVM',
-    //     sdk: EVM,
-    //     rpc: chainProviders.eth.sepolia,
-    // },
-    // {
-    //     name: 'IBC',
-    //     sdk: IBC,
-    //     rpc: chainProviders.ibc.testnet,
-    // },
+    {
+        name: 'EVM',
+        sdk: EVM,
+        rpc: chainProviders.eth.sepolia,
+    },
+    {
+        name: 'IBC',
+        sdk: IBC,
+        rpc: chainProviders.ibc.testnet,
+    },
 ]
 
 // INFO: For loop to test each chain sdk
@@ -41,7 +41,7 @@ describe.each(chains)('GENERIC CHAIN TESTS › $name', ({ name, rpc, sdk }) => {
     let instance: IBC | EVM | MULTIVERSX | XRPL
 
     beforeAll(async () => {
-        // /@ts-expect-error
+        // @ts-expect-error
         // Caused by the use of generics to determine the output of sdk.create
         instance = await sdk.create(rpc)
     })
@@ -51,14 +51,13 @@ describe.each(chains)('GENERIC CHAIN TESTS › $name', ({ name, rpc, sdk }) => {
     })
 
     test('Testnet RPC is up', async () => {
-        // INFO: Tests for failure are mocked in dedicated chain test
-        const connected = await instance.connect(false)
+        const connected = await instance.connect()
 
-        expect(instance.connected).toBe(connected)
+        expect(instance.connected).toBe(true)
         expect(connected).toBe(true)
 
         // INFO: Max timeout for this test
-    }, 20_000)
+    })
 
     test('On connect failure, .connected is false', async () => {
         const mock = jest.fn().mockRejectedValue(new Error('mock error'))
@@ -69,6 +68,7 @@ describe.each(chains)('GENERIC CHAIN TESTS › $name', ({ name, rpc, sdk }) => {
                 ;(instance.provider as JsonRpcProvider).getNetwork = mock
                 break
             case 'IBC':
+                // ERROR: Breaks because .connect creates a overwrites the mock on .connect (see line #1)
                 ;(instance.provider as StargateClient).getChainId = mock
                 break
             case 'XRPL':
@@ -82,8 +82,16 @@ describe.each(chains)('GENERIC CHAIN TESTS › $name', ({ name, rpc, sdk }) => {
                 expect(true).toBe(false)
         }
 
-        const connected = await instance.connect(false)
-        expect(connected).toBe(false)
+        let isConnected: boolean
+
+        if (name === 'IBC') {
+            isConnected = await (instance as IBC).connect(instance.rpc_url)
+        } else {
+			// @ts-expect-error
+            isConnected = await instance.connect(false)
+        }
+
+        expect(isConnected).toBe(false)
     })
 
     test('On disconnect, provider is reset', async () => {

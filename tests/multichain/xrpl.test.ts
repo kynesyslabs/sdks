@@ -10,6 +10,8 @@ describe('XRPL CHAIN TESTS', () => {
     const instance = new XRPL(chainProviders.xrpl.testnet)
 
     beforeAll(async () => {
+		// with_reconnect is set to false
+		// to avoid open handles when exiting
         const connected = await instance.connect(false)
         expect(connected).toBe(true)
     })
