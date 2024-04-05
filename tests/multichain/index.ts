@@ -68,7 +68,6 @@ describe.each(chains)('GENERIC CHAIN TESTS › $name', ({ name, rpc, sdk }) => {
                 ;(instance.provider as JsonRpcProvider).getNetwork = mock
                 break
             case 'IBC':
-                // ERROR: Breaks because .connect creates a overwrites the mock on .connect (see line #1)
                 ;(instance.provider as StargateClient).getChainId = mock
                 break
             case 'XRPL':
