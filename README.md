@@ -2,6 +2,17 @@
 
 This repo contains all the Demos SDKs
 
+## Usage
+
+### Core
+
+> [!NOTE]
+> Will be updated once ported.
+
+### Multichain SDKs
+
+Check out the [multichain documentation](./documentation/multichain/README.md).
+
 ## Organization
 
 The packages are structured like this:
@@ -16,7 +27,7 @@ The packages are structured like this:
 │   └── websdk   # web sdks for all chains
 ```
 
-# Setup
+## Development setup
 
 > [!TIP]
 > Quick setup (installs dependencies for all packages)
@@ -25,7 +36,7 @@ The packages are structured like this:
 > yarn install
 > ```
 
-This monorepo uses the [yarn workspaces](https://yarnpkg.com/features/workspaces) feature which is only available on the non-classic Yarn version `>2.x` to organize packages. Yarn binaries and friends are installed in the `.yarn` directory, so you don't need to worry about it.
+This monorepo uses the [yarn workspaces](https://yarnpkg.com/features/workspaces) feature which is only available on the non-classic Yarn version `>2.x` to organize packages. Yarn binaries and friends are installed in the `.yarn` directory, so you don't need to install them.
 
 To install dependencies for all packages, run:
 
@@ -57,9 +68,8 @@ To install a local package in a package, define it as a workspace dependency in 
 ## Running tests
 
 ```sh
-# IS TODO!
 # multichain
-# yarn test:mx
+yarn test:multichain
 ```
 
 ## Publishing on NPM
@@ -77,7 +87,7 @@ To install a local package in a package, define it as a workspace dependency in 
 previous: `rpc_url`, `isEIP1559`, `chain_id` \
 new: `rpc_url`, `chain_id`, `isEIP1559`
 
-
 ## TODOs
-- Review `getBalance` return type. Should it be a string or an object?
-- 
+
+-   Review `getBalance` return type. Should it be a string or an object?
+-

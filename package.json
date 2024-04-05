@@ -12,7 +12,7 @@
     "clean": "yarn exec find ./multichain -type d -name 'build' -exec rm -rf {} +",
     "build": "yarn workspaces foreach --topological-dev --parallel --verbose run build",
     "publish-latest": "yarn workspaces foreach --no-private exec yarn npm publish",
-    "test:chains": "yarn clean && jest --testMatch '**/tests/**/*.ts' --testPathIgnorePatterns tests/**/chainProvider* tests/utils/* tests/**/template*  --verbose"
+    "test:multichain": "yarn clean && jest --testMatch '**/tests/**/*.ts' --testPathIgnorePatterns tests/**/chainProvider* tests/utils/* tests/**/template*  --verbose"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",

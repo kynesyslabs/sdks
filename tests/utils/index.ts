@@ -1,4 +1,4 @@
-import { IPayOptions } from '$lib/demos_libs/xmlibs/chains/types/transfers';
+import { IPayOptions } from '@demos/mx-core';
 
 /**
  * Verify that keys in a list of items appear in ascending order
