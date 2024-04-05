@@ -1,16 +1,18 @@
 ## General layout of the multichain SDKs
 
-SDKs should be imported from `@demos/xm-websdk` or `@demos/xm-localsdk`.
+SDKs can be imported from `@demos/xm-websdk` or `@demos/xm-localsdk`.
 
 ```ts
-import { EVM, XRPL, MULTIVERSX, IBC } from '@demos/xm-websdk'
+import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@demos/xm-websdk'
 
 // or
 
-import { EVM, XRPL, MULTIVERSX, IBC } from '@demos/xm-localsdk'
+import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@demos/xm-localsdk'
 ```
 
 ### Creating an instance
+
+Create an SDK instance to interact with the chain.
 
 ```ts
 const instance = EVM.create(rpc_url)
@@ -37,11 +39,11 @@ instance.connectWallet(privateKey, {
 ```
 
 > [!TIP]
-> The input of `.connectWallet` (and some other methods) depends on the specific chain. For example, on IBC, when connecting the wallet you need to specify the chain prefix and the denomination to use. Please refer to the specific chain sdk for details.
+> The input of `.connectWallet` (and some other methods) depends on the chain. For example, on IBC, when connecting the wallet you need to specify the chain prefix and the denomination to use. Please refer to the specific chain sdk for details.
 
-### Reading the wallet address
+### Getting the wallet address
 
-After you have connected a wallet, you can get it's address:
+After you have connected a wallet, you can get its address:
 
 ```ts
 const address = instance.getAddress()
