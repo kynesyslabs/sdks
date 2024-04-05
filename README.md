@@ -5,9 +5,7 @@ This repo contains all the Demos SDKs
 ## Usage
 
 ### Core
-
-> [!NOTE]
-> Will be updated once ported.
+TODO: Update once ported.
 
 ### Multichain SDKs
 
@@ -73,10 +71,7 @@ yarn test:multichain
 ```
 
 ## Publishing on NPM
-
-> [!NOTE]
->
-> TODO!
+TODO!
 
 ## What has Changed?
 
