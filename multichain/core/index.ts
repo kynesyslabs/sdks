@@ -1,11 +1,28 @@
-export * from './types/defaultChain'
-export * from './types/interfaces'
-export * from './utils'
+export {
+    DefaultChain,
+    IBCDefaultChain,
+    IDefaultChainLocal,
+    IDefaultChainWeb,
+    IEVMDefaultChain,
+} from './types/defaultChain'
+
+export {
+    EGLDSignTxOptions,
+    IBCConnectWalletOptions,
+    IBCGetBalanceOptions,
+    IBCPreparePayOptions,
+    IBCSignTxOptions,
+    IBCTransaction,
+    IPayOptions,
+    TransactionResponse,
+} from './types/interfaces'
+
+export { required } from './utils'
 
 // SECTION: Chain SDKs
-export * from './evm'
-export * from './ibc'
+export { EVM } from './evm'
+export { IBC } from './ibc'
+export { MULTIVERSX } from './multiversx'
 
 // The official XRPL Library is called "xrpl" which conflicts with the name of our XRPL SDK
-export * from './xrp'
-export * from "./multiversx"
+export { XRPL, xrplGetLastSequence } from './xrp'

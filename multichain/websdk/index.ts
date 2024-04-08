@@ -1,3 +1,3 @@
-export * from './xrp'
-export * from './evm'
-export * from './ibc'
+export { XRPL } from './xrp'
+export { EVM } from './evm'
+export { IBC } from './ibc'
