@@ -1,5 +1,5 @@
+import { IDefaultChainLocal, XRPL as XRPLSdkCore } from '@kynesyslabs/mx-core'
 import * as xrpl from 'xrpl'
-import { IDefaultChainLocal, XRPL as XRPLSdkCore } from '@demos/mx-core'
 
 export class XRPL extends XRPLSdkCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {

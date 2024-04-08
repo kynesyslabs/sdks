@@ -1,26 +1,25 @@
 {
-  "name": "@demos/mx-localsdk",
-  "version": "1.0.0",
-  "private": true,
-  "main": "build/index.js",
-  "types": "build/index.d.ts",
-  "files": [
-    "build/",
-    "*.md"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/?"
-  },
-  "publishConfig": {
-    "access": "restricted",
-    "registry": "https://registry.npmjs.org"
-  },
-  "scripts": {
-    "build": "rm -rf ./build && tsc"
-  },
-  "dependencies": {
-    "@demos/mx-core": "workspace:^"
-  },
-  "packageManager": "yarn@3.8.0"
+    "name": "@kynesyslabs/mx-localsdk",
+    "version": "1.0.0",
+    "main": "build/index.js",
+    "types": "build/index.d.ts",
+    "files": [
+        "build/",
+        "*.md"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/?"
+    },
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org"
+    },
+    "scripts": {
+        "build": "rm -rf ./build && tsc"
+    },
+    "dependencies": {
+        "@kynesyslabs/mx-core": "workspace:^"
+    },
+    "packageManager": "yarn@3.8.0"
 }

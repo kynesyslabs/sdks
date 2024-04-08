@@ -7,14 +7,19 @@ import {
     Transaction,
     TransferTransactionsFactory,
 } from '@multiversx/sdk-core'
-import { UserSigner } from '@multiversx/sdk-wallet'
 import { ExtensionProvider } from '@multiversx/sdk-extension-provider'
 import { ApiNetworkProvider } from '@multiversx/sdk-network-providers'
 import { INetworkProvider } from '@multiversx/sdk-network-providers/out/interface'
+import { UserSigner } from '@multiversx/sdk-wallet'
 
 // import { _required as required } from '$lib/demos_libs/utils/required'
 
-import { DefaultChain, EGLDSignTxOptions, IPayOptions, required } from '@demos/mx-core'
+import {
+    DefaultChain,
+    EGLDSignTxOptions,
+    IPayOptions,
+    required,
+} from '@kynesyslabs/mx-core'
 // import DefaultChainAsync from './types/defaultChainAsync'
 
 export class MULTIVERSX extends DefaultChain {

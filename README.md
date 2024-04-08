@@ -5,6 +5,7 @@ This repo contains all the Demos SDKs
 ## Usage
 
 ### Core
+
 TODO: Update once ported.
 
 ### Multichain SDKs
@@ -47,8 +48,8 @@ To run a command in a specific package, eg. install dependencies, use:
 ```sh
 yarn workspace <package-name> <command-name>
 
-# yarn workspace @demos/mx-core install
-# yarn workspace @demos/mx-core add @somepackage
+# yarn workspace @kynesyslabs/mx-core install
+# yarn workspace @kynesyslabs/mx-core add @somepackage
 ```
 
 Dependencies for packages are installed in a shared `node_modules` directory at the root of the monorepo. Linking to the node modules is automatically handled by the yarn workspace.
@@ -58,7 +59,7 @@ To install a local package in a package, define it as a workspace dependency in 
 ```json
 {
     "dependencies": {
-        "@demos/sdk-name": "workspace:^"
+        "@kynesyslabs/sdk-name": "workspace:^"
     }
 }
 ```
@@ -71,6 +72,7 @@ yarn test:multichain
 ```
 
 ## Publishing on NPM
+
 TODO!
 
 ## What has Changed?

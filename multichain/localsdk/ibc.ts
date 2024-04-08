@@ -1,5 +1,8 @@
-import { IDefaultChainLocal } from '@demos/mx-core'
-import { IBC as IBCCore, required } from '@demos/mx-core'
+import {
+    IBC as IBCCore,
+    IDefaultChainLocal,
+    required,
+} from '@kynesyslabs/mx-core'
 
 export class IBC extends IBCCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {

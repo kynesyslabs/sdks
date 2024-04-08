@@ -1,26 +1,23 @@
 {
-  "name": "@demos/<name>",
-  "version": "1.0.0",
-  "private": true,
-  "main": "build/index.js",
-  "types": "build/index.d.ts",
-  "files": [
-    "build/",
-    "*.md"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/?"
-  },
-  "publishConfig": {
-    "access": "restricted",
-    "registry": "https://registry.npmjs.org"
-  },
-  "scripts": {
-    "build": "rm -rf ./build && tsc"
-  },
-  "dependencies": {
-    "@demos/sdk-name": "workspace:^"
-  },
-  "packageManager": "yarn@3.8.0"
+    "name": "@kynesyslabs/<name>",
+    "version": "1.0.0",
+    "private": true,
+    "main": "build/index.js",
+    "types": "build/index.d.ts",
+    "files": ["build/", "*.md"],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/?"
+    },
+    "publishConfig": {
+        "access": "restricted",
+        "registry": "https://registry.npmjs.org"
+    },
+    "scripts": {
+        "build": "rm -rf ./build && tsc"
+    },
+    "dependencies": {
+        "@kynesyslabs/sdk-name": "workspace:^"
+    },
+    "packageManager": "yarn@3.8.0"
 }

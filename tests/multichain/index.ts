@@ -3,14 +3,14 @@
   They make sure all the sdks behave the same way.
 */
 
-import { Client } from 'xrpl'
 import { JsonRpcProvider } from 'ethers'
+import { Client } from 'xrpl'
 
 import { StargateClient } from '@cosmjs/stargate'
 import { INetworkProvider } from '@multiversx/sdk-network-providers/out/interface'
 
+import { EVM, IBC, MULTIVERSX, XRPL } from '@kynesyslabs/mx-core'
 import chainProviders from './chainProviders'
-import { EVM, IBC, MULTIVERSX, XRPL } from '@demos/mx-core'
 
 // INFO: Chains and their RPCs
 const chains = [
@@ -86,7 +86,7 @@ describe.each(chains)('GENERIC CHAIN TESTS › $name', ({ name, rpc, sdk }) => {
         if (name === 'IBC') {
             isConnected = await (instance as IBC).connect(instance.rpc_url)
         } else {
-			// @ts-expect-error
+            // @ts-expect-error
             isConnected = await instance.connect(false)
         }
 

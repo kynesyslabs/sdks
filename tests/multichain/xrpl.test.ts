@@ -1,6 +1,5 @@
+import { XRPL, xrplGetLastSequence } from '@kynesyslabs/mx-core'
 import { decode } from 'xrpl'
-import { XRPL } from '@demos/mx-core'
-import { xrplGetLastSequence } from '@demos/mx-core'
 
 import { getSampleTranfers, verifyNumberOrder } from '../utils'
 import { wallets } from '../utils/wallets'
@@ -10,8 +9,8 @@ describe('XRPL CHAIN TESTS', () => {
     const instance = new XRPL(chainProviders.xrpl.testnet)
 
     beforeAll(async () => {
-		// with_reconnect is set to false
-		// to avoid open handles when exiting
+        // with_reconnect is set to false
+        // to avoid open handles when exiting
         const connected = await instance.connect(false)
         expect(connected).toBe(true)
     })

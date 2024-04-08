@@ -1,5 +1,5 @@
 {
-    "name": "@demos/mx",
+    "name": "@kynesyslabs/mx",
     "version": "1.0.0",
     "private": true,
     "main": "build/index.js",

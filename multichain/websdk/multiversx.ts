@@ -1,12 +1,12 @@
 import {
-    required,
-    IDefaultChainWeb,
-    EGLDSignTxOptions,
     MULTIVERSX as EGLDCore,
-} from '@demos/mx-core'
-import { Transaction, IPlainTransactionObject } from '@multiversx/sdk-core'
-import { UserSigner } from '@multiversx/sdk-wallet'
+    EGLDSignTxOptions,
+    IDefaultChainWeb,
+    required,
+} from '@kynesyslabs/mx-core'
+import { IPlainTransactionObject, Transaction } from '@multiversx/sdk-core'
 import { ExtensionProvider } from '@multiversx/sdk-extension-provider'
+import { UserSigner } from '@multiversx/sdk-wallet'
 
 export class MULTIVERSX extends EGLDCore implements IDefaultChainWeb {
     constructor(rpc_url: string) {

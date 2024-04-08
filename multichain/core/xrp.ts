@@ -6,7 +6,7 @@ import {
     xrpToDrops,
 } from 'xrpl'
 
-import { DefaultChain, IPayOptions, required } from '@demos/mx-core'
+import { DefaultChain, IPayOptions, required } from '@kynesyslabs/mx-core'
 
 /**
  * Get the last sequence number of an address

@@ -1,9 +1,9 @@
-import { IBC as IBCCoreSDK, IDefaultChainWeb } from "@demos/mx-core";
+import { IBC as IBCCoreSDK, IDefaultChainWeb } from '@kynesyslabs/mx-core'
 
 // INFO: Websdk is the same as the core sdk
 export class IBC extends IBCCoreSDK implements IDefaultChainWeb {
     constructor(rpc_url: string) {
-        super(rpc_url);
+        super(rpc_url)
     }
 
     // INFO: Add custom methods here

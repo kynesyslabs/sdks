@@ -1,13 +1,13 @@
 ## General layout of the multichain SDKs
 
-SDKs can be imported from `@demos/xm-websdk` or `@demos/xm-localsdk`.
+SDKs can be imported from `@kynesyslabs/xm-websdk` or `@kynesyslabs/xm-localsdk`.
 
 ```ts
-import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@demos/xm-websdk'
+import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@kynesyslabs/xm-websdk'
 
 // or
 
-import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@demos/xm-localsdk'
+import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@kynesyslabs/xm-localsdk'
 ```
 
 ### Creating an instance

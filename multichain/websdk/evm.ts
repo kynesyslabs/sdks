@@ -1,4 +1,4 @@
-import { EVM as EVMCoreSDK, IDefaultChainWeb } from '@demos/mx-core'
+import { EVM as EVMCoreSDK, IDefaultChainWeb } from '@kynesyslabs/mx-core'
 
 export class EVM extends EVMCoreSDK implements IDefaultChainWeb {
     constructor(rpc_url: string) {

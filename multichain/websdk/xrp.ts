@@ -1,5 +1,4 @@
-import { IDefaultChainWeb } from '@demos/mx-core'
-import { XRPL as XRPLCoreSDK } from '@demos/mx-core'
+import { IDefaultChainWeb, XRPL as XRPLCoreSDK } from '@kynesyslabs/mx-core'
 
 export class XRPL extends XRPLCoreSDK implements IDefaultChainWeb {
     constructor(rpc_url: string) {

@@ -1,5 +1,9 @@
+import {
+    EVM as EVMCore,
+    IDefaultChainLocal,
+    required,
+} from '@kynesyslabs/mx-core'
 import { TransactionRequest } from 'ethers'
-import { IDefaultChainLocal, EVM as EVMCore, required } from '@demos/mx-core'
 
 export class EVM extends EVMCore implements IDefaultChainLocal {
     private static instances: Map<number, EVM> = new Map<number, EVM>()

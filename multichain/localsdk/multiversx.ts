@@ -2,10 +2,10 @@ import {
     MULTIVERSX as EGLDCore,
     IDefaultChainLocal,
     required,
-} from '@demos/mx-core'
+} from '@kynesyslabs/mx-core'
 
-import { Mnemonic, UserWallet } from "@multiversx/sdk-wallet"
-import { Transaction, IPlainTransactionObject } from '@multiversx/sdk-core'
+import { IPlainTransactionObject, Transaction } from '@multiversx/sdk-core'
+import { Mnemonic, UserWallet } from '@multiversx/sdk-wallet'
 
 export class MULTIVERSX extends EGLDCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {
