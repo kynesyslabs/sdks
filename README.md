@@ -16,9 +16,11 @@ Check out the [multichain documentation](./documentation/multichain/README.md).
 
 The packages are structured like this:
 
-```
-~
+```sh
+./src
 ├── core # blockchain interface stuff <todo: port from frontend>
+│
+├── types # shared types
 │
 ├── multichain
 │   ├── core     # default chain sdk implementation for all chains
@@ -27,41 +29,8 @@ The packages are structured like this:
 ```
 
 ## Development setup
-
-> [!TIP]
-> Quick setup (installs dependencies for all packages)
->
-> ```sh
-> yarn install
-> ```
-
-This monorepo uses the [yarn workspaces](https://yarnpkg.com/features/workspaces) feature which is only available on the non-classic Yarn version `>2.x` to organize packages. Yarn binaries and friends are installed in the `.yarn` directory, so you don't need to install them.
-
-To install dependencies for all packages, run:
-
 ```sh
 yarn install
-```
-
-To run a command in a specific package, eg. install dependencies, use:
-
-```sh
-yarn workspace <package-name> <command-name>
-
-# yarn workspace @kynesyslabs/mx-core install
-# yarn workspace @kynesyslabs/mx-core add @somepackage
-```
-
-Dependencies for packages are installed in a shared `node_modules` directory at the root of the monorepo. Linking to the node modules is automatically handled by the yarn workspace.
-
-To install a local package in a package, define it as a workspace dependency in its `package.json`:
-
-```json
-{
-    "dependencies": {
-        "@kynesyslabs/sdk-name": "workspace:^"
-    }
-}
 ```
 
 ## Running tests

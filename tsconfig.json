@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "strict": true,
-    "baseUrl": ".",
+    "baseUrl": "./src",
+    "outDir": "./build",
+    "rootDir": ".",
     "declaration": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -21,5 +23,9 @@
     "removeComments": false,
     "resolveJsonModule": true,
     "sourceMap": true,
-  }
+    "paths": {
+      "@/*": ["*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
 }

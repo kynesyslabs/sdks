@@ -4,7 +4,7 @@ import type { JestConfigWithTsJest } from 'ts-jest';
 
 const jestConfig: JestConfigWithTsJest = {
 	moduleNameMapper: pathsToModuleNameMapper({
-		"$xm/*": ["multichain/*"],
+		"@/*": ["src/*"]
 		// SEE: tsconfig.json > compilerOptions > paths
 		// '$lib/*': ['src/lib/*']
 	}),
