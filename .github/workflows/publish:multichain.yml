@@ -26,12 +26,12 @@ jobs:
             - name: Install dependencies
               run: |
                   yarn install --frozen-lockfile
-            - name: Build
+            - name: Build package
               run: |
                   yarn build
-            - name: Read NPM key from secrets
+            - name: Read NPM Key
               run: |
                   echo 'npmAuthToken: "${{ secrets.NPM_PUBLISH_KEY }}"' >> .yarnrc.yml
-            - name: Publish
+            - name: Publish 🎉
               run: |
                   yarn publish
