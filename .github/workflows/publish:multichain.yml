@@ -30,7 +30,8 @@ jobs:
               run: |
                   yarn build
             - name: Read NPM key from secrets
-              run: echo 'npmAuthToken:"${{ secrets.NPM_PUBLISH_KEY }}"' >> .yarnrc.yml && cat .yarnrc.yml
+              run: |
+                  echo 'npmAuthToken: "${{ secrets.NPM_PUBLISH_KEY }}"' >> .yarnrc.yml
             - name: Publish
               run: |
                   yarn publish
