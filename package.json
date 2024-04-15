@@ -1,20 +1,19 @@
 {
-    "name": "@kynesyslabs/demos",
-    "version": "1.0.0",
+    "name": "@kynesyslabs/demosdk",
+    "version": "1.0.3",
     "main": "build/index.js",
     "types": "build/index.d.ts",
-    "private": true,
     "author": "Kynesys Labs",
     "license": "MIT",
     "files": [
         "build/",
-        "build/tests/",
-        "*.md"
+        "!build/tests"
     ],
     "exports": {
         ".": "./build/index.js",
-        "./types/*": "./build/types/*",
-        "./xm/*": "./build/multichain/*"
+        "./types": "./build/types/index.js",
+        "./xm-websdk": "./build/multichain/websdk/index.js",
+        "./xm-localsdk": "./build/multichain/localsdk/index.js"
     },
     "scripts": {
         "build": "rm -rf build && tsc && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",

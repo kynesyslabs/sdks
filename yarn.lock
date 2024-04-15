@@ -886,9 +886,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@kynesyslabs/demos@workspace:.":
+"@kynesyslabs/demosdk@workspace:.":
   version: 0.0.0-use.local
-  resolution: "@kynesyslabs/demos@workspace:."
+  resolution: "@kynesyslabs/demosdk@workspace:."
   dependencies:
     "@cosmjs/proto-signing": ^0.32.3
     "@cosmjs/stargate": ^0.32.3
