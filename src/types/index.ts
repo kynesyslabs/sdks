@@ -13,6 +13,7 @@ export { StateChange } from './StateChange'
 export { ValidityData } from './ValidityData'
 
 export { RawTransaction } from './rawTransaction'
+export { Bundle, BundleContent } from './communication/transmit'
 export { Transaction, TransactionContent } from './Transaction'
 
 export { StatusNative } from './statusNative'
@@ -32,3 +33,15 @@ export { ExecutionResult } from './network/ExecutionResult'
 
 // SECTION Peer
 export { IPeerConfig } from './peers/Peer'
+
+// !SECTION Peer
+
+// SECTION Web2
+export {
+    IParam,
+    IWeb2Payload,
+    IWeb2Request,
+    IWeb2Result,
+    IRawWeb2Request,
+    IWeb2Attestation,
+} from './web2'
