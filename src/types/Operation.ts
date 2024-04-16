@@ -10,3 +10,16 @@ export interface Operation {
     status: boolean | "pending"
     fees: TxFee
 }
+
+export interface OperationResult {
+    success: boolean
+    message: string
+}
+
+// WIP Making 'operations' registry more stable through db writing or file writing
+export interface OperationRegistrySlot {
+    operation: Operation
+    status: boolean | "pending"
+    result: OperationResult
+    timestamp: number
+}
