@@ -3,3 +3,4 @@ build
 BLOG.md
 TODO.md
 .trunk
+.yarn/install-state.gz
