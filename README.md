@@ -1,41 +1,19 @@
-# DEMOS SDKs
+# @kynesyslabs/demosdk
 
-This repo contains all the Demos SDKs
+Demos SDKs metapackage
 
-## Usage
-
-### Multichain SDKs
+### Multichain SDKs Usage
 
 Check out the [multichain documentation](./documentation/multichain/README.md).
 
-## Organization
-
-The packages are structured like this:
-
-```sh
-./src
-├── types # shared types
-│
-├── multichain
-│   ├── core     # default chain sdk implementation for all chains
-│   ├── localsdk # local sdks for all chains
-│   └── websdk   # web sdks for all chains
-```
-
-
-## Development setup
-
-```sh
-yarn install
-```
-
 
 ### Adding stuff
+
 Create a new folder in the `src` directory and add your stuff. Export items on the `index.ts` file in your new folder. Then add an export entry in `package.json` as shown:
 
 ```json
 "exports": {
-    ...
+    // ...
     "./stuff": "./build/stuff/index.js"
 }
 ```
@@ -43,7 +21,7 @@ Create a new folder in the `src` directory and add your stuff. Export items on t
 This will allow users to use the new things as follows:
 
 ```js
-import { Stuff, otherStuff } from "@kynesyslabs/demosdk/stuff"
+import { Stuff, otherStuff } from '@kynesyslabs/demosdk/stuff'
 ```
 
 ### Running tests
