@@ -1,6 +1,6 @@
-import { ISignature } from "./ISignature"
-import * as forge from "node-forge"
-import { TxFee } from "./TxFee"
+import * as forge from 'node-forge'
+import { ISignature } from './ISignature'
+import { TxFee } from './TxFee'
 
 export interface TransactionContent {
     type: string
@@ -21,4 +21,3 @@ export interface Transaction {
     status: string
     blockNumber: number
 }
-

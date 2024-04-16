@@ -4,44 +4,48 @@ export {
     GenesisMutableProperties,
     StandardGenesis,
     forkGenesis,
-} from './genesisTypes'
+} from './blockchain/genesisTypes'
 
-export { TxFee } from './TxFee'
-export { BlockContent } from './blocks'
-export { ISignature } from './ISignature'
-export { StateChange } from './StateChange'
-export { ValidityData } from './ValidityData'
+export { ISignature } from './blockchain/ISignature'
+export { TxFee } from './blockchain/TxFee'
+export { ValidityData } from './blockchain/ValidityData'
+export { BlockContent } from './blockchain/blocks'
 
-export { RawTransaction } from './rawTransaction'
+export { Transaction, TransactionContent } from './blockchain/Transaction'
+export { RawTransaction } from './blockchain/rawTransaction'
 export { Bundle, BundleContent } from './communication/transmit'
-export { Transaction, TransactionContent } from './Transaction'
 
-export { StatusNative } from './statusNative'
-export { statusNative as StatusProperties } from './statusProperties'
-export { Operation, OperationRegistrySlot, OperationResult } from './Operation'
+export { AddressInfo } from './blockchain/addressInfo'
+export { StatusNative } from './blockchain/statusNative'
+export { statusNative as StatusProperties } from './blockchain/statusProperties'
 
-// SECTION Network types
+export {
+    Operation,
+    OperationRegistrySlot,
+    OperationResult,
+} from './gls/Operation'
+export { StateChange } from './gls/StateChange'
 
+// network
+
+export { ExecutionResult } from './network/ExecutionResult'
 export {
     ISecurityReport,
     SIComlink,
     SIResponseRegistry,
 } from './network/SecurityTypes'
-export { ExecutionResult } from './network/ExecutionResult'
 
-// !SECTION Network types
 
-// SECTION Peer
+// peer
 export { IPeerConfig } from './peers/Peer'
 
-// !SECTION Peer
 
-// SECTION Web2
+// web2
 export {
     IParam,
+    IRawWeb2Request,
+    IWeb2Attestation,
     IWeb2Payload,
     IWeb2Request,
     IWeb2Result,
-    IRawWeb2Request,
-    IWeb2Attestation,
 } from './web2'

@@ -1,5 +1,5 @@
-import { Operation } from './Operation'
 import { pki } from 'node-forge'
+import { Operation } from '../gls/Operation'
 import { Transaction } from './Transaction'
 
 export interface ValidityData {

@@ -1,4 +1,4 @@
-import { TxFee } from "./TxFee"
+import { TxFee } from '../blockchain/TxFee'
 
 export interface Operation {
     operator: string
@@ -7,7 +7,7 @@ export interface Operation {
     hash: string
     nonce: number
     timestamp: number
-    status: boolean | "pending"
+    status: boolean | 'pending'
     fees: TxFee
 }
 
@@ -19,7 +19,7 @@ export interface OperationResult {
 // WIP Making 'operations' registry more stable through db writing or file writing
 export interface OperationRegistrySlot {
     operation: Operation
-    status: boolean | "pending"
+    status: boolean | 'pending'
     result: OperationResult
     timestamp: number
 }

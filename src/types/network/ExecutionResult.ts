@@ -1,4 +1,4 @@
-import { Operation } from "../Operation"
+import { Operation } from '../gls/Operation'
 
 export interface ExecutionResult {
     response: any
