@@ -4,10 +4,6 @@ This repo contains all the Demos SDKs
 
 ## Usage
 
-### Core
-
-TODO: Update once ported.
-
 ### Multichain SDKs
 
 Check out the [multichain documentation](./documentation/multichain/README.md).
@@ -18,8 +14,6 @@ The packages are structured like this:
 
 ```sh
 ./src
-├── core # blockchain interface stuff <todo: port from frontend>
-│
 ├── types # shared types
 │
 ├── multichain
@@ -28,21 +22,51 @@ The packages are structured like this:
 │   └── websdk   # web sdks for all chains
 ```
 
+
 ## Development setup
+
 ```sh
 yarn install
 ```
 
-## Running tests
+
+### Adding stuff
+Create a new folder in the `src` directory and add your stuff. Export items on the `index.ts` file in your new folder. Then add an export entry in `package.json` as shown:
+
+```json
+"exports": {
+    ...
+    "./stuff": "./build/stuff/index.js"
+}
+```
+
+This will allow users to use the new things as follows:
+
+```js
+import { Stuff, otherStuff } from "@kynesyslabs/demosdk/stuff"
+```
+
+### Running tests
 
 ```sh
 # multichain
 yarn test:multichain
 ```
 
-## Publishing on NPM
+### Publishing on NPM
 
-TODO!
+Publishing to NPM is automated using a Github Workflow. To publish a new version:
+
+1. Incrememt the `package.json` version field
+2. Commit your changes with a message starting with the word `release`
+3. Push to Github.
+
+```sh
+# Example:
+git commit -m "release v1.0.5"
+```
+
+The commit will trigger a workflow run to build the files and publish a new version on NPM.
 
 ## What has Changed?
 
@@ -56,4 +80,3 @@ new: `rpc_url`, `chain_id`, `isEIP1559`
 ## TODOs
 
 -   Review `getBalance` return type. Should it be a string or an object?
--
