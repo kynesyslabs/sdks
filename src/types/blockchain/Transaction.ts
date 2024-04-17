@@ -5,8 +5,8 @@ import { TxFee } from './TxFee'
 import { IWeb2Request } from '../web2'
 import { XMScript } from '../xm'
 
-export type XMPayload = ["xm", XMScript]
-export type Web2Payload = ["web2", IWeb2Request]
+export type XMPayload = ["crosschainOperation", XMScript]
+export type Web2Payload = ["web2Request", IWeb2Request]
 export type NativePayload = ["native", any] // TODO
 export type StringifiedPayload = [string, string]
 
