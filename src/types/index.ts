@@ -13,7 +13,7 @@ export { TxFee } from './blockchain/TxFee'
 export { ValidityData } from './blockchain/ValidityData'
 export { BlockContent } from './blockchain/blocks'
 
-export { Transaction, TransactionContent } from './blockchain/Transaction'
+export { Transaction, TransactionContent, XMPayload, Web2Payload, NativePayload, StringifiedPayload } from './blockchain/Transaction'
 export { RawTransaction } from './blockchain/rawTransaction'
 export { Bundle, BundleContent } from './communication/transmit'
 
