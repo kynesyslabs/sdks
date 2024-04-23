@@ -12,6 +12,7 @@
     "exports": {
         ".": "./build/index.js",
         "./types": "./build/types/index.js",
+        "./websdk": "./build/websdk/index.js",
         "./xm-websdk": "./build/multichain/websdk/index.js",
         "./xm-localsdk": "./build/multichain/localsdk/index.js"
     },

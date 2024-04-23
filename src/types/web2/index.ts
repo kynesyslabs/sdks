@@ -37,12 +37,20 @@ export interface IWeb2Request {
     signature?: forge.pki.ed25519.BinaryBuffer
 }
 
+export enum EnumWeb2Methods {
+    GET = "GET",
+    POST = "POST",
+    PUT = "PUT",
+    DELETE = "DELETE",
+    PATCH = "PATCH"
+}
+
 // INFO A request without any attestations or identity data
 export interface IRawWeb2Request {
     action: string
     parameters: IParam[]
     requestedParameters: [] | null
-    method: "POST" | "GET" | "PUT" | "DELETE" | "PATCH"
+    method: EnumWeb2Methods,
     url: string
     headers: any
     minAttestations: number
