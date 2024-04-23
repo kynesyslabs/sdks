@@ -13,7 +13,7 @@ export interface IPayOptions {
 /**
  * The response of a XM transaction
  */
-export interface TransactionResponse {
+export interface XmTransactionResponse {
     /**
      * Whether the transaction was successful or not
      */

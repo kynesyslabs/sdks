@@ -28,4 +28,5 @@
     }
   },
   "include": ["src/**/*.ts"],
+  "exclude": ["src/multichain/core/archive/**/*"]
 }

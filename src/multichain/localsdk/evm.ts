@@ -1,4 +1,4 @@
-import { EVM as EVMCore, IDefaultChainLocal, required } from '@/multichain/core'
+import { EVM as EVMCore, IDefaultChainLocal, TransactionResponse, required } from '@/multichain/core'
 import { TransactionRequest } from 'ethers'
 
 export class EVM extends EVMCore implements IDefaultChainLocal {
@@ -35,7 +35,7 @@ export class EVM extends EVMCore implements IDefaultChainLocal {
         }
     }
 
-    async sendTransaction(tx: TransactionRequest) {
+    async sendTransaction(tx: TransactionRequest) :Promise<TransactionResponse> {
         required(this.wallet, 'Wallet not connected')
         const txResponse = await this.wallet.sendTransaction(tx) // NOTE It will be signed automatically
         return {

@@ -1,4 +1,4 @@
-import { IDefaultChainLocal, XRPL as XRPLSdkCore } from '@/multichain/core'
+import { IDefaultChainLocal, TransactionResponse, XRPL as XRPLSdkCore } from '@/multichain/core'
 import * as xrpl from 'xrpl'
 
 export class XRPL extends XRPLSdkCore implements IDefaultChainLocal {
@@ -26,7 +26,7 @@ export class XRPL extends XRPLSdkCore implements IDefaultChainLocal {
     }
 
     // INFO Generic sign, send and await (if not specified) a tx
-    async sendTransaction(signed: any, wait: boolean = false) {
+    async sendTransaction(signed: any, wait: boolean = false) :Promise<TransactionResponse> {
         // Sending the tx
         console.log('[xrpl] sendtransaction')
 

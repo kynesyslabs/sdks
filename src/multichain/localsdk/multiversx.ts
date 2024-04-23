@@ -1,6 +1,7 @@
 import {
     MULTIVERSX as EGLDCore,
     IDefaultChainLocal,
+    TransactionResponse,
     required,
 } from '@/multichain/core'
 
@@ -41,7 +42,7 @@ export class MULTIVERSX extends EGLDCore implements IDefaultChainLocal {
         }
     }
 
-    async sendTransaction(raw_tx: Transaction | IPlainTransactionObject) {
+    async sendTransaction(raw_tx: Transaction | IPlainTransactionObject) :Promise<TransactionResponse> {
         required(this.provider, 'Provider not connected')
         let signed_tx: Transaction
 

@@ -14,7 +14,7 @@ export {
     IBCSignTxOptions,
     IBCTransaction,
     IPayOptions,
-    TransactionResponse,
+    XmTransactionResponse as TransactionResponse,
 } from './types/interfaces'
 
 export { required } from './utils'
