@@ -11,7 +11,7 @@ Check out the [multichain documentation](./documentation/multichain/README.md).
 
 Create a new folder in the `src` directory and add your stuff. Export items on the `index.ts` file in your new folder. Then add an export entry in `package.json` as shown:
 
-```json
+```jsonc
 "exports": {
     // ...
     "./stuff": "./build/stuff/index.js"
@@ -45,15 +45,6 @@ git commit -m "release v1.0.5"
 ```
 
 The commit will trigger a workflow run to build the files and publish a new version on NPM.
-
-## What has Changed?
-
-### EVM Web sdk
-
-#### 1. Constructor parameter order:
-
-previous: `rpc_url`, `isEIP1559`, `chain_id` \
-new: `rpc_url`, `chain_id`, `isEIP1559`
 
 ## TODOs
 
