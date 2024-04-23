@@ -33,7 +33,10 @@ export function _required(value: any, msg: string = 'Missing required element', 
 	// INFO: Copied from node repo
 
 	if (!value) {
-		if (fatal) throw new Error('[REQUIRED] ' + msg);
+		if (fatal) {
+			throw new Error('[REQUIRED] ' + msg)
+		};
+
 		return false;
 	}
 

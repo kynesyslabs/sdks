@@ -136,14 +136,15 @@ export class DemosWebAuth {
 				publicKey: forge_converter.stringToForge(this.stringified_keypair?.publicKey)
 			};
 		}
-		let result = [true, ''];
+		let result = [true, {}];
 		try {
-			// @ts-expect-error
-			const sign_result = forge.pki.ed25519.sign(message, this.keypair!.privateKey);
-			// @ts-expect-error
+			const sign_result = forge.pki.ed25519.sign({
+				message: message,
+				privateKey: this.keypair!.privateKey as Uint8Array
+			});
+
 			result = [true, sign_result];
-		} catch (e) {
-			// @ts-expect-error
+		} catch (e: any) {
 			result = [false, '[SIGN ERROR] ' + e.message];
 		}
 		return result; // Is already a [boolean, string]
@@ -154,12 +155,24 @@ export class DemosWebAuth {
 		// Deriving the buffers from the strings
 		const publicKey = forge_converter.stringToForge(s_publicKey);
 		const signature = forge_converter.stringToForge(s_signature);
+
+		if (!signature){
+			return [false, 'Invalid signature'];
+		}
+
+		if (!publicKey){
+			return [false, 'Invalid public key'];
+		}
+
 		try {
-			// @ts-expect-error
-			const verify_result = forge.pki.ed25519.verify(message, signature, publicKey);
+			const verify_result = forge.pki.ed25519.verify({
+				message: message,
+				signature: signature,
+				publicKey: publicKey
+			});
+
 			result = [true, verify_result];
-		} catch (e) {
-			// @ts-expect-error
+		} catch (e: any) {
 			result = [false, '[VERIFY ERROR] ' + e.message];
 		}
 		return result; // Is already a [boolean, string]

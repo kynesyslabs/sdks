@@ -5,7 +5,7 @@ import { required } from './utils/required'
 // INFO This class is to be used as part of DemosWebAuthenticator (e.g. DemosWebAuth.getInstance().rsa().refresh())
 export class RSA {
   static _instance = <RSA | null>null
-  keypair = <any>null
+  keypair = <forge.pki.rsa.KeyPair | null>null
   stringified_keypair = ""
 
   constructor () {}
@@ -48,12 +48,14 @@ export class RSA {
 
   // INFO Encrypting a message using the RSA keypair
   self_encrypt (message: string) {
-    if (!required(this.keypair)) throw new Error('RSA Keypair cannot be generated without a proper ECDSA keypair')
+    if (!required(this.keypair)) {
+      throw new Error('RSA Keypair cannot be generated without a proper ECDSA keypair')
+    }
     if (!(typeof (message) === 'string')) {
       message = JSON.stringify(message)
     }
     const encoded = forge.util.encode64(message)
-    const encrypted = this.keypair.publicKey.encrypt(encoded)
+    const encrypted = this.keypair!.publicKey.encrypt(encoded)
     return forge.util.encode64(encrypted)
   }
 
@@ -71,9 +73,12 @@ export class RSA {
 
   // INFO Decrypting a message using the RSA keypair
   decrypt (message: any) {
-    if (!required(this.keypair)) throw new Error('RSA Keypair cannot be generated without a proper ECDSA keypair')
+    if (!required(this.keypair)) {
+      throw new Error('RSA Keypair cannot be generated without a proper ECDSA keypair')
+    }
+  
     const debased_encrypted = forge.util.decode64(message)
-    const raw_decrypted = this.keypair.privateKey.decrypt(debased_encrypted)
+    const raw_decrypted = this.keypair!.privateKey.decrypt(debased_encrypted)
     const decrypted = forge.util.decode64(raw_decrypted)
     return decrypted
   }
