@@ -9,6 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
     "lib": ["es2020"],
+    "strictNullChecks": false,
     "target": "es2020",
     "module": "commonjs",
     "moduleResolution": "node",
