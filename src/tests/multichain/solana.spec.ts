@@ -36,7 +36,7 @@ describe("SOLANA CHAIN TESTS", () => {
             "0.1",
         )
 
-        const signature = base58.encode(tx.signature)
+        const signature = base58.encode(tx.signature!)
         console.log("tx.signature: ", signature)
 
         expect(signature.length).toBeGreaterThan(80)

@@ -191,9 +191,9 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
             options && options.nonceAccountAddress ? true : false
 
         // if we have the nonce authority, overwrite.
-        if (nonceAccAvailable && options.nonceAccountAuthority) {
+        if (nonceAccAvailable && options!.nonceAccountAuthority) {
             nonceAuthority = Keypair.fromSecretKey(
-                bs58.decode(options.nonceAccountAuthority),
+                bs58.decode(options!.nonceAccountAuthority),
             )
         }
 
@@ -201,10 +201,10 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         if (nonceAccAvailable) {
             advanceNonceIx = SystemProgram.nonceAdvance({
                 authorizedPubkey: nonceAuthority.publicKey,
-                noncePubkey: new PublicKey(options.nonceAccountAddress),
+                noncePubkey: new PublicKey(options!.nonceAccountAddress!),
             })
 
-            nonceAccount = await this.readNonce(options.nonceAccountAddress)
+            nonceAccount = await this.readNonce(options!.nonceAccountAddress!)
         }
 
         // if advance instruction is not null

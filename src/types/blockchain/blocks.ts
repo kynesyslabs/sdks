@@ -9,6 +9,7 @@ KyneSys Labs: https://www.kynesys.xyz/
 
 */
 
+import { pki } from "node-forge"
 
 export interface BlockContent {
     ordered_transactions: string[]
@@ -16,4 +17,13 @@ export interface BlockContent {
     web2data: {} // TODO Add Web2 class
     previousHash: string
     timestamp: number
+}
+
+export interface Block {
+    number: number
+    hash: string
+    content: BlockContent
+    status: "derived" | "confirmed"
+    proposer: pki.PublicKey | pki.ed25519.BinaryBuffer
+    validation_data: any
 }
