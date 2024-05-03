@@ -1,3 +1,5 @@
+import { clusterApiUrl } from "@solana/web3.js";
+
 export default {
     eth: {
         mainnet: "https://rpc.ankr.com/eth",
@@ -21,5 +23,10 @@ export default {
         mainnet: "",
         // Stargaze 👇
         testnet: "https://rpc.elgafar-1.stargaze-apis.com",
+    },
+    solana: {
+        mainnet: clusterApiUrl("mainnet-beta"),
+        // using devnet as testnet faucet is broken 👇
+        testnet: clusterApiUrl('devnet')
     }
 }
