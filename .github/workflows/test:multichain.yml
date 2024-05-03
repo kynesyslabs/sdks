@@ -7,8 +7,8 @@ permissions: read-all
 on:
   push:
     paths:
-      - 'multichain/**'
-      - 'tests/multichain/**'
+      - 'src/multichain/**'
+      - 'src/tests/multichain/**'
 
 jobs:
   test:

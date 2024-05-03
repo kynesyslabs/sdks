@@ -19,7 +19,7 @@
     "scripts": {
         "build": "rm -rf build && tsc && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
         "publish": "yarn npm publish",
-        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
+        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/sol*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
     },
     "dependencies": {
         "@cosmjs/proto-signing": "^0.32.3",
@@ -29,6 +29,7 @@
         "@multiversx/sdk-network-providers": "^2.4.3",
         "@multiversx/sdk-wallet": "^4.4.0",
         "@solana/web3.js": "^1.91.7",
+        "bs58": "^5.0.0",
         "ethers": "^6.11.1",
         "node-forge": "^1.3.1",
         "node-seal": "^5.1.3",

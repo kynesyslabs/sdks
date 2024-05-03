@@ -9,7 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
     "lib": ["es2020"],
-    "strictNullChecks": false,
+    // "strictNullChecks": false,
     "target": "es2020",
     "module": "commonjs",
     "moduleResolution": "node",
@@ -29,5 +29,5 @@
     }
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/multichain/core/archive/**/*"]
+  "exclude": ["src/**/archive/**/*"]
 }

@@ -4,6 +4,7 @@ import {
     IPayOptions,
     XmTransactionResponse,
 } from './interfaces'
+import { NonceAccount } from '@solana/web3.js'
 
 export abstract class DefaultChain {
     provider: any = null
@@ -197,8 +198,10 @@ export interface IDefaultChainLocal extends DefaultChain {
     sendTransaction: (signed_tx: any) => Promise<XmTransactionResponse>
 }
 
+// SECTION: Custom Extends to DefaultChain
+
 /**
- * Base methods for the EVM Default Chain SDK
+ * Extension methods for the EVM Default Chain SDK
  */
 export interface IEVMDefaultChain {
     contracts: Map<string, Contract>
@@ -219,10 +222,33 @@ export interface IEVMDefaultChain {
     waitForReceipt: (tx_hash: string) => Promise<TransactionReceipt>
 }
 
+/**
+ * Extension methods for IBC
+ */
 export interface IBCDefaultChain extends DefaultChain {
     connectWallet(
         privateKey: string,
         options: IBCConnectWalletOptions
     ): Promise<any>
     ibcSend: () => Promise<any>
+}
+
+
+/**
+ * Extension methods for Solana
+ */
+export interface SolanaDefaultChain extends DefaultChain {
+    /**
+     * Creates a Nonce account
+     * 
+     * @returns Address of the nonce account
+     */
+    createNonceAccount: () => Promise<string>
+
+    /**
+     * 
+     * @param address The address of the nonce account
+     * @returns The latest nonce as a 32-byte (base58-encoded) nonce string or null
+     */
+    readNonce: (address: string) => Promise<NonceAccount | null>
 }
