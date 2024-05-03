@@ -6,6 +6,8 @@ export async function HexToObject(hex: string): Promise<any> {
   return JSON.parse(Buffer.from(hex, 'hex').toString('utf8'))
 }
 
+/* REVIEW Could we possibly ditch the below functions? */
+
 // INFO forgeBuffer comes in as the raw result of forge methods
 export function ForgeToHex(forgeBuffer: any) {
     console.log("[forge to string encoded]")
