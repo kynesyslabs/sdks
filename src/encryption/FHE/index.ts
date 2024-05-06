@@ -5,7 +5,6 @@ import { EncryptionParameters } from 'node-seal/implementation/encryption-parame
 import { SEALLibrary } from 'node-seal/implementation/seal';
 
 // Initialize SEAL completely
-// @ts-expect-error
 let seal: SEALLibrary = null;
 (async() => {
     seal = await SEAL();

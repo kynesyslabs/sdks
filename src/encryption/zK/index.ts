@@ -1,3 +1,1 @@
-export default class zK {
-    
-}
+export * as interactive from './interactive' // interactive.Prover and interactive.Verifier
