@@ -4,6 +4,5 @@ BLOG.md
 TODO.md
 .trunk
 .yarn
-yarn.lock
+# yarn.lock
 package-lock.json
-
