@@ -1,4 +1,4 @@
-import { clusterApiUrl } from "@solana/web3.js";
+import { clusterApiUrl } from "@solana/web3.js"
 
 export default {
     eth: {
@@ -27,6 +27,6 @@ export default {
     solana: {
         mainnet: clusterApiUrl("mainnet-beta"),
         // using devnet as testnet faucet is broken 👇
-        testnet: clusterApiUrl('devnet')
-    }
+        devnet: clusterApiUrl("devnet"),
+    },
 }

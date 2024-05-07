@@ -29,7 +29,6 @@ KyneSys Labs: https://www.kynesys.xyz/
 
 // LINK https://docs.solana.com/developing/clients/javascript-api
 
-
 // INTERFACES (TO BE MOVED)
 interface SignTxOptions {
     /**

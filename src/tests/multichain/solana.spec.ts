@@ -2,10 +2,10 @@ import { SOLANA } from "@/multichain/core"
 import chainProviders from "./chainProviders"
 import { wallets } from "../utils/wallets"
 import base58 from "bs58"
-import { Keypair } from "@solana/web3.js"
+import { Keypair, SystemProgram } from "@solana/web3.js"
 
 describe("SOLANA CHAIN TESTS", () => {
-    const instance = new SOLANA(chainProviders.solana.testnet)
+    const instance = new SOLANA(chainProviders.solana.devnet)
 
     beforeAll(async () => {
         const connected = await instance.connect()
@@ -40,5 +40,17 @@ describe("SOLANA CHAIN TESTS", () => {
         console.log("tx.signature: ", signature)
 
         expect(signature.length).toBeGreaterThan(80)
+    })
+
+    test.only("Send tx", async () => {
+        const keypair = Keypair.generate()
+        console.log(keypair.publicKey.toBase58())
+        console.log(keypair.secretKey)
+        // const tx = await instance.preparePay(
+        //     "tKeYE4wtowRb8yRroZShTipE18YVnqwXjsSAoNsFU6g",
+        //     "0.1",
+        // )
+        // await instance.sendTransaction(tx)
+        // expect(true)
     })
 })
