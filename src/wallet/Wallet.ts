@@ -5,9 +5,11 @@ import * as fs from "fs"
 import { Cryptography } from "@/encryption"
 import { Address } from "@/types/blockchain/WalletTypes"
 import * as websdk from "@/websdk"
+import { DemosTransactions } from "@/websdk"
+import { ValidityData } from "@/types"
 
 export default class Wallet {
-    // A wallet class is a singleton class, so we need to make sure that only one instance of the class is created.
+    // A wallet class is a singleton class, so we need to make sure that only one instance per id is created.
     private static instances: Wallet[]
     // A DEMOS wallet is comprised of both an ed25519 keypair and an rsa keypair.
     public ed25519: forge.pki.KeyPair
@@ -74,4 +76,25 @@ export default class Wallet {
         // return info.native.balance
     }
 
+    /* SECTION Basic writes */
+    // NOTE All the writes return a validity object that needs to be confirmed and broadcasted
+
+    async transfer(to: Address, amount: number): Promise<ValidityData> {
+        let tx = DemosTransactions.empty()
+        // Putting the right data in the transaction
+        tx.content.from = this.ed25519_hex.publicKey
+        tx.content.to = to
+        tx.content.amount = amount
+        tx = await DemosTransactions.sign(tx)
+        // Sending the transaction and getting the validity data
+        let validity = await DemosTransactions.confirm(tx)
+        return validity
+    }
+
+    // TODO Implement other methods too
+
+    // NOTE  This is a quick wrapper to avoid having to write the same code over and over again
+    async broadcast(validityData: ValidityData): Promise<any> {
+        return await websdk.demos.broadcast(validityData)
+    }
 }

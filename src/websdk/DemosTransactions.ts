@@ -14,12 +14,12 @@ export const DemosTransactions = {
     return skeletons.transaction
   },
   // NOTE Building a transaction without signing or hashing it
-  prepare: async function (data: any) {
+  prepare: async function (data: any = null) {
     // sourcery skip: inline-immediately-returned-variable
     const thisTx = skeletons.transaction
     // if (!data.timestamp) data.timestamp = Date.now()
     // Assigning the transaction data to our object
-    // thisTx.content = data
+    if (data) thisTx.content.data = data
     return thisTx
   },
   // NOTE Signing a transaction after hashing it
