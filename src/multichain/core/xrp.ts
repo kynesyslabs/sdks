@@ -140,7 +140,6 @@ export class XRPL extends DefaultChain {
             response = await this.provider.getXrpBalance(address)
         }
 
-        // @ts-expect-error
         return response as string
     }
 

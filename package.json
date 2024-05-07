@@ -17,7 +17,7 @@
         "./xm-localsdk": "./build/multichain/localsdk/index.js"
     },
     "scripts": {
-        "build": "rm -rf build && tsc && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
+        "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
         "publish": "yarn npm publish",
         "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/sol*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
     },
