@@ -86,17 +86,22 @@ export class Cryptography {
     }
     // !SECTION Encrypted save and load
 
-    static async load(path) {
+    // NOTE Accepts both file paths and strings being either hex or buffer strings
+    static async load(path: string, isFile = true): Promise<forge.pki.KeyPair> {
         let keypair: forge.pki.KeyPair = {
             privateKey: null,
             publicKey: null,
         }
-
-        const contentOfFile = await fs.readFile(path, "utf8")
-        if (contentOfFile.includes("{")) {
-            keypair = Cryptography.loadFromBufferString(contentOfFile)
+        let content: string
+        if (isFile) {
+            content = await fs.readFile(path, "utf8")
         } else {
-            keypair = Cryptography.loadFromHex(contentOfFile)
+            content = path
+        }
+        if (content.includes("{")) {
+            keypair = Cryptography.loadFromBufferString(content)
+        } else {
+            keypair = Cryptography.loadFromHex(content)
         }
         return keypair
     }
