@@ -3,73 +3,72 @@
 import * as forge from "node-forge"
 import * as fs from "fs"
 import { Cryptography } from "@/encryption"
-import getRemoteIP from "@/utils/getRemoteIP"
+import { Address } from "@/types/blockchain/WalletTypes"
 
 export default class Wallet {
-    private static instance: Wallet
+    // A wallet class is a singleton class, so we need to make sure that only one instance of the class is created.
+    private static instances: Wallet[]
+    // A DEMOS wallet is comprised of both an ed25519 keypair and an rsa keypair.
     public ed25519: forge.pki.KeyPair
     public ed25519_hex: {
         privateKey: string
         publicKey: string
     }
+    // TODO Implement RSA derivation from ED25519 private key
     public rsa: forge.pki.rsa.KeyPair
     public rsa_hex: {
         privateKey: string
         publicKey: string
     }
-    public publicIP: string
-    public publicPort: string
 
-    // Make the constructor private.
     private constructor() {
         this.ed25519 = null
-        this.publicIP = null
-        this.publicPort = null
+        this.rsa = null
     }
 
     // Create a public static method to get the instance of the Wallet class
-    public static getInstance(): Wallet {
-        if (!Wallet.instance) {
-            Wallet.instance = new Wallet()
+    public static getInstance(name: string): Wallet {
+        if (!Wallet.instances[name]) {
+            Wallet.instances[name] = new Wallet()
         }
-        return Wallet.instance
+        return Wallet.instances[name]
     }
 
-    async ensureIdentity(): Promise<void> {
-        if (fs.existsSync("./.demos_identity")) {
-            // Loading the identity
-            // TODO Add load with  Cryptography
-            this.ed25519 = await  Cryptography.load("./.demos_identity")
-            console.log("Loaded ecdsa identity")
-        } else {
-            this.ed25519 =  Cryptography.new()
-            // Writing the identity to disk in binary format
-            await  Cryptography.save(this.ed25519, "./.demos_identity")
-            console.log("Generated new identity")
-        }
-        // Stringifying to hex
+    /* SECTION Create wallets */
+    async create(): Promise<void> {
+        this.ed25519 = Cryptography.new()
         this.ed25519_hex = {
             privateKey: "0x" + this.ed25519.privateKey.toString("hex"),
             publicKey: "0x" + this.ed25519.publicKey.toString("hex"),
         }
     }
 
-    async getPublicIP(): Promise<string> {
-        this.publicIP = await getRemoteIP()
-        return await this.publicIP
+    /* SECTION Load and save wallets */
+
+    async loadFromKey(privateKey: Address): Promise<void> {
+        this.ed25519 = await Cryptography.load(privateKey, false)
+        this.ed25519_hex = {
+            privateKey: "0x" + this.ed25519.privateKey.toString("hex"),
+            publicKey: "0x" + this.ed25519.publicKey.toString("hex"),
+        }
     }
 
-    getPublicKeyHex(): string | undefined {
-        return "0x" + this.ed25519?.publicKey?.toString("hex")
+    async load(filename: string): Promise<void> {
+        this.ed25519 = await Cryptography.load(filename, true)
+        this.ed25519_hex = {
+            privateKey: "0x" + this.ed25519.privateKey.toString("hex"),
+            publicKey: "0x" + this.ed25519.publicKey.toString("hex"),
+        }
     }
 
-    setPublicPort(port: string): void {
-        this.publicPort = port
+    async save(filename: string): Promise<void> {
+        await Cryptography.save(this.ed25519, filename)
     }
 
-    getConnectionString(): string {
-        return `http://${this.publicIP}>${
-            this.publicPort
-        }>${this.getPublicKeyHex()}`
+    /* SECTION nodeCalls */
+
+    async getBalance(): Promise<void> {
+        // TODO Implement this and other nodeCalls
     }
+
 }
