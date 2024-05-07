@@ -11,7 +11,7 @@ KyneSys Labs: https://www.kynesys.xyz/
 
 import forge from "node-forge"
 
-export default class Hashing {
+export class Hashing {
     static sha256(message: string) {
         const md = forge.sha256.create()
         md.update(message)

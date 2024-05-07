@@ -1,5 +1,6 @@
 import { XMPayload } from './blockchain/Transaction';
 import { XMScript, ITask, IOperation } from './xm/index';
+
 export {
     GenesisArtifact,
     GenesisImmutableProperties,

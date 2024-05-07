@@ -18,7 +18,7 @@ import { HexToForge } from "@/utils/dataManipulation"
 
 const algorithm = "aes-256-cbc"
 
-export default class Cryptography {
+export class Cryptography {
 
     static ed25519 = {
         sign: (
