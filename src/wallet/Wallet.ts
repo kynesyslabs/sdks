@@ -4,6 +4,7 @@ import * as forge from "node-forge"
 import * as fs from "fs"
 import { Cryptography } from "@/encryption"
 import { Address } from "@/types/blockchain/WalletTypes"
+import * as websdk from "@/websdk"
 
 export default class Wallet {
     // A wallet class is a singleton class, so we need to make sure that only one instance of the class is created.
@@ -68,7 +69,9 @@ export default class Wallet {
     /* SECTION nodeCalls */
 
     async getBalance(): Promise<void> {
+        let info = await websdk.demos.getAddressInfo(this.ed25519_hex.publicKey)
         // TODO Implement this and other nodeCalls
+        // return info.native.balance
     }
 
 }
