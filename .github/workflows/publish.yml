@@ -4,7 +4,10 @@ name: Build and Publish
 permissions: read-all
 
 # INFO: Run workflow on changes to the sdks
-on: push
+on: 
+  push:
+    branches:
+      - back-to-legacy-yarn
 
 jobs:
     build:
@@ -30,9 +33,14 @@ jobs:
             - name: Build package
               run: |
                   yarn build
-            - name: Read NPM Key
+            - name: Create .npmrc
               run: |
-                  echo 'npmAuthToken: "${{ secrets.NPM_PUBLISH_KEY }}"' >> .yarnrc.yml
+                  echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+                  registry=https://registry.npmjs.org/
+                  always-auth=true
+                  " > ~/.npmrc
             - name: Publish 🎉
               run: |
                   yarn publish
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_KEY }}

@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "1.0.19",
+    "version": "v1.0.21",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -9,6 +9,9 @@
         "build/",
         "!build/tests"
     ],
+    "publishConfig": {
+        "access": "public"
+    },
     "exports": {
         ".": "./build/index.js",
         "./types": "./build/types/index.js",
@@ -51,6 +54,5 @@
         "ts-jest": "^29.1.2",
         "ts-node": "^10.9.2",
         "typescript": "^5.4.3"
-    },
-    "packageManager": "yarn@3.8.0"
+    }
 }
