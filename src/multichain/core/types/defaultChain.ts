@@ -232,23 +232,3 @@ export interface IBCDefaultChain extends DefaultChain {
     ): Promise<any>
     ibcSend: () => Promise<any>
 }
-
-
-/**
- * Extension methods for Solana
- */
-export interface SolanaDefaultChain extends DefaultChain {
-    /**
-     * Creates a Nonce account
-     * 
-     * @returns Address of the nonce account
-     */
-    createNonceAccount: () => Promise<string>
-
-    /**
-     * 
-     * @param address The address of the nonce account
-     * @returns The latest nonce as a 32-byte (base58-encoded) nonce string or null
-     */
-    readNonce: (address: string) => Promise<NonceAccount | null>
-}

@@ -28,7 +28,7 @@ export function getSampleTranfers(
         return {
             address,
             // INFO: Amount is passed to preparePays as a string
-            amount: `0.01${i + 1}`,
+            amount: `${i + 1}`,
             // amount: 0.1,
         }
     })

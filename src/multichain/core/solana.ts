@@ -3,18 +3,15 @@ import {
     Keypair,
     PublicKey,
     Connection,
-    Transaction,
-    NonceAccount,
     SystemProgram,
     LAMPORTS_PER_SOL,
-    NONCE_ACCOUNT_LENGTH,
     TransactionMessage,
     VersionedTransaction,
 } from "@solana/web3.js"
 
 import { required } from "./utils"
 import { IPayOptions } from "./types/interfaces"
-import { DefaultChain, SolanaDefaultChain } from "./types/defaultChain"
+import { DefaultChain } from "./types/defaultChain"
 
 /* LICENSE
 
@@ -37,7 +34,7 @@ interface SignTxOptions {
     privateKey?: string
 }
 
-export class SOLANA extends DefaultChain implements SolanaDefaultChain {
+export class SOLANA extends DefaultChain {
     private static instance: SOLANA
 
     declare wallet: Keypair
@@ -74,25 +71,9 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         }
     }
     // ANCHOR Public methods
-    async connectWallet(
-        privateKey: string,
-        options?: {
-            /**
-             * If the private key is in base58 format
-             */
-            base58: boolean
-        },
-    ) {
-        let privateKeyBuffer: Uint8Array
-
-        if (options && options.base58) {
-            privateKeyBuffer = base58.decode(privateKey)
-        } else {
-            const pk = privateKey.split(",").map(x => parseInt(x))
-            privateKeyBuffer = Buffer.from(pk)
-        }
-
-        this.wallet = Keypair.fromSecretKey(privateKeyBuffer)
+    async connectWallet(privateKey: string) {
+        const pkBuffer = base58.decode(privateKey)
+        this.wallet = Keypair.fromSecretKey(pkBuffer)
         return this.wallet
     }
 
@@ -102,17 +83,7 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         return balance.toString()
     }
 
-    async info(): Promise<string> {
-        let info = ""
-        // TODO
-        return info
-    }
-
-    // INFO Placeholder compatibility function that is here only for the interface
-    override async signTransaction(
-        tx: VersionedTransaction,
-        options?: SignTxOptions,
-    ) {
+    async signTransaction(tx: VersionedTransaction, options?: SignTxOptions) {
         required(this.wallet, "Wallet not connected")
         // LINK https://docs.shyft.to/tutorials/how-to-sign-transactions-on-solana
         // NOTE Due to the above, the transaction is signed and sent at the same time.
@@ -121,56 +92,14 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         return txs[0]
     }
 
-    async readNonce(address: string) {
-        console.log("reading nonce account: ", address)
-        const pubkey = new PublicKey(address)
-        const accountInfo = await this.provider.getAccountInfo(pubkey)
-        console.log("accountInfo: ", accountInfo)
-
-        if (accountInfo) {
-            return NonceAccount.fromAccountData(accountInfo?.data)
-        }
-
-        return null
-    }
-
-    async createNonceAccount() {
-        required(this.wallet, "Wallet not connected")
-
-        let tx = new Transaction()
-        const nonceAccount = Keypair.generate()
-
-        const create_acc_ix = SystemProgram.createAccount({
-            fromPubkey: this.wallet.publicKey,
-            newAccountPubkey: nonceAccount.publicKey,
-            lamports: await this.provider.getMinimumBalanceForRentExemption(
-                NONCE_ACCOUNT_LENGTH,
-            ),
-            space: NONCE_ACCOUNT_LENGTH,
-            programId: SystemProgram.programId,
-        })
-
-        const init_nonce_ix = SystemProgram.nonceInitialize({
-            noncePubkey: nonceAccount.publicKey,
-            authorizedPubkey: this.wallet.publicKey,
-        })
-
-        tx.add(create_acc_ix, init_nonce_ix)
-
-        const txhash = this.provider.sendTransaction(tx, [
-            this.wallet,
-            nonceAccount,
-        ])
-        console.log("txhash: ", txhash)
-
-        return nonceAccount.publicKey.toBase58()
-    }
-
     async signTransactions(
         transactions: VersionedTransaction[],
         options?: SignTxOptions,
     ) {
-        required(this.wallet || (options && options.privateKey), "Wallet not connected")
+        required(
+            this.wallet || (options && options.privateKey),
+            "Wallet not connected",
+        )
         let signers = [this.wallet]
 
         if (options && options.privateKey) {
@@ -212,10 +141,7 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         return tx[0]
     }
 
-    async preparePays(
-        payments: IPayOptions[],
-        options?: SignTxOptions,
-    ) {
+    async preparePays(payments: IPayOptions[], options?: SignTxOptions) {
         const blockInfo = await this.provider.getLatestBlockhash()
 
         const transactions = payments.map(payment => {

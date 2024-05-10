@@ -1,4 +1,5 @@
 export { XRPL } from './xrp'
 export { EVM } from './evm'
 export { IBC } from './ibc'
+export { SOLANA } from './solana'
 export { MULTIVERSX } from './multiversx'
