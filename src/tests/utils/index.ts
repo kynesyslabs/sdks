@@ -22,13 +22,14 @@ export function verifyNumberOrder(items: any[], key: string) {
  */
 export function getSampleTranfers(
     address: string,
-    length: number = 10
+    length: number = 9
 ): IPayOptions[] {
     return Array.from({ length }, (_, i) => {
         return {
             address,
             // INFO: Amount is passed to preparePays as a string
-            amount: `${i + 1}`,
+            amount: `0.01${i + 1}`,
+            // amount: 0.1,
         }
     })
 }

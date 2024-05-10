@@ -1,5 +1,8 @@
-import { Keypair, Transaction } from "@solana/web3.js"
-import { IDefaultChainLocal, SOLANA as SolanaCore, TransactionResponse } from "../core"
+import {
+    IDefaultChainLocal,
+    SOLANA as SolanaCore,
+    TransactionResponse,
+} from "../core"
 
 export class SOLANA extends SolanaCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {
@@ -7,12 +10,16 @@ export class SOLANA extends SolanaCore implements IDefaultChainLocal {
     }
 
     async sendTransaction(
-        signed_tx: Transaction,
+        serialized_tx: Uint8Array,
     ): Promise<TransactionResponse> {
-        const tx = signed_tx.serialize()
-
         try {
-            const txhash = await this.provider.sendRawTransaction(tx)
+            const txhash = await this.provider.sendRawTransaction(
+                serialized_tx,
+                {
+                    preflightCommitment: "processed",
+                },
+            )
+
             return {
                 result: "success",
                 hash: txhash,
@@ -20,18 +27,12 @@ export class SOLANA extends SolanaCore implements IDefaultChainLocal {
         } catch (error) {
             return {
                 result: "error",
-                error: error,
+                error: error.toString(),
             }
         }
     }
 
-    async getInfo(){
-        throw new Error("Method not implemented.")
-    }
-
-    async createWallet(){
-        const keypair = Keypair.generate()
-        // REVIEW: Should 
+    async getInfo() {
         throw new Error("Method not implemented.")
     }
 }

@@ -1,4 +1,4 @@
-import bs58 from "bs58"
+import base58 from "bs58"
 import {
     Keypair,
     PublicKey,
@@ -7,9 +7,9 @@ import {
     NonceAccount,
     SystemProgram,
     LAMPORTS_PER_SOL,
-    TransactionNonceCtor,
     NONCE_ACCOUNT_LENGTH,
-    TransactionInstruction,
+    TransactionMessage,
+    VersionedTransaction,
 } from "@solana/web3.js"
 
 import { required } from "./utils"
@@ -35,17 +35,6 @@ interface SignTxOptions {
      * The private key to sign the transaction with, instead of the connected wallet.
      */
     privateKey?: string
-    /**
-     * The address of your nonce account for signing with durable nonces.
-     */
-    nonceAccountAddress?: string
-
-    /**
-     * The secret key of the nonce account authority, for signing the tx.
-     *
-     * Defaults to the connected wallet's secret key.
-     */
-    nonceAccountAuthority?: string
 }
 
 export class SOLANA extends DefaultChain implements SolanaDefaultChain {
@@ -60,7 +49,9 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
     }
 
     async connect() {
-        this.provider = new Connection(this.rpc_url)
+        this.provider = new Connection(this.rpc_url, {
+            confirmTransactionInitialTimeout: 5000,
+        })
 
         const version = await this.provider.getVersion()
         this.connected = Number.isInteger(version["feature-set"])
@@ -73,8 +64,15 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         return true
     }
 
-    // async createWallet() {}
+    async createWallet() {
+        const keypair = Keypair.generate()
 
+        return {
+            address: keypair.publicKey.toBase58(),
+            secretKey: base58.encode(keypair.secretKey),
+            keypair: keypair,
+        }
+    }
     // ANCHOR Public methods
     async connectWallet(
         privateKey: string,
@@ -88,7 +86,7 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         let privateKeyBuffer: Uint8Array
 
         if (options && options.base58) {
-            privateKeyBuffer = bs58.decode(privateKey)
+            privateKeyBuffer = base58.decode(privateKey)
         } else {
             const pk = privateKey.split(",").map(x => parseInt(x))
             privateKeyBuffer = Buffer.from(pk)
@@ -104,25 +102,17 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         return balance.toString()
     }
 
-    // async pay(to: string, amount: string): Promise<any> {
-    //     required(this.wallet, 'Wallet not connected')
-    //     // TODO
-    //     return null
-    // }
-
     async info(): Promise<string> {
         let info = ""
         // TODO
         return info
     }
 
-    // INFO Returning an empty raw transaction skeleton
-    // async createRawTransaction(): Promise<Transaction> {
-
-    // }
-
     // INFO Placeholder compatibility function that is here only for the interface
-    override async signTransaction(tx: Transaction, options?: SignTxOptions) {
+    override async signTransaction(
+        tx: VersionedTransaction,
+        options?: SignTxOptions,
+    ) {
         required(this.wallet, "Wallet not connected")
         // LINK https://docs.shyft.to/tutorials/how-to-sign-transactions-on-solana
         // NOTE Due to the above, the transaction is signed and sent at the same time.
@@ -177,81 +167,40 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
     }
 
     async signTransactions(
-        transactions: Transaction[],
+        transactions: VersionedTransaction[],
         options?: SignTxOptions,
     ) {
-        required(this.wallet, "Wallet not connected")
+        required(this.wallet || (options && options.privateKey), "Wallet not connected")
+        let signers = [this.wallet]
 
-        let nonceAccount: NonceAccount | null = null
-        let advanceNonceIx: TransactionInstruction | null = null
-        let nonceAuthority: Keypair = this.wallet
-
-        const nonceAccAvailable =
-            options && options.nonceAccountAddress ? true : false
-
-        // if we have the nonce authority, overwrite.
-        if (nonceAccAvailable && options!.nonceAccountAuthority) {
-            nonceAuthority = Keypair.fromSecretKey(
-                bs58.decode(options!.nonceAccountAuthority),
-            )
+        if (options && options.privateKey) {
+            const privateKeyBuffer = base58.decode(options.privateKey)
+            const keypair = Keypair.fromSecretKey(privateKeyBuffer)
+            signers = [keypair]
         }
 
-        // if we have the nonce address, create a nonce advance instruction
-        if (nonceAccAvailable) {
-            advanceNonceIx = SystemProgram.nonceAdvance({
-                authorizedPubkey: nonceAuthority.publicKey,
-                noncePubkey: new PublicKey(options!.nonceAccountAddress!),
-            })
-
-            nonceAccount = await this.readNonce(options!.nonceAccountAddress!)
-        }
-
-        // if advance instruction is not null
-        // ie. we have the nonce address,
-        // insert the advance nonce ix at instructions index 0
-        // on each transaction
-        if (advanceNonceIx && nonceAccount) {
-            transactions.forEach(tx => {
-                tx.instructions.splice(0, 0, advanceNonceIx!)
-
-                // update recent block hash to use the current nonce
-                tx.recentBlockhash = nonceAccount!.nonce
-                nonceAccount?.nonce
-                // TODO: FIND OUT WHAT HAPPENS WHEN MULTIPLE TX HAVE THE SAME DURABLE NONCE
-            })
-        }
-
-        const signers = new Set([this.wallet, nonceAuthority])
-        console.log("signers length: ", signers.size)
-        console.log("signers: ", signers)
-
-        transactions.forEach(async tx => {
-            tx.sign(...signers)
+        return transactions.map(tx => {
+            tx.sign(signers)
+            return tx.serialize()
         })
-
-        return transactions
     }
 
-    override getAddress() {
+    getAddress() {
         required(this.wallet, "Wallet not connected")
-
         return this.wallet.publicKey.toBase58()
     }
 
     getEmptyTransaction() {
-        // const recentBlockhash = await this.provider.getLatestBlockhash()
-        const options = <TransactionNonceCtor>{
-            feePayer: this.wallet.publicKey,
-        }
+        const vmsg = new TransactionMessage({
+            payerKey: this.wallet.publicKey,
+            recentBlockhash: "",
+            instructions: [],
+        }).compileToV0Message()
 
-        let empty_tx = new Transaction(options)
-        // empty_tx.recentBlockhash = recentBlockhash.blockhash
-        // empty_tx.lastValidBlockHeight = recentBlockhash.lastValidBlockHeight
-
-        return empty_tx
+        return new VersionedTransaction(vmsg)
     }
 
-    override async preparePay(
+    async preparePay(
         receiver: string,
         amount: string,
         options?: SignTxOptions,
@@ -263,17 +212,14 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         return tx[0]
     }
 
-    override async preparePays(
+    async preparePays(
         payments: IPayOptions[],
         options?: SignTxOptions,
     ) {
-        const recentBlockhash = await this.provider.getLatestBlockhash()
+        const blockInfo = await this.provider.getLatestBlockhash()
 
         const transactions = payments.map(payment => {
-            const tx = this.getEmptyTransaction()
-            tx.recentBlockhash = recentBlockhash.blockhash
-            tx.lastValidBlockHeight = recentBlockhash.lastValidBlockHeight
-
+            // create a transfer instruction
             const transferIx = SystemProgram.transfer({
                 fromPubkey: this.wallet.publicKey,
                 toPubkey: new PublicKey(payment.address),
@@ -281,44 +227,32 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
                     parseFloat(payment.amount as string) * LAMPORTS_PER_SOL,
             })
 
-            tx.add(transferIx)
-            return tx
+            // compile the instruction into a message
+            const vmsg = new TransactionMessage({
+                instructions: [transferIx],
+                payerKey: this.wallet.publicKey,
+                recentBlockhash: blockInfo.blockhash,
+            }).compileToV0Message()
+
+            // create a versioned transaction
+            return new VersionedTransaction(vmsg)
         })
 
+        // sign the transactions
         return this.signTransactions(transactions, options)
     }
 
-    override async prepareTransfer(
+    async prepareTransfer(
         receiver: string,
         amount: string,
-        options: {},
+        options?: SignTxOptions,
     ) {
         return await this.preparePay(receiver, amount, options)
     }
 
-    override async prepareTransfers(transfers: IPayOptions[], options: {}) {
+    async prepareTransfers(transfers: IPayOptions[], options?: SignTxOptions) {
         return await this.preparePays(transfers, options)
     }
-
-    // TODO: move sendTransaction to localsdk
-    // INFO Sending a transfer transaction on Solana network
-    // sendTransaction({ to, amount }) {
-    //     required(this.wallet, 'Wallet not connected')
-    //     let tx = new Transaction()
-    //     tx.add(
-    //         SystemProgram.transfer({
-    //             fromPubkey: this.wallet.publicKey,
-    //             toPubkey: to,
-    //             lamports: amount * LAMPORTS_PER_SOL,
-    //         })
-    //     )
-    //     let result = sendAndConfirmTransaction(this.provider, tx, [
-    //         this.wallet,
-    //     ])
-    //     return result
-    // }
-
-    // ANCHOR Static singleton methods
 
     static getInstance(): SOLANA | boolean {
         if (!SOLANA.instance) {

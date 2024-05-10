@@ -1,8 +1,11 @@
-import { SOLANA } from "@/multichain/core"
-import chainProviders from "./chainProviders"
-import { wallets } from "../utils/wallets"
 import base58 from "bs58"
-import { Keypair, SystemProgram } from "@solana/web3.js"
+import { Keypair, VersionedTransaction } from "@solana/web3.js"
+
+import { wallets } from "../utils/wallets"
+import { SOLANA } from "@/multichain/core"
+import { getSampleTranfers } from "../utils"
+import chainProviders from "./chainProviders"
+import { SOLANA as SolanaLocal } from "@/multichain/localsdk"
 
 describe("SOLANA CHAIN TESTS", () => {
     const instance = new SOLANA(chainProviders.solana.devnet)
@@ -31,21 +34,37 @@ describe("SOLANA CHAIN TESTS", () => {
         //     nonceAccountAddress: 'amzR7nwNhLSEuQygN9xSbrfpXniQAuCJJweCWxiryvg',
         //     nonceAccountAuthority: base58.encode(keypair.secretKey)
         // })
-        const tx = await instance.preparePay(
+        const tx_data = await instance.preparePay(
             "tKeYE4wtowRb8yRroZShTipE18YVnqwXjsSAoNsFU6g",
             "0.1",
         )
 
-        const signature = base58.encode(tx.signature!)
+        const tx = VersionedTransaction.deserialize(tx_data)
+        const signature = base58.encode(tx.signatures[0])
         console.log("tx.signature: ", signature)
 
         expect(signature.length).toBeGreaterThan(80)
     })
 
-    test.only("Send tx", async () => {
+    test.only('Sending Multiple tx', async () => {
+        const address = instance.getAddress()
+        const transfers = getSampleTranfers(address)
+        const localInstance = await SolanaLocal.create(chainProviders.solana.devnet)
+        await localInstance.connectWallet(wallets.solana.wallet, { base58: true })
+        const signed_txs = await localInstance.preparePays(transfers)
+
+        for (const tx of signed_txs) {
+            const res = await localInstance.sendTransaction(tx)
+            console.log("res: ", res)
+        }
+
+        expect(true)
+    })
+
+    test("Send tx", async () => {
         const keypair = Keypair.generate()
         console.log(keypair.publicKey.toBase58())
-        console.log(keypair.secretKey)
+        console.log(base58.encode(keypair.secretKey))
         // const tx = await instance.preparePay(
         //     "tKeYE4wtowRb8yRroZShTipE18YVnqwXjsSAoNsFU6g",
         //     "0.1",
