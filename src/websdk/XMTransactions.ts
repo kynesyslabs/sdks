@@ -3,6 +3,7 @@
 
 import type { Transaction, XMScript } from "@/types";
 import { DemosTransactions } from "./DemosTransactions";
+import { DemosWebAuth } from './DemosWebAuth'
 
 // INFO Using the methods below to create, manage and send chainscript-like scripts
 const XMTransactions = {
@@ -129,8 +130,14 @@ const XMTransactions = {
 
 async function prepareXMPayload(xm_payload: XMScript): Promise<Transaction> {
   var xm_transaction: Transaction = DemosTransactions.empty()
+  // From and To are the same in XM transactions
+  xm_transaction.content.from = DemosWebAuth.getInstance().keypair!.publicKey as Uint8Array
+  xm_transaction.content.to = xm_transaction.content.from
+  // Setting the type and data
   xm_transaction.content.type = "crosschainOperation"
   xm_transaction.content.data = ["crosschainOperation", xm_payload]
+  // Producing a timestamp
+  xm_transaction.content.timestamp = Date.now()
   // Signing the transaction
   xm_transaction = await DemosTransactions.sign(xm_transaction)
   // Returning the transaction

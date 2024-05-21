@@ -4,6 +4,7 @@ import * as skeletons from './utils/skeletons'
 // import demos from '../demos'
 import { DemosTransactions } from './DemosTransactions';
 import type { IWeb2Request, Transaction } from '@/types';
+import { DemosWebAuth } from './DemosWebAuth'
 
 // INFO Web2 Endpoints
 export async function prepareWeb2Payload (
@@ -32,8 +33,14 @@ export async function prepareWeb2Payload (
   // REVIEW Finish upgrading to the new transaction system
   // Creating a web2 payload
   let web2_tx: Transaction = DemosTransactions.empty()
+  // From and To are the same in Web2 transactions
+  web2_tx.content.from = DemosWebAuth.getInstance().keypair!.publicKey as Uint8Array
+  web2_tx.content.to = web2_tx.content.from
+  // Setting the type and data
   web2_tx.content.type = "web2Request"
   web2_tx.content.data = ["web2Request", web2_payload]
+  // Producing a timestamp
+  web2_tx.content.timestamp = Date.now()
   // Signing the transaction
   web2_tx = await DemosTransactions.sign(web2_tx)
   // Returning the transaction
