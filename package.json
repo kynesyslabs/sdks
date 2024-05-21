@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "1.0.25",
+    "version": "1.0.26",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -30,6 +30,7 @@
         "@multiversx/sdk-wallet": "^4.4.0",
         "@solana/web3.js": "^1.91.7",
         "@types/rijndael-js": "^1.0.2",
+        "@types/terminal-kit": "^2.5.6",
         "argon2": "^0.40.1",
         "big-integer": "^1.6.52",
         "bs58": "^5.0.0",
@@ -40,6 +41,7 @@
         "rijndael-js": "^2.0.0",
         "socket.io-client": "^4.7.2",
         "superdilithium": "^2.0.6",
+        "terminal-kit": "^3.1.1",
         "xrpl": "^3.0.0"
     },
     "devDependencies": {
