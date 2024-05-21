@@ -11,7 +11,7 @@ export {
 
 export { ISignature } from './blockchain/ISignature'
 export { TxFee } from './blockchain/TxFee'
-export { ValidityData } from './blockchain/ValidityData'
+export { CValidityData, ValidityData } from './blockchain/ValidityData'
 export { BlockContent, Block } from './blockchain/blocks'
 
 export { Transaction, TransactionContent, XMPayload, Web2Payload, NativePayload, StringifiedPayload } from './blockchain/Transaction'
