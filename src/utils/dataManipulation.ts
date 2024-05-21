@@ -36,6 +36,6 @@ export function HexToForge(forgeString: string) {
     return finalArray
 }
 
-export function copyCreate(obj: any) {
+export function copyCreate(obj: any): any {
     return JSON.parse(JSON.stringify(obj))
 }
