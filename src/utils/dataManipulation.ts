@@ -35,3 +35,7 @@ export function HexToForge(forgeString: string) {
     //console.log(finalArray)
     return finalArray
 }
+
+export function copyCreate(obj: any) {
+    return JSON.parse(JSON.stringify(obj))
+}
