@@ -2,7 +2,19 @@ import { pki } from 'node-forge'
 import { Operation } from '../gls/Operation'
 import { Transaction } from './Transaction'
 
-export class ValidityData {
+export interface ValidityData {
+    data: {
+        valid: boolean
+        reference_block: number
+        message: string
+        gas_operation: Operation
+        transaction: Transaction
+    }
+    signature: pki.ed25519.BinaryBuffer
+    rpc_public_key: pki.ed25519.BinaryBuffer
+}
+
+export class CValidityData {
     // Empty object
     data: {
         valid: boolean
