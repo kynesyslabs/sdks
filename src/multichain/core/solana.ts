@@ -1,17 +1,18 @@
-import base58 from "bs58"
+import { AnchorProvider, Program, Wallet } from "@project-serum/anchor"
 import {
-    Keypair,
-    PublicKey,
     Connection,
-    SystemProgram,
+    Keypair,
     LAMPORTS_PER_SOL,
+    PublicKey,
+    SystemProgram,
     TransactionMessage,
     VersionedTransaction,
 } from "@solana/web3.js"
+import base58 from "bs58"
 
-import { required } from "./utils"
-import { IPayOptions } from "./types/interfaces"
 import { DefaultChain } from "./types/defaultChain"
+import { IPayOptions } from "./types/interfaces"
+import { required } from "./utils"
 
 /* LICENSE
 
@@ -32,6 +33,16 @@ interface SignTxOptions {
      * The private key to sign the transaction with, instead of the connected wallet.
      */
     privateKey?: string
+}
+
+export interface programParams {
+    instruction: string
+    args?: any
+    accounts?: {
+        [key: string]: string
+    }
+    signers?: Keypair[]
+    returnAccounts?: { [key: string]: string }[]
 }
 
 export class SOLANA extends DefaultChain {
@@ -179,6 +190,43 @@ export class SOLANA extends DefaultChain {
     async prepareTransfers(transfers: IPayOptions[], options?: SignTxOptions) {
         return await this.preparePays(transfers, options)
     }
+
+    // SECTION: Programs
+    async getProgramIdl(programId: string) {
+        const provider = {
+            connection: this.provider,
+        }
+        return await Program.fetchIdl(programId, provider)
+    }
+
+    async runProgram(programId: string, params: programParams) {
+        const wallet = new Wallet(this.wallet)
+        const pid = new PublicKey(programId)
+        const anchorProvider = new AnchorProvider(this.provider, wallet, {})
+
+        // INFO: Get the IDL and create program interface
+        const idl = await this.getProgramIdl(programId)
+        const program = new Program(idl, pid, anchorProvider)
+
+        // INFO: construct the transaction
+        const ix = program.methods[params.instruction]
+        // calling the method with undefined throws an error, so prevent it
+        const tx = params.args ? ix(params.args) : ix()
+        const txhash = await tx.accounts(params.accounts).signers(params.signers).rpc()
+
+        console.log("txhash: ", txhash)
+
+        // REVIEW: Do we need to return the accounts?
+        return await Promise.all(
+            params.returnAccounts.map(async account => {
+                return await program.account[Object.keys(account)[0]].fetch(
+                    Object.values(account)[0],
+                )
+            }),
+        )
+    }
+
+    // SECTION: Singleton methods
 
     static getInstance(): SOLANA | boolean {
         if (!SOLANA.instance) {

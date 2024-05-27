@@ -1,8 +1,9 @@
 import base58 from "bs58"
-import { VersionedTransaction } from "@solana/web3.js"
+import { VersionedTransaction, Keypair } from "@solana/web3.js"
 
-import { wallets } from "../utils/wallets"
 import { SOLANA } from "@/multichain/core"
+import { programParams } from "@/multichain/core/solana"
+import { wallets } from "../utils/wallets"
 import chainProviders from "./chainProviders"
 
 describe("SOLANA CHAIN TESTS", () => {
@@ -11,6 +12,7 @@ describe("SOLANA CHAIN TESTS", () => {
     beforeAll(async () => {
         const connected = await instance.connect()
         await instance.connectWallet(wallets.solana.wallet)
+
         expect(connected).toBe(true)
     })
 
@@ -24,6 +26,43 @@ describe("SOLANA CHAIN TESTS", () => {
         const signature = base58.encode(tx.signatures[0])
 
         expect(signature.length).toBeGreaterThan(80)
+    })
+
+    test.only("fetching Program IDL", async () => {
+        const idl = await instance.getProgramIdl('MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD')
+        console.log("idl: ", idl.instructions[0])
+        
+        const pk = instance.wallet.publicKey.toBase58()
+        Keypair.generate()
+        const programParams: programParams = {
+            // args: {
+            //     score: 100,
+            // },
+            instruction: "close",
+            accounts: {
+                state: pk,
+                receiver: pk,
+                tokenVault: pk,
+                vaultAuthority: pk,
+                duplicationFlag: pk,
+            },
+            signers: [instance.wallet],
+            returnAccounts: [
+                {
+                    state: pk,
+                },
+            ],
+        }
+        const pg = await instance.runProgram(
+            "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ",
+            programParams,
+        )
+        console.log("pg: ", pg)
+
+        const newInstance = await SOLANA.create(chainProviders.solana.devnet)
+        console.log(newInstance.provider)
+
+        expect(pg).toBeDefined()
     })
 
     // test.only('Sending Multiple tx', async () => {
