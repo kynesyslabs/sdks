@@ -4,9 +4,11 @@ A small guide to the SOLANA multichain SDK.
 
 ## Introduction to Solana
 
-[Solana](https://solana.com/) is a "high performance" with roots in finance, smart contracts and NFTs. Solana has roots in other areas like gaming, but those won't be covered in this guide. r
+[Solana](https://solana.com/) is a "high performance" network with roots in finance, smart contracts and NFTs. Solana has roots in other areas like gaming, but those won't be covered in this guide.
 
 ## Core Concepts
+
+Solana runs on the following core concepts:
 
 1. [Accounts](https://solana.com/docs/core/accounts)
 2. [Transactions](https://solana.com/docs/core/transactions)
@@ -20,11 +22,11 @@ There are 3 types of accounts:
 
 1. Data accounts - they store data.
 2. Program accounts - they host program code
-3. Native accounts - native Solana programs, eg. System account which is responsible for creating all accounts.
+3. Native accounts - native Solana programs, eg. the System account which is responsible for creating all accounts.
 
 An account in Solana is like a file in a normal operating system, and it can contain any data as defined by a program.
 
-The account you create via a wallet is categorized as a data account owned by the System program. An account hosting your program code is a program account owned you (or your account).
+The account you create via a wallet is categorized as a data account owned by the System program. An account hosting your program code is a program account owned by you (your account).
 
 An account stores data that looks like this:
 
@@ -45,7 +47,7 @@ A lamport is the smallest unit of SOL (1 SOL = 1 billion lamports)
 
 A program is a smart contract running on the Solana network.
 
-Programs do not store data themselves, instead they store data in acccounts. When you run a program it modifies data stored in one or more accounts.
+Programs do not store data themselves, instead they store data in acccounts.
 
 ## How Solana Handles Nonces
 
@@ -87,9 +89,11 @@ const instance = await SOLANA.create(rpc_url)
 
 ### Connecting your wallet
 
+Pass the base58 representation of your private key to `.connectWallet`:
+
 ```ts
 await instance.connectWallet(
-    "25WecT1ApBVs9PEpNgsgEYJEjDMGqc63jeq1dWxwmzTCBPo6nnKq7NwyzicARJPfvQNrFGNjB7Kx6UvLFpH1MNsz",
+    "25WecT1ApBVs9PEpNgsgEYJEjDMGqc63jeq1dWxwmzTCBPo6nnKq7NwyzicARJPfvQNrFGNjB7Kx6UvLFpH1MNsz"
 )
 ```
 
@@ -109,11 +113,11 @@ The signed transaction is a serialized form of itself (`Uint8Array`) that can no
 ```ts
 const signed_txs = await instance.preparePays([
     {
-        address: "<ADDRESS>",
+        address: "tKeYE4wtowRb8yRroZShTipE18YVnqwXjsSAoNsFU6g",
         amount: "1",
     },
     {
-        address: "<ANOTHER_ADDRESS>",
+        address: "CU3pJe9E3NxyBMWbTAJYjoahut9juerfmmjCin2g8ipG",
         amount: "2",
     },
 ])
@@ -166,9 +170,9 @@ type IdlAccount = {
 }
 ```
 
-The `instructions` are a list of all the methods defined on the program. An instruction can require arguments which are declared on the `args` property. When the instruction is reading data or modifying dadta, the data account's address is needed. If data is being modified, the private key of the account's owner is required to sign the transaction.
+The `instructions` are a list of the methods defined on the program. An instruction can require arguments which are declared on the `args` property. When the instruction is reading data or modifying dadta, the data account's address is needed. If data is being modified, the private key of the account's owner is required to sign the transaction.
 
-You can determine the number of signers are required by checking how many required accounts have a `isSigner` flag.
+You can determine the number of signers required by checking how many accounts have a `isSigner` flag.
 
 The required System program addresses will be autofilled by the sdk.
 
@@ -179,11 +183,11 @@ tokenProgram
 systemProgram
 ```
 
-When a program is reading or modifiying data, the address of the account being modified is needed. When modifying data, the owner of the address containing the data needs to sign the transaction. So his private key is required.
-
 ```ts
+// Invoking a program
 const programParams = {
     instruction: "deposit",
+    idl: [object, object] // manual idl
     args: {
         lamports: 100,
     },

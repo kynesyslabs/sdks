@@ -29,7 +29,7 @@ describe("SOLANA CHAIN TESTS", () => {
         expect(signature.length).toBeGreaterThan(80)
     })
 
-    test.only("fetching Program IDL", async () => {
+    test.only("Running a program", async () => {
         const pk = instance.wallet.publicKey.toBase58()
         const newAccountKeypair = new Keypair()
         const idl = {
@@ -101,7 +101,7 @@ describe("SOLANA CHAIN TESTS", () => {
             programParams,
         )
         console.log("txhash: ", pg)
-        expect(pg).toBeDefined()
+        expect(pg).toBe(typeof "string")
     })
 
     // test.only('Sending Multiple tx', async () => {
