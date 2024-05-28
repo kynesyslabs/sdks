@@ -61,7 +61,7 @@ export class SOLANA extends DefaultChain {
 
     async connect() {
         this.provider = new Connection(this.rpc_url, {
-            confirmTransactionInitialTimeout: 5000,
+            confirmTransactionInitialTimeout: 15000,
         })
 
         const version = await this.provider.getVersion()

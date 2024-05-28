@@ -96,12 +96,13 @@ describe("SOLANA CHAIN TESTS", () => {
         }
 
         console.log("new account: ", newAccountKeypair.publicKey.toBase58())
-        const pg = await instance.runProgram(
+        const txhash = await instance.runProgram(
             "BLTXVno27Vc5geSn2FMxJ2yU6c3fVaUzESgDAfbYHJD6",
             programParams,
         )
-        console.log("txhash: ", pg)
-        expect(pg).toBe(typeof "string")
+
+        console.log("txhash: ", txhash)
+        expect(typeof txhash).toBe("string")
     })
 
     // test.only('Sending Multiple tx', async () => {
