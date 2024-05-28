@@ -1,4 +1,4 @@
-import { AnchorProvider, Program, Wallet } from "@project-serum/anchor"
+import { AnchorProvider, Idl, Program, Wallet } from "@project-serum/anchor"
 import {
     Connection,
     Keypair,
@@ -37,6 +37,9 @@ interface SignTxOptions {
 
 export interface programParams {
     instruction: string
+    idl?: {
+        [key: string]: any
+    }
     args?: any
     accounts?: {
         [key: string]: string
@@ -196,6 +199,7 @@ export class SOLANA extends DefaultChain {
         const provider = {
             connection: this.provider,
         }
+
         return await Program.fetchIdl(programId, provider)
     }
 
@@ -204,26 +208,46 @@ export class SOLANA extends DefaultChain {
         const pid = new PublicKey(programId)
         const anchorProvider = new AnchorProvider(this.provider, wallet, {})
 
+        // @ts-ignore
+        let idl: Idl = params.idl
+        if (!params.idl) {
+            idl = await this.getProgramIdl(programId)
+        }
+
+        if (!idl) {
+            throw new Error("No IDL found for this program")
+        }
+
         // INFO: Get the IDL and create program interface
-        const idl = await this.getProgramIdl(programId)
         const program = new Program(idl, pid, anchorProvider)
 
         // INFO: construct the transaction
         const ix = program.methods[params.instruction]
         // calling the method with undefined throws an error, so prevent it
         const tx = params.args ? ix(params.args) : ix()
-        const txhash = await tx.accounts(params.accounts).signers(params.signers).rpc()
+        const txhash = await tx
+            .accounts(params.accounts)
+            .signers(params.signers)
+            .rpc()
 
-        console.log("txhash: ", txhash)
+        return txhash
+
+        // console.log("txhash: ", txhash)
+        // await this.provider.confirmTransaction(txhash)
 
         // REVIEW: Do we need to return the accounts?
-        return await Promise.all(
-            params.returnAccounts.map(async account => {
-                return await program.account[Object.keys(account)[0]].fetch(
-                    Object.values(account)[0],
-                )
-            }),
-        )
+        // const accounts = await Promise.all(
+        //     (params.returnAccounts || []).map(async account => {
+        //         return await program.account[Object.keys(account)[0]].fetch(
+        //             Object.values(account)[0],
+        //         )
+        //     }),
+        // )
+
+        // return {
+        //     txhash,
+        //     accounts,
+        // }
     }
 
     // SECTION: Singleton methods

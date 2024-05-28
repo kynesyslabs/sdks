@@ -88,7 +88,9 @@ const instance = await SOLANA.create(rpc_url)
 ### Connecting your wallet
 
 ```ts
-await instance.connectWallet("<YOUR_PRIVATE_KEY>")
+await instance.connectWallet(
+    "25WecT1ApBVs9PEpNgsgEYJEjDMGqc63jeq1dWxwmzTCBPo6nnKq7NwyzicARJPfvQNrFGNjB7Kx6UvLFpH1MNsz",
+)
 ```
 
 ### Sending SOL

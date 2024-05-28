@@ -1,10 +1,11 @@
 import base58 from "bs58"
-import { VersionedTransaction, Keypair } from "@solana/web3.js"
+import { VersionedTransaction, Keypair, SystemProgram } from "@solana/web3.js"
 
 import { SOLANA } from "@/multichain/core"
 import { programParams } from "@/multichain/core/solana"
 import { wallets } from "../utils/wallets"
 import chainProviders from "./chainProviders"
+import { BN } from "@project-serum/anchor"
 
 describe("SOLANA CHAIN TESTS", () => {
     const instance = new SOLANA(chainProviders.solana.devnet)
@@ -29,39 +30,77 @@ describe("SOLANA CHAIN TESTS", () => {
     })
 
     test.only("fetching Program IDL", async () => {
-        const idl = await instance.getProgramIdl('MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD')
-        console.log("idl: ", idl.instructions[0])
-        
         const pk = instance.wallet.publicKey.toBase58()
-        Keypair.generate()
-        const programParams: programParams = {
-            // args: {
-            //     score: 100,
-            // },
-            instruction: "close",
-            accounts: {
-                state: pk,
-                receiver: pk,
-                tokenVault: pk,
-                vaultAuthority: pk,
-                duplicationFlag: pk,
-            },
-            signers: [instance.wallet],
-            returnAccounts: [
+        const newAccountKeypair = new Keypair()
+        const idl = {
+            version: "0.1.0",
+            name: "hello_anchor",
+            instructions: [
                 {
-                    state: pk,
+                    name: "initialize",
+                    accounts: [
+                        {
+                            name: "newAccount",
+                            isMut: true,
+                            isSigner: true,
+                        },
+                        {
+                            name: "signer",
+                            isMut: true,
+                            isSigner: true,
+                        },
+                        {
+                            name: "systemProgram",
+                            isMut: false,
+                            isSigner: false,
+                        },
+                    ],
+                    args: [
+                        {
+                            name: "data",
+                            type: "u64",
+                        },
+                    ],
+                },
+            ],
+            accounts: [
+                {
+                    name: "NewAccount",
+                    type: {
+                        kind: "struct",
+                        fields: [
+                            {
+                                name: "data",
+                                type: "u64",
+                            },
+                        ],
+                    },
                 },
             ],
         }
+        const programParams: programParams = {
+            idl: idl,
+            args: new BN(42),
+            instruction: "initialize",
+            accounts: {
+                newAccount: newAccountKeypair.publicKey.toBase58(),
+                signer: pk,
+                SystemProgram: SystemProgram.programId.toBase58(),
+            },
+            signers: [newAccountKeypair, instance.wallet],
+            returnAccounts: [
+                {
+                    newAccount: newAccountKeypair.publicKey.toBase58(),
+                },
+            ],
+        }
+
+        console.log("new account: ", newAccountKeypair.publicKey.toBase58())
         const pg = await instance.runProgram(
-            "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ",
+            "BLTXVno27Vc5geSn2FMxJ2yU6c3fVaUzESgDAfbYHJD6",
             programParams,
         )
-        console.log("pg: ", pg)
-
-        const newInstance = await SOLANA.create(chainProviders.solana.devnet)
-        console.log(newInstance.provider)
-
+        console.log("txhash: ", pg)
         expect(pg).toBeDefined()
     })
 
