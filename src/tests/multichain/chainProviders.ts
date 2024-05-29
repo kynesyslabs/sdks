@@ -20,8 +20,8 @@ export default {
         testnet: "https://rpc.ankr.com/filecoin_testnet",
     },
     ibc: {
-        mainnet: "",
         // Stargaze 👇
+        mainnet: "https://stargaze-rpc.publicnode.com:443",
         testnet: "https://rpc.elgafar-1.stargaze-apis.com",
     },
     solana: {

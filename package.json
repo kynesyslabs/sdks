@@ -29,6 +29,7 @@
         "@multiversx/sdk-network-providers": "^2.4.3",
         "@multiversx/sdk-wallet": "^4.4.0",
         "@project-serum/anchor": "^0.26.0",
+        "@solana/buffer-layout": "^4.0.1",
         "@solana/web3.js": "^1.91.7",
         "@types/rijndael-js": "^1.0.2",
         "@types/terminal-kit": "^2.5.6",

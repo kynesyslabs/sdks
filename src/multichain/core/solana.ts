@@ -1,18 +1,32 @@
-import { AnchorProvider, Idl, Program, Wallet } from "@project-serum/anchor"
+import {
+    Address,
+    AnchorProvider,
+    Idl,
+    Program,
+    Wallet,
+} from "@project-serum/anchor"
 import {
     Connection,
     Keypair,
     LAMPORTS_PER_SOL,
     PublicKey,
     SystemProgram,
+    Transaction,
+    TransactionInstruction,
     TransactionMessage,
     VersionedTransaction,
 } from "@solana/web3.js"
 import base58 from "bs58"
 
-import { DefaultChain } from "./types/defaultChain"
-import { IPayOptions } from "./types/interfaces"
+import { DefaultChain, SolanaDefaultChain } from "./types/defaultChain"
+import {
+    IPayOptions,
+    SolanaReadAccountDataOptions,
+    SolanaRunRawProgramParams,
+    SolanarunProgramParams,
+} from "./types/interfaces"
 import { required } from "./utils"
+import { ns64, struct, u32 } from "@solana/buffer-layout"
 
 /* LICENSE
 
@@ -35,20 +49,7 @@ interface SignTxOptions {
     privateKey?: string
 }
 
-export interface programParams {
-    instruction: string
-    idl?: {
-        [key: string]: any
-    }
-    args?: any
-    accounts?: {
-        [key: string]: string
-    }
-    signers?: Keypair[]
-    returnAccounts?: { [key: string]: string }[]
-}
-
-export class SOLANA extends DefaultChain {
+export class SOLANA extends DefaultChain implements SolanaDefaultChain {
     private static instance: SOLANA
 
     declare wallet: Keypair
@@ -195,7 +196,7 @@ export class SOLANA extends DefaultChain {
     }
 
     // SECTION: Programs
-    async getProgramIdl(programId: string) {
+    async getProgramIdl(programId: Address) {
         const provider = {
             connection: this.provider,
         }
@@ -203,18 +204,49 @@ export class SOLANA extends DefaultChain {
         return await Program.fetchIdl(programId, provider)
     }
 
-    async runProgram(programId: string, params: programParams) {
+    async fetchAccount(
+        address: Address,
+        options: SolanaReadAccountDataOptions,
+    ) {
+        let programId = options.programId
+        let idl = options.idl as Idl
+
+        if (!programId) {
+            // INFO: Fetch the program ID from the account
+            const accInfo = await this.provider.getAccountInfo(
+                new PublicKey(address),
+            )
+
+            programId = accInfo.owner
+        }
+
+        if (!idl) {
+            // INFO: Fetch the IDL from the network
+            idl = await this.getProgramIdl(options.programId)
+        }
+
+        const program = new Program(idl, programId, {
+            connection: this.provider,
+        })
+
+        return await program.account[options.name].fetch(address)
+    }
+
+    async runAnchorProgram(programId: string, params: SolanarunProgramParams) {
+        // REVIEW: Do we need to connect our wallet with the anchor provider?
         const wallet = new Wallet(this.wallet)
         const pid = new PublicKey(programId)
         const anchorProvider = new AnchorProvider(this.provider, wallet, {})
 
-        // @ts-ignore
-        let idl: Idl = params.idl
-        if (!params.idl) {
+        let idl = params.idl as Idl
+
+        if (!idl) {
+            // INFO: If not using manual IDL, fetch it from the network
             idl = await this.getProgramIdl(programId)
         }
 
         if (!idl) {
+            // INFO: If no IDL is found, throw an error
             throw new Error("No IDL found for this program")
         }
 
@@ -231,23 +263,50 @@ export class SOLANA extends DefaultChain {
             .rpc()
 
         return txhash
+    }
 
-        // console.log("txhash: ", txhash)
-        // await this.provider.confirmTransaction(txhash)
+    async runRawProgram(programId: Address, params: SolanaRunRawProgramParams) {
+        // INFO: Set fee payer
+        const tx = new Transaction({
+            feePayer: params.feePayer,
+        })
 
-        // REVIEW: Do we need to return the accounts?
-        // const accounts = await Promise.all(
-        //     (params.returnAccounts || []).map(async account => {
-        //         return await program.account[Object.keys(account)[0]].fetch(
-        //             Object.values(account)[0],
-        //         )
-        //     }),
-        // )
+        // INFO: Locate the instruction
+        const ix = {
+            index: params.instructionIndex,
+            // @ts-expect-error
+            layout: struct([u32("instruction"), ns64(params.instructionName)]),
+        }
 
-        // return {
-        //     txhash,
-        //     accounts,
-        // }
+        // INFO: Encode the instruction and its parameters
+        // Create an empty buffer
+        let data = Buffer.alloc(ix.layout.span)
+        let layoutFields = Object.assign(
+            {
+                instruction: ix.index,
+            },
+            params.params,
+        )
+        // Write the data to the buffer
+        ix.layout.encode(layoutFields, data)
+
+        // INFO: Add the instruction to the transaction
+        tx.add(
+            new TransactionInstruction({
+                keys: params.keys,
+                programId: new PublicKey(programId),
+                data: data,
+            }),
+        )
+
+        // INFO: Add validity information
+        const block = await this.provider.getLatestBlockhash()
+        tx.recentBlockhash = block.blockhash
+        tx.lastValidBlockHeight = block.lastValidBlockHeight
+
+        // INFO: Sign and return the transaction
+        tx.sign(...params.signers)
+        return tx.serialize()
     }
 
     // SECTION: Singleton methods

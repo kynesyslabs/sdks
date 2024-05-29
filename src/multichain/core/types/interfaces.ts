@@ -1,4 +1,6 @@
-import { MsgSendEncodeObject, StdFee } from '@cosmjs/stargate'
+import { MsgSendEncodeObject, StdFee } from "@cosmjs/stargate"
+import { Address, Idl } from "@project-serum/anchor"
+import { Keypair, PublicKey } from "@solana/web3.js"
 
 // SECTION: Generic Default Chain Interfaces
 
@@ -17,7 +19,7 @@ export interface XmTransactionResponse {
     /**
      * Whether the transaction was successful or not
      */
-    result: 'success' | 'error'
+    result: "success" | "error"
 
     /**
      * The hash of the transaction if the tx was successful
@@ -55,6 +57,7 @@ export interface EGLDSignTxOptions {
 }
 
 // SECTION: IBC Interfaces
+// ========================
 
 // IBC TRANSACTION //
 export interface IBCTransaction {
@@ -99,4 +102,92 @@ export interface IBCSignTxOptions extends IBCConnectWalletOptions {
      * The private key to override the connected wallet
      */
     privateKey?: string
+}
+
+// SECTION: Solana Interfaces
+// ===========================
+
+export interface SolanarunProgramParams {
+    /**
+     * The IDL of the program to call. If not provided, the IDL will be fetched from the network.
+     */
+    idl?:
+        | Idl
+        | {
+              [key: string]: any
+          }
+
+    /**
+     * The name of the instruction to call.
+     */
+    instruction: string
+
+    /**
+     * The arguments to pass to the instruction.
+     */
+    args?: any
+
+    /**
+     * The accounts to pass to the instruction.
+     */
+    accounts?: {
+        [key: string]: PublicKey | string
+    }
+
+    /**
+     * Private keys to sign this transaction.
+     */
+    signers?: Keypair[]
+}
+
+export interface SolanaReadAccountDataOptions {
+    /**
+     * The IDL of the program to read from. If not provided, the IDL will be fetched from the network.
+     */
+    idl?: Idl | { [key: string]: any }
+    /**
+     * The name of the account to read from the program IDL.
+     */
+    name: string
+
+    /**
+     * The account's assigned program Id. If not provided, the account's owner will be fetched from the network.
+     */
+    programId?: Address
+}
+
+export interface SolanaRunRawProgramParams {
+    /**
+     * The instruction to call.
+     */
+    instructionName: string
+
+    /**
+     * The index of the instruction on the program definition
+     */
+    instructionIndex: number
+
+    /**
+     * The accounts required for this instruction
+     */
+    keys?: {
+        pubkey: PublicKey
+        isSigner: boolean
+        isWritable: boolean
+    }[]
+
+    /**
+     * The parameters required by the instruction
+     */
+    params?: any
+
+    /**
+     * Private keys to sign this transaction.
+     */
+    signers: Keypair[]
+
+    /**
+     * The fee payer of the transaction
+     */
+    feePayer: PublicKey
 }

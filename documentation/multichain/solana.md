@@ -77,14 +77,17 @@ Airdrop some test SOL from the [Solana Faucet](https://solfaucet.com) for testin
 
 ## Using the Sdk
 
-The solana sdk provides a utility function to get the rpc url.
+The solana sdk provides a utility function to get the [rpc url](https://solana.com/rpc).
 
 ```ts
 import { clusterApiUrl } from "@solana/web3.js"
 import { SOLANA } from "@kynesyslabs/demosdk/xm-<localsdk|websdk>"
 
-const rpc_url = clusterApiUrl("devnet")
-const instance = await SOLANA.create(rpc_url)
+const testnet = clusterApiUrl("testnet")
+// const devnet = clusterApiUrl("devnet")
+// const mainnet = clusterApiUrl("mainnet-beta")
+
+const instance = await SOLANA.create(testnet)
 ```
 
 ### Connecting your wallet
@@ -93,7 +96,7 @@ Pass the base58 representation of your private key to `.connectWallet`:
 
 ```ts
 await instance.connectWallet(
-    "25WecT1ApBVs9PEpNgsgEYJEjDMGqc63jeq1dWxwmzTCBPo6nnKq7NwyzicARJPfvQNrFGNjB7Kx6UvLFpH1MNsz"
+    "25WecT1ApBVs9PEpNgsgEYJEjDMGqc63jeq1dWxwmzTCBPo6nnKq7NwyzicARJPfvQNrFGNjB7Kx6UvLFpH1MNsz",
 )
 ```
 
@@ -125,11 +128,13 @@ const signed_txs = await instance.preparePays([
 
 The signed transactions will be signed using the recent block hash and therefore are only valid for the next few minutes.
 
-### Executing a program
+### Programs
 
 To execute a program on solana, you need to have its address (program Id) and IDL.
 
 On Solana, an IDL (interface definition language) is what an ABI is to an EVM smart contract. It is a programs's public interface. It define its methods, inputs and types.
+
+### When the IDL is available
 
 Here's an example IDL of a program running on the Solana Devnet: https://explorer.solana.com/address/MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD/anchor-program
 
@@ -174,36 +179,101 @@ The `instructions` are a list of the methods defined on the program. An instruct
 
 You can determine the number of signers required by checking how many accounts have a `isSigner` flag.
 
-The required System program addresses will be autofilled by the sdk.
+<!-- The required System program addresses will be autofilled by the sdk.
 
 Examples:
 
 ```
 tokenProgram
 systemProgram
-```
+``` -->
+
+Invoking a program:
 
 ```ts
-// Invoking a program
 const programParams = {
     instruction: "deposit",
-    idl: [object, object] // manual idl
+    idl: idl,
     args: {
         lamports: 100,
     },
     accounts: {
         // example account:
-        state: "state acc. address here",
+        receiver: "address",
         // other accounts here ...
     },
     signers: [Keypair, Keypair], // all signers
-    returnAccounts: [{ state: KeyPair }],
 }
 
-await instance.runProgram(
+const txhash = await instance.runProgram(
     "MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD",
     programParams,
 )
+```
+
+After broadcasting the transaction to the network, you can await its confirmation and then read an account data.
+
+```ts
+await instance.provider.confirmTransaction(txhash, "finalized")
+
+// account affected by program invocation
+const modifiedAccount = new PublicKey(
+    "5dDANLFBcmFyFQonFcJsE9i3YqK74JPAMAiL1WXmWKSL",
+)
+
+const account = await instance.fetchAccount(modifiedAccount, {
+    idl: idl,
+    name: "newAccount", // account name
+    programId: "MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD", // optional
+})
+
+console.log(account.data)
+```
+
+The IDL and `accountName` are needed to deserialize the account data
+
+### When the IDL is not available
+
+When you don't have the IDL, you need to know:
+
+1. The name of the instruction
+2. The index of the instruction on the program definition
+3. The proper format and type of the instruction parameters
+4. The accounts needed
+5. The signers needed by the instruction.
+
+With all that in place, you can do the following:
+
+```ts
+const programId = "yourProgramId"
+const account = new Keypair()
+
+// accounts
+const accounts = [
+    {
+        pubkey: key.publicKey,
+        isSigner: true,
+        isWritable: true,
+    },
+]
+
+// parameters
+const params = {
+    space: 100,
+}
+
+const instructionIndex = 8
+const instructionName = "space"
+
+// the signed tx
+const signedTx = await instance.runRawProgram(programId, {
+    instructionName,
+    instructionIndex,
+    params,
+    keys: accounts,
+    feePayer: account.publicKey,
+    signers: [account],
+})
 ```
 
 <!-- TODO: Review this with some fresh eyes! -->
@@ -219,3 +289,4 @@ await instance.runProgram(
 3. [ANCHOR - Solana Sealevel Framework ](https://www.anchor-lang.com/)
 4. [Javascript Client](https://solana.com/docs/clients/javascript)
 5. [Known Programs [Github]](https://github.com/solana-labs/explorer/blob/master/app/utils/programs.ts)
+6. [Interacting with Custom Programs](https://solana.com/docs/clients/javascript#interacting-with-custom-programs)

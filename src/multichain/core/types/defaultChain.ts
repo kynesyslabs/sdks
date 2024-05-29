@@ -1,17 +1,18 @@
-import { Contract, TransactionReceipt } from 'ethers'
+import { Address, Idl } from "@project-serum/anchor"
+import { Contract, TransactionReceipt } from "ethers"
 import {
     IBCConnectWalletOptions,
     IPayOptions,
+    SolanaReadAccountDataOptions,
     XmTransactionResponse,
-} from './interfaces'
-import { NonceAccount } from '@solana/web3.js'
+} from "./interfaces"
 
 export abstract class DefaultChain {
     provider: any = null
-    name: string = ''
+    name: string = ""
     signer: any = null
     wallet: any = null
-    rpc_url: string = ''
+    rpc_url: string = ""
     connected: boolean = false
 
     // NOTE We init chain with await CHAIN.create(rpc_url)
@@ -37,7 +38,7 @@ export abstract class DefaultChain {
      */
     static async create<T extends DefaultChain>(
         this: new (rpc_url: string) => T,
-        rpc_url: string = ''
+        rpc_url: string = "",
     ): Promise<T> {
         const instance = new this(rpc_url)
         instance.setRpc(rpc_url)
@@ -100,7 +101,7 @@ export abstract class DefaultChain {
     abstract preparePay(
         receiver: string,
         amount: string,
-        options: {}
+        options: {},
     ): Promise<any>
 
     /**
@@ -113,7 +114,7 @@ export abstract class DefaultChain {
     abstract prepareTransfer(
         receiver: string,
         amount: string,
-        options: {}
+        options: {},
     ): Promise<any>
 
     /**
@@ -132,7 +133,7 @@ export abstract class DefaultChain {
      */
     abstract prepareTransfers(
         payments: IPayOptions[],
-        options: {}
+        options: {},
     ): Promise<any[]>
 
     /**
@@ -153,7 +154,7 @@ export abstract class DefaultChain {
      */
     abstract signTransaction(
         raw_transaction: any,
-        options?: { privateKey?: string }
+        options?: { privateKey?: string },
     ): Promise<any>
 
     /**
@@ -164,7 +165,7 @@ export abstract class DefaultChain {
      */
     abstract signTransactions(
         transactions: any[],
-        options?: { privateKey?: string }
+        options?: { privateKey?: string },
     ): Promise<any[]>
 }
 
@@ -216,11 +217,14 @@ export interface IEVMDefaultChain {
     listenForEvent: (
         event: string,
         contract: string,
-        abi: any[]
+        abi: any[],
     ) => Promise<any>
     listenForAllEvents: (contract: string, abi: any[]) => Promise<any>
     waitForReceipt: (tx_hash: string) => Promise<TransactionReceipt>
 }
+
+// SECTION
+// ============ IBC ============
 
 /**
  * Extension methods for IBC
@@ -228,7 +232,30 @@ export interface IEVMDefaultChain {
 export interface IBCDefaultChain extends DefaultChain {
     connectWallet(
         privateKey: string,
-        options: IBCConnectWalletOptions
+        options: IBCConnectWalletOptions,
     ): Promise<any>
     ibcSend: () => Promise<any>
+}
+
+// SECTION
+// ============ SOLANA ============
+
+export interface SolanaDefaultChain extends DefaultChain {
+    /**
+     * Fetch the IDL from the network
+     * @param programId The program address
+     * @returns The IDL of the program
+     */
+    getProgramIdl: (programId: string) => Promise<Idl>
+
+    /**
+     * Fetch the deserialized account from the network
+     * @param address The program address
+     * @param options Options
+     * @returns The account data
+     */
+    fetchAccount: (
+        address: Address,
+        options: SolanaReadAccountDataOptions,
+    ) => Promise<any>
 }
