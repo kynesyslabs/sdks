@@ -256,13 +256,21 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         // INFO: construct the transaction
         const ix = program.methods[params.instruction]
         // calling the method with undefined throws an error, so prevent it
-        const tx = params.args ? ix(params.args) : ix()
-        const txhash = await tx
+        const _ix = params.args ? ix(params.args) : ix()
+        const tx = await _ix
             .accounts(params.accounts)
-            .signers(params.signers)
-            .rpc()
+            // .signers(params.signers)
+            .transaction()
 
-        return txhash
+        // INFO: Add fee payer and validity data
+        tx.feePayer = params.feePayer
+        const block = await this.provider.getLatestBlockhash()
+        tx.recentBlockhash = block.blockhash
+        tx.lastValidBlockHeight = block.lastValidBlockHeight
+
+        // INFO: Sign and return the tx
+        tx.sign(...params.signers)
+        return tx.serialize()
     }
 
     async runRawProgram(programId: Address, params: SolanaRunRawProgramParams) {

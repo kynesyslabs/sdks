@@ -191,6 +191,7 @@ systemProgram
 Invoking a program:
 
 ```ts
+const programId = "MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD"
 const programParams = {
     instruction: "deposit",
     idl: idl,
@@ -202,13 +203,11 @@ const programParams = {
         receiver: "address",
         // other accounts here ...
     },
+    feePayer: publicKey,
     signers: [Keypair, Keypair], // all signers
 }
 
-const txhash = await instance.runProgram(
-    "MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD",
-    programParams,
-)
+const signedTx = await instance.runProgram(programId, programParams)
 ```
 
 After broadcasting the transaction to the network, you can await its confirmation and then read an account data.
@@ -251,7 +250,7 @@ const account = new Keypair()
 // accounts
 const accounts = [
     {
-        pubkey: key.publicKey,
+        pubkey: account.publicKey,
         isSigner: true,
         isWritable: true,
     },
@@ -263,7 +262,7 @@ const params = {
 }
 
 const instructionIndex = 8
-const instructionName = "space"
+const instructionName = "ixName"
 
 // the signed tx
 const signedTx = await instance.runRawProgram(programId, {

@@ -135,6 +135,11 @@ export interface SolanarunProgramParams {
     }
 
     /**
+     * The fee payer of the transaction.
+     */
+    feePayer: PublicKey
+
+    /**
      * Private keys to sign this transaction.
      */
     signers?: Keypair[]
