@@ -136,7 +136,7 @@ On Solana, an IDL (interface definition language) is what an ABI is to an EVM sm
 
 ### When the IDL is available
 
-Here's an example IDL of a program running on the Solana Devnet: https://explorer.solana.com/address/MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD/anchor-program
+Here's an example IDL of a program running on the Solana Mainnet: https://explorer.solana.com/address/MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD/anchor-program
 
 ```ts
 // Getting the IDL
