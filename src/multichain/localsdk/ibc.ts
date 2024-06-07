@@ -1,4 +1,5 @@
 import { IBC as IBCCore, IDefaultChainLocal, TransactionResponse, required } from '@/multichain/core'
+import { XmTransactionResult } from '../core/types/interfaces'
 
 export class IBC extends IBCCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {
@@ -11,7 +12,7 @@ export class IBC extends IBCCore implements IDefaultChainLocal {
         const hash = await this.wallet.broadcastTxSync(signed_tx)
         return {
             hash,
-            result: 'success',
+            result: XmTransactionResult.success,
         }
     }
 

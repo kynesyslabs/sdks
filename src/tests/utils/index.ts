@@ -7,11 +7,12 @@ import { IPayOptions } from '@/multichain/core'
  * @returns True if the list is sorted, false otherwise
  */
 export function verifyNumberOrder(items: any[], key: string) {
-    // INFO: Verify that each number is greater than the previous one
+    // INFO: Verify that each number is greater than the previous one by 1
     return items.every((num, i) => {
         const current = Number(num[key])
         const prev = Number(items[i - 1]?.[key])
-        return i === 0 || current > prev
+
+        return i === 0 || current - prev === 1
     })
 }
 
@@ -22,13 +23,14 @@ export function verifyNumberOrder(items: any[], key: string) {
  */
 export function getSampleTranfers(
     address: string,
-    length: number = 9
+    startFrom: number = 1,
+    length: number = 9,
 ): IPayOptions[] {
     return Array.from({ length }, (_, i) => {
         return {
             address,
             // INFO: Amount is passed to preparePays as a string
-            amount: `${i + 1}`,
+            amount: startFrom.toString() + 1,
             // amount: 0.1,
         }
     })

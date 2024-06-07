@@ -18,15 +18,15 @@ import {
 } from "@solana/web3.js"
 import base58 from "bs58"
 
+import { ns64, struct, u32 } from "@solana/buffer-layout"
 import { DefaultChain, SolanaDefaultChain } from "./types/defaultChain"
 import {
-    IPayOptions,
+    IPayParams,
     SolanaReadAccountDataOptions,
     SolanaRunRawProgramParams,
     SolanarunProgramParams,
 } from "./types/interfaces"
 import { required } from "./utils"
-import { ns64, struct, u32 } from "@solana/buffer-layout"
 
 /* LICENSE
 
@@ -156,7 +156,7 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         return tx[0]
     }
 
-    async preparePays(payments: IPayOptions[], options?: SignTxOptions) {
+    async preparePays(payments: IPayParams[], options?: SignTxOptions) {
         const blockInfo = await this.provider.getLatestBlockhash()
 
         const transactions = payments.map(payment => {
@@ -181,18 +181,6 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
 
         // sign the transactions
         return this.signTransactions(transactions, options)
-    }
-
-    async prepareTransfer(
-        receiver: string,
-        amount: string,
-        options?: SignTxOptions,
-    ) {
-        return await this.preparePay(receiver, amount, options)
-    }
-
-    async prepareTransfers(transfers: IPayOptions[], options?: SignTxOptions) {
-        return await this.preparePays(transfers, options)
     }
 
     // SECTION: Programs

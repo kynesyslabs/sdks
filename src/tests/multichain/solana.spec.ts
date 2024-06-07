@@ -2,8 +2,8 @@ import { Keypair, SystemProgram, VersionedTransaction } from "@solana/web3.js"
 import base58 from "bs58"
 
 import { SOLANA } from "@/multichain/core"
-import { SOLANA as SC } from "@/multichain/localsdk"
 import { SolanarunProgramParams as SolanaRunAnchorProgramParams } from "@/multichain/core/types/interfaces"
+import { SOLANA as SC } from "@/multichain/localsdk"
 import { BN } from "@project-serum/anchor"
 import { wallets } from "../utils/wallets"
 import chainProviders from "./chainProviders"
@@ -61,7 +61,7 @@ describe("SOLANA CHAIN TESTS", () => {
 
     beforeAll(async () => {
         const connected = await instance.connect()
-        await instance.connectWallet(wallets.solana.wallet)
+        await instance.connectWallet(wallets.solana.privateKey)
         expect(connected).toBe(true)
 
         const localConnected = await localInstance.connect()

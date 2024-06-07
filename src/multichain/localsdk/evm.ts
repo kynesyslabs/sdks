@@ -1,5 +1,6 @@
 import { EVM as EVMCore, IDefaultChainLocal, TransactionResponse, required } from '@/multichain/core'
 import { TransactionRequest } from 'ethers'
+import { XmTransactionResult } from '../core/types/interfaces'
 
 export class EVM extends EVMCore implements IDefaultChainLocal {
     private static instances: Map<number, EVM> = new Map<number, EVM>()
@@ -39,7 +40,7 @@ export class EVM extends EVMCore implements IDefaultChainLocal {
         required(this.wallet, 'Wallet not connected')
         const txResponse = await this.wallet.sendTransaction(tx) // NOTE It will be signed automatically
         return {
-            result: 'success',
+            result: XmTransactionResult.success,
             hash: txResponse.hash,
         }
     }

@@ -3,7 +3,7 @@ export {
     IBCDefaultChain,
     IDefaultChainLocal,
     IDefaultChainWeb,
-    IEVMDefaultChain,
+    IEVMDefaultChain
 } from './types/defaultChain'
 
 export {
@@ -13,8 +13,8 @@ export {
     IBCPreparePayOptions,
     IBCSignTxOptions,
     IBCTransaction,
-    IPayOptions,
-    XmTransactionResponse as TransactionResponse,
+    IPayParams as IPayOptions,
+    XmTransactionResponse as TransactionResponse
 } from './types/interfaces'
 
 export { required } from './utils'
@@ -22,8 +22,8 @@ export { required } from './utils'
 // SECTION: Chain SDKs
 export { EVM } from './evm'
 export { IBC } from './ibc'
-export { SOLANA } from './solana'
 export { MULTIVERSX } from './multiversx'
+export { SOLANA } from './solana'
 
 // The official XRPL Library is called "xrpl" which conflicts with the name of our XRPL SDK
 export { XRPL, xrplGetLastSequence } from './xrp'

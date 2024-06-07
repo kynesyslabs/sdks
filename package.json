@@ -19,7 +19,7 @@
     "scripts": {
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
         "publish": "yarn npm publish",
-        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/sol*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
+        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/ten*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
     },
     "dependencies": {
         "@cosmjs/proto-signing": "^0.32.3",
@@ -35,6 +35,7 @@
         "@types/terminal-kit": "^2.5.6",
         "argon2": "^0.40.1",
         "big-integer": "^1.6.52",
+        "bignumber.js": "^9.1.2",
         "bs58": "^5.0.0",
         "ethers": "^6.11.1",
         "mceliece-nist": "^4.0.1",
@@ -44,6 +45,7 @@
         "socket.io-client": "^4.7.2",
         "superdilithium": "^2.0.6",
         "terminal-kit": "^3.1.1",
+        "web3": "^4.9.0",
         "xrpl": "^3.0.0"
     },
     "devDependencies": {

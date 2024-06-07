@@ -7,9 +7,14 @@ import { Keypair, PublicKey } from "@solana/web3.js"
 /**
  * `preparePay` parameters
  */
-export interface IPayOptions {
+export interface IPayParams {
     address: string
     amount: number | string
+}
+
+export enum XmTransactionResult {
+    success = "success",
+    error = "error",
 }
 
 /**
@@ -19,7 +24,7 @@ export interface XmTransactionResponse {
     /**
      * Whether the transaction was successful or not
      */
-    result: "success" | "error"
+    result: XmTransactionResult
 
     /**
      * The hash of the transaction if the tx was successful

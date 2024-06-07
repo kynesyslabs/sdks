@@ -1,5 +1,6 @@
 import { IDefaultChainLocal, TransactionResponse, XRPL as XRPLSdkCore } from '@/multichain/core'
 import * as xrpl from 'xrpl'
+import { XmTransactionResult } from '../core/types/interfaces'
 
 export class XRPL extends XRPLSdkCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {
@@ -35,14 +36,14 @@ export class XRPL extends XRPLSdkCore implements IDefaultChainLocal {
 
             // NOTE: The return type here might need to change
             return {
-                result: 'success',
+                result: XmTransactionResult.success,
                 hash: res.result.hash,
             }
         } else {
             const res = await this.provider.submit(signed.tx_blob)
 
             return {
-                result: res.result.accepted ? 'success' : 'error',
+                result: res.result.accepted ? XmTransactionResult.success : XmTransactionResult.error,
                 hash: res.result.tx_json.hash,
                 extra: {
                     accepted: res.result.accepted,

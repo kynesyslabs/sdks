@@ -3,6 +3,7 @@ import {
     SOLANA as SolanaCore,
     TransactionResponse,
 } from "../core"
+import { XmTransactionResult } from "../core/types/interfaces"
 
 export class SOLANA extends SolanaCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {
@@ -21,12 +22,12 @@ export class SOLANA extends SolanaCore implements IDefaultChainLocal {
             )
 
             return {
-                result: "success",
+                result: XmTransactionResult.success,
                 hash: txhash,
             }
         } catch (error) {
             return {
-                result: "error",
+                result: XmTransactionResult.error,
                 error: error.toString(),
             }
         }

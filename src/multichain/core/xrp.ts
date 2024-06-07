@@ -219,15 +219,6 @@ export class XRPL extends DefaultChain {
         return this.signTransactions(txs)
     }
 
-    // INFO transfer and pay are the same
-    async prepareTransfer(address: any, amount: any) {
-        return this.preparePay(address, amount)
-    }
-
-    async prepareTransfers(payments: IPayOptions[]) {
-        return this.preparePays(payments)
-    }
-
     // SECTION: Utils
 
     // INFO Generic empty tx skeleton for this chain

@@ -15,7 +15,7 @@ describe('EGLD CHAIN TESTS', () => {
     })
 
     test('preparePay returns a signed transaction', async () => {
-        await instance.connectWallet(wallets.egld.wallet, {
+        await instance.connectWallet(wallets.egld.privateKey, {
             password: wallets.egld.password,
         })
         const tx = await instance.preparePay(instance.getAddress(), '0.00001')

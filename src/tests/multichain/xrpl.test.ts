@@ -22,7 +22,7 @@ describe('XRPL CHAIN TESTS', () => {
     })
 
     test('preparePay returns a signed transaction', async () => {
-        await instance.connectWallet(wallets.xrpl.wallet)
+        await instance.connectWallet(wallets.xrpl.privateKey)
         const address = instance.getAddress()
 
         const signed_tx = await instance.preparePay(address, '1')

@@ -1,14 +1,13 @@
 import {
     Contract,
     JsonRpcProvider,
-    TransactionReceipt,
     TransactionRequest,
     Wallet,
     formatEther,
-    parseEther,
+    parseEther
 } from 'ethers'
 import { DefaultChain, IEVMDefaultChain } from './types/defaultChain'
-import { IPayOptions } from './types/interfaces'
+import { IPayParams } from './types/interfaces'
 import { required } from './utils'
 
 export class EVM extends DefaultChain implements IEVMDefaultChain {
@@ -54,23 +53,13 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         return this.connected
     }
 
-    // static override async create(
-    //     rpc_url: string = '',
-    //     eip1559: boolean = true,
-    //     chainId: number = 11155111
-    // ): Promise<EVM> {
-    //     const instance = new EVM(rpc_url, eip1559, chainId)
-    //     if (rpc_url) {
-    //         await instance.connect()
-    //     }
-    //     return instance
-    // }
-
     // INFO Connecting a wallet through a private key (string)
     // REVIEW should private key be a string or a Buffer?
     async connectWallet(privateKey: string) {
         required(this.provider, 'Provider not connected')
         this.wallet = new Wallet(privateKey, this.provider)
+
+        return this.wallet
     }
 
     // INFO Signing a transaction
@@ -125,7 +114,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         return tx[0]
     }
 
-    async preparePays(payments: IPayOptions[]) {
+    async preparePays(payments: IPayParams[]) {
         required(this.wallet, 'Wallet not connected')
 
         const baseTx = await this.prepareBaseTxWithType()
@@ -147,14 +136,6 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         return this.signTransactions(txs)
     }
 
-    async prepareTransfer(address: string, amount: string) {
-        return this.preparePay(address, amount)
-    }
-
-    async prepareTransfers(payments: IPayOptions[]) {
-        return this.preparePays(payments)
-    }
-
     // SECTION EVM Specific methods
     // INFO Generic transaction skeleton for both EIP-1559 and legacy chains
     async prepareBaseTxWithType() {
@@ -163,6 +144,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
 
         const baseTx = {
             // REVIEW: is there a way to get the gas limit from the provider?
+            // Using the previous block gas limit will throw an error if the sender's  balance is lower than the gas limit.
             gasLimit: 21000,
             chainId: this.chainId,
         }

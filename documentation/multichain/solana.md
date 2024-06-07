@@ -207,7 +207,7 @@ const programParams = {
     signers: [Keypair, Keypair], // all signers
 }
 
-const signedTx = await instance.runProgram(programId, programParams)
+const signedTx = await instance.runAnchorProgram(programId, programParams)
 ```
 
 After broadcasting the transaction to the network, you can await its confirmation and then read an account data.

@@ -16,7 +16,7 @@ import {
     IBCPreparePayOptions,
     IBCSignTxOptions,
     IBCTransaction,
-    IPayOptions,
+    IPayParams,
 } from './types/interfaces'
 import { required } from './utils'
 
@@ -128,6 +128,7 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
     /**
      * Get the balance of the address
      * @param address The address
+     * @param options Specify the denomination of the token
      * @returns The balance of the address in the specified denomination
      */
     async getBalance(address: string, options: IBCGetBalanceOptions) {
@@ -169,31 +170,13 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
         return tx[0]
     }
 
-    prepareTransfer(
-        receiver: string,
-        amount: string,
-        options: IBCPreparePayOptions
-    ) {
-        return this.preparePay(receiver, amount, options)
-    }
-
     /**
      * Prepare multiple payments
      * @param payments An array of payments
      * @param options Specifies the denomination of the token
      * @returns An array of signed transactions
      */
-    prepareTransfers(payments: IPayOptions[], options: IBCPreparePayOptions) {
-        return this.preparePays(payments, options)
-    }
-
-    /**
-     * Prepare multiple payments
-     * @param payments An array of payments
-     * @param options Specifies the denomination of the token
-     * @returns An array of signed transactions
-     */
-    async preparePays(payments: IPayOptions[], options: IBCPreparePayOptions) {
+    async preparePays(payments: IPayParams[], options: IBCPreparePayOptions) {
         // INFO: Create an array of transactions
         const txs = payments.map((payment) => {
             const tx = this.getEmptyTransaction()

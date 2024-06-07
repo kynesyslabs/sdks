@@ -2,7 +2,7 @@ import { Address, Idl } from "@project-serum/anchor"
 import { Contract, TransactionReceipt } from "ethers"
 import {
     IBCConnectWalletOptions,
-    IPayOptions,
+    IPayParams,
     SolanaReadAccountDataOptions,
     XmTransactionResponse,
 } from "./interfaces"
@@ -79,7 +79,10 @@ export abstract class DefaultChain {
      * @param privateKey The private key of the wallet
      * @returns The wallet object
      */
-    abstract connectWallet(privateKey: string, options?: {}): Promise<any>
+    abstract connectWallet(
+        privateKey: string,
+        options?: {},
+    ): Promise<this["wallet"]>
 
     /**
      * Gets the balance of a wallet
@@ -111,11 +114,16 @@ export abstract class DefaultChain {
      * @param options Options
      * @returns The signed transaction
      */
-    abstract prepareTransfer(
+    prepareTransfer<T extends DefaultChain>(
+        this: T,
         receiver: string,
         amount: string,
-        options: {},
-    ): Promise<any>
+        options?: {},
+    ): ReturnType<T["preparePay"]> {
+        // @ts-expect-error
+        // INFO: Will throw error here because method is not implemented in the abstract class
+        return this.preparePay(receiver, amount, options)
+    }
 
     /**
      * Creates a list of signed transactions to transfer default chain currency
@@ -123,7 +131,7 @@ export abstract class DefaultChain {
      * @param options Options
      * @returns An ordered list of signed transactions
      */
-    abstract preparePays(payments: IPayOptions[], options: {}): Promise<any[]>
+    abstract preparePays(payments: IPayParams[], options: {}): Promise<any[]>
 
     /**
      * Creates a list of signed transactions to transfer default chain currency
@@ -131,10 +139,15 @@ export abstract class DefaultChain {
      * @param options Options
      * @returns An ordered list of signed transactions
      */
-    abstract prepareTransfers(
-        payments: IPayOptions[],
-        options: {},
-    ): Promise<any[]>
+    prepareTransfers<T extends DefaultChain>(
+        this: T,
+        payments: IPayParams[],
+        options?: {},
+    ): ReturnType<T["preparePays"]> {
+        // @ts-expect-error
+        // INFO: Will throw error here because method is not implemented in the abstract class
+        return this.preparePays(payments, options)
+    }
 
     /**
      * Creates a skeleton transaction

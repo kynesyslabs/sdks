@@ -6,11 +6,11 @@ import { wallets } from '../utils/wallets'
 import chainProviders from './chainProviders'
 
 describe('EVM CHAIN TESTS', () => {
-    const instance = new EVM(chainProviders.eth.sepolia)
+    const instance = new EVM("https://testnet.ten.xyz/v1/?token=79A8DFE7D9020080C5901FC9815F329A9741289F")
 
     beforeAll(async () => {
         const connected = await instance.connect()
-        await instance.connectWallet(wallets.evm.wallet)
+        await instance.connectWallet(wallets.evm.privateKey)
 
         expect(connected).toBe(true)
     })

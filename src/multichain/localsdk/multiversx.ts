@@ -7,6 +7,7 @@ import {
 
 import { IPlainTransactionObject, Transaction } from '@multiversx/sdk-core'
 import { Mnemonic, UserWallet } from '@multiversx/sdk-wallet'
+import { XmTransactionResult } from '../core/types/interfaces'
 
 export class MULTIVERSX extends EGLDCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {
@@ -59,7 +60,7 @@ export class MULTIVERSX extends EGLDCore implements IDefaultChainLocal {
         )
 
         return {
-            result: 'success',
+            result: XmTransactionResult.success,
             hash: tx_hash,
         }
     }

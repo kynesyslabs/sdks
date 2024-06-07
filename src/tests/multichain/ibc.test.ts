@@ -14,7 +14,7 @@ describe('IBC CHAIN TESTS', () => {
 
     beforeAll(async () => {
         instance = await IBC.create(chainProviders.ibc.testnet)
-        await instance.connectWallet(wallets.ibc.wallet, {
+        await instance.connectWallet(wallets.ibc.privateKey, {
             prefix: chain_prefix,
             gasPrice: '0.012ustars',
         })

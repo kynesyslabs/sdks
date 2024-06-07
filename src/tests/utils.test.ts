@@ -5,7 +5,7 @@ describe('TEST UTILS TESTS', () => {
 		const address = '0xSomething';
 		const length = 3;
 
-		const transfers = getSampleTranfers(address, length);
+		const transfers = getSampleTranfers(address, 1, length);
 
 		expect(transfers.length).toEqual(length);
 		expect(transfers[0].address).toEqual(address);

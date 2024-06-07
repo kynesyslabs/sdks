@@ -290,14 +290,6 @@ export class MULTIVERSX extends DefaultChain {
         return this.signTransactions(transactions)
     }
 
-    prepareTransfer(receiver: string, amount: string) {
-        return this.preparePay(receiver, amount)
-    }
-
-    prepareTransfers(tranfers: IPayOptions[]) {
-        return this.preparePays(tranfers)
-    }
-
     async disconnect() {
         this.resetInstance()
         return !this.connected
