@@ -1,12 +1,12 @@
-import { Transaction } from 'ethers'
+import { Transaction } from "ethers"
 
-import { EVM } from '@/multichain/core'
-import { getSampleTranfers, verifyNumberOrder } from '../utils'
-import { wallets } from '../utils/wallets'
-import chainProviders from './chainProviders'
+import { EVM } from "@/multichain/core"
+import { getSampleTranfers, verifyNumberOrder } from "../utils"
+import { wallets } from "../utils/wallets"
+import chainProviders from "./chainProviders"
 
-describe('EVM CHAIN TESTS', () => {
-    const instance = new EVM("https://testnet.ten.xyz/v1/?token=79A8DFE7D9020080C5901FC9815F329A9741289F")
+describe("EVM CHAIN TESTS", () => {
+    const instance = new EVM(chainProviders.eth.sepolia)
 
     beforeAll(async () => {
         const connected = await instance.connect()
@@ -15,9 +15,9 @@ describe('EVM CHAIN TESTS', () => {
         expect(connected).toBe(true)
     })
 
-    test('preparePay returns a signed transaction', async () => {
+    test("preparePay returns a signed transaction", async () => {
         const address = instance.getAddress()
-        const signed_tx = await instance.preparePay(address, '1')
+        const signed_tx = await instance.preparePay(address, "1")
 
         // INFO: Reconstruct the transaction from the signed transaction
         const tx = Transaction.from(signed_tx)
@@ -28,11 +28,11 @@ describe('EVM CHAIN TESTS', () => {
         expect(tx.signature?.r.length).toEqual(66)
     })
 
-    test('A tx is signed with the ledger nonce', async () => {
+    test("A tx is signed with the ledger nonce", async () => {
         const address = instance.getAddress()
         const ledgerNonce = await instance.provider.getTransactionCount(address)
 
-        const signed_tx = await instance.preparePay(address, '1')
+        const signed_tx = await instance.preparePay(address, "1")
 
         // INFO: Reconstruct the transaction from the signed payload
         const tx = Transaction.from(signed_tx)
@@ -40,24 +40,26 @@ describe('EVM CHAIN TESTS', () => {
         expect(tx.nonce).toEqual(ledgerNonce)
     })
 
-    test('Transactions are signed with increasing nonces', async () => {
+    test("Transactions are signed with increasing nonces", async () => {
         const address = instance.getAddress()
         const transfers = getSampleTranfers(address)
         const signed_txs = await instance.preparePays(transfers)
 
-        const txs = signed_txs.map((tx) => Transaction.from(tx))
-        const nonces_sorted = verifyNumberOrder(txs, 'nonce')
+        const txs = signed_txs.map(tx => Transaction.from(tx))
+        const nonces_sorted = verifyNumberOrder(txs, "nonce", {
+            isNonce: true,
+        })
 
         expect(nonces_sorted).toBe(true)
     })
 
-    test('Transactions are signed in order of appearance', async () => {
+    test("Transactions are signed in order of appearance", async () => {
         const address = instance.getAddress()
         const transfers = getSampleTranfers(address)
         const signed_txs = await instance.preparePays(transfers)
 
-        const txs = signed_txs.map((tx) => Transaction.from(tx))
-        const values_sorted = verifyNumberOrder(txs, 'value')
+        const txs = signed_txs.map(tx => Transaction.from(tx))
+        const values_sorted = verifyNumberOrder(txs, "value")
 
         expect(values_sorted).toBe(true)
     })
