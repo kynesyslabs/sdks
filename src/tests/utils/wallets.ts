@@ -42,7 +42,8 @@ export const wallets: {
             "0d6033655b0d2903b337dc4a7abfa3c109f8c9484f3f19869525058fd62f61bf",
     },
     tenAlt: {
-        privateKey: "4efe8454860e1f1c2d516d274f6e43639715818af62e02126d006983deeb3ca6"
+        privateKey:
+            "4efe8454860e1f1c2d516d274f6e43639715818af62e02126d006983deeb3ca6",
     },
     ibc: {
         // INFO: Cosmos chain Id: "theta-testnet-001"
@@ -52,6 +53,10 @@ export const wallets: {
     solana: {
         privateKey:
             "25WecT1ApBVs9PEpNgsgEYJEjDMGqc63jeq1dWxwmzTCBPo6nnKq7NwyzicARJPfvQNrFGNjB7Kx6UvLFpH1MNsz",
+    },
+    ton: {
+        privateKey:
+            "fence agent vivid want verb early surface margin hunt return baby cute april torch smooth village item illegal edge lobster dune owner rate habit",
     },
 }
 

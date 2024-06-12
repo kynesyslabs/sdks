@@ -23,6 +23,8 @@ export abstract class DefaultChain {
         this.setRpc(rpc_url)
     }
 
+    // SECTION: Global methods
+
     /**
      * Sets the RPC URL only. Use `await instance.connect()` to connect to the rpc provider
      * @param rpc_url
@@ -60,6 +62,91 @@ export abstract class DefaultChain {
         this.connected = false
     }
 
+    /**
+     * Signs a transaction using the connected wallet
+     * @param tx The transaction to sign
+     * @param options Options
+     * @returns The signed transaction
+     */
+    async signTransaction<
+        T extends DefaultChain,
+        Tx extends Parameters<T["signTransactions"]>[0][number],
+    >(
+        this: T,
+        tx: Tx,
+        options?: {},
+    ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
+        // INFO: The return type of this.signTransaction is the same as the return type of the first element of this.signTransactions
+        // The type of the tx parameter is the same as the type of the first parameter of this.signTransactions
+        const txs = await this.signTransactions([tx], options)
+        return txs[0]
+    }
+
+    /**
+     * Creates a signed transaction to transfer default chain currency
+     * @param receiver The receiver's address
+     * @param amount The amount to transfer
+     * @param options Options
+     * @returns The signed transaction
+     */
+    async preparePay<T extends DefaultChain>(
+        this: T,
+        receiver: string,
+        amount: string,
+        options?: {},
+    ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
+        const txs = await this.preparePays(
+            [{ address: receiver, amount }],
+            options,
+        )
+
+        return txs[0]
+    }
+
+    /**
+     * Creates a signed transaction to transfer default chain currency
+     * @param receiver The receiver's address
+     * @param amount The amount to transfer
+     * @param options Options
+     * @returns The signed transaction
+     */
+    prepareTransfer<T extends DefaultChain>(
+        this: T,
+        receiver: string,
+        amount: string,
+        options?: {},
+    ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
+        return this.preparePay(receiver, amount, options)
+    }
+
+    /**
+     * Creates a list of signed transactions to transfer default chain currency
+     * @param payments A list of transfers to prepare
+     * @param options Options
+     * @returns An ordered list of signed transactions
+     */
+    prepareTransfers<T extends DefaultChain>(
+        this: T,
+        payments: IPayParams[],
+        options?: {},
+    ): Promise<Awaited<ReturnType<T["preparePays"]>>> {
+        // @ts-expect-error
+        // INFO: Will throw error here because method is not implemented in the abstract class
+        return this.preparePays(payments, options)
+    }
+
+    /**
+     * Disconnects from the RPC provider and the wallet
+     * @returns A boolean indicating if the disconnection was successful
+     */
+    async disconnect(){
+        // INFO: Override when using a web sockets provider
+        this.resetInstance()
+        return this.connected
+    }
+
+    // !SECTION Global methods
+
     // ANCHOR Base methods
 
     /**
@@ -67,12 +154,6 @@ export abstract class DefaultChain {
      * @returns A boolean indicating if the connection was successful
      */
     abstract connect(): Promise<boolean>
-
-    /**
-     * Disconnects from the RPC provider and the wallet
-     * @returns A boolean indicating if the disconnection was successful
-     */
-    abstract disconnect(): Promise<boolean>
 
     /**
      * Connects to a wallet using a private key
@@ -92,39 +173,6 @@ export abstract class DefaultChain {
      */
     abstract getBalance(address: string, options?: {}): Promise<string>
 
-    // SECTION: These two methods are for compatibility
-
-    /**
-     * Creates a signed transaction to transfer default chain currency
-     * @param receiver The receiver's address
-     * @param amount The amount to transfer
-     * @param options Options
-     * @returns The signed transaction
-     */
-    abstract preparePay(
-        receiver: string,
-        amount: string,
-        options: {},
-    ): Promise<any>
-
-    /**
-     * Creates a signed transaction to transfer default chain currency
-     * @param receiver The receiver's address
-     * @param amount The amount to transfer
-     * @param options Options
-     * @returns The signed transaction
-     */
-    prepareTransfer<T extends DefaultChain>(
-        this: T,
-        receiver: string,
-        amount: string,
-        options?: {},
-    ): ReturnType<T["preparePay"]> {
-        // @ts-expect-error
-        // INFO: Will throw error here because method is not implemented in the abstract class
-        return this.preparePay(receiver, amount, options)
-    }
-
     /**
      * Creates a list of signed transactions to transfer default chain currency
      * @param payments A list of transfers to prepare
@@ -132,22 +180,6 @@ export abstract class DefaultChain {
      * @returns An ordered list of signed transactions
      */
     abstract preparePays(payments: IPayParams[], options: {}): Promise<any[]>
-
-    /**
-     * Creates a list of signed transactions to transfer default chain currency
-     * @param payments A list of transfers to prepare
-     * @param options Options
-     * @returns An ordered list of signed transactions
-     */
-    prepareTransfers<T extends DefaultChain>(
-        this: T,
-        payments: IPayParams[],
-        options?: {},
-    ): ReturnType<T["preparePays"]> {
-        // @ts-expect-error
-        // INFO: Will throw error here because method is not implemented in the abstract class
-        return this.preparePays(payments, options)
-    }
 
     /**
      * Creates a skeleton transaction
@@ -158,17 +190,6 @@ export abstract class DefaultChain {
      * Returns the address of the connected wallet
      */
     abstract getAddress(): string
-
-    /**
-     * Signs a transaction using the connected wallet
-     * @param raw_transaction The transaction to sign
-     * @param options Options
-     * @returns The signed transaction
-     */
-    abstract signTransaction(
-        raw_transaction: any,
-        options?: { privateKey?: string },
-    ): Promise<any>
 
     /**
      * Signs a list of transactions using the connected wallet. The transaction nonce is incremented for each transaction in order of appearance.
