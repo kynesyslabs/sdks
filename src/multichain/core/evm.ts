@@ -25,16 +25,6 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
 
         this.chainId = chainId
         this.isEIP1559 = isEIP1559
-
-        if (rpc_url) {
-            this.setRPC(rpc_url)
-        }
-    }
-
-    // INFO Set of methods for connecting to an RPC while
-    // retaining a granular control over the instance status
-    async setRPC(rpc_url: string) {
-        this.provider = new JsonRpcProvider(rpc_url)
     }
 
     /**
@@ -47,7 +37,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
      * When parameters are not provided, they are automatically inferred from the network.
      */
     async connect(chainId?: number, isEIP1559?: boolean) {
-        required(this.provider, "Provider not connected")
+        this.provider = new JsonRpcProvider(this.rpc_url)
 
         if (chainId) {
             this.chainId = chainId
