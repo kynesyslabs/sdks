@@ -5,14 +5,6 @@ import { XmTransactionResult } from '../core/types/interfaces'
 export class EVM extends EVMCore implements IDefaultChainLocal {
     private static instances: Map<number, EVM> = new Map<number, EVM>()
 
-    constructor(
-        rpc_url: string = '',
-        chainId: number = 11155111,
-        eip1559: boolean = true
-    ) {
-        super(rpc_url, eip1559, chainId)
-    }
-
     async getInfo() {
         throw new Error('Method not implemented.')
     }

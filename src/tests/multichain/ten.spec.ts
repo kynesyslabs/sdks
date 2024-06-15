@@ -27,7 +27,7 @@ describe("TEN CHAIN TESTS", () => {
     })
 
     test("PreparePay returns a signed tx", async () => {
-        const signedTx = await instance.prepareTransfer(
+        const signedTx = await instance.preparePay(
             instance.getAddress(),
             "0.00014533",
         )

@@ -1,3 +1,4 @@
+import { getHttpEndpoint } from "@orbs-network/ton-access"
 import { clusterApiUrl } from "@solana/web3.js"
 
 const tenTestnetBaseUrl = "https://testnet.ten.xyz/v1/?token="
@@ -37,5 +38,11 @@ export default {
         mainnet: clusterApiUrl("mainnet-beta"),
         // using devnet as testnet faucet is broken 👇
         devnet: clusterApiUrl("devnet"),
+    },
+    ton: {
+        mainnet: "https://toncenter.com/api/v2/jsonRPC",
+        testnet: getHttpEndpoint({
+            network: "testnet",
+        }),
     },
 }

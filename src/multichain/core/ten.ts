@@ -1,9 +1,6 @@
 import * as web3 from "web3"
 
-import {
-    FeeMarketEIP1559Transaction,
-    FeeMarketEIP1559TxData,
-} from "web3-eth-accounts"
+import { FeeMarketEIP1559TxData } from "web3-eth-accounts"
 import { DefaultChain } from "./types/defaultChain"
 import { IPayParams } from "./types/interfaces"
 import { required } from "./utils"
@@ -61,7 +58,10 @@ export class TEN extends DefaultChain {
         }
 
         // INFO: Get account nonce
-        const nonce = await this.provider.getTransactionCount(signer.address, 'pending')
+        const nonce = await this.provider.getTransactionCount(
+            signer.address,
+            "pending",
+        )
         console.log("ledger nonce: ", nonce)
 
         //INFO: Max safe integer: 9007199254740991
@@ -74,7 +74,10 @@ export class TEN extends DefaultChain {
                 currentNonce++
 
                 console.log(txData)
-                const tx = web3.eth.accounts.FeeMarketEIP1559Transaction.fromTxData(txData)
+                const tx =
+                    web3.eth.accounts.FeeMarketEIP1559Transaction.fromTxData(
+                        txData,
+                    )
                 console.log(tx)
 
                 return web3.eth.accounts.signTransaction(tx, signer.privateKey)
@@ -82,10 +85,15 @@ export class TEN extends DefaultChain {
         )
     }
 
-    async signTransaction(tx: any, options?: { privateKey?: string }) {
-        const txs = await this.signTransactions([tx], options)
-        return txs[0]
-    }
+    declare signTransaction: (
+        tx: any,
+        options?: { cats?: string },
+    ) => Promise<any>
+
+    // async signTransaction(tx: any, options?: { privateKey?: string }) {
+    //     const txs = await this.signTransactions([tx], options)
+    //     return txs[0]
+    // }
 
     async prepareBaseTransaction() {
         const feeData = await this.provider.calculateFeeData()
@@ -114,20 +122,15 @@ export class TEN extends DefaultChain {
         return await this.signTransactions(txs)
     }
 
-    override async preparePay(address: string, amount: string) {
-        const tx = await this.preparePays([{ address, amount }])
-        return tx[0]
-    }
+    // override async preparePay(address: string, amount: string) {
+    //     const tx = await this.preparePays([{ address, amount }])
+    //     return tx[0]
+    // }
 
     async getBalance(address: string) {
         const balance = await this.provider.getBalance(address)
 
         return toNumber(balance).toString()
-    }
-
-    async disconnect() {
-        this.resetInstance()
-        return this.connected
     }
 
     getEmptyTransaction() {

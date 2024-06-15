@@ -4,11 +4,12 @@ import {
     TransactionRequest,
     Wallet,
     formatEther,
-    parseEther
-} from 'ethers'
-import { DefaultChain, IEVMDefaultChain } from './types/defaultChain'
-import { IPayParams } from './types/interfaces'
-import { required } from './utils'
+    parseEther,
+    toNumber,
+} from "ethers"
+import { DefaultChain, IEVMDefaultChain } from "./types/defaultChain"
+import { IPayParams } from "./types/interfaces"
+import { required } from "./utils"
 
 export class EVM extends DefaultChain implements IEVMDefaultChain {
     declare provider: JsonRpcProvider
@@ -18,34 +19,38 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     isEIP1559: boolean
     chainId: number
 
-    constructor(
-        rpc_url: string = '',
-        eip1559: boolean = true,
-        chainId: number = 11155111
-    ) {
+    constructor(rpc_url: string, chainId?: number, isEIP1559?: boolean) {
         super(rpc_url)
-        this.name = 'evm'
+        this.name = "evm"
 
         this.chainId = chainId
-        this.isEIP1559 = eip1559
+        this.isEIP1559 = isEIP1559
+    }
 
-        if (rpc_url) {
-            this.setRPC(rpc_url)
+    /**
+     * Connects to the EVM network
+     *
+     * @param chainId (Optional) The chainId of this network
+     * @param isEIP1559 (Optional) Whether this network uses EIP-1559
+     * @returns A boolean indicating whether the connection was successful
+     *
+     * When parameters are not provided, they are automatically inferred from the network.
+     */
+    async connect(chainId?: number, isEIP1559?: boolean) {
+        this.provider = new JsonRpcProvider(this.rpc_url)
+
+        if (chainId) {
+            this.chainId = chainId
         }
-    }
 
-    // INFO Set of methods for connecting to an RPC while
-    // retaining a granular control over the instance status
-    async setRPC(rpc_url: string) {
-        this.provider = new JsonRpcProvider(rpc_url)
-    }
-
-    async connect() {
-        required(this.provider, 'Provider not connected')
+        if (isEIP1559) {
+            this.isEIP1559 = isEIP1559
+        }
 
         try {
             const network = await this.provider.getNetwork()
-            this.connected = Boolean(network.name)
+            this.chainId = toNumber(network.chainId)
+            this.connected = this.chainId > 0
         } catch (error) {
             this.connected = false
         }
@@ -56,7 +61,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     // INFO Connecting a wallet through a private key (string)
     // REVIEW should private key be a string or a Buffer?
     async connectWallet(privateKey: string) {
-        required(this.provider, 'Provider not connected')
+        required(this.provider, "Provider not connected")
         this.wallet = new Wallet(privateKey, this.provider)
 
         return this.wallet
@@ -69,7 +74,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         transaction: TransactionRequest,
         options?: {
             privateKey?: string
-        }
+        },
     ) {
         const txs = await this.signTransactions([transaction], options)
 
@@ -80,9 +85,9 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         transactions: TransactionRequest[],
         options?: {
             privateKey?: string
-        }
+        },
     ) {
-        required(this.wallet || options?.privateKey, 'Wallet not connected')
+        required(this.wallet || options?.privateKey, "Wallet not connected")
 
         if (options?.privateKey) {
             this.wallet = new Wallet(options.privateKey, this.provider)
@@ -94,13 +99,13 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
 
         // INFO: Return a list of signed transactions
         return Promise.all(
-            transactions.map(async (tx) => {
+            transactions.map(async tx => {
                 tx.nonce = currentNonce
 
                 // INFO: Increment the nonce for the next transaction
                 currentNonce++
                 return this.wallet.signTransaction(tx)
-            })
+            }),
         )
     }
 
@@ -115,11 +120,11 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     }
 
     async preparePays(payments: IPayParams[]) {
-        required(this.wallet, 'Wallet not connected')
+        required(this.wallet, "Wallet not connected")
 
         const baseTx = await this.prepareBaseTxWithType()
 
-        const txs = payments.map((payment) => {
+        const txs = payments.map(payment => {
             const tx = {
                 ...baseTx,
                 to: payment.address,
@@ -140,16 +145,16 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     // INFO Generic transaction skeleton for both EIP-1559 and legacy chains
     async prepareBaseTxWithType() {
         const feeData = await this.provider.getFeeData()
-        // console.log({ baseFeePerGas: parseInt(feeData.lastBaseFeePerGas._hex, 16) });
+        // INFO: Check if the chain uses EIP-1559
+        // If the user has set the isEIP1559 flag, use it
+        const isEIP1559 = this.isEIP1559 || feeData.maxFeePerGas !== null
 
         const baseTx = {
-            // REVIEW: is there a way to get the gas limit from the provider?
-            // Using the previous block gas limit will throw an error if the sender's  balance is lower than the gas limit.
             gasLimit: 21000,
             chainId: this.chainId,
         }
 
-        if (this.isEIP1559) {
+        if (isEIP1559) {
             return {
                 ...baseTx,
                 type: 2,
@@ -158,10 +163,9 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
             }
         }
 
+        // INFO: Legacy chains use a gasPrice
         return {
             ...baseTx,
-            // INFO: ethers v5 used this line 👇
-            // gasPrice: feeData.lastBaseFeePerGas
             gasPrice: feeData.gasPrice,
         }
     }
@@ -184,7 +188,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
 
     // SECTION EVM Exclusive methods
     async createRawTransaction(tx_data: any): Promise<any> {
-        throw new Error('Not implemented')
+        throw new Error("Not implemented")
     }
 
     async waitForReceipt(tx_hash: string): Promise<any> {
@@ -195,7 +199,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     async getContractInstance(address: string, abi: string): Promise<Contract> {
         console.log(this)
         if (!this.provider) {
-            throw new Error('Provider not connected')
+            throw new Error("Provider not connected")
         }
         let contract = new Contract(address, abi, this.provider)
         return contract
@@ -206,7 +210,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     async readFromContract(
         contract_instance: Contract,
         function_name: string,
-        args: any
+        args: any,
     ): Promise<any> {
         return await contract_instance[function_name](...args)
     }
@@ -215,7 +219,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     async writeToContract(
         contract_instance: Contract,
         function_name: string,
-        args: any
+        args: any,
     ): Promise<any> {
         required(this.wallet)
         return await contract_instance[function_name](...args) // NOTE Ensure it is writeable i guess
@@ -225,10 +229,10 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     async listenForEvent(
         event: string,
         contract: string,
-        abi: any[]
+        abi: any[],
     ): Promise<any> {
         if (!this.provider) {
-            throw new Error('Provider not connected')
+            throw new Error("Provider not connected")
         }
         let contractInstance = new Contract(contract, abi, this.provider)
         // REVIEW THis could work
@@ -240,11 +244,11 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
 
     async listenForAllEvents(contract: string, abi: any[]): Promise<any> {
         if (!this.provider) {
-            throw new Error('Provider not connected')
+            throw new Error("Provider not connected")
         }
         let contractInstance = new Contract(contract, abi, this.provider)
         // REVIEW 99% Won't work
-        return contractInstance.on('*', (data: any) => {
+        return contractInstance.on("*", (data: any) => {
             ////console.log(data)
             // TODO Do something with the data
         })
