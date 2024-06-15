@@ -15,6 +15,7 @@ export { CValidityData, ValidityData } from './blockchain/ValidityData'
 export { BlockContent, Block } from './blockchain/blocks'
 
 export { Transaction, TransactionContent, XMPayload, Web2Payload, NativePayload, StringifiedPayload } from './blockchain/Transaction'
+export { EncryptedTransaction } from './blockchain/encryptedTransaction'
 export { RawTransaction } from './blockchain/rawTransaction'
 export { Bundle, BundleContent } from './communication/transmit'
 

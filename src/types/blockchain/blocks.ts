@@ -10,9 +10,11 @@ KyneSys Labs: https://www.kynesys.xyz/
 */
 
 import { pki } from "node-forge"
+import { EncryptedTransaction } from '@/types/blockchain/encryptedTransaction';
 
 export interface BlockContent {
     ordered_transactions: string[]
+    encrypted_transactions: EncryptedTransaction[] // REVIEW This should work already as it is not enforced in the database as a field
     per_address_transactions: Map<string, string[]>
     web2data: {} // TODO Add Web2 class
     previousHash: string
