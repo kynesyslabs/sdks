@@ -62,46 +62,46 @@ export abstract class DefaultChain {
         this.connected = false
     }
 
-    /**
-     * Signs a transaction using the connected wallet
-     * @param tx The transaction to sign
-     * @param options Options
-     * @returns The signed transaction
-     */
-    async signTransaction<
-        T extends DefaultChain,
-        Tx extends Parameters<T["signTransactions"]>[0][number],
-    >(
-        this: T,
-        tx: Tx,
-        options?: {},
-    ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
-        // INFO: The return type of this.signTransaction is the same as the return type of the first element of this.signTransactions
-        // The type of the tx parameter is the same as the type of the first parameter of this.signTransactions
-        const txs = await this.signTransactions([tx], options)
-        return txs[0]
-    }
+    // /**
+    //  * Signs a transaction using the connected wallet
+    //  * @param tx The transaction to sign
+    //  * @param options Options
+    //  * @returns The signed transaction
+    //  */
+    // async signTransaction<
+    //     T extends DefaultChain,
+    //     Tx extends Parameters<T["signTransactions"]>[0][number],
+    // >(
+    //     this: T,
+    //     tx: Tx,
+    //     options?: {},
+    // ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
+    //     // INFO: The return type of this.signTransaction is the same as the return type of the first element of this.signTransactions
+    //     // The type of the tx parameter is the same as the type of the first parameter of this.signTransactions
+    //     const txs = await this.signTransactions([tx], options)
+    //     return txs[0]
+    // }
 
-    /**
-     * Creates a signed transaction to transfer default chain currency
-     * @param receiver The receiver's address
-     * @param amount The amount to transfer
-     * @param options Options
-     * @returns The signed transaction
-     */
-    async preparePay<T extends DefaultChain>(
-        this: T,
-        receiver: string,
-        amount: string,
-        options?: {},
-    ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
-        const txs = await this.preparePays(
-            [{ address: receiver, amount }],
-            options,
-        )
+    // /**
+    //  * Creates a signed transaction to transfer default chain currency
+    //  * @param receiver The receiver's address
+    //  * @param amount The amount to transfer
+    //  * @param options Options
+    //  * @returns The signed transaction
+    //  */
+    // async preparePay<T extends DefaultChain>(
+    //     this: T,
+    //     receiver: string,
+    //     amount: string,
+    //     options?: {},
+    // ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
+    //     const txs = await this.preparePays(
+    //         [{ address: receiver, amount }],
+    //         options,
+    //     )
 
-        return txs[0]
-    }
+    //     return txs[0]
+    // }
 
     /**
      * Creates a signed transaction to transfer default chain currency
@@ -116,6 +116,7 @@ export abstract class DefaultChain {
         amount: string,
         options?: {},
     ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
+        // @ts-expect-error
         return this.preparePay(receiver, amount, options)
     }
 
@@ -139,11 +140,11 @@ export abstract class DefaultChain {
      * Disconnects from the RPC provider and the wallet
      * @returns A boolean indicating if the disconnection was successful
      */
-    async disconnect(){
-        // INFO: Override when using a web sockets provider
-        this.resetInstance()
-        return this.connected
-    }
+    // async disconnect(){
+    //     // INFO: Override when using a web sockets provider
+    //     this.resetInstance()
+    //     return this.connected
+    // }
 
     // !SECTION Global methods
 

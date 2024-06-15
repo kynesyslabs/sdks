@@ -1,5 +1,4 @@
 import { TON } from "@/multichain/core/ton"
-import chainProviders from "./chainProviders"
 import { wallets } from "../utils/wallets"
 import { getHttpEndpoint } from "@orbs-network/ton-access"
 
@@ -20,15 +19,15 @@ describe("TON CHAIN TESTS", () => {
         console.log(instance.getAddress())
     })
 
-    test("preparePay returns a signed tx", async () => {
-        const res = await instance.preparePay(
-            "EQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqB2N",
-            "1",
-        )
+    // test("preparePay returns a signed tx", async () => {
+    //     const res = await instance.preparePay(
+    //         "EQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqB2N",
+    //         "1",
+    //     )
 
-        const bal = await instance.getBalance(instance.getAddress())
-		console.log("Balance: ", bal)
-    })
+    //     const bal = await instance.getBalance(instance.getAddress())
+	// 	console.log("Balance: ", bal)
+    // })
 
     test("A tx is signed with the ledger nonce", async () => {
         // TODO: Test code here

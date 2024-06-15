@@ -90,18 +90,24 @@ export class TON extends DefaultChain {
         console.log("seqNo: ", seqNo)
 
         const txs = payments.map(payment => {
-            return contract.createTransfer({
-                seqno: seqNo,
-                secretKey: this.signer.secretKey,
-                messages: [
-                    internal({
-                        value: toNano(payment.amount),
-                        to: payment.address,
-                    }),
-                ],
-            })
+            return contract
+                .createTransfer({
+                    seqno: seqNo,
+                    secretKey: this.signer.secretKey,
+                    messages: [
+                        internal({
+                            value: toNano(payment.amount),
+                            to: payment.address,
+                        }),
+                    ],
+                })
+                .toBoc()
         })
 
         return txs
+    }
+
+    async getEmptyTransaction() {
+        return beginCell()
     }
 }

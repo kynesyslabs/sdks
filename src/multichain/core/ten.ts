@@ -85,15 +85,11 @@ export class TEN extends DefaultChain {
         )
     }
 
-    declare signTransaction: (
-        tx: any,
-        options?: { cats?: string },
-    ) => Promise<any>
 
-    // async signTransaction(tx: any, options?: { privateKey?: string }) {
-    //     const txs = await this.signTransactions([tx], options)
-    //     return txs[0]
-    // }
+    async signTransaction(tx: any, options?: { privateKey?: string }) {
+        const txs = await this.signTransactions([tx], options)
+        return txs[0]
+    }
 
     async prepareBaseTransaction() {
         const feeData = await this.provider.calculateFeeData()
@@ -122,10 +118,10 @@ export class TEN extends DefaultChain {
         return await this.signTransactions(txs)
     }
 
-    // override async preparePay(address: string, amount: string) {
-    //     const tx = await this.preparePays([{ address, amount }])
-    //     return tx[0]
-    // }
+    async preparePay(address: string, amount: string) {
+        const tx = await this.preparePays([{ address, amount }])
+        return tx[0]
+    }
 
     async getBalance(address: string) {
         const balance = await this.provider.getBalance(address)
