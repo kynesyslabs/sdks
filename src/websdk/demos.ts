@@ -19,16 +19,15 @@ import { DemosTransactions } from './DemosTransactions'
 import { prepareWeb2Payload } from './Web2Transactions'
 
 import type { IBufferized } from './types/IBuffer'
-import type { Transaction, ValidityData } from '@/types'
+import type { EncryptedTransaction, Transaction, ValidityData } from '@/types'
+import { l2psCalls } from './L2PSCalls'
 
-// TODO Use XMTransactions for the crosschain transactions
-
-// REVIEW Maybe modularize this behemoth
+// TODO WIP modularize this behemoth (see l2psCalls as an example)
 export const demos = {
     // ANCHOR Properties
     socket: <Socket | null>null,
     socket_connected: false,
-    connectedListener: function (val: any) {},
+    connectedListener: function (val: any) { },
     set connected(val) {
         this.socket_connected = val
         this.connectedListener(val)
@@ -44,7 +43,7 @@ export const demos = {
         {
             [key: string]: any
         }
-    >{},
+        >{},
 
     // SECTION Registry
     replies: {
@@ -201,7 +200,6 @@ export const demos = {
         return await demos.call('transaction', '', transaction, 'confirmTx')
     },
     broadcast: async function (validationData: ValidityData) {
-        // FIXME Implement validationData type
         return await demos.call(
             'transaction',
             '',
@@ -209,6 +207,8 @@ export const demos = {
             'broadcastTx'
         )
     },
+    // L2PS calls are defined here
+    l2ps: l2psCalls,
     // INFO NodeCalls use the same structure
     call: async function (
         type: any,
@@ -307,7 +307,7 @@ export const demos = {
         const t_hashed = await sha256(stringifiedTransmissionContent)
         console.log(
             t_hashed +
-                ' is the hashed version of comlink.chain.current.currentMessage.bundle.content'
+            ' is the hashed version of comlink.chain.current.currentMessage.bundle.content'
         )
         comlink.chain.current.currentMessage.bundle.hash = t_hashed
         comlink.chain.current.currentMessageHash = t_hashed
@@ -319,7 +319,7 @@ export const demos = {
         })
         console.log(
             t_signature.toString('utf8') +
-                ' is the signature of the hashed version of comlink.chain.current.currentMessage.bundle.content'
+            ' is the signature of the hashed version of comlink.chain.current.currentMessage.bundle.content'
         )
         comlink.chain.current.currentMessage.bundle.signature = bufferize(
             Buffer.from(t_signature)
@@ -340,7 +340,7 @@ export const demos = {
         })
         console.log(
             signature.toString('utf8') +
-                ' is the signature of the hashed version of comlink.chain.current'
+            ' is the signature of the hashed version of comlink.chain.current'
         )
         comlink.chain.comlinkCurrentHashSignature = bufferize(
             Buffer.from(signature)
