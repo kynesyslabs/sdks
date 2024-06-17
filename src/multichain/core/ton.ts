@@ -5,7 +5,9 @@ import {
     TonClient,
     WalletContractV4,
     beginCell,
+    external,
     internal,
+    storeMessage,
     toNano,
 } from "@ton/ton"
 
@@ -16,6 +18,7 @@ import BigNumber from "bignumber.js"
 export class TON extends DefaultChain {
     declare provider: TonClient
     declare signer: KeyPair
+    declare wallet: WalletContractV4
 
     constructor(rpc_url: string) {
         super(rpc_url)
@@ -41,18 +44,17 @@ export class TON extends DefaultChain {
 
     async connectWallet(mnemonics: string, options?: {}) {
         this.signer = await mnemonicToPrivateKey(mnemonics.split(" "))
-
-        return this.signer
-    }
-
-    // SECTION: Information
-    getAddress() {
-        const wallet = WalletContractV4.create({
+        this.wallet = WalletContractV4.create({
             publicKey: this.signer.publicKey,
             workchain: 0,
         })
 
-        return wallet.address.toString()
+        return this.wallet
+    }
+
+    // SECTION: Information
+    getAddress() {
+        return this.wallet.address.toString()
     }
 
     async getBalance(address: string) {
@@ -78,33 +80,66 @@ export class TON extends DefaultChain {
     }
 
     async preparePays(payments: IPayOptions[], options: {}) {
-        const wallet = WalletContractV4.create({
-            publicKey: this.signer.publicKey,
-            workchain: 0,
-        })
-
-        wallet.address
-
-        const contract = this.provider.open(wallet)
-        const seqNo = await contract.getSeqno()
+        const contract = this.provider.open(this.wallet)
+        let seqNo = await contract.getSeqno()
         console.log("seqNo: ", seqNo)
 
         const txs = payments.map(payment => {
-            return contract
-                .createTransfer({
-                    seqno: seqNo,
-                    secretKey: this.signer.secretKey,
-                    messages: [
-                        internal({
-                            value: toNano(payment.amount),
-                            to: payment.address,
-                        }),
-                    ],
-                })
-                .toBoc()
+            const cell = contract.createTransfer({
+                seqno: seqNo,
+                secretKey: this.signer.secretKey,
+                messages: [
+                    internal({
+                        value: toNano(payment.amount),
+                        to: payment.address,
+                    }),
+                ],
+            })
+
+            seqNo++
+
+            return cell
         })
 
-        return txs
+        return await this.cellsToSendableFile(txs)
+    }
+
+    /**
+     * Prepare a cell to be sent to the network.
+     *
+     * @param cell The cell to convert to a sendable file
+     * @returns The cell as a sendable file
+     */
+    async cellsToSendableFile(cells: Cell[]) {
+        // NOTE: All this is done to get the final tx hash
+        const contract = this.provider.open(this.wallet)
+        let neededInit = null
+
+        const address = Address.parse(this.getAddress())
+        const isContractDeployed = await this.provider.isContractDeployed(
+            address,
+        )
+
+        if (contract.init && !isContractDeployed) {
+            neededInit = contract.init
+        }
+
+        return cells.map(cell => {
+            // INFO: Create an external message
+            const ext = external({
+                to: this.getAddress(),
+                init: neededInit,
+                body: cell,
+            })
+
+            // INFO: Create a new cell with the external message
+            let boc = beginCell().store(storeMessage(ext)).endCell()
+
+            console.log("boc hash: ", boc.hash().toString("hex"))
+
+            // INFO: Convert the cell to a buffer for network transmission
+            return boc.toBoc()
+        })
     }
 
     async getEmptyTransaction() {
