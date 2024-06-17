@@ -8,16 +8,18 @@ const l2psCalls = {
         L2PSId: string): Promise<EncryptedTransaction> {
         return await demos.call(
             'l2ps',
-            'retrieve',
+            '',
             { eTxHash: eTxHash, L2PSId: L2PSId }, // Data
+            'retrieve', // Method
         ) as EncryptedTransaction
     },
     // Retrieving all transactions from the L2PS in a specific block
     retrieveAll: async function (L2PSId: string, blockNumber: number): Promise<EncryptedTransaction[]> {
         return await demos.call(
             'l2ps',
-            'retrieveAll',
+            '',
             { L2PSId: L2PSId, blockNumber: blockNumber }, // Data
+            'retrieveAll', // Method
         ) as EncryptedTransaction[]
     },
     // Registering a transaction in the L2PS
@@ -25,8 +27,9 @@ const l2psCalls = {
     register: async function (eTx: EncryptedTransaction) {
         return await demos.call(
             'l2ps',
-            'register',
+            '',
             { eTx: eTx }, // Data
+            'register', // Method
         )
     },
 }

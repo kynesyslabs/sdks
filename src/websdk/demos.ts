@@ -195,7 +195,7 @@ export const demos = {
     nodeCall: async function (message: any, args = {}) {
         return await demos.call('nodeCall', message, args)
     },
-    // TODO, FIXME & REVIEW: Replace call with validate / execute logic
+    // REVIEW: Replace call with validate / execute logic
     confirm: async function (transaction: Transaction) {
         return await demos.call('transaction', '', transaction, 'confirmTx')
     },
