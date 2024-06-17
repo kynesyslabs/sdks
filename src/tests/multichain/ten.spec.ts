@@ -1,5 +1,5 @@
 import { Web3 } from "web3"
-import { Transaction } from "ethers"
+import { ethers } from "ethers"
 import { toWei, toNumber } from "web3-utils"
 
 import { TEN } from "@/multichain/core/ten"
@@ -75,7 +75,7 @@ describe("TEN CHAIN TESTS", () => {
         console.log("Transaction result: ", res)
     })
 
-    test.only("Sending a tx using web3js", async () => {
+    test("Sending a tx using web3js", async () => {
         const rpc_url = chainProviders.ten.testnet
         const privateKey = "0x" + wallets["ten"].privateKey
 
@@ -107,5 +107,43 @@ describe("TEN CHAIN TESTS", () => {
         } catch (error) {
             console.log(error)
         }
+    }, 20000000)
+
+    test.only("Sending a tx using ethers v5", async () => {
+        console.log("ethers.version: ", ethers.version)
+        const rpc_url =
+            "https://testnet.ten.xyz/v1/?token=79A8DFE7D9020080C5901FC9815F329A9741289F"
+        const privateKey = "0x" + wallets["ten"].privateKey
+
+        const provider = new ethers.providers.JsonRpcProvider(rpc_url)
+        const wallet = new ethers.Wallet(privateKey, provider)
+        console.log("wallet.address: ", wallet.address)
+
+        const balance = await provider.getBalance(wallet.address)
+        console.log("balance: ", balance)
+
+        const nonce = await provider.getTransactionCount(wallet.address)
+        console.log("nonce: ", nonce)
+
+        const feeData = await provider.getFeeData()
+        console.log("feeData: ", feeData)
+
+        const tx = {
+            type: 2,
+            to: wallet.address,
+            value: ethers.utils.parseEther("0.2"),
+            gasLimit: 21000,
+            maxFeePerGas: feeData.maxFeePerGas,
+            maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+            nonce,
+            chainId: 443,
+        }
+
+        const signedTx = await wallet.signTransaction(tx)
+        const txOnNet = await provider.sendTransaction(signedTx)
+        console.log("txhash: ", txOnNet.hash)
+
+        const indexedTx = await provider.waitForTransaction(txOnNet.hash)
+        console.log("tx: ", indexedTx)
     }, 20000000)
 })
