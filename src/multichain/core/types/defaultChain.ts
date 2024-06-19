@@ -71,10 +71,11 @@ export abstract class DefaultChain {
     async signTransaction<
         T extends DefaultChain,
         Tx extends Parameters<T["signTransactions"]>[0][number],
+        Options extends Parameters<T["signTransactions"]>[1],
     >(
         this: T,
         tx: Tx,
-        options?: {},
+        options?: Options,
     ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
         // INFO: The return type of this.signTransaction is the same as the return type of the first element of this.signTransactions
         // The type of the tx parameter is the same as the type of the first parameter of this.signTransactions
@@ -89,11 +90,14 @@ export abstract class DefaultChain {
      * @param options Options
      * @returns The signed transaction
      */
-    async preparePay<T extends DefaultChain>(
+    async preparePay<
+        T extends DefaultChain,
+        Options extends Parameters<T["preparePays"]>[1],
+    >(
         this: T,
         receiver: string,
         amount: string,
-        options?: {},
+        options?: Options,
     ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
         const txs = await this.preparePays(
             [{ address: receiver, amount }],
@@ -110,11 +114,14 @@ export abstract class DefaultChain {
      * @param options Options
      * @returns The signed transaction
      */
-    prepareTransfer<T extends DefaultChain>(
+    prepareTransfer<
+        T extends DefaultChain,
+        Options extends Parameters<T["preparePays"]>[1],
+    >(
         this: T,
         receiver: string,
         amount: string,
-        options?: {},
+        options?: Options,
     ): Promise<Awaited<ReturnType<T["preparePays"]>>[number]> {
         return this.preparePay(receiver, amount, options)
     }
@@ -125,10 +132,13 @@ export abstract class DefaultChain {
      * @param options Options
      * @returns An ordered list of signed transactions
      */
-    prepareTransfers<T extends DefaultChain>(
+    prepareTransfers<
+        T extends DefaultChain,
+        Options extends Parameters<T["preparePays"]>[1],
+    >(
         this: T,
         payments: IPayParams[],
-        options?: {},
+        options?: Options,
     ): Promise<Awaited<ReturnType<T["preparePays"]>>> {
         // @ts-expect-error
         // INFO: Will throw error here because method is not implemented in the abstract class
@@ -139,7 +149,7 @@ export abstract class DefaultChain {
      * Disconnects from the RPC provider and the wallet
      * @returns A boolean indicating if the disconnection was successful
      */
-    async disconnect(){
+    async disconnect() {
         // INFO: Override when using a web sockets provider
         this.resetInstance()
         return this.connected

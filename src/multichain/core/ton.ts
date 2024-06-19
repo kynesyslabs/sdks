@@ -1,4 +1,3 @@
-import { KeyPair, mnemonicToPrivateKey, sign } from "@ton/crypto"
 import {
     Address,
     Cell,
@@ -10,10 +9,11 @@ import {
     storeMessage,
     toNano,
 } from "@ton/ton"
-
-import { DefaultChain } from "./types/defaultChain"
-import { IPayOptions } from "."
 import BigNumber from "bignumber.js"
+import { KeyPair, mnemonicToPrivateKey, sign } from "@ton/crypto"
+
+import { IPayOptions, required } from "."
+import { DefaultChain } from "./types/defaultChain"
 
 export class TON extends DefaultChain {
     declare provider: TonClient
@@ -32,7 +32,6 @@ export class TON extends DefaultChain {
 
         try {
             const info = await this.provider.getMasterchainInfo()
-            console.log(info)
             this.connected = !!info
         } catch (error) {
             console.error(error)
@@ -42,7 +41,7 @@ export class TON extends DefaultChain {
         return this.connected
     }
 
-    async connectWallet(mnemonics: string, options?: {}) {
+    async connectWallet(mnemonics: string) {
         this.signer = await mnemonicToPrivateKey(mnemonics.split(" "))
         this.wallet = WalletContractV4.create({
             publicKey: this.signer.publicKey,
@@ -79,15 +78,30 @@ export class TON extends DefaultChain {
         })
     }
 
-    async preparePays(payments: IPayOptions[], options: {}) {
+    async preparePays(
+        payments: IPayOptions[],
+        options?: {
+            /**
+             * A private key mnemonic to use for signing the transaction(s) instead of the connected wallet
+             */
+            privateKey: string
+        },
+    ) {
+        required(this.signer || options?.privateKey, "Wallet not connected")
+
+        let signer = this.signer
+
+        if (options?.privateKey) {
+            signer = await mnemonicToPrivateKey(options.privateKey.split(" "))
+        }
+
         const contract = this.provider.open(this.wallet)
         let seqNo = await contract.getSeqno()
-        console.log("seqNo: ", seqNo)
 
         const txs = payments.map(payment => {
             const cell = contract.createTransfer({
                 seqno: seqNo,
-                secretKey: this.signer.secretKey,
+                secretKey: signer.secretKey,
                 messages: [
                     internal({
                         value: toNano(payment.amount),
@@ -111,7 +125,7 @@ export class TON extends DefaultChain {
      * @returns The cell as a sendable file
      */
     async cellsToSendableFile(cells: Cell[]) {
-        // NOTE: All this is done to get the final tx hash
+        // NOTE: All this is done to retrieve the the final tx hash
         const contract = this.provider.open(this.wallet)
         let neededInit = null
 
@@ -134,8 +148,6 @@ export class TON extends DefaultChain {
 
             // INFO: Create a new cell with the external message
             let boc = beginCell().store(storeMessage(ext)).endCell()
-
-            console.log("boc hash: ", boc.hash().toString("hex"))
 
             // INFO: Convert the cell to a buffer for network transmission
             return boc.toBoc()
