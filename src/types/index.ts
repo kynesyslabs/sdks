@@ -1,5 +1,10 @@
+
+
 import { XMPayload } from './blockchain/Transaction';
 import { XMScript, ITask, IOperation } from './xm/index';
+
+export { XMStep, Web2Step, NativeStep, demosStepType } from './communication/demosWork';
+export { demosStep, demosStepContent, demosWork } from './communication/demosWork';
 
 export {
     GenesisArtifact,
