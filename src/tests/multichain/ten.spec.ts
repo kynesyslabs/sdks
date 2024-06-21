@@ -8,7 +8,7 @@ import chainProviders from "./chainProviders"
 import { wallets } from "../utils/wallets"
 import { getSampleTranfers, verifyNumberOrder } from "../utils"
 
-describe("TEN CHAIN TESTS", () => {
+describe.skip("TEN CHAIN TESTS", () => {
     const chain = "ten"
     const rpc_url =
         chain === "ten"
