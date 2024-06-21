@@ -1,6 +1,8 @@
-import { TON } from "@/multichain/core/ton"
-import { wallets } from "../utils/wallets"
 import { getHttpEndpoint } from "@orbs-network/ton-access"
+
+import { TON } from "@/multichain/core/ton"
+import { TON as Local } from "@/multichain/localsdk/ton"
+import { wallets } from "../utils/wallets"
 
 describe("TON CHAIN TESTS", () => {
     let instance: TON
@@ -15,28 +17,42 @@ describe("TON CHAIN TESTS", () => {
         expect(instance.connected).toBe(true)
 
         await instance.connectWallet(wallets.ton.privateKey)
-
-        console.log(instance.getAddress())
     })
 
-    // test("preparePay returns a signed tx", async () => {
-    //     const res = await instance.preparePay(
-    //         "EQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqB2N",
-    //         "1",
-    //     )
+    test.skip("preparePay returns a signed tx", async () => {
+        return "ok"
+    })
 
-    //     const bal = await instance.getBalance(instance.getAddress())
-	// 	console.log("Balance: ", bal)
-    // })
+    test.skip("A tx is signed with the ledger nonce", async () => {
+        // // TODO: Test code here
+        // const tx = await instance.preparePay(
+        //     "EQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqB2N",
+        //     "1.01",
+        // )
+        // // extract nonce from tx
+        // const cell = Cell.fromBoc(tx)[0]
+        // // INFO: Figure out how to extract the nonce from a Cell
+        // const nonce = loadMessage(cell.beginParse())
+        // console.log(nonce)
+    })
 
-    test("A tx is signed with the ledger nonce", async () => {
+    test.skip("Transactions are signed with increasing nonces", async () => {
         // TODO: Test code here
     })
 
-    test("Transactions are signed with increasing nonces", async () => {
+    test.skip("Transactions are signed in order of appearance", async () => {
         // TODO: Test code here
     })
-    test("Transactions are signed in order of appearance", async () => {
-        // TODO: Test code here
+
+    test("Sending a tx", async () => {
+        // NOTE: Tx sending is working, skip this test!
+        const tx = await instance.preparePay(
+            "EQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqB2N",
+            "1.01",
+        )
+
+        const localInstance = await Local.create(instance.rpc_url)
+        const res = await localInstance.sendTransaction(tx)
+        console.log(res)
     })
 })

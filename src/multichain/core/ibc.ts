@@ -285,7 +285,7 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
         return await Promise.all(signed_txs)
     }
 
-    async disconnect() {
+    override async disconnect() {
         this.resetInstance()
         this.address = ''
         this.gasPrice = ''

@@ -290,11 +290,6 @@ export class MULTIVERSX extends DefaultChain {
         return this.signTransactions(transactions)
     }
 
-    async disconnect() {
-        this.resetInstance()
-        return !this.connected
-    }
-
     // SECTION Unimplemented methods
     getEmptyTransaction() {
         throw new Error('Method not implemented.')

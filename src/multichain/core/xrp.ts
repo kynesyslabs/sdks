@@ -38,7 +38,7 @@ export class XRPL extends DefaultChain {
         this.name = 'xrpl'
 
         if (rpc_url) {
-            this.setRPC(rpc_url)
+            this.setRpc(rpc_url)
         }
     }
 
@@ -46,7 +46,8 @@ export class XRPL extends DefaultChain {
 
     // INFO Set of methods for connecting to an RPC while
     // retaining a granular control over the instance status
-    async setRPC(rpc_url: string) {
+    override async setRpc(rpc_url: string) {
+        this.rpc_url = rpc_url
         this.provider = new Client(rpc_url, {
             connectionTimeout: 10000,
         })
@@ -235,7 +236,7 @@ export class XRPL extends DefaultChain {
         return tx
     }
 
-    async disconnect() {
+    override async disconnect() {
         await this.provider.disconnect()
         this.resetInstance()
 
