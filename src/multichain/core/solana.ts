@@ -60,21 +60,28 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         this.name = "solana"
     }
 
-    async connect() {
+    override setRpc(rpc_url: string): void {
+        this.rpc_url = rpc_url
         this.provider = new Connection(this.rpc_url, {
             confirmTransactionInitialTimeout: 15000,
         })
+    }
 
-        const version = await this.provider.getVersion()
-        this.connected = Number.isInteger(version["feature-set"])
+    async connect() {
+        try {
+            const version = await this.provider.getVersion()
+            this.connected = Number.isInteger(version["feature-set"])
+        } catch (error) {
+            this.connected = false
+        }
 
         return this.connected
     }
 
-    async disconnect() {
-        this.resetInstance()
-        return true
-    }
+    // async disconnect() {
+    //     this.resetInstance()
+    //     return true
+    // }
 
     async createWallet() {
         const keypair = Keypair.generate()
@@ -98,7 +105,10 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         return balance.toString()
     }
 
-    async signTransaction(tx: VersionedTransaction, options?: SignTxOptions) {
+    override async signTransaction(
+        tx: VersionedTransaction,
+        options?: SignTxOptions,
+    ) {
         required(this.wallet, "Wallet not connected")
         // LINK https://docs.shyft.to/tutorials/how-to-sign-transactions-on-solana
         // NOTE Due to the above, the transaction is signed and sent at the same time.

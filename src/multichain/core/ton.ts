@@ -25,16 +25,19 @@ export class TON extends DefaultChain {
         this.name = "ton"
     }
 
-    async connect() {
+    override setRpc(rpc_url: string): void {
+        this.rpc_url = rpc_url
+
         this.provider = new TonClient({
             endpoint: this.rpc_url,
         })
+    }
 
+    async connect() {
         try {
             const info = await this.provider.getMasterchainInfo()
             this.connected = !!info
         } catch (error) {
-            console.error(error)
             this.connected = false
         }
 
@@ -64,6 +67,10 @@ export class TON extends DefaultChain {
     }
 
     // SECTION: Transactions
+    async signTransaction(tx: Cell) {
+        const txs = await this.signTransactions([tx])
+        return txs[0]
+    }
 
     async signTransactions(txs: Cell[]) {
         // TODO: Test this method
@@ -76,6 +83,23 @@ export class TON extends DefaultChain {
                 .storeBuilder(tx.asBuilder())
                 .endCell()
         })
+    }
+
+    async preparePay(
+        receiver: string,
+        amount: string,
+        options?: {
+            /**
+             * A private key mnemonic to use for signing the transaction(s) instead of the connected wallet
+             */
+            privateKey: string
+        },
+    ) {
+        const txs = await this.preparePays(
+            [{ address: receiver, amount }],
+            options,
+        )
+        return txs[0]
     }
 
     async preparePays(

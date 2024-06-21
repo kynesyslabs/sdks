@@ -27,6 +27,12 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         this.isEIP1559 = isEIP1559
     }
 
+    override setRpc(rpc_url: string): void {
+        // NOTE: We override here because we need to create a new provider
+        this.rpc_url = rpc_url
+        this.provider = new JsonRpcProvider(this.rpc_url)
+    }
+
     /**
      * Connects to the EVM network
      *
@@ -37,8 +43,6 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
      * When parameters are not provided, they are automatically inferred from the network.
      */
     async connect(chainId?: number, isEIP1559?: boolean) {
-        this.provider = new JsonRpcProvider(this.rpc_url)
-
         if (chainId) {
             this.chainId = chainId
         }
@@ -252,10 +256,5 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
             ////console.log(data)
             // TODO Do something with the data
         })
-    }
-
-    async disconnect() {
-        this.resetInstance()
-        return !this.connected
     }
 }
