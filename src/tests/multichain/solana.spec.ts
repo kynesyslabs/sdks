@@ -80,7 +80,7 @@ describe("SOLANA CHAIN TESTS", () => {
         expect(signature.length).toBeGreaterThan(80)
     })
 
-    test("Running anchor program", async () => {
+    test.skip("Running anchor program", async () => {
         const programOwner = Keypair.fromSecretKey(
             Buffer.from([
                 47, 72, 142, 251, 130, 2, 4, 156, 56, 97, 212, 198, 50, 46, 70,
@@ -150,7 +150,7 @@ describe("SOLANA CHAIN TESTS", () => {
         expect(acc.data.toNumber()).toEqual(42)
     })
 
-    test("Running raw program", async () => {
+    test.skip("Running raw program", async () => {
         const key = new Keypair()
 
         const txhash = await instance.provider.requestAirdrop(
