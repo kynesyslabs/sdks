@@ -1,6 +1,6 @@
 import * as forge from "node-forge"
-import { XMPayload } from "../blockchain/Transaction"
-import { Web2Payload } from "../blockchain/Transaction"
+import { XMPayload } from "@/types/blockchain/Transaction"
+import { Web2Payload } from "@/types/blockchain/Transaction"
 
 // Strictly declaring the type of a step of a demosWork enables us to
 // easily manage the various steps with the appropriate types.
@@ -35,4 +35,11 @@ export interface demosStep {
 export interface demosWork {
     workUID: string,
     steps: demosStep[],
+}
+
+// Return interface for demosWork
+export interface demosResult {
+    workUID: string,
+    results: any[], // ! Obviously this is just a draft
+    signature: forge.pki.ed25519.BinaryBuffer,
 }
