@@ -10,6 +10,7 @@ export type Web2Payload = ["web2Request", IWeb2Request]
 export type NativePayload = ["native", any] // TODO
 export type StringifiedPayload = [string, string]
 
+import { demosWork } from '../communication/demosWork'
 
 
 export interface TransactionContent {
@@ -19,6 +20,20 @@ export interface TransactionContent {
     amount: number
     // TODO Replace below with data: XMPayload | Web2Payload | NativePayload when ready
     data: StringifiedPayload | XMPayload | Web2Payload | NativePayload
+    nonce: number // Increments every time a transaction is sent from the same account
+    timestamp: number // Is the registered unix timestamp when the transaction was sent the first time
+    transaction_fee: TxFee // Is the signed message where the sender locks X tokens until the tx is confirmed
+}
+
+// NOTE: This type will replace TransactionContent in the future
+// It uses demosWork to handle the data field as per the DEMOS specifications
+export interface _TransactionContent {
+    type: string
+    from: forge.pki.ed25519.BinaryBuffer | forge.pki.PublicKey | ISignature
+    to: forge.pki.ed25519.BinaryBuffer | forge.pki.PrivateKey | ISignature
+    amount: number
+    // TODO Replace below with data: XMPayload | Web2Payload | NativePayload when ready
+    data: demosWork
     nonce: number // Increments every time a transaction is sent from the same account
     timestamp: number // Is the registered unix timestamp when the transaction was sent the first time
     transaction_fee: TxFee // Is the signed message where the sender locks X tokens until the tx is confirmed
