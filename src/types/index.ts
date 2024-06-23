@@ -18,8 +18,8 @@ export { ISignature } from './blockchain/ISignature'
 export { TxFee } from './blockchain/TxFee'
 export { CValidityData, ValidityData } from './blockchain/ValidityData'
 export { BlockContent, Block } from './blockchain/blocks'
-
-export { Transaction, TransactionContent, XMPayload, Web2Payload, NativePayload, StringifiedPayload } from './blockchain/Transaction'
+// ! Remove _ temporary exports here!
+export { Transaction, TransactionContent, _TransactionContent, XMPayload, Web2Payload, NativePayload, StringifiedPayload } from './blockchain/Transaction'
 export { EncryptedTransaction } from './blockchain/encryptedTransaction'
 export { RawTransaction } from './blockchain/rawTransaction'
 export { Bundle, BundleContent } from './communication/transmit'
