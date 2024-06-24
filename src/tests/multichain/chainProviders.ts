@@ -40,7 +40,9 @@ export default {
         devnet: clusterApiUrl("devnet"),
     },
     ton: {
-        mainnet: "https://toncenter.com/api/v2/jsonRPC",
+        mainnet: getHttpEndpoint({
+            network: "mainnet",
+        }),
         testnet: getHttpEndpoint({
             network: "testnet",
         }),

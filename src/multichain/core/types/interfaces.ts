@@ -112,6 +112,13 @@ export interface IBCSignTxOptions extends IBCConnectWalletOptions {
 // SECTION: Solana Interfaces
 // ===========================
 
+export interface SolanaSignTxOptions {
+    /**
+     * The private key to sign the transaction with, instead of the connected wallet.
+     */
+    privateKey?: string
+}
+
 export interface SolanarunProgramParams {
     /**
      * The IDL of the program to call. If not provided, the IDL will be fetched from the network.

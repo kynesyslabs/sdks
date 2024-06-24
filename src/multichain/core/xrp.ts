@@ -106,17 +106,6 @@ export class XRPL extends DefaultChain {
         return this.connected
     }
 
-    // static override async create(rpc_url: string) {
-    //     const instance = new XRPL(rpc_url)
-    //     // instance.setRpc(rpc_url)
-
-    //     if (rpc_url) {
-    //         await instance.connect('')
-    //     }
-
-    //     return instance
-    // }
-
     // SECTION: Wallets
 
     // INFO Connecting a wallet through a private key (string)

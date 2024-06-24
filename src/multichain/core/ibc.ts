@@ -34,28 +34,7 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
     constructor(rpc_url: string) {
         super(rpc_url)
         this.name = 'ibc'
-
-        // INFO: We can't await here, so we call .setRPC in .create()
-        // if (rpc_url) {
-        // 	this.setRPC(rpc_url);
-        // }
     }
-
-    // override async setRpc(rpc_url: string) {
-    //     this.provider = await StargateClient.connect(rpc_url)
-    // }
-
-    // static override async create(rpc_url: string): Promise<IBC> {
-    //     const instance = new IBC(rpc_url)
-
-    //     if (rpc_url) {
-    //         // INFO: Set rpc url and ping it.
-    //         await instance.setRPC(rpc_url)
-    //         await instance.connect()
-    //     }
-
-    //     return instance
-    // }
 
     // INFO: rpc_url used to avoid overwriting this.provider for test mocking
     async connect(rpc_url?: string) {
