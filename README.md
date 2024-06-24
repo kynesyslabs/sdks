@@ -45,7 +45,3 @@ git commit -m "release v1.0.5"
 ```
 
 The commit will trigger a workflow run to build the files and publish a new version on NPM.
-
-## TODOs
-
--   Review `getBalance` return type. Should it be a string or an object?
