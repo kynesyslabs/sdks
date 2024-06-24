@@ -232,9 +232,8 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
 
     async runAnchorProgram(programId: string, params: SolanarunProgramParams) {
         // REVIEW: Do we need to connect our wallet with the anchor provider?
-        const wallet = new Wallet(this.wallet)
         const pid = new PublicKey(programId)
-        const anchorProvider = new AnchorProvider(this.provider, wallet, {})
+        const anchorProvider = new AnchorProvider(this.provider, null, {})
 
         let idl = params.idl as Idl
 
@@ -255,10 +254,7 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         const ix = program.methods[params.instruction]
         // calling the method with undefined throws an error, so prevent it
         const _ix = params.args ? ix(params.args) : ix()
-        const tx = await _ix
-            .accounts(params.accounts)
-            // .signers(params.signers)
-            .transaction()
+        const tx = await _ix.accounts(params.accounts).transaction()
 
         // INFO: Add fee payer and validity data
         tx.feePayer = params.feePayer

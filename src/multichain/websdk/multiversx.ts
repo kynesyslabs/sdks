@@ -3,14 +3,27 @@ import {
     EGLDSignTxOptions,
     IDefaultChainWeb,
     required,
-} from '@/multichain/core'
-import { IPlainTransactionObject, Transaction } from '@multiversx/sdk-core'
-import { ExtensionProvider } from '@multiversx/sdk-extension-provider'
-import { UserSigner } from '@multiversx/sdk-wallet'
+} from "@/multichain/core"
+import { IPlainTransactionObject, Transaction } from "@multiversx/sdk-core"
+import { ExtensionProvider } from "@multiversx/sdk-extension-provider"
+import { UserSigner } from "@multiversx/sdk-wallet"
 
 export class MULTIVERSX extends EGLDCore implements IDefaultChainWeb {
     constructor(rpc_url: string) {
         super(rpc_url)
+    }
+
+    override getAddress() {
+        // INFO: method is overriden in the web sdk
+        required(this.wallet, "Wallet not connected")
+
+        if (this.wallet instanceof ExtensionProvider) {
+            return this.wallet.account.address
+        } else if (this.wallet instanceof UserSigner) {
+            return this.wallet.getAddress().bech32()
+        }
+
+        throw new Error("Unknown wallet type. Can't get address.")
     }
 
     /**
@@ -21,7 +34,7 @@ export class MULTIVERSX extends EGLDCore implements IDefaultChainWeb {
         privateKey?: string,
         options?: {
             password: string
-        }
+        },
     ) {
         if (privateKey && options?.password) {
             await this.connectKeyFileWallet(privateKey, options.password)
@@ -37,7 +50,7 @@ export class MULTIVERSX extends EGLDCore implements IDefaultChainWeb {
 
         if (!this.wallet.isInitialized()) {
             throw new Error(
-                'Wallet not detected. Is the MultiversX DeFi Wallet extension installed?'
+                "Wallet not detected. Is the MultiversX DeFi Wallet extension installed?",
             )
         }
 
@@ -47,9 +60,9 @@ export class MULTIVERSX extends EGLDCore implements IDefaultChainWeb {
 
     override async signTransactions(
         transactions: Transaction[],
-        options?: EGLDSignTxOptions
+        options?: EGLDSignTxOptions,
     ): Promise<IPlainTransactionObject[]> {
-        required(this.wallet || options?.privateKey, 'Wallet not connected')
+        required(this.wallet || options?.privateKey, "Wallet not connected")
 
         // INFO: Override wallet connection
         if (options?.privateKey) {
@@ -69,14 +82,14 @@ export class MULTIVERSX extends EGLDCore implements IDefaultChainWeb {
             for (const tx of transactions) {
                 const serializedTx = tx.serializeForSigning()
                 const txSign = await (this.wallet as UserSigner).sign(
-                    serializedTx
+                    serializedTx,
                 )
 
                 tx.applySignature(txSign)
             }
         }
 
-        return transactions.map((tx) => {
+        return transactions.map(tx => {
             // INFO: Return plain objects
             return tx.toSendable()
         })
