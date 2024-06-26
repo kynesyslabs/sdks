@@ -100,6 +100,14 @@ await instance.connectWallet(
 )
 ```
 
+On the browser, you can also try to connect to the [Phantom](https://phantom.app) browser extension by calling `.connectWallet` without an argument.
+
+```ts
+await instance.connectWallet()
+
+// instance.wallet: PhantomProvider
+```
+
 ### Sending SOL
 
 ```ts
