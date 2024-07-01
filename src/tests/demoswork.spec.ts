@@ -1,10 +1,8 @@
-import {
-    DemosWork,
-    Web2WorkStep,
-    XmStepResult,
-    XmWorkStep,
-    equalTo
-} from "@/types/demoswork"
+import { XmStepResult } from "@/demoswork/types"
+import { equalTo } from "@/demoswork/utils"
+import { DemosWork } from "@/demoswork/work"
+import { Web2WorkStep, XmWorkStep } from "@/demoswork/workstep"
+
 import pprint from "@/utils/pprint"
 
 describe("Demos Workflow", () => {
