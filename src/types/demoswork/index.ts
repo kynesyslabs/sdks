@@ -1,12 +1,14 @@
+import { v4 as uuidv4 } from "uuid"
+
 function getNewUID() {
-    return "something_something"
+    return uuidv4()
 }
 
 // SECTION: XM
 /**
  * A xm step can either be successful or error
  */
-enum XmStepResult {
+export enum XmStepResult {
     success = "success",
     error = "error",
 }
@@ -48,17 +50,72 @@ interface WorkStepInput {
     payload: "payload" | Web2Request
 }
 
-class WorkStep {
+export class WorkStep {
+    type: string
     workUID: string
     input: WorkStepInput
-    output: DemosXmStepOutput
+    output: any
+    description: string
+    // output: DemosXmStepOutput
 
     constructor(input: WorkStepInput) {
+        this.type = input.type
         this.input = input
+        this.workUID = getNewUID()
     }
 
     exec() {
         // INFO: Send payload or execute web2 request here
+    }
+}
+
+enum OutputTypes {
+    demosType = "internal",
+}
+
+export class Web2WorkStep extends WorkStep {
+    override output = {
+        statusCode: {
+            type: OutputTypes.demosType,
+            src: {
+                stepUID: this.workUID,
+                key: "output.statusCode",
+            },
+        },
+        payload: {
+            type: OutputTypes.demosType,
+            src: {
+                stepUID: this.workUID,
+                key: "output.payload",
+            },
+        },
+    }
+
+    constructor(payload: Web2Request) {
+        super({ type: "web2", payload })
+    }
+}
+
+export class XmWorkStep extends WorkStep {
+    override output = {
+        result: {
+            type: OutputTypes.demosType,
+            src: {
+                stepUID: this.workUID,
+                key: "output.result",
+            },
+        },
+        hash: {
+            type: OutputTypes.demosType,
+            src: {
+                stepUID: this.workUID,
+                key: "output.hash",
+            },
+        },
+    }
+
+    constructor(payload: "payload") {
+        super({ type: "xm", payload })
     }
 }
 
@@ -70,7 +127,7 @@ enum stepKeysEnum {
 
 type stepKeys = keyof typeof stepKeysEnum
 
-function equalTo(step: WorkStep, key: stepKeys, value: any) {
+export function equalTo(step: WorkStep, key: stepKeys, value: any) {
     return {
         step: step,
         operator: "equality",
@@ -83,7 +140,7 @@ function equalTo(step: WorkStep, key: stepKeys, value: any) {
  * The final shape of the work script
  */
 interface XmScript {
-    operationOrder: string[]
+    operationOrder: Set<string>
     operations: { [key: string]: any }
     steps: { [key: string]: WorkStep }
 }
@@ -110,13 +167,40 @@ interface Conditional {
     stepUID: string
 }
 
-class DemosWork {
-    script: XmScript
-    results: Map<string, DemosXmStepOutput | DemosWeb2StepOutput>
+// class XmScript {
+//     operationOrder: Set<string>
+//     operations: { [key: string]: any }
+//     steps: { [key: string]: WorkStep }
+
+//     constructor() {
+//         this.operations = {}
+//         this.operationOrder = new Set()
+//         this.steps = {}
+//     }
+// }
+
+export class DemosWork {
+    #iscript: XmScript = {
+        operationOrder: new Set<string>(),
+        operations: {},
+        steps: {},
+    }
+    results: Map<string, DemosXmStepOutput | DemosWeb2StepOutput> = new Map()
     steps: WorkStep[]
 
-    constructor(steps?: WorkStep[]) {
+    constructor(steps: WorkStep[] = []) {
         this.steps = steps
+    }
+
+    get script() {
+        let script = this.#iscript
+        script.steps = this.steps.reduce((acc, step) => {
+            delete step.output
+            acc[step.workUID] = step
+            return acc
+        }, {} as { [key: string]: WorkStep })
+
+        return script
     }
 
     add(step: WorkStep) {
@@ -167,8 +251,8 @@ class DemosWork {
             if_script.then = step.workUID
 
             // INFO: 8. Close operation by adding the if_script to the work script
-            this.script.operations[if_script.operationUID] = if_script
-            this.script.operationOrder.push(if_script.operationUID)
+            this.#iscript.operations[if_script.operationUID] = if_script
+            this.#iscript.operationOrder.add(if_script.operationUID)
 
             return { elif, else_ }
         }
@@ -183,38 +267,55 @@ class DemosWork {
         // INFO: 10. Allow chaining of if, elif and then
         return { then }
     }
+
+    toJSON() {
+        let script = this.script
+        // @ts-expect-error
+        script.operationOrder = [...script.operationOrder]
+        return JSON.stringify(script, null, 2)
+    }
 }
 
+// class DemosWorkLoader extends DemosWork {
+//     #iscript: XmScript
+
+//     fromScript(script: XmScript) {
+//         let newscript = script
+//         newscript.operationOrder = new Set(script.operationOrder)
+
+//         this.#iscript = script
+//         return this
+//     }
+// }
 // SECTION: Example usage
 
-const work = new DemosWork()
+// const work = new DemosWork()
 
-const sendEth = new WorkStep({
-    type: "xm",
-    payload: "payload",
-})
+// const sendEth = new WorkStep({
+//     type: "xm",
+//     payload: "payload",
+// })
 
-const sendHash = new WorkStep({
-    type: "web2",
-    payload: {
-        url: "https://myapi.com",
-        method: "POST",
-        data: {
-            hash: sendEth.output.hash,
-        },
-    },
-})
+// const sendHash = new WorkStep({
+//     type: "web2",
+//     payload: {
+//         url: "https://myapi.com",
+//         method: "POST",
+//         data: {
+//             hash: sendEth.output.hash,
+//         },
+//     },
+// })
 
-//              WorkStep | Workstep property | value
-work.if(equalTo(sendEth, "output.result", XmStepResult.success))
-    .then(sendHash)
-    .elif(equalTo(sendEth, "output.result", XmStepResult.error))
-    .then(sendHash)
-    .else_(sendHash)
+// //              WorkStep | Workstep property | value
+// work.if(equalTo(sendEth, "output.result", XmStepResult.success))
+//     .then(sendHash)
+//     .elif(equalTo(sendEth, "output.result", XmStepResult.error))
+//     .then(sendHash)
+//     .else_(sendHash)
 
-// This would be the final script
-console.log(work.script)
-
+// // This would be the final script
+// console.log(work.script)
 
 // SECTION: NOTES
 
