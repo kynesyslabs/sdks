@@ -29,7 +29,7 @@ describe("Demos Workflow", () => {
             .then(sendHash)
             .elif(equalTo(sendMoreEth, "output.result", XmStepResult.error))
             .then(sendHash)
-            .else_(sendHash)
+            .else(sendHash)
 
         // This would be the final script
         pprint(work.script)

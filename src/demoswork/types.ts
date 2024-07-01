@@ -85,4 +85,5 @@ export interface Conditional {
     key: string
     value: any
     stepUID: string
+    do: string
 }
