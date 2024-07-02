@@ -11,6 +11,7 @@ describe("Demos Workflow", () => {
 
         const sendEth = new XmWorkStep("payload")
         sendEth.description = "Send ETH"
+        // sendEth.sign("privateKey")
 
         const sendMoreEth = new XmWorkStep("payload")
         sendMoreEth.description = "Send more ETH"
@@ -22,7 +23,7 @@ describe("Demos Workflow", () => {
                 hash: sendEth.output.hash,
             },
         })
-        sendHash.description = "Send XM tx hash to HTTP API"
+        sendHash.description = "Send xm hash to HTTP API"
 
         //              WorkStep | Workstep property | value
         work.if(equalTo(sendEth, "output.result", XmStepResult.success))

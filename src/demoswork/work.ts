@@ -1,5 +1,4 @@
-import { Condition, WorkStepOutput, XmScript } from "@/demoswork/types"
-import { WorkStep } from "./workstep"
+import { Condition, XmScript } from "@/demoswork/types"
 import { Conditional } from "./operations/conditional"
 
 export class DemosWork {
@@ -7,12 +6,6 @@ export class DemosWork {
         operationOrder: new Set<string>(),
         operations: {},
         steps: {},
-    }
-    results: Map<string, WorkStepOutput> = new Map()
-    steps: WorkStep[]
-
-    constructor(steps: WorkStep[] = []) {
-        this.steps = steps
     }
 
     if(condition: Condition) {

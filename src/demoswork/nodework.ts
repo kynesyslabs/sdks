@@ -1,18 +1,22 @@
-import { XmScript } from "./types"
+import { WorkStepOutput, XmScript } from "./types"
 import { DemosWork } from "./work"
 
 /**
  * Node-side Demos Work. Loads the XMScript sent from the client
  * and prepares it for execution.
  */
-class NodeDemosWork extends DemosWork {
-    #iscript: XmScript
+class NodeWork extends DemosWork {
+    results: Map<string, WorkStepOutput> = new Map()
 
-    fromScript(script: XmScript) {
+    loadScript(script: XmScript) {
         let newscript = script
         newscript.operationOrder = new Set(script.operationOrder)
 
-        this.#iscript = script
+        this.script = script
         return this
+    }
+
+    execute() {
+        // TODO: Parse Xmscript and execute operations.
     }
 }

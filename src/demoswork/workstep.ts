@@ -1,5 +1,9 @@
-import { Web2Request, WorkStepInput } from "@/demoswork/types"
+import forge from "node-forge"
+
 import { getNewUID } from "./utils"
+import { Web2Request, WorkStepInput } from "@/demoswork/types"
+import { HexToForge } from "@/utils/dataManipulation"
+import { Hashing } from "@/encryption"
 
 export class WorkStep {
     type: string
@@ -7,6 +11,8 @@ export class WorkStep {
     input: WorkStepInput
     output: any
     description: string
+    // hash: string
+    signature: Uint8Array
     // output: DemosXmStepOutput
 
     constructor(input: WorkStepInput) {
@@ -14,7 +20,32 @@ export class WorkStep {
         this.workUID = getNewUID()
     }
 
-    exec() {
+    get hash() {
+        return Hashing.sha256(JSON.stringify(this))
+    }
+
+    /**
+     * Sign a work step using a private key
+     *
+     * @param privateKey The private key
+     * @returns The signature
+     */
+    sign(privateKey: forge.pki.ed25519.BinaryBuffer | any) {
+        if (privateKey.type == "string") {
+            console.log("[HexToForge] Deriving a buffer from privateKey...")
+            privateKey = HexToForge(privateKey)
+        }
+
+        this.signature = forge.pki.ed25519.sign({
+            message: this.hash,
+            encoding: "utf8",
+            privateKey,
+        })
+
+        return this.signature
+    }
+
+    execute() {
         // INFO: Send payload or execute web2 request here
     }
 }
