@@ -19,19 +19,19 @@ describe("Demos Workflow", () => {
             url: "https://myapi.com",
             method: "POST",
             data: {
-                something: "else",
                 hash: sendEth.output.hash,
             },
         })
+        sendHash.description = "Send XM tx hash to HTTP API"
 
         //              WorkStep | Workstep property | value
         work.if(equalTo(sendEth, "output.result", XmStepResult.success))
             .then(sendHash)
-            .elif(equalTo(sendMoreEth, "output.result", XmStepResult.error))
+            .elif(equalTo(sendEth, "output.result", XmStepResult.error))
             .then(sendHash)
             .else(sendHash)
 
         // This would be the final script
-        pprint(work.script)
+        pprint(work.toJSON())
     })
 })

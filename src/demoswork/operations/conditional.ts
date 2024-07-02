@@ -1,4 +1,3 @@
-import pprint from "@/utils/pprint"
 import { Operation, OperationType } from "."
 import { Condition, XmScript, Conditional as C } from "../types"
 import { WorkStep } from "../workstep"
@@ -47,20 +46,17 @@ export class Conditional extends Operation {
         this.writeToScript()
 
         return {
-            elif: this.elif,
-            else: this.else,
+            elif: this.elif.bind(this),
+            else: this.else.bind(this),
         }
     }
 
     elif(condition: Condition) {
-        // "this" here does not refer to the Conditional instance
-        // It refers to the object returned by the "then" method
-        // TODO: Fix this!
         this.addStep(condition.step)
         this.appendCondition(condition)
 
         return {
-            then: this.then,
+            then: this.then.bind(this),
         }
     }
 
@@ -75,9 +71,5 @@ export class Conditional extends Operation {
         })
 
         this.writeToScript()
-
-        // this.script.operations[this.operationScript.operationUID] =
-        //     this.operationScript
-        // this.script.operationOrder.add(this.operationScript.operationUID)
     }
 }

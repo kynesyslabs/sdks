@@ -41,10 +41,7 @@ interface DemosWeb2StepOutput {
 
 // SECTION: WORK STEPS
 
-export interface WorkStepInput {
-    type: "xm" | "web2"
-    payload: "payload" | Web2Request
-}
+export type WorkStepInput = "payload" | Web2Request
 
 enum stepKeysEnum {
     "output.result" = "output.result",

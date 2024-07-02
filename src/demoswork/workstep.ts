@@ -10,7 +10,6 @@ export class WorkStep {
     // output: DemosXmStepOutput
 
     constructor(input: WorkStepInput) {
-        this.type = input.type
         this.input = input
         this.workUID = getNewUID()
     }
@@ -25,6 +24,7 @@ enum OutputTypes {
 }
 
 export class Web2WorkStep extends WorkStep {
+    override type: string = "web2"
     override output = {
         statusCode: {
             type: OutputTypes.demosType,
@@ -43,11 +43,12 @@ export class Web2WorkStep extends WorkStep {
     }
 
     constructor(payload: Web2Request) {
-        super({ type: "web2", payload })
+        super(payload)
     }
 }
 
 export class XmWorkStep extends WorkStep {
+    override type: string = "xm"
     override output = {
         result: {
             type: OutputTypes.demosType,
@@ -66,6 +67,6 @@ export class XmWorkStep extends WorkStep {
     }
 
     constructor(payload: "payload") {
-        super({ type: "xm", payload })
+        super(payload)
     }
 }

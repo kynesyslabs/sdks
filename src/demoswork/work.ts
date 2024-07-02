@@ -23,6 +23,17 @@ export class DemosWork {
         let script = this.script
         // @ts-expect-error
         script.operationOrder = [...script.operationOrder]
-        return JSON.stringify(script, null, 2)
+        // remove all step outputs
+        for (const stepUID in script.steps) {
+            delete script.steps[stepUID].output
+            delete script.steps[stepUID].workUID
+        }
+
+        // remove all operation uids
+        for (const opUID in script.operations) {
+            delete script.operations[opUID].operationUID
+        }
+
+        return script
     }
 }
