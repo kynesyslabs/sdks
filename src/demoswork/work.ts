@@ -1,5 +1,8 @@
-import { Condition, XmScript } from "@/demoswork/types"
+import { XmScript } from "@/types/demoswork"
+import { Condition } from "@/types/demoswork/steps"
 import { Conditional } from "./operations/conditional"
+import executeScript from "./executor"
+import pprint from "@/utils/pprint"
 
 export class DemosWork {
     script: XmScript = {
@@ -7,15 +10,36 @@ export class DemosWork {
         operations: {},
         steps: {},
     }
+    // INFO: Step results indexed by stepUID
+    results: Record<string, any> = {}
 
-    if(condition: Condition) {
+    if(condition: boolean | Condition) {
         return new Conditional(this.script, condition)
+    }
+
+    #validate() {
+        // NOTES: Test the script for errors before trying to execute it.
+    }
+
+    fromJSON(script: XmScript) {
+        let newscript = script
+        pprint(newscript.operationOrder)
+        newscript.operationOrder = new Set(script.operationOrder)
+
+        this.script = script
+        return this
+    }
+
+    async execute() {
+        await executeScript(this)
     }
 
     toJSON() {
         let script = this.script
         // @ts-expect-error
+        // convert set to array
         script.operationOrder = [...script.operationOrder]
+
         // remove all step outputs
         for (const stepUID in script.steps) {
             delete script.steps[stepUID].output

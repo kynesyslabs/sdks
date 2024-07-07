@@ -1,6 +1,11 @@
-import { Operation, OperationType } from "."
-import { Condition, XmScript, Conditional as C } from "../types"
+import { Operation } from "."
 import { WorkStep } from "../workstep"
+
+import { XmScript } from "@/types/demoswork"
+import { OperationType } from "@/types/demoswork/operations"
+
+// NOTE: A conditional type is the one that goes into the script
+import { Conditional as C, Condition } from "@/types/demoswork/steps"
 
 export class Conditional extends Operation {
     override operationScript: {
@@ -9,11 +14,16 @@ export class Conditional extends Operation {
         conditions: C[]
     }
 
-    constructor(script: XmScript, condition: Condition) {
+    // INFO: A condition can be a boolean (pre-computed) or a condition object (to be computed on runtime)
+    constructor(script: XmScript, condition: boolean | Condition) {
         super(script)
         this.operationScript.operationType = "conditional"
 
-        this.addStep(condition.step)
+        if (typeof condition === "object") {
+            console.log("inside conditional", condition)
+            this.addStep(condition.step)
+        }
+
         this.operationScript = {
             ...this.operationScript,
             conditions: [],
@@ -22,13 +32,28 @@ export class Conditional extends Operation {
         this.writeToScript()
     }
 
-    appendCondition(condition: Condition) {
-        this.operationScript.conditions.push({
+    appendCondition(condition: boolean | Condition) {
+        // INFO: If the condition is a boolean, create a value only condition
+        if (typeof condition === "boolean") {
+            return this.operationScript.conditions.push({
+                operator: null,
+                key: null,
+                value: condition,
+                stepUID: null,
+                do: null,
+            })
+        }
+
+        // INFO: If the condition is an object, create a condition object
+        return this.operationScript.conditions.push({
             operator: condition.operator,
             key: condition.key,
             value: condition.value,
             stepUID: condition.step.workUID,
-            do: null,
+            do: {
+                type: "step",
+                uid: null,
+            },
         })
     }
 
@@ -42,7 +67,10 @@ export class Conditional extends Operation {
     then(step: WorkStep) {
         this.addStep(step)
         const op_length = this.operationScript.conditions.length
-        this.operationScript.conditions[op_length - 1].do = step.workUID
+        this.operationScript.conditions[op_length - 1].do = {
+            type: "step",
+            uid: step.workUID,
+        }
         this.writeToScript()
 
         return {
@@ -51,8 +79,11 @@ export class Conditional extends Operation {
         }
     }
 
-    elif(condition: Condition) {
-        this.addStep(condition.step)
+    elif(condition: boolean | Condition) {
+        if (typeof condition === "object") {
+            console.log("inside conditional", condition)
+            this.addStep(condition.step)
+        }
         this.appendCondition(condition)
 
         return {
@@ -66,8 +97,11 @@ export class Conditional extends Operation {
             operator: null,
             key: null,
             value: null,
-            stepUID: step.workUID,
-            do: null,
+            stepUID: null,
+            do: {
+                type: "step",
+                uid: step.workUID,
+            },
         })
 
         this.writeToScript()

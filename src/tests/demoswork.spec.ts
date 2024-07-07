@@ -1,4 +1,4 @@
-import { XmStepResult } from "@/demoswork/types"
+import { XmStepResult } from "@/types/demoswork/steps"
 import { equalTo } from "@/demoswork/utils"
 import { DemosWork } from "@/demoswork/work"
 import { Web2WorkStep, XmWorkStep } from "@/demoswork/workstep"
@@ -26,13 +26,18 @@ describe("Demos Workflow", () => {
         sendHash.description = "Send xm hash to HTTP API"
 
         //              WorkStep | Workstep property | value
-        work.if(equalTo(sendEth, "output.result", XmStepResult.success))
+        work.if(true)
             .then(sendHash)
             .elif(equalTo(sendEth, "output.result", XmStepResult.error))
             .then(sendHash)
             .else(sendHash)
 
+        // work.if(sendEth.output.result, "==", XmStepResult.error)
         // This would be the final script
-        pprint(work.toJSON())
+        // pprint(work.toJSON())
+
+        const loaded = work.fromJSON(work.toJSON())
+        pprint(loaded.toJSON())
+        loaded.execute()
     })
 })

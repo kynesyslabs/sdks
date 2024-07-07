@@ -1,22 +1,27 @@
-import { XmScript } from "../types";
-import { getNewUID } from "../utils";
-import { WorkStep } from "../workstep";
+import { XmScript } from "@/types/demoswork"
+import { OperationScript, OperationType } from "@/types/demoswork/operations"
 
-export type OperationType = "conditional" | "loop" | "operation" | "function"
+import { getNewUID } from "../utils"
+import { WorkStep } from "../workstep"
 
 export class Operation {
     script: XmScript
-    operationScript = {
+    operationScript: OperationScript = {
         operationUID: "",
         operationType: <OperationType>"",
     }
 
-    addStep(step: WorkStep){
+    constructor(script: XmScript) {
+        this.script = script
+        this.operationScript.operationUID = getNewUID()
+    }
+
+    addStep(step: WorkStep) {
+        console.log('step', step)
         this.script.steps[step.workUID] = step
     }
 
-    constructor(script: XmScript){
-        this.script = script
-        this.operationScript.operationUID = getNewUID()
+    execute() {
+        throw new Error("Method not implemented.")
     }
 }

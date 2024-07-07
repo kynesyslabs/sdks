@@ -1,9 +1,12 @@
 import forge from "node-forge"
 
 import { getNewUID } from "./utils"
-import { Web2Request, WorkStepInput } from "@/demoswork/types"
-import { HexToForge } from "@/utils/dataManipulation"
 import { Hashing } from "@/encryption"
+import { HexToForge } from "@/utils/dataManipulation"
+
+import { DataTypes } from "@/types/demoswork/types"
+import { WorkStepInput } from "@/types/demoswork/steps"
+import { Web2Request } from "@/types/demoswork/web2"
 
 export class WorkStep {
     type: string
@@ -50,22 +53,18 @@ export class WorkStep {
     }
 }
 
-enum OutputTypes {
-    demosType = "internal",
-}
-
 export class Web2WorkStep extends WorkStep {
     override type: string = "web2"
     override output = {
         statusCode: {
-            type: OutputTypes.demosType,
+            type: DataTypes.internal,
             src: {
                 stepUID: this.workUID,
                 key: "output.statusCode",
             },
         },
         payload: {
-            type: OutputTypes.demosType,
+            type: DataTypes.internal,
             src: {
                 stepUID: this.workUID,
                 key: "output.payload",
@@ -82,14 +81,14 @@ export class XmWorkStep extends WorkStep {
     override type: string = "xm"
     override output = {
         result: {
-            type: OutputTypes.demosType,
+            type: DataTypes.internal,
             src: {
                 stepUID: this.workUID,
                 key: "output.result",
             },
         },
         hash: {
-            type: OutputTypes.demosType,
+            type: DataTypes.internal,
             src: {
                 stepUID: this.workUID,
                 key: "output.hash",

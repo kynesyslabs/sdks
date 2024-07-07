@@ -148,7 +148,7 @@ class DemosWork {
 
     // more operation go here
 
-    toJSON(): JSON<XMScript> {}
+    toJSON(): JSON<XMScript>{}
 }
 ```
 
