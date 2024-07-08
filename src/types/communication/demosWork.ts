@@ -1,6 +1,7 @@
 import * as forge from "node-forge"
 import { XMPayload } from "@/types/blockchain/Transaction"
 import { Web2Payload } from "@/types/blockchain/Transaction"
+import { NativePayload } from "@/types/blockchain/Transaction"
 
 // Strictly declaring the type of a step of a demosWork enables us to
 // easily manage the various steps with the appropriate types.
@@ -14,7 +15,7 @@ export type Web2Step = {
 }
 export type NativeStep = {
     context: "native",
-    payload: any,
+    payload: NativePayload,
 }
 // Here we define the type of a demosWork based on the type of the steps.
 export type demosStepType = XMStep | Web2Step | NativeStep
@@ -23,23 +24,37 @@ export type demosStepType = XMStep | Web2Step | NativeStep
 export interface demosStepContent {
     workUID: string
     type: demosStepType,
+    timestamp: number,
 }
 
 // A single step of a demosWork
 export interface demosStep {
     content: demosStepContent,
-    signature: forge.pki.ed25519.BinaryBuffer // ? Unsure about this
+    signature: forge.pki.ed25519.BinaryBuffer // Enforce the signature to be present
 }
 
 // An aggregate of demosStep
 export interface demosWork {
     workUID: string,
     steps: demosStep[],
+    // ? Would we need an order field to enforce the order of the steps?
+}
+
+export interface demosStepResult {
+    workUID: string,
+    result: {
+        timestamp: number,
+        result: any, // ! Obviously this is just a draft
+    }
+    resultHash: string,
+    signature: forge.pki.ed25519.BinaryBuffer,
 }
 
 // Return interface for demosWork
 export interface demosResult {
     workUID: string,
+    workHash: string, // ? Do we need a hash of the work for verification?
     results: any[], // ! Obviously this is just a draft
+    resultsHash: string, // We do need a hash of the results for verification
     signature: forge.pki.ed25519.BinaryBuffer,
 }
