@@ -164,11 +164,11 @@ const sendHash = new Web2WorkStep({
 sendHash.description = "Send xm hash to HTTP API"
 
 // INFO: Construct a conditional operation
-work.if(sendEth, "==", "success") // if
+work.if(sendEth.output.result, "==", "success") // if
     .then(sendHash)
-    .elif(sendEth, "==", "error") // another condition
+    .elif(sendEth.output.result, "==", "error") // another condition
     .then(sendHash)
-    .else(sendHash)
+    .else(sendMoreEth)
 
 // This will validate the script and return a JSON serializable object
 const demoscript = work.toJSON()
