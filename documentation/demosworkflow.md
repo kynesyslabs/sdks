@@ -164,7 +164,7 @@ const sendHash = new Web2WorkStep({
 sendHash.description = "Send xm hash to HTTP API"
 
 // INFO: Construct a conditional operation
-work.if(sendEth.output.result, "==", "success") // if
+work.if(sendEth.output.result, "==", "success") // also accepts boolean
     .then(sendHash)
     .elif(sendEth.output.result, "==", "error") // another condition
     .then(sendHash)
