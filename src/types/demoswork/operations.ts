@@ -9,3 +9,5 @@ export interface OperationScript {
 export interface ConditionalScript extends OperationScript {
     conditions: Conditional[]
 }
+
+export type AnyOperation = ConditionalScript

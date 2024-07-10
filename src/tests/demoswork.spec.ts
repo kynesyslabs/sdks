@@ -6,7 +6,7 @@ import { Web2WorkStep, XmWorkStep } from "@/demoswork/workstep"
 import pprint from "@/utils/pprint"
 
 describe("Demos Workflow", () => {
-    it("works", () => {
+    it("works", async () => {
         const work = new DemosWork()
 
         const sendEth = new XmWorkStep("payload")
@@ -34,10 +34,12 @@ describe("Demos Workflow", () => {
 
         // work.if(sendEth.output.result, "==", XmStepResult.error)
         // This would be the final script
-        // pprint(work.toJSON())
+        pprint(work.toJSON())
 
         const loaded = work.fromJSON(work.toJSON())
-        pprint(loaded.toJSON())
-        loaded.execute()
+
+        const res = await loaded.execute()
+        pprint(res)
+        pprint(loaded.results)
     })
 })

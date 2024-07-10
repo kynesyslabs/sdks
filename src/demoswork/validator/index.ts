@@ -1,6 +1,11 @@
-import { DemosWork } from "../work"
+import { DemoScript } from "@/types/demoswork";
+import { noUnusedSteps } from "./steps.validator";
 
-export default function (work: DemosWork) {
-    // TODO
-    // NOTES: Test the script for errors before trying to execute it.
+/**
+ * Validates a work script. Checks for common errors.
+ * 
+ * @param work The work script to validate
+ */
+export default function (script: DemoScript) {
+    noUnusedSteps(script)
 }

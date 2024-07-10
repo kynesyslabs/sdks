@@ -7,7 +7,7 @@ import executeConditional from "./conditionalExecutor"
 
 export default async function (work: DemosWork) {
     // TODO! Rewrite forEach to for...of
-    work.script.operationOrder.forEach(async operationUID => {
+    for (const operationUID of work.script.operationOrder) {
         const operation: OperationScript = work.script.operations[operationUID]
 
         if (!operation) {
@@ -30,5 +30,7 @@ export default async function (work: DemosWork) {
                     "Unknown operation type" + operation.operationType,
                 )
         }
-    })
+    }
+
+    return work.results
 }

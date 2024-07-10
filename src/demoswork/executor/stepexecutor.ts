@@ -1,5 +1,12 @@
 import { DemosWork } from "../work"
 
+/**
+ * Execute a step and write the output to the work instance.
+ *
+ * @param work The work instance
+ * @param stepUID The UID of the step to execute
+ * @returns The result of the step
+ */
 export async function executeStep(work: DemosWork, stepUID: string) {
     // INFO: Execute the step here and write the output to the work instance.
     // Process:
@@ -25,4 +32,26 @@ export async function executeStep(work: DemosWork, stepUID: string) {
     }
 
     return work.results[stepUID]
+}
+
+/**
+ * Get the result of a step from the work instance.
+ * If not found, execute the step and return the result.
+ *
+ * @param work The work instance
+ * @param stepUID The step UID
+ * @returns The result of the step
+ */
+export async function getStepResult(work: DemosWork, stepUID: string) {
+    let result = work.results[stepUID]
+
+    if (result) {
+        return result
+    }
+
+    // INFO: If the step result is not found, execute the step
+    console.log(
+        `Step with UID ${stepUID} not found in work results. Executing it now.`,
+    )
+    return await executeStep(work, stepUID)
 }

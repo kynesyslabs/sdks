@@ -1,21 +1,7 @@
-import { ConditionalScript } from "@/types/demoswork/operations"
 import { DemosWork } from "../work"
-import { executeStep } from "./stepexecutor"
 import { compare, getValue } from "../utils"
-
-async function getStepResult(work: DemosWork, stepUID: string) {
-    let result = work.results[stepUID]
-
-    if (result) {
-        return result
-    }
-
-    // INFO: If the step result is not found, execute the step
-    console.log(
-        `Step with UID ${stepUID} not found in work results. Executing it now.`,
-    )
-    return await executeStep(work, stepUID)
-}
+import { executeStep, getStepResult } from "./stepexecutor"
+import { ConditionalScript } from "@/types/demoswork/operations"
 
 export default async function (work: DemosWork, operation: ConditionalScript) {
     for (const condition of operation.conditions) {

@@ -1,11 +1,12 @@
-import { XmScript } from "@/types/demoswork"
+import { DemoScript } from "@/types/demoswork"
 import { Condition } from "@/types/demoswork/steps"
-import { Conditional } from "./operations/conditional"
-import executeScript from "./executor"
 import pprint from "@/utils/pprint"
+import executeScript from "./executor"
+import { Conditional } from "./operations/conditional"
+import sanityCheck from "./validator"
 
 export class DemosWork {
-    script: XmScript = {
+    script: DemoScript = {
         operationOrder: new Set<string>(),
         operations: {},
         steps: {},
@@ -17,11 +18,11 @@ export class DemosWork {
         return new Conditional(this.script, condition)
     }
 
-    #validate() {
-        // NOTES: Test the script for errors before trying to execute it.
+    validate(script: DemoScript) {
+        sanityCheck(script)
     }
 
-    fromJSON(script: XmScript) {
+    fromJSON(script: DemoScript) {
         let newscript = script
         pprint(newscript.operationOrder)
         newscript.operationOrder = new Set(script.operationOrder)
@@ -31,7 +32,7 @@ export class DemosWork {
     }
 
     async execute() {
-        await executeScript(this)
+        return await executeScript(this)
     }
 
     toJSON() {
@@ -51,6 +52,7 @@ export class DemosWork {
             delete script.operations[opUID].operationUID
         }
 
+        this.validate(script)
         return script
     }
 }

@@ -1,7 +1,7 @@
 import { Operation } from "."
 import { WorkStep } from "../workstep"
 
-import { XmScript } from "@/types/demoswork"
+import { DemoScript } from "@/types/demoswork"
 import { OperationType } from "@/types/demoswork/operations"
 
 // NOTE: A conditional type is the one that goes into the script
@@ -15,7 +15,8 @@ export class Conditional extends Operation {
     }
 
     // INFO: A condition can be a boolean (pre-computed) or a condition object (to be computed on runtime)
-    constructor(script: XmScript, condition: boolean | Condition) {
+    // REVIEW: if the condition is a boolean false, then it will never be executed. So, can we omit it from the script?
+    constructor(script: DemoScript, condition: boolean | Condition) {
         super(script)
         this.operationScript.operationType = "conditional"
 
