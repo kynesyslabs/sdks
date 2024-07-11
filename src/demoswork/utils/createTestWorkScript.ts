@@ -18,7 +18,7 @@ export default async function () {
     const payload = await evm.preparePay(evm.getAddress(), "0.0001")
     const sendEth = prepareXMStep({
         operations: {
-            uid: {
+            [uid]: {
                 chain: "eth",
                 is_evm: true,
                 rpc: null,
