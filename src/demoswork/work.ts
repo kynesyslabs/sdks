@@ -6,6 +6,7 @@ import { Conditional } from "./operations/conditional"
 import { runSanityChecks } from "./validator"
 import { operators } from "@/types/demoswork/types"
 import { DemosTransactions, DemosWebAuth } from "@/websdk"
+import { Transaction } from "@/types"
 
 export class DemosWork {
     script: DemoScript = {
@@ -79,10 +80,10 @@ export class DemosWork {
     // TODO: Add static methods for adding and retrieving step results
 }
 
-export async function prepareDemosWorkPayload(work: DemosWork) {
+export async function prepareDemosWorkPayload(work: DemosWork): Promise<Transaction> {
     const script = work.toJSON()
 
-    let tx = DemosTransactions.empty()
+    let tx: Transaction = DemosTransactions.empty()
     tx.content.from = DemosWebAuth.getInstance()!.keypair
         .publicKey as Uint8Array
     tx.content.to = tx.content.from
