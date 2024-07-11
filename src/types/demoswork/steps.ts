@@ -1,5 +1,5 @@
 import { IOperation, XMScript } from "../xm"
-import { operators } from "./types"
+import { DataTypes, operators } from "./types"
 
 import { IWeb2Request } from "../web2"
 import { DemosWeb2StepOutput } from "./web2"
@@ -52,6 +52,14 @@ export interface DemosXmStepOutput {
      * The hash of the sent transaction
      */
     hash: string
+}
+
+export interface StepOutputKey {
+    type: DataTypes
+    src: {
+        step: WorkStep
+        key: string
+    }
 }
 
 /**

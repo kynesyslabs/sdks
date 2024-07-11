@@ -1,9 +1,11 @@
 import { DemoScript } from "@/types/demoswork"
-import { Condition } from "@/types/demoswork/steps"
+import { Condition, StepOutputKey } from "@/types/demoswork/steps"
 import pprint from "@/utils/pprint"
 import executeScript from "./executor"
 import { Conditional } from "./operations/conditional"
-import sanityCheck from "./validator"
+import { runSanityChecks } from "./validator"
+import { operators } from "@/types/demoswork/types"
+import { DemosTransactions, DemosWebAuth } from "@/websdk"
 
 export class DemosWork {
     script: DemoScript = {
@@ -11,15 +13,33 @@ export class DemosWork {
         operations: {},
         steps: {},
     }
+
     // INFO: Step results indexed by stepUID
     results: Record<string, any> = {}
 
-    if(condition: boolean | Condition) {
-        return new Conditional(this.script, condition)
+    // INFO: Parameters of the if statement can be either a single
+    //  boolean (pre-computed value) or args that form an expression
+    if(conditon: boolean): Conditional
+    if(
+        condition: boolean | StepOutputKey,
+        operator?: operators,
+        value?: any,
+    ): Conditional
+    if(condition: boolean | StepOutputKey, operator?: operators, value?: any) {
+        if (typeof condition === "boolean") {
+            return new Conditional(this.script, condition)
+        }
+
+        return new Conditional(this.script, {
+            key: condition.src.key,
+            operator: operator,
+            step: condition.src.step,
+            value: value,
+        })
     }
 
     validate(script: DemoScript) {
-        sanityCheck(script)
+        runSanityChecks(script)
     }
 
     fromJSON(script: DemoScript) {
@@ -55,4 +75,23 @@ export class DemosWork {
         this.validate(script)
         return script
     }
+
+    // TODO: Add static methods for adding and retrieving step results
+}
+
+export async function prepareDemosWorkPayload(work: DemosWork) {
+    const script = work.toJSON()
+
+    let tx = DemosTransactions.empty()
+    tx.content.from = DemosWebAuth.getInstance()!.keypair
+        .publicKey as Uint8Array
+    tx.content.to = tx.content.from
+    tx.content.type = "demosWork"
+
+    // @ts-expect-error
+    tx.content.data = ["demosWork", script]
+    tx.content.timestamp = Date.now()
+    tx = await DemosTransactions.sign(tx)
+
+    return tx
 }

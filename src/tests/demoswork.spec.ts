@@ -4,42 +4,48 @@ import { DemosWork } from "@/demoswork/work"
 import { Web2WorkStep, XmWorkStep } from "@/demoswork/workstep"
 
 import pprint from "@/utils/pprint"
+import createTestScript from "@/demoswork/utils/createTestWorkScript"
 
 describe("Demos Workflow", () => {
-    // it("works", async () => {
-    //     const work = new DemosWork()
+    test.only("Creating a demoswork tx", async () => {
+        const tx = await createTestScript()
+        pprint(tx)
+    })
 
-    //     const sendEth = new XmWorkStep("payload")
-    //     sendEth.description = "Send ETH"
-    //     // sendEth.sign("privateKey")
+    it("works", async () => {
+        const work = new DemosWork()
 
-    //     const sendMoreEth = new XmWorkStep("payload")
-    //     sendMoreEth.description = "Send more ETH"
+        const sendEth = new XmWorkStep("payload" as any)
+        sendEth.description = "Send ETH"
+        // sendEth.sign("privateKey")
 
-    //     const sendHash = new Web2WorkStep({
-    //         url: "https://myapi.com",
-    //         method: "POST",
-    //         data: {
-    //             hash: sendEth.output.hash,
-    //         },
-    //     })
-    //     sendHash.description = "Send xm hash to HTTP API"
+        const sendMoreEth = new XmWorkStep("payload" as any)
+        sendMoreEth.description = "Send more ETH"
 
-    //     //              WorkStep | Workstep property | value
-    //     work.if(true)
-    //         .then(sendHash)
-    //         .elif(equalTo(sendEth, "output.result", XmStepResult.error))
-    //         .then(sendHash)
-    //         .else(sendHash)
+        const sendHash = new Web2WorkStep({
+            url: "https://myapi.com",
+            method: "POST",
+            data: {
+                hash: sendEth.output.hash,
+            },
+        } as any)
+        sendHash.description = "Send xm hash to HTTP API"
 
-    //     // work.if(sendEth.output.result, "==", XmStepResult.error)
-    //     // This would be the final script
-    //     pprint(work.toJSON())
+        //              WorkStep | Workstep property | value
+        work.if(sendEth.output.result, "==", XmStepResult.success)
+            .then(sendHash)
+            .elif(sendEth.output.result, "==", XmStepResult.error)
+            .then(sendHash)
+            .else(sendHash)
 
-    //     const loaded = work.fromJSON(work.toJSON())
+        // work.if(sendEth.output.result, "==", XmStepResult.error)
+        // This would be the final script
+        pprint(work.toJSON())
 
-    //     const res = await loaded.execute()
-    //     pprint(res)
-    //     pprint(loaded.results)
-    // })
+        const loaded = work.fromJSON(work.toJSON())
+
+        const res = await loaded.execute()
+        pprint(res)
+        pprint(loaded.results)
+    })
 })

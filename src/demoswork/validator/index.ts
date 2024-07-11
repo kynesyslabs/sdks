@@ -6,6 +6,6 @@ import { noUnusedSteps } from "./steps.validator";
  * 
  * @param work The work script to validate
  */
-export default function (script: DemoScript) {
+export function runSanityChecks(script: DemoScript) {
     noUnusedSteps(script)
 }

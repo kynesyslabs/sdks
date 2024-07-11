@@ -5,7 +5,12 @@ import { DemoScript } from "@/types/demoswork"
 import { OperationType } from "@/types/demoswork/operations"
 
 // NOTE: A conditional type is the one that goes into the script
-import { Conditional as C, Condition } from "@/types/demoswork/steps"
+import {
+    Conditional as C,
+    Condition,
+    StepOutputKey,
+} from "@/types/demoswork/steps"
+import { operators } from "@/types/demoswork/types"
 
 export class Conditional extends Operation {
     override operationScript: {
@@ -80,12 +85,34 @@ export class Conditional extends Operation {
         }
     }
 
-    elif(condition: boolean | Condition) {
+    elif(conditon: boolean): Conditional
+    elif(
+        condition: boolean | StepOutputKey,
+        operator?: operators,
+        value?: any,
+    ): Conditional
+    elif(
+        condition: boolean | StepOutputKey,
+        operator?: operators,
+        value?: any,
+    ) {
+        let conditionEntry = null
+
         if (typeof condition === "object") {
             console.log("inside conditional", condition)
-            this.addStep(condition.step)
+            this.addStep(condition.src.step)
+
+            conditionEntry = {
+                key: condition.src.key,
+                operator: operator,
+                step: condition.src.step,
+                value: value,
+            }
+        } else {
+            conditionEntry = condition
         }
-        this.appendCondition(condition)
+
+        this.appendCondition(conditionEntry)
 
         return {
             then: this.then.bind(this),
