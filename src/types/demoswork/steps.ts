@@ -1,6 +1,9 @@
+import { IOperation, XMScript } from "../xm"
 import { operators } from "./types"
+
+import { IWeb2Request } from "../web2"
+import { DemosWeb2StepOutput } from "./web2"
 import { WorkStep } from "@/demoswork/workstep"
-import { DemosWeb2StepOutput, Web2Request } from "./web2"
 
 interface BaseCondition {
     operator: operators
@@ -35,7 +38,7 @@ export enum stepKeysEnum {
 }
 
 export type stepKeys = keyof typeof stepKeysEnum
-export type WorkStepInput = "payload" | Web2Request
+export type WorkStepInput = XMScript | IWeb2Request | any
 export type WorkStepOutput = DemosXmStepOutput | DemosWeb2StepOutput
 
 /**

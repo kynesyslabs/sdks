@@ -1,6 +1,6 @@
 {
-    "name": "@kynesyslabs/demosdk",
-    "version": "1.1.6",
+    "name": "@kynesyslabs/demosdk-beta",
+    "version": "1.0.0",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -13,6 +13,7 @@
         ".": "./build/index.js",
         "./types": "./build/types/index.js",
         "./websdk": "./build/websdk/index.js",
+        "./demoswork": "./build/demoswork/index.js",
         "./xm-websdk": "./build/multichain/websdk/index.js",
         "./xm-localsdk": "./build/multichain/localsdk/index.js"
     },

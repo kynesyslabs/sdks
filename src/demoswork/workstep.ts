@@ -4,26 +4,25 @@ import { getNewUID } from "./utils"
 import { Hashing } from "@/encryption"
 import { HexToForge } from "@/utils/dataManipulation"
 
+import { IWeb2Request, XMScript } from "@/types"
 import { DataTypes } from "@/types/demoswork/types"
 import { WorkStepInput } from "@/types/demoswork/steps"
-import { Web2Request } from "@/types/demoswork/web2"
 
 export class WorkStep {
     type: string
     workUID: string
-    input: WorkStepInput
+    content: WorkStepInput
     output: any
     description: string
-    // hash: string
-    signature: Uint8Array
-    // output: DemosXmStepOutput
+    signature: forge.pki.ed25519.BinaryBuffer
 
-    constructor(input: WorkStepInput) {
-        this.input = input
+    constructor(payload: WorkStepInput) {
+        this.content = payload
         this.workUID = getNewUID()
     }
 
     get hash() {
+        // REVIEW: What fields should be hashed?
         return Hashing.sha256(JSON.stringify(this))
     }
 
@@ -72,7 +71,7 @@ export class Web2WorkStep extends WorkStep {
         },
     }
 
-    constructor(payload: Web2Request) {
+    constructor(payload: IWeb2Request) {
         super(payload)
     }
 }
@@ -96,7 +95,14 @@ export class XmWorkStep extends WorkStep {
         },
     }
 
-    constructor(payload: "payload") {
+    constructor(payload: XMScript) {
         super(payload)
     }
 }
+
+export function prepareXMStep(xm_payload: XMScript) {
+    return new XmWorkStep(xm_payload)
+}
+
+
+
