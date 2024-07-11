@@ -34,9 +34,7 @@ export default async function () {
     })
     sendEth.description = "Send ETH"
 
-    const sendMoreEth = prepareXMStep("payload" as any)
-    sendMoreEth.description = "Send more ETH"
-
+    // WEB2 STEP
     const web2request = skeletons.web2_request
     web2request.raw.action = "POST"
     web2request.raw.url = "https://myapi.com"
@@ -44,9 +42,9 @@ export default async function () {
     // INFO: Send the output of the sendEth step as a parameter
     // REVIEW: Is this where the hash should go?
     web2request.raw.parameters = [
-        {
-            hash: sendEth.output.hash,
-        },
+        // {
+        //    hash: sendEth.output.hash,
+        // },
     ]
 
     web2request.raw.headers = null
