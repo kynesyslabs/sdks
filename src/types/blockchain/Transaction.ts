@@ -5,12 +5,14 @@ import { TxFee } from './TxFee'
 import { IWeb2Request } from '../web2'
 import { XMScript } from '../xm'
 
+import { demosWork } from '../communication/demosWork'
+import { INativePayload } from '../native/index';
+
 export type XMPayload = ["crosschainOperation", XMScript]
 export type Web2Payload = ["web2Request", IWeb2Request]
-export type NativePayload = ["native", any] // TODO
+export type NativePayload = ["native", INativePayload] 
 export type StringifiedPayload = [string, string]
 
-import { demosWork } from '../communication/demosWork'
 
 
 export interface TransactionContent {

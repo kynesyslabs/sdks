@@ -8,7 +8,7 @@ import { XmStepResult } from "@/types/demoswork/steps"
 import { DemosWebAuth, skeletons } from "@/websdk"
 import createTestScript from '@/demoswork/utils/createTestWorkScript';
 import { Transaction } from "@/types"
-
+    
 export default async function createTestWorkScript (): Promise<Transaction> {
     const work = new DemosWork()
 
