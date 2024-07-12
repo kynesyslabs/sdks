@@ -1,12 +1,12 @@
-import { DemoScript } from "@/types/demoswork"
-import { Condition, StepOutputKey } from "@/types/demoswork/steps"
-import pprint from "@/utils/pprint"
-import executeScript from "./executor"
-import { Conditional } from "./operations/conditional"
-import { runSanityChecks } from "./validator"
-import { operators } from "@/types/demoswork/types"
-import { DemosTransactions, DemosWebAuth } from "@/websdk"
 import { Transaction } from "@/types"
+import { DemoScript } from "@/types/demoswork"
+import { StepOutputKey } from "@/types/demoswork/steps"
+import { operators } from "@/types/demoswork/datatypes"
+import pprint from "@/utils/pprint"
+import { DemosTransactions, DemosWebAuth } from "@/websdk"
+import executeScript from "./executor"
+import { ConditionalOperation } from "./operations/conditional"
+import { runSanityChecks } from "./validator"
 
 export class DemosWork {
     script: DemoScript = {
@@ -20,18 +20,18 @@ export class DemosWork {
 
     // INFO: Parameters of the if statement can be either a single
     //  boolean (pre-computed value) or args that form an expression
-    if(conditon: boolean): Conditional
+    if(conditon: boolean): ConditionalOperation
     if(
         condition: boolean | StepOutputKey,
         operator?: operators,
         value?: any,
-    ): Conditional
+    ): ConditionalOperation
     if(condition: boolean | StepOutputKey, operator?: operators, value?: any) {
         if (typeof condition === "boolean") {
-            return new Conditional(this.script, condition)
+            return new ConditionalOperation(this.script, condition)
         }
 
-        return new Conditional(this.script, {
+        return new ConditionalOperation(this.script, {
             key: condition.src.key,
             operator: operator,
             step: condition.src.step,

@@ -1,4 +1,4 @@
-import { Operation } from "."
+import { DemosWorkOperation } from "."
 import { WorkStep } from "../workstep"
 
 import { DemoScript } from "@/types/demoswork"
@@ -6,17 +6,17 @@ import { OperationType } from "@/types/demoswork/operations"
 
 // NOTE: A conditional type is the one that goes into the script
 import {
-    Conditional as C,
+    Conditional,
     Condition,
     StepOutputKey,
 } from "@/types/demoswork/steps"
-import { operators } from "@/types/demoswork/types"
+import { operators } from "@/types/demoswork/datatypes"
 
-export class Conditional extends Operation {
+export class ConditionalOperation extends DemosWorkOperation {
     override operationScript: {
         operationUID: string
         operationType: OperationType
-        conditions: C[]
+        conditions: Conditional[]
     }
 
     // INFO: A condition can be a boolean (pre-computed) or a condition object (to be computed on runtime)
@@ -85,12 +85,12 @@ export class Conditional extends Operation {
         }
     }
 
-    elif(conditon: boolean): Conditional
+    elif(conditon: boolean): ConditionalOperation
     elif(
         condition: boolean | StepOutputKey,
         operator?: operators,
         value?: any,
-    ): Conditional
+    ): ConditionalOperation
     elif(
         condition: boolean | StepOutputKey,
         operator?: operators,

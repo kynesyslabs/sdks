@@ -1,9 +1,8 @@
-import { IOperation, XMScript } from "../xm"
-import { DataTypes, operators } from "./types"
+import { XMScript } from "../xm"
+import { DataTypes, operators } from "./datatypes"
 
-import { IWeb2Request } from "../web2"
-import { DemosWeb2StepOutput } from "./web2"
 import { WorkStep } from "@/demoswork/workstep"
+import { IWeb2Request } from "../web2"
 
 interface BaseCondition {
     operator: operators
@@ -21,7 +20,7 @@ export interface Condition extends BaseCondition {
 
 /**
  * The shape of the conditional operation
- * on the if_script
+ * on the conditional script.
  */
 export interface Conditional extends BaseCondition {
     stepUID: string
@@ -30,7 +29,9 @@ export interface Conditional extends BaseCondition {
         uid: string
     }
 }
-
+/**
+ * Keys that can be used to refer to the output of a step
+ */
 export enum stepKeysEnum {
     "output.result" = "output.result",
     "output.hash" = "output.hash",
@@ -39,21 +40,12 @@ export enum stepKeysEnum {
 
 export type stepKeys = keyof typeof stepKeysEnum
 export type WorkStepInput = XMScript | IWeb2Request | any
-export type WorkStepOutput = DemosXmStepOutput | DemosWeb2StepOutput
 
 /**
- * Assume a xm step that send some ether outputs and object of this shape
+ * The object you get when you refer to the output of a step
+ *
+ * @example sendEther.output.result
  */
-export interface DemosXmStepOutput {
-    stepUID: string
-    result: XmStepResult
-
-    /**
-     * The hash of the sent transaction
-     */
-    hash: string
-}
-
 export interface StepOutputKey {
     type: DataTypes
     src: {
@@ -63,7 +55,7 @@ export interface StepOutputKey {
 }
 
 /**
- * A xm step can either be successful or error
+ * A xm step can either be a success or error
  */
 export enum XmStepResult {
     success = "success",

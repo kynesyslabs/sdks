@@ -1,20 +1,7 @@
 import { v4 as uuidv4 } from "uuid"
 
-import { operators } from "@/types/demoswork/types"
-import { stepKeys } from "@/types/demoswork/steps"
-import { WorkStep } from "../workstep"
-
 export function getNewUID() {
     return uuidv4()
-}
-
-export function equalTo(step: WorkStep, key: stepKeys, value: any) {
-    return {
-        step,
-        operator: <operators>"==",
-        key,
-        value,
-    }
 }
 
 /**

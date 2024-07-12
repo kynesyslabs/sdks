@@ -1,8 +1,8 @@
-import { DemosWork } from "../work"
 import {
-    ConditionalScript,
+    ConditionalOperationScript,
     OperationScript,
 } from "@/types/demoswork/operations"
+import { DemosWork } from "../work"
 import executeConditional from "./conditionalExecutor"
 
 export default async function (work: DemosWork) {
@@ -22,7 +22,7 @@ export default async function (work: DemosWork) {
                     "Executing conditional operation with UID:",
                     operationUID,
                 )
-                await executeConditional(work, operation as ConditionalScript)
+                await executeConditional(work, operation as ConditionalOperationScript)
                 break
 
             default:

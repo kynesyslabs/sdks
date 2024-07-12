@@ -1,5 +1,4 @@
 import { XmStepResult } from "@/types/demoswork/steps"
-import { equalTo } from "@/demoswork/utils"
 import { DemosWork } from "@/demoswork/work"
 import { Web2WorkStep, XmWorkStep } from "@/demoswork/workstep"
 

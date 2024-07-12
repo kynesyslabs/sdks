@@ -6,8 +6,8 @@ export interface OperationScript {
     operationType: OperationType
 }
 
-export interface ConditionalScript extends OperationScript {
+export interface ConditionalOperationScript extends OperationScript {
     conditions: Conditional[]
 }
 
-export type AnyOperation = ConditionalScript
+export type DemosWorkOperationScripts = ConditionalOperationScript

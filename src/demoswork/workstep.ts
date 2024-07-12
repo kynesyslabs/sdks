@@ -5,7 +5,7 @@ import { Hashing } from "@/encryption"
 import { HexToForge } from "@/utils/dataManipulation"
 
 import { IWeb2Request, XMScript } from "@/types"
-import { DataTypes } from "@/types/demoswork/types"
+import { DataTypes } from "@/types/demoswork/datatypes"
 import { StepOutputKey, WorkStepInput } from "@/types/demoswork/steps"
 
 export class WorkStep {

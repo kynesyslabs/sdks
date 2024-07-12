@@ -1,9 +1,9 @@
-import { DemosWork } from "../work"
+import { ConditionalOperationScript } from "@/types/demoswork/operations"
 import { compare, getValue } from "../utils"
+import { DemosWork } from "../work"
 import { executeStep, getStepResult } from "./stepexecutor"
-import { ConditionalScript } from "@/types/demoswork/operations"
 
-export default async function (work: DemosWork, operation: ConditionalScript) {
+export default async function (work: DemosWork, operation: ConditionalOperationScript) {
     for (const condition of operation.conditions) {
         // INFO: operator will be null if the value is pre-computed
         // or if the condition is an else block

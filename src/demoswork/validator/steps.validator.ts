@@ -1,7 +1,7 @@
 import { DemoScript } from "@/types/demoswork"
-import { ConditionalScript } from "@/types/demoswork/operations"
+import { ConditionalOperationScript } from "@/types/demoswork/operations"
 
-function getConditionalScriptSteps(script: ConditionalScript) {
+function getConditionalScriptSteps(script: ConditionalOperationScript) {
     let steps = new Set<string>()
 
     // INFO: Loop through all conditions and add the step to the set

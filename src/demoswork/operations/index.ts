@@ -4,7 +4,7 @@ import { OperationScript, OperationType } from "@/types/demoswork/operations"
 import { getNewUID } from "../utils"
 import { WorkStep } from "../workstep"
 
-export class Operation {
+export class DemosWorkOperation {
     script: DemoScript
     operationScript: OperationScript = {
         operationUID: "",
