@@ -7,6 +7,7 @@ import { HexToForge } from "@/utils/dataManipulation"
 import { IWeb2Request, XMScript } from "@/types"
 import { DataTypes } from "@/types/demoswork/datatypes"
 import { StepOutputKey, WorkStepInput } from "@/types/demoswork/steps"
+import { INativePayload } from "@/types/native"
 
 export class WorkStep {
     context: string
@@ -24,7 +25,7 @@ export class WorkStep {
 
     constructor(payload: WorkStepInput) {
         this.content = payload
-        this.workUID = getNewUID()
+        this.workUID = "step_" + getNewUID()
     }
 
     get hash() {
@@ -119,7 +120,7 @@ export class NativeWorkStep extends WorkStep {
         },
     }
 
-    constructor(payload: any) {
+    constructor(payload: INativePayload) {
         super(payload)
     }
 }
@@ -133,6 +134,6 @@ export function prepareWeb2Step(web2_payload: IWeb2Request) {
     return new Web2WorkStep(web2_payload)
 }
 
-export function prepareNativeStep(native_payload: any) {
+export function prepareNativeStep(native_payload: INativePayload) {
     return new NativeWorkStep(native_payload)
 }

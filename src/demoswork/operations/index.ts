@@ -13,7 +13,7 @@ export class DemosWorkOperation {
 
     constructor(script: DemoScript) {
         this.script = script
-        this.operationScript.operationUID = getNewUID()
+        this.operationScript.operationUID = "op_" + getNewUID()
     }
 
     addStep(step: WorkStep) {

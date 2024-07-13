@@ -3,7 +3,7 @@ import { DataTypes, operators } from "./datatypes"
 
 import { WorkStep } from "@/demoswork/workstep"
 import { IWeb2Request } from "../web2"
-import { NativePayload } from '../blockchain/Transaction';
+import { INativePayload } from "../native";
 
 interface BaseCondition {
     operator: operators
@@ -40,7 +40,7 @@ export enum stepKeysEnum {
 }
 
 export type stepKeys = keyof typeof stepKeysEnum
-export type WorkStepInput = XMScript | IWeb2Request | NativePayload
+export type WorkStepInput = XMScript | IWeb2Request | INativePayload
 
 /**
  * The object you get when you refer to the output of a step

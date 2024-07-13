@@ -1,15 +1,3 @@
-// export {
-//     XMStep,
-//     Web2Step,
-//     NativeStep,
-//     demosStepType,
-// } from "./communication/demosWork"
-// export {
-//     demosStep,
-//     demosStepContent,
-//     demosWork,
-// } from "./communication/demosWork"
-
 export {
     GenesisArtifact,
     GenesisImmutableProperties,
@@ -26,12 +14,8 @@ export { CValidityData, ValidityData } from "./blockchain/ValidityData"
 export { EncryptedTransaction } from "./blockchain/encryptedTransaction"
 export { RawTransaction } from "./blockchain/rawTransaction"
 export {
-    NativePayload,
-    StringifiedPayload,
     Transaction,
     TransactionContent,
-    Web2Payload,
-    XMPayload,
     _TransactionContent,
 } from "./blockchain/Transaction"
 export { Bundle, BundleContent } from "./communication/transmit"
@@ -72,15 +56,6 @@ export {
 export { IOperation, ITask, XMScript } from "./xm"
 
 // DemosWork
-export {
-    DemosWork,
-    DemosWorkOperation,
-    ConditionalOperation,
-    WorkStep,
-    XmWorkStep,
-    NativeWorkStep,
-    Web2WorkStep,
-} from "@/demoswork"
 export { DemoScript } from "./demoswork"
 export { DataTypes, operators } from "./demoswork/datatypes"
 export {
