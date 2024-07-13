@@ -38,6 +38,7 @@ export async function prepareWeb2Payload (
   web2_tx.content.to = web2_tx.content.from
   // Setting the type and data
   web2_tx.content.type = "web2Request"
+  // @ts-expect-error
   web2_tx.content.data = ["web2Request", web2_payload]
   // Producing a timestamp
   web2_tx.content.timestamp = Date.now()

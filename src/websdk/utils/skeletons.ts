@@ -10,6 +10,7 @@ const transaction: Transaction = {
         from: '', // forge.pki.ed25519.BinaryBuffer
         to: '', // forge.pki.ed25519.BinaryBuffer
         amount: 0, // number
+        // @ts-expect-error
         data: ['', ''], // [string, string] // type as string and content in hex string
         nonce: 0, // number // Increments every time a transaction is sent from the same account
         timestamp: 0, // number // Is the registered unix timestamp when the transaction was sent the first time

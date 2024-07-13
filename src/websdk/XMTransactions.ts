@@ -135,6 +135,7 @@ async function prepareXMPayload(xm_payload: XMScript): Promise<Transaction> {
   xm_transaction.content.to = xm_transaction.content.from
   // Setting the type and data
   xm_transaction.content.type = "crosschainOperation"
+  // @ts-expect-error
   xm_transaction.content.data = ["crosschainOperation", xm_payload]
   // Producing a timestamp
   xm_transaction.content.timestamp = Date.now()
