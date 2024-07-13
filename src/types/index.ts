@@ -10,13 +10,11 @@ export { Block, BlockContent } from "./blockchain/blocks"
 export { ISignature } from "./blockchain/ISignature"
 export { TxFee } from "./blockchain/TxFee"
 export { CValidityData, ValidityData } from "./blockchain/ValidityData"
-// ! Remove _ temporary exports here!
 export { EncryptedTransaction } from "./blockchain/encryptedTransaction"
 export { RawTransaction } from "./blockchain/rawTransaction"
 export {
     Transaction,
-    TransactionContent,
-    _TransactionContent,
+    TransactionContent
 } from "./blockchain/Transaction"
 export { Bundle, BundleContent } from "./communication/transmit"
 
