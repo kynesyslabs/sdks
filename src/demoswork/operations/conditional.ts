@@ -1,112 +1,64 @@
 import { DemosWorkOperation } from "."
 import { WorkStep } from "../workstep"
 
-import { DemoScript } from "@/types/demoswork"
 import { OperationType } from "@/types/demoswork/operations"
 
 // NOTE: A conditional type is the one that goes into the script
-import {
-    Conditional,
-    Condition,
-    StepOutputKey,
-} from "@/types/demoswork/steps"
-import { operators } from "@/types/demoswork/datatypes"
+import { DemosWorkOutputKey } from "@/types/demoswork"
+import { DataTypes, operators } from "@/types/demoswork/datatypes"
+import { Condition, Conditional } from "@/types/demoswork/steps"
 
 export class ConditionalOperation extends DemosWorkOperation {
+    // INFO: A conditional in the making
+    tempConditions: Conditional[] = []
     override operationScript: {
-        operationUID: string
+        id: string
         operationType: OperationType
         conditions: Conditional[]
     }
 
-    // INFO: A condition can be a boolean (pre-computed) or a condition object (to be computed on runtime)
-    // REVIEW: if the condition is a boolean false, then it will never be executed. So, can we omit it from the script?
-    constructor(script: DemoScript, condition: boolean | Condition) {
-        super(script)
+    override output = {
+        success: {
+            type: DataTypes.internal,
+            src: {
+                self: this as DemosWorkOperation,
+                key: "output.success",
+            },
+        },
+    }
+
+    constructor() {
+        super()
         this.operationScript.operationType = "conditional"
-
-        if (typeof condition === "object") {
-            console.log("inside conditional", condition)
-            this.addStep(condition.step)
-        }
-
         this.operationScript = {
             ...this.operationScript,
             conditions: [],
         }
-        this.appendCondition(condition)
-        this.writeToScript()
     }
 
-    appendCondition(condition: boolean | Condition) {
-        // INFO: If the condition is a boolean, create a value only condition
-        if (typeof condition === "boolean") {
-            return this.operationScript.conditions.push({
-                operator: null,
-                key: null,
-                value: condition,
-                stepUID: null,
-                do: null,
-            })
-        }
-
-        // INFO: If the condition is an object, create a condition object
-        return this.operationScript.conditions.push({
-            operator: condition.operator,
-            key: condition.key,
-            value: condition.value,
-            stepUID: condition.step.workUID,
-            do: {
-                type: "step",
-                uid: null,
-            },
-        })
-    }
-
-    writeToScript() {
-        this.script.operations[this.operationScript.operationUID] =
-            this.operationScript
-        this.script.operationOrder.add(this.operationScript.operationUID)
-        // TODO: Remove all step outputs
-    }
-
-    then(step: WorkStep) {
-        this.addStep(step)
-        const op_length = this.operationScript.conditions.length
-        this.operationScript.conditions[op_length - 1].do = {
-            type: "step",
-            uid: step.workUID,
-        }
-        this.writeToScript()
-
-        return {
-            elif: this.elif.bind(this),
-            else: this.else.bind(this),
-        }
-    }
-
-    elif(conditon: boolean): ConditionalOperation
-    elif(
-        condition: boolean | StepOutputKey,
-        operator?: operators,
-        value?: any,
-    ): ConditionalOperation
-    elif(
-        condition: boolean | StepOutputKey,
+    // INFO: A condition can be a boolean (pre-computed) or a condition object (to be computed on runtime)
+    // REVIEW: if the condition is a boolean false, then it will never be executed. So, can we omit it from the script?
+    // public if(conditon: boolean): any
+    // public if(
+    //     condition: DemosWorkOutputKey,
+    //     operator?: operators,
+    //     value?: any,
+    // ): any
+    if(
+        condition: boolean | DemosWorkOutputKey,
         operator?: operators,
         value?: any,
     ) {
-        let conditionEntry = null
+        let conditionEntry: boolean | Condition
 
         if (typeof condition === "object") {
             console.log("inside conditional", condition)
-            this.addStep(condition.src.step)
-
+            this.addWork(condition.src.self)
             conditionEntry = {
                 key: condition.src.key,
                 operator: operator,
-                step: condition.src.step,
-                value: value,
+                action: condition.src.self,
+                data: value,
             }
         } else {
             conditionEntry = condition
@@ -119,19 +71,95 @@ export class ConditionalOperation extends DemosWorkOperation {
         }
     }
 
-    else(step: WorkStep) {
-        this.addStep(step)
+    appendCondition(condition: boolean | Condition) {
+        // INFO: If the condition is a boolean, create a value only condition
+        if (typeof condition === "boolean") {
+            return this.operationScript.conditions.push({
+                operator: null,
+                key: null,
+                data: condition,
+                workUID: null,
+                do: null,
+            })
+        }
+
+        if (condition.data["type"] === DataTypes.internal) {
+            this.addWork(condition.action)
+            condition.data = {
+                type: DataTypes.internal,
+                workUID: condition.data.src.self.id,
+                key: condition.data.src.key,
+            }
+        } else {
+            condition.data = {
+                type: DataTypes.static,
+                value: condition.data,
+            }
+        }
+
+        // INFO: If the condition is an object, create a condition object
+        return this.tempConditions.push({
+            operator: condition.operator,
+            key: condition.key,
+            data: condition.data,
+            workUID: condition.action.id,
+            do: null,
+        })
+    }
+
+    then(step: WorkStep | DemosWorkOperation) {
+        this.addWork(step)
+        const op_length = this.tempConditions.length
+        this.tempConditions[op_length - 1].do = step.id
+        this.operationScript.conditions.push(this.tempConditions.pop())
+
+        return {
+            elif: this.elif.bind(this),
+            else: this.else.bind(this),
+        }
+    }
+
+    // elif(condition: boolean): any
+    // elif(
+    //     condition: boolean | DemosWorkOutputKey,
+    //     operator?: operators,
+    //     value?: any,
+    // ): any
+    elif(
+        condition: boolean | DemosWorkOutputKey,
+        operator?: operators,
+        value?: any,
+    ) {
+        let conditionEntry: boolean | Condition = null
+
+        if (typeof condition === "object") {
+            this.addWork(condition.src.self)
+
+            conditionEntry = {
+                key: condition.src.key,
+                operator: operator,
+                action: condition.src.self,
+                data: value,
+            }
+        } else {
+            conditionEntry = condition
+        }
+
+        this.appendCondition(conditionEntry)
+
+        return {
+            then: this.then.bind(this),
+        }
+    }
+
+    else(step: WorkStep | DemosWorkOperation) {
+        this.addWork(step)
         this.operationScript.conditions.push({
             operator: null,
             key: null,
-            value: null,
-            stepUID: null,
-            do: {
-                type: "step",
-                uid: step.workUID,
-            },
+            data: null,
+            workUID: null,
+            do: step.id,
         })
-
-        this.writeToScript()
     }
 }

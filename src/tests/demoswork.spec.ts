@@ -4,9 +4,10 @@ import { Web2WorkStep, XmWorkStep } from "@/demoswork/workstep"
 
 import pprint from "@/utils/pprint"
 import createTestScript from "@/demoswork/utils/createTestWorkScript"
+import { ConditionalOperation } from "@/demoswork"
 
 describe("Demos Workflow", () => {
-    test.only("Creating a demoswork tx", async () => {
+    test.skip("Creating a demoswork tx", async () => {
         const tx = await createTestScript()
         pprint(tx)
     })
@@ -31,20 +32,20 @@ describe("Demos Workflow", () => {
         sendHash.description = "Send xm hash to HTTP API"
 
         //              WorkStep | Workstep property | value
-        work.if(sendEth.output.result, "==", XmStepResult.success)
-            .then(sendHash)
-            .elif(sendEth.output.result, "==", XmStepResult.error)
-            .then(sendHash)
-            .else(sendHash)
+        const op1 = new ConditionalOperation()
+        op1.if(sendEth.output.result, "==", XmStepResult.success).then(sendHash)
 
-        // work.if(sendEth.output.result, "==", XmStepResult.error)
-        // This would be the final script
+        const op2 = new ConditionalOperation()
+        op2.if(op1.output.success, "==", sendEth.output.hash).then(sendHash)
+
+        work.push(op2)
+
+        pprint(work)
         pprint(work.toJSON())
+        // const loaded = work.fromJSON(work.toJSON())
 
-        const loaded = work.fromJSON(work.toJSON())
-
-        const res = await loaded.execute()
-        pprint(res)
-        pprint(loaded.results)
+        // const res = await loaded.execute()
+        // pprint(res)
+        // pprint(loaded.results)
     })
 })

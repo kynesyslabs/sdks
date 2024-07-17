@@ -6,10 +6,14 @@ function getConditionalScriptSteps(script: ConditionalOperationScript) {
 
     // INFO: Loop through all conditions and add the step to the set
     script.conditions.forEach(condition => {
-        if (condition.stepUID){
-            steps.add(condition.stepUID)
+        if (condition.workUID.startsWith("step_")) {
+            steps.add(condition.workUID)
         }
-        steps.add(condition.do.uid)
+
+        // Skip operation dos
+        if (condition.do.startsWith("step_")) {
+            steps.add(condition.do)
+        }
     })
 
     return steps
@@ -24,6 +28,7 @@ function collectAllSteps(script: DemoScript) {
         switch (operation.operationType) {
             case "conditional":
                 let conditonalSteps = getConditionalScriptSteps(operation)
+                console.log("conditonalSteps", conditonalSteps)
                 let scriptSteps = new Set(Object.keys(script.steps))
 
                 // INFO: Assert that all steps in the conditional

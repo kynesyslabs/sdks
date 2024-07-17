@@ -8,4 +8,7 @@ import { noUnusedSteps } from "./steps.validator";
  */
 export function runSanityChecks(script: DemoScript) {
     noUnusedSteps(script)
+    // TODO: Add check to ensure operation reference order does not conflict with
+    // defined operations order in the final script
+    // TODO: Check for circular references!
 }

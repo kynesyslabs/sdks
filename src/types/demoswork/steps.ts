@@ -1,14 +1,15 @@
-import { XMScript } from "../xm"
-import { DataTypes, operators } from "./datatypes"
+import { XMScript } from "../xm";
+import { DataTypes, operators } from "./datatypes";
 
-import { WorkStep } from "@/demoswork/workstep"
-import { IWeb2Request } from "../web2"
+import { DemosWorkOperation } from "@/demoswork";
+import { WorkStep } from "@/demoswork/workstep";
 import { INativePayload } from "../native";
+import { IWeb2Request } from "../web2";
 
 interface BaseCondition {
     operator: operators
     key: string
-    value: any
+    data: any
 }
 
 /**
@@ -16,7 +17,7 @@ interface BaseCondition {
  * that is used in `DemosWork.if` and friends
  */
 export interface Condition extends BaseCondition {
-    step: WorkStep
+    action: WorkStep | DemosWorkOperation
 }
 
 /**
@@ -24,11 +25,8 @@ export interface Condition extends BaseCondition {
  * on the conditional script.
  */
 export interface Conditional extends BaseCondition {
-    stepUID: string
-    do: {
-        type: "step"
-        uid: string
-    }
+    workUID: string
+    do: string
 }
 /**
  * Keys that can be used to refer to the output of a step
@@ -50,7 +48,7 @@ export type WorkStepInput = XMScript | IWeb2Request | INativePayload
 export interface StepOutputKey {
     type: DataTypes
     src: {
-        step: WorkStep
+        self: WorkStep
         key: string
     }
 }

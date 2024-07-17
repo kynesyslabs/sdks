@@ -1,11 +1,10 @@
 import { Transaction } from "@/types"
 import { DemoScript } from "@/types/demoswork"
-import { StepOutputKey } from "@/types/demoswork/steps"
-import { operators } from "@/types/demoswork/datatypes"
+
 import pprint from "@/utils/pprint"
 import { DemosTransactions, DemosWebAuth } from "@/websdk"
 import executeScript from "./executor"
-import { ConditionalOperation } from "./operations/conditional"
+import { DemosWorkOperation } from "./operations"
 import { runSanityChecks } from "./validator"
 
 export class DemosWork {
@@ -18,25 +17,23 @@ export class DemosWork {
     // INFO: Step results indexed by stepUID
     results: Record<string, any> = {}
 
-    // INFO: Parameters of the if statement can be either a single
-    //  boolean (pre-computed value) or args that form an expression
-    if(conditon: boolean): ConditionalOperation
-    if(
-        condition: boolean | StepOutputKey,
-        operator?: operators,
-        value?: any,
-    ): ConditionalOperation
-    if(condition: boolean | StepOutputKey, operator?: operators, value?: any) {
-        if (typeof condition === "boolean") {
-            return new ConditionalOperation(this.script, condition)
+    push(operation: DemosWorkOperation) {
+        // @ts-expect-error
+        // INFO: Add operation to the script
+        this.script.operations[operation.operationScript.id] =
+            operation.operationScript
+        this.script.operationOrder.add(operation.operationScript.id)
+
+        // INFO: Add steps used by the operation to the script
+        for (const stepUID in operation.steps) {
+            this.script.steps[stepUID] = operation.steps[stepUID]
         }
 
-        return new ConditionalOperation(this.script, {
-            key: condition.src.key,
-            operator: operator,
-            step: condition.src.step,
-            value: value,
-        })
+        // INFO: Add operations used by the operation to the script
+        for (const op of operation.operations) {
+            // @ts-expect-error
+            this.script.operations[op.operationScript.id] = op.operationScript
+        }
     }
 
     validate(script: DemoScript) {
@@ -45,7 +42,6 @@ export class DemosWork {
 
     fromJSON(script: DemoScript) {
         let newscript = script
-        pprint(newscript.operationOrder)
         newscript.operationOrder = new Set(script.operationOrder)
 
         this.script = script
@@ -65,22 +61,25 @@ export class DemosWork {
         // remove all step outputs
         for (const stepUID in script.steps) {
             delete script.steps[stepUID].output
-            delete script.steps[stepUID].workUID
+            delete script.steps[stepUID].id
         }
 
         // remove all operation uids
         for (const opUID in script.operations) {
-            delete script.operations[opUID].operationUID
+            delete script.operations[opUID].id
         }
 
         this.validate(script)
+        // return JSON.stringify(script)
         return script
     }
 
     // TODO: Add static methods for adding and retrieving step results
 }
 
-export async function prepareDemosWorkPayload(work: DemosWork): Promise<Transaction> {
+export async function prepareDemosWorkPayload(
+    work: DemosWork,
+): Promise<Transaction> {
     const script = work.toJSON()
 
     let tx: Transaction = DemosTransactions.empty()

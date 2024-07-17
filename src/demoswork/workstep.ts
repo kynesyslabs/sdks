@@ -1,17 +1,18 @@
 import forge from "node-forge"
 
-import { getNewUID } from "./utils"
 import { Hashing } from "@/encryption"
 import { HexToForge } from "@/utils/dataManipulation"
+import { getNewUID } from "./utils"
 
 import { IWeb2Request, XMScript } from "@/types"
 import { DataTypes } from "@/types/demoswork/datatypes"
 import { StepOutputKey, WorkStepInput } from "@/types/demoswork/steps"
 import { INativePayload } from "@/types/native"
+import { skeletons } from "@/websdk"
 
 export class WorkStep {
+    id: string
     context: string
-    workUID: string
     content: WorkStepInput
 
     // INFO: The ouput property will be used by devs
@@ -25,7 +26,7 @@ export class WorkStep {
 
     constructor(payload: WorkStepInput) {
         this.content = payload
-        this.workUID = "step_" + getNewUID()
+        this.id = "step_" + getNewUID()
     }
 
     get hash() {
@@ -65,7 +66,7 @@ export class Web2WorkStep extends WorkStep {
         statusCode: {
             type: DataTypes.internal,
             src: {
-                step: this as Web2WorkStep,
+                self: this as Web2WorkStep,
                 key: "output.statusCode",
             },
         },
@@ -73,7 +74,7 @@ export class Web2WorkStep extends WorkStep {
             type: DataTypes.internal,
             src: {
                 key: "output.payload",
-                step: this as Web2WorkStep,
+                self: this as Web2WorkStep,
             },
         },
     }
@@ -90,14 +91,14 @@ export class XmWorkStep extends WorkStep {
         result: {
             type: DataTypes.internal,
             src: {
-                step: this as XmWorkStep,
+                self: this as XmWorkStep,
                 key: "output.result",
             },
         },
         hash: {
             type: DataTypes.internal,
             src: {
-                step: this as XmWorkStep,
+                self: this as XmWorkStep,
                 key: "output.hash",
             },
         },
@@ -114,7 +115,7 @@ export class NativeWorkStep extends WorkStep {
         result: {
             type: DataTypes.internal,
             src: {
-                step: this as NativeWorkStep,
+                self: this as NativeWorkStep,
                 key: "output.result",
             },
         },
@@ -130,7 +131,26 @@ export function prepareXMStep(xm_payload: XMScript) {
     return new XmWorkStep(xm_payload)
 }
 
-export function prepareWeb2Step(web2_payload: IWeb2Request) {
+export function prepareWeb2Step(
+    action = "GET",
+    url = "https://icanhazip.com",
+    parameters = [],
+    requestedParameters = null,
+    headers = null,
+    minAttestations = 2,
+) {
+    // Generating an empty request and filling it
+    const web2_payload: IWeb2Request = skeletons.web2_request
+    web2_payload.raw.action = action
+    web2_payload.raw.url = url
+    web2_payload.raw.parameters = parameters
+    web2_payload.raw.headers = headers
+    web2_payload.raw.minAttestations = minAttestations
+    // Ensuring content is a known property
+    web2_payload.attestations = new Map()
+    web2_payload.hash = ""
+    web2_payload.signature = ""
+    web2_payload.result = ""
     return new Web2WorkStep(web2_payload)
 }
 

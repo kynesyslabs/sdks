@@ -1,5 +1,6 @@
 export enum DataTypes {
-    internal = "internal",
+    internal = "$internal",
+    static = "$static",
 }
 
 export type operators =

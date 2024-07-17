@@ -5,11 +5,11 @@ import { prepareWeb2Step, prepareXMStep } from "../workstep"
 
 import { EVM } from "@/multichain/core"
 import { XmStepResult } from "@/types/demoswork/steps"
-import { DemosWebAuth, skeletons } from "@/websdk"
-import createTestScript from '@/demoswork/utils/createTestWorkScript';
+import { DemosWebAuth } from "@/websdk"
 import { Transaction } from "@/types"
-    
-export default async function createTestWorkScript (): Promise<Transaction> {
+import { ConditionalOperation } from "../operations/conditional"
+
+export default async function createTestWorkScript(): Promise<Transaction> {
     const work = new DemosWork()
 
     const uid = getNewUID()
@@ -37,30 +37,24 @@ export default async function createTestWorkScript (): Promise<Transaction> {
     sendEth.description = "Send ETH"
 
     // WEB2 STEP
-    const web2request = skeletons.web2_request
-    web2request.raw.action = "POST"
-    web2request.raw.url = "https://myapi.com"
-
-    // INFO: Send the output of the sendEth step as a parameter
-    // REVIEW: Is this where the hash should go?
-    web2request.raw.parameters = [
-        // {
-        //    hash: sendEth.output.hash,
-        // },
-    ]
-
-    web2request.raw.headers = null
-    web2request.raw.minAttestations = 2
-
-    const sendHash = prepareWeb2Step(web2request)
+    const sendHash = prepareWeb2Step(
+        "POST",
+        "https://icanhazip.com",
+        null,
+        null,
+        null,
+        2,
+    )
     sendHash.description = "Send xm hash to HTTP API"
 
-    work.if(sendEth.output.result, "==", XmStepResult.success)
+    const operation = new ConditionalOperation()
+    operation
+        .if(sendEth.output.result, "==", XmStepResult.success)
         .then(sendHash)
         .elif(sendEth.output.result, "==", XmStepResult.error)
         .then(sendHash)
-        .else(sendHash)
 
+    work.push(operation)
     const script = work.toJSON()
     console.log(script)
 

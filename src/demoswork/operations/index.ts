@@ -1,23 +1,50 @@
-import { DemoScript } from "@/types/demoswork"
-import { OperationScript, OperationType } from "@/types/demoswork/operations"
+import {
+    OperationOutputKey,
+    OperationScript,
+    OperationType,
+} from "@/types/demoswork/operations"
 
 import { getNewUID } from "../utils"
 import { WorkStep } from "../workstep"
 
 export class DemosWorkOperation {
-    script: DemoScript
+    id: string = "op_" + getNewUID()
+    steps: Record<string, WorkStep> = {}
+    operations: Set<DemosWorkOperation> = new Set()
     operationScript: OperationScript = {
-        operationUID: "",
+        id: "",
         operationType: <OperationType>"",
     }
-
-    constructor(script: DemoScript) {
-        this.script = script
-        this.operationScript.operationUID = "op_" + getNewUID()
+    output: {
+        [key: string]: OperationOutputKey
     }
 
-    addStep(step: WorkStep) {
-        this.script.steps[step.workUID] = step
+    constructor() {
+        this.operationScript.id = this.id
+    }
+
+    addWork(work: WorkStep | DemosWorkOperation) {
+        // INFO: The action can be a step or an operation
+        // If it is an operation, copy its steps into this operation
+        // if is a step, add it to the steps of this operation
+        if (work.id.startsWith("op_")) {
+            this.operations.add(work as DemosWorkOperation)
+
+            // INFO: Inherit the steps of the operation
+            for (const stepUID in (work as DemosWorkOperation).steps) {
+                this.steps[stepUID] = (work as DemosWorkOperation).steps[
+                    stepUID
+                ]
+            }
+            return
+        }
+
+        if (work.id.startsWith("step_")) {
+            this.steps[work.id] = work as WorkStep
+            return
+        }
+
+        throw new Error("Invalid work unit with id:" + work.id)
     }
 
     execute() {

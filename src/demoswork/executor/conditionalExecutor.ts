@@ -9,26 +9,26 @@ export default async function (work: DemosWork, operation: ConditionalOperationS
         // or if the condition is an else block
         if (condition.operator === null) {
             // else condition block has no value
-            if (condition.value === null) {
+            if (condition.data === null) {
                 await executeStep(work, condition.do.uid)
                 continue
             }
 
             // Pro-computed value
-            if (condition.value) {
+            if (condition.data) {
                 await executeStep(work, condition.do.uid)
             }
             continue
         }
 
-        const result = await getStepResult(work, condition.stepUID)
+        const result = await getStepResult(work, condition.workUID)
         const resolvedValue = getValue(result, condition.key)
 
         console.log(
-            `Comparing resolved value: ${resolvedValue}, with condition value: ${condition.value}, using operator: ${condition.operator}`,
+            `Comparing resolved value: ${resolvedValue}, with condition value: ${condition.data}, using operator: ${condition.operator}`,
         )
 
-        if (compare(resolvedValue, condition.value, condition.operator)) {
+        if (compare(resolvedValue, condition.data, condition.operator)) {
             await executeStep(work, condition.do.uid)
         }
     }

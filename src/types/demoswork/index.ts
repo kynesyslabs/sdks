@@ -1,5 +1,6 @@
 import { WorkStep } from "@/demoswork/workstep"
-import { DemosWorkOperationScripts } from "./operations"
+import { DemosWorkOperationScripts, OperationOutputKey } from "./operations"
+import { StepOutputKey } from "./steps"
 
 /**
  * The final shape of the work script
@@ -10,3 +11,5 @@ export interface DemoScript {
     steps: { [key: string]: WorkStep }
 }
 
+
+export type DemosWorkOutputKey = OperationOutputKey | StepOutputKey
