@@ -10,13 +10,13 @@ export default async function (work: DemosWork, operation: ConditionalOperationS
         if (condition.operator === null) {
             // else condition block has no value
             if (condition.data === null) {
-                await executeStep(work, condition.do.uid)
+                await executeStep(work, condition.do)
                 continue
             }
 
             // Pro-computed value
             if (condition.data) {
-                await executeStep(work, condition.do.uid)
+                await executeStep(work, condition.do)
             }
             continue
         }
@@ -29,7 +29,7 @@ export default async function (work: DemosWork, operation: ConditionalOperationS
         )
 
         if (compare(resolvedValue, condition.data, condition.operator)) {
-            await executeStep(work, condition.do.uid)
+            await executeStep(work, condition.do)
         }
     }
 }
