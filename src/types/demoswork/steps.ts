@@ -1,15 +1,26 @@
-import { XMScript } from "../xm";
-import { DataTypes, operators } from "./datatypes";
+import { XMScript } from "../xm"
+import { DataTypes, operators } from "./datatypes"
 
-import { DemosWorkOperation } from "@/demoswork";
-import { WorkStep } from "@/demoswork/workstep";
-import { INativePayload } from "../native";
-import { IWeb2Request } from "../web2";
+import { DemosWorkOperation } from "@/demoswork"
+import { WorkStep } from "@/demoswork/workstep"
+import { INativePayload } from "../native"
+import { IWeb2Request } from "../web2"
+import { DemosWorkOutputKey } from "."
 
 interface BaseCondition {
     operator: operators
     key: string
-    data: any
+    data:
+        | {
+              type: DataTypes.internal
+              workUID?: string
+              key?: string
+          }
+        | {
+              type: DataTypes.static
+              value: any
+          }
+        | DemosWorkOutputKey
 }
 
 /**
@@ -46,7 +57,7 @@ export type WorkStepInput = XMScript | IWeb2Request | INativePayload
  * @example sendEther.output.result
  */
 export interface StepOutputKey {
-    type: DataTypes
+    type: DataTypes.work
     src: {
         self: WorkStep
         key: string

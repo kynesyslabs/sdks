@@ -6,21 +6,26 @@ import {
 
 import { getNewUID } from "../utils"
 import { WorkStep } from "../workstep"
+import { DataTypes } from "@/types/demoswork/datatypes"
 
-export class DemosWorkOperation {
+export abstract class DemosWorkOperation {
     id: string = "op_" + getNewUID()
+    abstract type: OperationType
+
     steps: Record<string, WorkStep> = {}
     operations: Set<DemosWorkOperation> = new Set()
     operationScript: OperationScript = {
-        id: "",
-        operationType: <OperationType>"",
+        id: this.id,
+        operationType: null,
     }
-    output: {
-        [key: string]: OperationOutputKey
-    }
-
-    constructor() {
-        this.operationScript.id = this.id
+    output = {
+        success: {
+            type: DataTypes.work as DataTypes.work,
+            src: {
+                self: this as DemosWorkOperation,
+                key: "output.success",
+            },
+        },
     }
 
     addWork(work: WorkStep | DemosWorkOperation) {

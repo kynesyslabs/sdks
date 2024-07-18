@@ -1,4 +1,5 @@
 export enum DataTypes {
+    work = "$work",
     internal = "$internal",
     static = "$static",
 }

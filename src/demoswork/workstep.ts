@@ -64,14 +64,14 @@ export class Web2WorkStep extends WorkStep {
     override context = "web2"
     override output = {
         statusCode: {
-            type: DataTypes.internal,
+            type: DataTypes.work as DataTypes.work,
             src: {
                 self: this as Web2WorkStep,
                 key: "output.statusCode",
             },
         },
         payload: {
-            type: DataTypes.internal,
+            type: DataTypes.work as DataTypes.work,
             src: {
                 key: "output.payload",
                 self: this as Web2WorkStep,
@@ -89,14 +89,14 @@ export class XmWorkStep extends WorkStep {
     override output = {
         // REVIEW: What result fields do developers need?
         result: {
-            type: DataTypes.internal,
+            type: DataTypes.work  as DataTypes.work,
             src: {
                 self: this as XmWorkStep,
                 key: "output.result",
             },
         },
         hash: {
-            type: DataTypes.internal,
+            type: DataTypes.work  as DataTypes.work,
             src: {
                 self: this as XmWorkStep,
                 key: "output.hash",
@@ -113,7 +113,7 @@ export class NativeWorkStep extends WorkStep {
     override context = "native"
     override output = {
         result: {
-            type: DataTypes.internal,
+            type: DataTypes.work  as DataTypes.work,
             src: {
                 self: this as NativeWorkStep,
                 key: "output.result",

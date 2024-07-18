@@ -1,7 +1,10 @@
 import { DemosWorkOperation } from "."
 import { WorkStep } from "../workstep"
 
-import { OperationType } from "@/types/demoswork/operations"
+import {
+    ConditionalOperationScript,
+    OperationType,
+} from "@/types/demoswork/operations"
 
 // NOTE: A conditional type is the one that goes into the script
 import { DemosWorkOutputKey } from "@/types/demoswork"
@@ -9,31 +12,13 @@ import { DataTypes, operators } from "@/types/demoswork/datatypes"
 import { Condition, Conditional } from "@/types/demoswork/steps"
 
 export class ConditionalOperation extends DemosWorkOperation {
-    // INFO: A conditional in the making
+    override type: OperationType = "conditional"
     tempConditions: Conditional[] = []
-    override operationScript: {
-        id: string
-        operationType: OperationType
-        conditions: Conditional[]
-    }
 
-    override output = {
-        success: {
-            type: DataTypes.internal,
-            src: {
-                self: this as DemosWorkOperation,
-                key: "output.success",
-            },
-        },
-    }
-
-    constructor() {
-        super()
-        this.operationScript.operationType = "conditional"
-        this.operationScript = {
-            ...this.operationScript,
-            conditions: [],
-        }
+    override operationScript: ConditionalOperationScript = {
+        id: this.id,
+        operationType: "conditional",
+        conditions: [],
     }
 
     // INFO: A condition can be a boolean (pre-computed) or a condition object (to be computed on runtime)
@@ -77,13 +62,16 @@ export class ConditionalOperation extends DemosWorkOperation {
             return this.operationScript.conditions.push({
                 operator: null,
                 key: null,
-                data: condition,
+                data: {
+                    type: DataTypes.static,
+                    value: condition,
+                },
                 workUID: null,
                 do: null,
             })
         }
 
-        if (condition.data["type"] === DataTypes.internal) {
+        if (condition.data.type === DataTypes.work) {
             this.addWork(condition.action)
             condition.data = {
                 type: DataTypes.internal,

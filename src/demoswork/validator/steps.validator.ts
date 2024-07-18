@@ -1,5 +1,19 @@
+import { DataTypes } from "@/types"
 import { DemoScript } from "@/types/demoswork"
-import { ConditionalOperationScript } from "@/types/demoswork/operations"
+import {
+    ConditionalOperationScript,
+    DemosWorkOperationScripts,
+} from "@/types/demoswork/operations"
+
+function getMappedScriptSteps(script: DemoScript) {
+    // return a map of step ids mapped to their descriptions
+    return new Map(
+        Object.keys(script.steps).map(step => [
+            step,
+            script.steps[step].description,
+        ]),
+    )
+}
 
 function getConditionalScriptSteps(script: ConditionalOperationScript) {
     let steps = new Set<string>()
@@ -10,44 +24,71 @@ function getConditionalScriptSteps(script: ConditionalOperationScript) {
             steps.add(condition.workUID)
         }
 
-        // Skip operation dos
+        // Check if the condition has a do property
         if (condition.do.startsWith("step_")) {
             steps.add(condition.do)
+        }
+
+        // Extract step from the dynamic data property
+        if (condition.data.type === DataTypes.internal) {
+            if (condition.data.workUID.startsWith("step_")) {
+                steps.add(condition.data.workUID)
+            }
         }
     })
 
     return steps
 }
 
-function collectAllSteps(script: DemoScript) {
+function catchNotIncluded(
+    steps: Set<string>,
+    scriptSteps: Map<string, string>,
+    message: string = "",
+) {
+    let diff = new Set(Array.from(steps).filter(x => !scriptSteps.has(x)))
+
+    if (diff.size > 0) {
+        throw new Error(
+            `Steps ${[...diff]} not included in final script - ${message}`,
+        )
+    }
+}
+
+function extractStepsFromOperation(
+    operation: DemosWorkOperationScripts,
+    scriptSteps: Map<string, string>,
+) {
+    let steps = new Set<string>()
+
+    switch (operation.operationType) {
+        case "conditional":
+            let conditionalSteps = getConditionalScriptSteps(operation)
+            console.error("conditionalSteps", conditionalSteps)
+            steps = new Set([...steps, ...conditionalSteps])
+            break
+
+        case "base":
+            let baseSteps = new Set(
+                operation.work.filter(step => step.startsWith("step_")),
+            )
+            steps = new Set([...steps, ...baseSteps])
+            break
+    }
+
+    catchNotIncluded(
+        steps,
+        scriptSteps,
+        `${operation.operationType} - ${operation.id}`,
+    )
+    return steps
+}
+
+function collectAllSteps(script: DemoScript, scriptSteps: Map<string, string>) {
     let steps = new Set<string>()
 
     Object.keys(script.operations).forEach(opUID => {
         let operation = script.operations[opUID]
-
-        switch (operation.operationType) {
-            case "conditional":
-                let conditonalSteps = getConditionalScriptSteps(operation)
-                console.log("conditonalSteps", conditonalSteps)
-                let scriptSteps = new Set(Object.keys(script.steps))
-
-                // INFO: Assert that all steps in the conditional
-                // script are included in the final script
-                let diff = new Set(
-                    Array.from(conditonalSteps).filter(
-                        x => !scriptSteps.has(x),
-                    ),
-                )
-
-                if (diff.size > 0) {
-                    throw new Error(
-                        `Steps ${[...diff]} not included in final script`,
-                    )
-                }
-
-                steps = new Set([...steps, ...conditonalSteps])
-                break
-        }
+        steps = extractStepsFromOperation(operation, scriptSteps)
     })
 
     return steps
@@ -62,12 +103,14 @@ function collectAllSteps(script: DemoScript) {
 export function noUnusedSteps(script: DemoScript) {
     // NOTES: Collect all steps in the script
     // and compare them to the script steps
-    let steps = collectAllSteps(script)
-    let scriptSteps = new Set(Object.keys(script.steps))
+    let scriptSteps = getMappedScriptSteps(script)
+    let steps = collectAllSteps(script, scriptSteps)
 
-    let diff = new Set(Array.from(scriptSteps).filter(x => !steps.has(x)))
-
-    if (diff.size > 0) {
-        throw new Error(`Steps ${[...diff]} not used in script`)
+    for (const id of scriptSteps.keys()){
+        if (!steps.has(id)){
+            throw new Error(
+                `Step ${scriptSteps.get(id) || id} not used in script`,
+            )
+        }
     }
 }
