@@ -40,7 +40,7 @@ describe("Demos Workflow", () => {
         op2.if(op1.output.success, "==", sendEth.output.hash).then(sendHash)
 
         const baseOp = new BaseOperation()
-        baseOp.addWork(op2)
+        baseOp.add(op2)
         pprint(baseOp)
 
         work.push(baseOp)

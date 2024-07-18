@@ -3,8 +3,13 @@
 Start by creating a DemoScript builder instance.
 
 ```ts
+import { DemosWork } from "@kynesyslabs/demosdk-beta/demoswork"
+
 const work = new DemosWork()
 ```
+
+> [!TIP]
+> All imports used here come from `@kynesyslabs/demosdk-beta/demoswork`
 
 ## Steps
 
@@ -34,6 +39,19 @@ const nativeStep = prepareNativeStep( ... ) // pass the native payload
 
 An operation can be likened to a function in programming.
 
+### Base Operation
+
+This operation enables you to simply group steps or operations together in an ordered manner.
+
+```ts
+const operation = BaseOperation()
+operation.addWork(xmStep, web2Step, someOperation, ...)
+
+// OR
+
+const operation = BaseOperation(xmStep, web2Step, someOperation, ...)
+```
+
 ### Conditional operation
 
 ```ts
@@ -55,6 +73,14 @@ operation2.if(xmStep.output.result, "==", "error").then(otherOperation)
 operation2.if(operation.output.result, "==", "error").then(otherOperation)
 ```
 
+You can also reference values across steps and operations:
+
+```ts
+operation2
+    .if(operation.output.result, "==", xmStep.output.result)
+    .then(otherOperation)
+```
+
 ### Write the operation to the script
 
 ```ts
@@ -70,3 +96,6 @@ The pushed operation(s) will drive the execution of the script.
 ```ts
 work.toJSON()
 ```
+
+> [!NOTE]
+> `toJSON()` won't export the script to a stringified JSON string, but rather a JSON-serializable object. The method just removes circular references from the steps and operations and return a clean script.

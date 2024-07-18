@@ -1,9 +1,9 @@
+import { WorkStep } from ".."
 import { DemosWorkOperation } from "."
 import {
     BaseOperationScript,
     OperationType,
 } from "@/types/demoswork/operations"
-import { WorkStep } from ".."
 
 export class BaseOperation extends DemosWorkOperation {
     override type: OperationType = "base"
@@ -15,10 +15,10 @@ export class BaseOperation extends DemosWorkOperation {
 
     constructor(...work: Array<WorkStep | DemosWorkOperation>) {
         super()
-        this.addWork(...work)
+        this.add(...work)
     }
 
-    override addWork(...work: Array<WorkStep | DemosWorkOperation>) {
+    add(...work: Array<WorkStep | DemosWorkOperation>) {
         for (const w of work) {
             this.operationScript.work.push(w.id)
             super.addWork(w)
