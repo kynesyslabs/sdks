@@ -20,13 +20,15 @@ function getConditionalScriptSteps(script: ConditionalOperationScript) {
 
     // INFO: Loop through all conditions and add the step to the set
     script.conditions.forEach(condition => {
-        if (condition.workUID.startsWith("step_")) {
-            steps.add(condition.workUID)
+        if (condition.operand.type === DataTypes.internal) {
+            if (condition.operand.workUID.startsWith("step_")) {
+                steps.add(condition.operand.workUID)
+            }
         }
 
         // Check if the condition has a do property
-        if (condition.do.startsWith("step_")) {
-            steps.add(condition.do)
+        if (condition.work.startsWith("step_")) {
+            steps.add(condition.work)
         }
 
         // Extract step from the dynamic data property
@@ -106,8 +108,8 @@ export function noUnusedSteps(script: DemoScript) {
     let scriptSteps = getMappedScriptSteps(script)
     let steps = collectAllSteps(script, scriptSteps)
 
-    for (const id of scriptSteps.keys()){
-        if (!steps.has(id)){
+    for (const id of scriptSteps.keys()) {
+        if (!steps.has(id)) {
             throw new Error(
                 `Step ${scriptSteps.get(id) || id} not used in script`,
             )

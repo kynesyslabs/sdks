@@ -3,22 +3,32 @@ import { DataTypes, operators } from "./datatypes"
 
 import { DemosWorkOperation } from "@/demoswork"
 import { WorkStep } from "@/demoswork/workstep"
+import { DemosWorkOutputKey } from "."
 import { INativePayload } from "../native"
 import { IWeb2Request } from "../web2"
-import { DemosWorkOutputKey } from "."
 
 interface BaseCondition {
     operator: operators
-    key: string
+    operand:
+        | {
+              type: DataTypes.static
+              value: any
+          }
+        | {
+              type: DataTypes.internal
+              workUID: string
+              key: string
+          }
+        | DemosWorkOutputKey
     data:
+        | {
+              type: DataTypes.static
+              value: any
+          }
         | {
               type: DataTypes.internal
               workUID?: string
               key?: string
-          }
-        | {
-              type: DataTypes.static
-              value: any
           }
         | DemosWorkOutputKey
 }
@@ -27,7 +37,7 @@ interface BaseCondition {
  * The shape of the condition
  * that is used in `DemosWork.if` and friends
  */
-export interface Condition extends BaseCondition {
+export interface ICondition extends BaseCondition {
     action: WorkStep | DemosWorkOperation
 }
 
@@ -36,8 +46,7 @@ export interface Condition extends BaseCondition {
  * on the conditional script.
  */
 export interface Conditional extends BaseCondition {
-    workUID: string
-    do: string
+    work: string
 }
 /**
  * Keys that can be used to refer to the output of a step

@@ -3,19 +3,19 @@ export {
     GenesisImmutableProperties,
     GenesisMutableProperties,
     StandardGenesis,
-    forkGenesis,
+    forkGenesis
 } from "./blockchain/genesisTypes"
 
 export { Block, BlockContent } from "./blockchain/blocks"
-export { ISignature } from "./blockchain/ISignature"
-export { TxFee } from "./blockchain/TxFee"
-export { CValidityData, ValidityData } from "./blockchain/ValidityData"
 export { EncryptedTransaction } from "./blockchain/encryptedTransaction"
+export { ISignature } from "./blockchain/ISignature"
 export { RawTransaction } from "./blockchain/rawTransaction"
 export {
     Transaction,
     TransactionContent
 } from "./blockchain/Transaction"
+export { TxFee } from "./blockchain/TxFee"
+export { CValidityData, ValidityData } from "./blockchain/ValidityData"
 export { Bundle, BundleContent } from "./communication/transmit"
 
 export { AddressInfo } from "./blockchain/addressInfo"
@@ -25,7 +25,7 @@ export { statusNative as StatusProperties } from "./blockchain/statusProperties"
 export {
     Operation,
     OperationRegistrySlot,
-    OperationResult,
+    OperationResult
 } from "./gls/Operation"
 export { StateChange } from "./gls/StateChange"
 
@@ -35,7 +35,7 @@ export { ExecutionResult } from "./network/ExecutionResult"
 export {
     ISecurityReport,
     SIComlink,
-    SIResponseRegistry,
+    SIResponseRegistry
 } from "./network/SecurityTypes"
 
 // peer
@@ -48,7 +48,7 @@ export {
     IWeb2Attestation,
     IWeb2Payload,
     IWeb2Request,
-    IWeb2Result,
+    IWeb2Result
 } from "./web2"
 
 export { IOperation, ITask, XMScript } from "./xm"
@@ -60,14 +60,15 @@ export {
     ConditionalOperationScript,
     DemosWorkOperationScripts,
     OperationScript,
-    OperationType,
+    OperationType
 } from "./demoswork/operations"
 export {
-    Condition,
+    ICondition,
     Conditional,
     StepOutputKey,
     WorkStepInput,
     XmStepResult,
     stepKeys,
-    stepKeysEnum,
+    stepKeysEnum
 } from "./demoswork/steps"
+

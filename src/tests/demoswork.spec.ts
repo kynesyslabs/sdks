@@ -6,9 +6,10 @@ import pprint from "@/utils/pprint"
 import createTestScript from "@/demoswork/utils/createTestWorkScript"
 import { ConditionalOperation } from "@/demoswork"
 import { BaseOperation } from "@/demoswork/operations/baseoperation"
+import { Condition } from "@/demoswork/operations/conditional"
 
 describe("Demos Workflow", () => {
-    test.only("Creating a demoswork tx", async () => {
+    test.skip("Creating a demoswork tx", async () => {
         const tx = await createTestScript()
         pprint(tx)
     })
@@ -36,17 +37,28 @@ describe("Demos Workflow", () => {
         const op1 = new ConditionalOperation()
         op1.if(sendEth.output.result, "==", XmStepResult.success).then(sendHash)
 
-        const op2 = new ConditionalOperation()
-        op2.if(op1.output.success, "==", sendEth.output.hash).then(sendHash)
+        const op1_ = new ConditionalOperation(
+            new Condition({
+                operand: XmStepResult.success,
+                operator: "==",
+                data: sendEth.output.result,
+                action: sendHash,
+            }),
+        )
 
-        const baseOp = new BaseOperation()
-        baseOp.add(op2)
-        pprint(baseOp)
+        pprint(op1, op1_)
 
-        work.push(baseOp)
+        // const op2 = new ConditionalOperation()
+        // op2.if(op1.output.success, "==", sendEth.output.hash).then(sendHash)
 
-        pprint(work)
-        pprint(work.toJSON())
+        // const baseOp = new BaseOperation(op2)
+        // // pprint(baseOp)
+
+        // work.push(baseOp)
+
+        // // pprint(work)
+        // pprint(work.toJSON())
+
         // const loaded = work.fromJSON(work.toJSON())
 
         // const res = await loaded.execute()

@@ -41,6 +41,11 @@ export abstract class DemosWorkOperation {
                     stepUID
                 ]
             }
+
+            // INFO: Inherit the operations of the operation
+            for (const operation of (work as DemosWorkOperation).operations) {
+                this.operations.add(operation)
+            }
             return
         }
 

@@ -9,7 +9,61 @@ import {
 // NOTE: A conditional type is the one that goes into the script
 import { DemosWorkOutputKey } from "@/types/demoswork"
 import { DataTypes, operators } from "@/types/demoswork/datatypes"
-import { Condition, Conditional } from "@/types/demoswork/steps"
+import { Conditional, ICondition } from "@/types/demoswork/steps"
+
+export class Condition implements ICondition {
+    action: WorkStep | DemosWorkOperation
+    data:
+        | { type: DataTypes.static; value: any }
+        | { type: DataTypes.internal; workUID?: string; key?: string }
+    operand:
+        | { type: DataTypes.static; value: any }
+        | { type: DataTypes.internal; workUID: string; key: string }
+    operator: operators
+    work: (WorkStep | DemosWorkOperation)[] = []
+
+    constructor({
+        action,
+        data,
+        operand,
+        operator,
+    }: {
+        action: WorkStep | DemosWorkOperation | null
+        data: DemosWorkOutputKey | any
+        operand: DemosWorkOutputKey | any
+        operator: operators
+    }) {
+        this.action = action
+        this.operator = operator
+        this.data = this.parseData(data)
+        this.operand = this.parseData(operand)
+    }
+
+    parseData(data: DemosWorkOutputKey | any) {
+        // INFO: Converts the conditional data to the script format
+        try {
+            // check "type" key in data
+            if (data.type && data.type === DataTypes.work) {
+                this.work.push(data.src.self)
+
+                return {
+                    type: DataTypes.internal as DataTypes.internal,
+                    workUID: data.src.self.id,
+                    key: data.src.key,
+                }
+            }
+        } catch (error) {
+            console.error("Error parsing data", error)
+            console.error("Data", data)
+        }
+
+        // INFO: If the data is not a work output, it is a static value
+        return {
+            type: DataTypes.static as DataTypes.static,
+            value: data,
+        }
+    }
+}
 
 export class ConditionalOperation extends DemosWorkOperation {
     override type: OperationType = "conditional"
@@ -21,34 +75,26 @@ export class ConditionalOperation extends DemosWorkOperation {
         conditions: [],
     }
 
-    // INFO: A condition can be a boolean (pre-computed) or a condition object (to be computed on runtime)
-    // REVIEW: if the condition is a boolean false, then it will never be executed. So, can we omit it from the script?
-    // public if(conditon: boolean): any
-    // public if(
-    //     condition: DemosWorkOutputKey,
-    //     operator?: operators,
-    //     value?: any,
-    // ): any
-    if(
-        condition: boolean | DemosWorkOutputKey,
-        operator?: operators,
-        value?: any,
-    ) {
-        let conditionEntry: boolean | Condition
-
-        if (typeof condition === "object") {
-            console.log("inside conditional", condition)
-            this.addWork(condition.src.self)
-            conditionEntry = {
-                key: condition.src.key,
-                operator: operator,
-                action: condition.src.self,
-                data: value,
-            }
-        } else {
-            conditionEntry = condition
+    constructor(...conditions: Condition[]) {
+        super()
+        for (const condition of conditions) {
+            this.appendCondition(condition)
         }
+    }
 
+    if(
+        condition: DemosWorkOutputKey | any,
+        operator: operators,
+        value: DemosWorkOutputKey | any,
+    ) {
+        let conditionEntry = new Condition({
+            action: null,
+            data: value,
+            operand: condition,
+            operator: operator,
+        })
+
+        console.log("conditionEntry", conditionEntry)
         this.appendCondition(conditionEntry)
 
         return {
@@ -56,87 +102,48 @@ export class ConditionalOperation extends DemosWorkOperation {
         }
     }
 
-    appendCondition(condition: boolean | Condition) {
-        // INFO: If the condition is a boolean, create a value only condition
-        if (typeof condition === "boolean") {
+    appendCondition(condition: Condition) {
+        console.log("Appending condition", condition)
+        for (const work of condition.work) {
+            this.addWork(work)
+        }
+        delete condition.work
+
+        // if there is an action, the condition comes from the constructor
+        // ie. is a fully formed condition.
+        if (condition.action) {
+            this.addWork(condition.action)
+
+            const actionid = condition.action.id
+            delete condition.action
+
             return this.operationScript.conditions.push({
-                operator: null,
-                key: null,
-                data: {
-                    type: DataTypes.static,
-                    value: condition,
-                },
-                workUID: null,
-                do: null,
+                ...condition,
+                work: actionid,
             })
         }
 
-        if (condition.data.type === DataTypes.work) {
-            this.addWork(condition.action)
-            condition.data = {
-                type: DataTypes.internal,
-                workUID: condition.data.src.self.id,
-                key: condition.data.src.key,
-            }
-        } else {
-            condition.data = {
-                type: DataTypes.static,
-                value: condition.data,
-            }
-        }
-
-        // INFO: If the condition is an object, create a condition object
         return this.tempConditions.push({
             operator: condition.operator,
-            key: condition.key,
+            operand: condition.operand,
             data: condition.data,
-            workUID: condition.action.id,
-            do: null,
+            work: null,
         })
     }
 
     then(step: WorkStep | DemosWorkOperation) {
+        console.log("then", step)
         this.addWork(step)
-        const op_length = this.tempConditions.length
-        this.tempConditions[op_length - 1].do = step.id
+
+        // update the last item in the temp conditions
+        // and push it to the operation script
+        const lastIndex = this.tempConditions.length
+        this.tempConditions[lastIndex - 1].work = step.id
         this.operationScript.conditions.push(this.tempConditions.pop())
 
         return {
-            elif: this.elif.bind(this),
+            elif: this.if.bind(this),
             else: this.else.bind(this),
-        }
-    }
-
-    // elif(condition: boolean): any
-    // elif(
-    //     condition: boolean | DemosWorkOutputKey,
-    //     operator?: operators,
-    //     value?: any,
-    // ): any
-    elif(
-        condition: boolean | DemosWorkOutputKey,
-        operator?: operators,
-        value?: any,
-    ) {
-        let conditionEntry: boolean | Condition = null
-
-        if (typeof condition === "object") {
-            this.addWork(condition.src.self)
-
-            conditionEntry = {
-                key: condition.src.key,
-                operator: operator,
-                action: condition.src.self,
-                data: value,
-            }
-        } else {
-            conditionEntry = condition
-        }
-
-        this.appendCondition(conditionEntry)
-
-        return {
-            then: this.then.bind(this),
         }
     }
 
@@ -144,10 +151,9 @@ export class ConditionalOperation extends DemosWorkOperation {
         this.addWork(step)
         this.operationScript.conditions.push({
             operator: null,
-            key: null,
+            operand: null,
             data: null,
-            workUID: null,
-            do: step.id,
+            work: step.id,
         })
     }
 }
