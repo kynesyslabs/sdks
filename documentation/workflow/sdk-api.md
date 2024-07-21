@@ -54,6 +54,21 @@ const operation = BaseOperation(xmStep, web2Step, someOperation, ...)
 
 ### Conditional operation
 
+You can create a conditional operation either by passing conditions to the `ConditionalOperation` class.
+
+```ts
+const condition = new Condition({
+    operand: true,
+    operator: "==",
+    data: sendEth.output.result,
+    action: sendHash,
+})
+
+const operation = new ConditionalOperation(condition, otherCondition, ...)
+```
+
+You can also the builder methods:
+
 ```ts
 // 1. create a builder class
 const operation = new ConditionalOperation()
@@ -80,6 +95,9 @@ operation2
     .if(operation.output.result, "==", xmStep.output.result)
     .then(otherOperation)
 ```
+
+> [!TIP]
+> To create an `else` clause using the `Condition` class, create an equality condition whose data and operator are null (or something that evaluates to true).
 
 ### Write the operation to the script
 
