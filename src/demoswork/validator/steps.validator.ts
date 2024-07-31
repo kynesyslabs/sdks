@@ -4,6 +4,7 @@ import {
     ConditionalOperationScript,
     DemosWorkOperationScripts,
 } from "@/types/demoswork/operations"
+import { Operand } from "@/types/demoswork/steps"
 
 function getMappedScriptSteps(script: DemoScript) {
     // return a map of step ids mapped to their descriptions
@@ -20,22 +21,21 @@ function getConditionalScriptSteps(script: ConditionalOperationScript) {
 
     // INFO: Loop through all conditions and add the step to the set
     script.conditions.forEach(condition => {
-        if (condition.operand.type === DataTypes.internal) {
-            if (condition.operand.workUID.startsWith("step_")) {
-                steps.add(condition.operand.workUID)
+        const parseValue = (value: Operand | null) => {
+            if (
+                value &&
+                value.type === DataTypes.internal &&
+                value.workUID.startsWith("step_")
+            ) {
+                steps.add(value.workUID)
             }
         }
 
-        // Check if the condition has a do property
-        if (condition.work.startsWith("step_")) {
+        parseValue(condition.value_a)
+        parseValue(condition.value_b)
+
+        if (condition.work && condition.work.startsWith("step_")) {
             steps.add(condition.work)
-        }
-
-        // Extract step from the dynamic data property
-        if (condition.data.type === DataTypes.internal) {
-            if (condition.data.workUID.startsWith("step_")) {
-                steps.add(condition.data.workUID)
-            }
         }
     })
 
@@ -65,7 +65,6 @@ function extractStepsFromOperation(
     switch (operation.operationType) {
         case "conditional":
             let conditionalSteps = getConditionalScriptSteps(operation)
-            console.error("conditionalSteps", conditionalSteps)
             steps = new Set([...steps, ...conditionalSteps])
             break
 

@@ -1,36 +1,23 @@
 import { XMScript } from "../xm"
 import { DataTypes, operators } from "./datatypes"
 
-import { DemosWorkOperation } from "@/demoswork"
+import { Condition, DemosWorkOperation } from "@/demoswork"
 import { WorkStep } from "@/demoswork/workstep"
-import { DemosWorkOutputKey } from "."
 import { INativePayload } from "../native"
 import { IWeb2Request } from "../web2"
 
+/**
+ * The condition operand type
+ *
+ * This type is used to define the data type of the operands in a condition.
+ * This can be either a static value (number, string, object, etc.) or an internal value (a reference to a work output).
+ */
+export type Operand =
+    | { type: DataTypes.static; value: any }
+    | { type: DataTypes.internal; workUID: string; key: string }
+
 interface BaseCondition {
     operator: operators
-    operand:
-        | {
-              type: DataTypes.static
-              value: any
-          }
-        | {
-              type: DataTypes.internal
-              workUID: string
-              key: string
-          }
-        | DemosWorkOutputKey
-    data:
-        | {
-              type: DataTypes.static
-              value: any
-          }
-        | {
-              type: DataTypes.internal
-              workUID?: string
-              key?: string
-          }
-        | DemosWorkOutputKey
 }
 
 /**
@@ -38,6 +25,8 @@ interface BaseCondition {
  * that is used in `DemosWork.if` and friends
  */
 export interface ICondition extends BaseCondition {
+    value_a: Condition | Operand
+    value_b: Condition | Operand
     action: WorkStep | DemosWorkOperation
 }
 
@@ -46,7 +35,10 @@ export interface ICondition extends BaseCondition {
  * on the conditional script.
  */
 export interface Conditional extends BaseCondition {
-    work: string
+    id?: string
+    value_b: Operand
+    value_a: Operand
+    work?: string
 }
 /**
  * Keys that can be used to refer to the output of a step

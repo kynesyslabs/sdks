@@ -1,9 +1,5 @@
-import {
-    ConditionalOperationScript,
-    OperationScript,
-} from "@/types/demoswork/operations"
+import { OperationScript } from "@/types/demoswork/operations"
 import { DemosWork } from "../work"
-import executeConditional from "./conditionalExecutor"
 
 export default async function (work: DemosWork) {
     // TODO! Rewrite forEach to for...of
@@ -22,7 +18,6 @@ export default async function (work: DemosWork) {
                     "Executing conditional operation with UID:",
                     operationUID,
                 )
-                await executeConditional(work, operation as ConditionalOperationScript)
                 break
 
             default:

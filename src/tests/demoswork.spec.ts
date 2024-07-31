@@ -1,12 +1,10 @@
-import { XmStepResult } from "@/types/demoswork/steps"
 import { DemosWork } from "@/demoswork/work"
 import { Web2WorkStep, XmWorkStep } from "@/demoswork/workstep"
+import { XmStepResult } from "@/types/demoswork/steps"
 
-import pprint from "@/utils/pprint"
+import { BaseOperation, Condition, ConditionalOperation } from "@/demoswork"
 import createTestScript from "@/demoswork/utils/createTestWorkScript"
-import { ConditionalOperation } from "@/demoswork"
-import { BaseOperation } from "@/demoswork/operations/baseoperation"
-import { Condition } from "@/demoswork/operations/conditional"
+import pprint from "@/utils/pprint"
 
 describe("Demos Workflow", () => {
     test.skip("Creating a demoswork tx", async () => {
@@ -14,15 +12,12 @@ describe("Demos Workflow", () => {
         pprint(tx)
     })
 
-    it("works", async () => {
+    test("it works", async () => {
         const work = new DemosWork()
 
         const sendEth = new XmWorkStep("payload" as any)
         sendEth.description = "Send ETH"
         // sendEth.sign("privateKey")
-
-        // const sendMoreEth = new XmWorkStep("payload" as any)
-        // sendMoreEth.description = "Send more ETH"
 
         const sendHash = new Web2WorkStep({
             url: "https://myapi.com",
@@ -37,27 +32,45 @@ describe("Demos Workflow", () => {
         const op1 = new ConditionalOperation()
         op1.if(sendEth.output.result, "==", XmStepResult.success).then(sendHash)
 
-        const op1_ = new ConditionalOperation(
-            new Condition({
-                operand: XmStepResult.success,
-                operator: "==",
-                data: sendEth.output.result,
-                action: sendHash,
-            }),
-        )
+        const equalityCondition = new Condition({
+            value_a: XmStepResult.success,
+            value_b: sendEth.output.result,
+            operator: "==",
+            // action: sendHash,
+        })
 
-        pprint(op1, op1_)
+        const equalityCondition2 = new Condition({
+            value_a: XmStepResult.success,
+            value_b: sendEth.output.result,
+            operator: "==",
+        })
 
+        const equalityCondition3 = new Condition({
+            value_a: equalityCondition,
+            value_b: equalityCondition2,
+            operator: "==",
+        })
+
+        const notOperation = new Condition({
+            value_a: equalityCondition,
+            operator: "not",
+            action: sendHash,
+        })
+
+        const op2 = new ConditionalOperation(notOperation)
+
+        // const op1_ = new ConditionalOperation(equalityCondition)
         // const op2 = new ConditionalOperation()
-        // op2.if(op1.output.success, "==", sendEth.output.hash).then(sendHash)
+        // op2.if(equalityCondition, "not")
+        //     .then(sendHash)
+        //     .else(op1)
 
-        // const baseOp = new BaseOperation(op2)
-        // // pprint(baseOp)
+        const baseOp = new BaseOperation(op2)
 
-        // work.push(baseOp)
+        work.push(baseOp)
 
-        // // pprint(work)
-        // pprint(work.toJSON())
+        // pprint(work)
+        pprint(work.toJSON())
 
         // const loaded = work.fromJSON(work.toJSON())
 

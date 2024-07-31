@@ -1,6 +1,7 @@
 export { DemosWorkOperation } from "./operations"
 export { BaseOperation } from "./operations/baseoperation"
-export { ConditionalOperation, Condition } from "./operations/conditional"
+export { ConditionalOperation } from "./operations/conditional"
+export { Condition } from "./operations/conditional/condition"
 export { DemosWork, prepareDemosWorkPayload } from "./work"
 export { NativeWorkStep, Web2WorkStep, WorkStep, XmWorkStep } from "./workstep"
 

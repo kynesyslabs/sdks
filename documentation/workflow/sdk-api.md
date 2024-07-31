@@ -57,15 +57,31 @@ const operation = BaseOperation(xmStep, web2Step, someOperation, ...)
 You can create a conditional operation either by passing conditions to the `ConditionalOperation` class.
 
 ```ts
-const condition = new Condition({
-    operand: true,
+const success = new Condition({
+    value_a: true,
     operator: "==",
-    data: sendEth.output.result,
-    action: sendHash,
+    value_b: sendEth.output.result,
 })
 
-const operation = new ConditionalOperation(condition, otherCondition, ...)
+const noError = new Condition({
+    value_a: sendEth.output.failed,
+    operator: "not",
+    // NOTE: Only value_a is passed.
+})
+
+const executed = new Condition({
+    value_a: success,
+    operator: "and",
+    value_b: noError,
+    action: sendHash
+})
+
+const operation = new ConditionalOperation(executed, ...)
 ```
+
+> [!NOTE]
+>
+> When passing conditions to the `ConditionalOperation` class constructor, you only need to pass the driver conditions.
 
 You can also the builder methods:
 
@@ -115,5 +131,4 @@ The pushed operation(s) will drive the execution of the script.
 work.toJSON()
 ```
 
-> [!NOTE]
-> `toJSON()` won't export the script to a stringified JSON string, but rather a JSON-serializable `DemoScript` object. The method just removes circular references from the steps and operations and return a clean script.
+> [!NOTE] > `toJSON()` won't export the script to a stringified JSON string, but rather a JSON-serializable `DemoScript` object. The method just removes circular references from the steps and operations and return a clean script.

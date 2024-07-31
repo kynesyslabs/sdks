@@ -15,3 +15,7 @@ export type operators =
     | "!=="
     | "in"
     | "not in"
+    // boolean operators
+    | "&&"
+    | "||"
+    | "not"
