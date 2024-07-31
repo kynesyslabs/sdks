@@ -70,7 +70,7 @@ When conditions reference each other, these methods call each other recursively 
 Here is how an equality check driven by a logical not operation looks like on the operation script:
 
 ```ts
-op_5784ee70135c49ac84ac53a08bb2c932: {
+"op_5784ee70135c49ac84ac53a08bb2c932": {
     operationType: 'conditional',
     conditions: {
         'cond_61b6f6e574114a1da175ae0b4a768749': {
