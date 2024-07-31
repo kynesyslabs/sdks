@@ -65,11 +65,10 @@ When you use the `if` method, a condition instance is created and assigned to `t
 
 The `appendCondition` method copies work units defined in the conditions to the operation script. It also creates entries in the script using the `indexCondition` method, which calls the `parseConditionValue` method to format condition values.
 
-When conditions reference each other, these methods call each other recursively until all conditions are indexed.
+When conditions reference each other, these methods call each other recursively until all conditions are indexed. Conditions are indexed as a map object with an `order` property controlling the order of execution.
 
-Conditions are indexed as a map object with an `order` property controlling the order of execution.
+Here is how an equality check driven by a logical not operation looks like on the operation script:
 
-Condition in the operation script look like this:
 ```ts
 conditions: {
     'cond_61b6f6e574114a1da175ae0b4a768749': {
