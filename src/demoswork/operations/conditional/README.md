@@ -70,20 +70,23 @@ When conditions reference each other, these methods call each other recursively 
 Here is how an equality check driven by a logical not operation looks like on the operation script:
 
 ```ts
-conditions: {
-    'cond_61b6f6e574114a1da175ae0b4a768749': {
-        operator: '==',
-        value_a: { type: '$static', value: 'success' },
-        value_b: { type: '$static', value: 'success' }
-    },
-    'cond_5901af81d8f146d3bef8b2bba66015fa': {
-        operator: 'not',
-        value_a: {
-            type: '$internal',
-            workUID: 'cond_61b6f6e574114a1da175ae0b4a768749',
+op_5784ee70135c49ac84ac53a08bb2c932: {
+    operationType: 'conditional',
+    conditions: {
+        'cond_61b6f6e574114a1da175ae0b4a768749': {
+            operator: '==',
+            value_a: { type: '$static', value: 'success' },
+            value_b: { type: '$static', value: 'success' }
         },
-        work: 'step_e36120a2b7a64f5a8497e84e9ed30502'
-    }
-},
-order: [ 'cond_5901af81d8f146d3bef8b2bba66015fa' ]
+        'cond_5901af81d8f146d3bef8b2bba66015fa': {
+            operator: 'not',
+            value_a: {
+                type: '$internal',
+                workUID: 'cond_61b6f6e574114a1da175ae0b4a768749',
+            },
+            work: 'step_e36120a2b7a64f5a8497e84e9ed30502'
+        }
+    },
+    order: [ 'cond_5901af81d8f146d3bef8b2bba66015fa' ]
+}
 ```
