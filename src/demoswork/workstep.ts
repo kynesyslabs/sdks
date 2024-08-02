@@ -42,7 +42,6 @@ export class WorkStep {
      */
     sign(privateKey: forge.pki.ed25519.BinaryBuffer | any) {
         if (privateKey.type == "string") {
-            console.log("[HexToForge] Deriving a buffer from privateKey...")
             privateKey = HexToForge(privateKey)
         }
 

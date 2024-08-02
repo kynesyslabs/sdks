@@ -26,9 +26,6 @@ export class Condition implements ICondition {
         this.operator = params.operator
         this.value_a = this.parseData(params.value_a)
 
-        console.error(params.value_a instanceof Condition)
-        console.error(this.value_a)
-
         // INFO: If the operator is "not", there should be no operand
         if (params.operator !== "not") {
             this.value_b = this.parseData(params.value_a)
@@ -38,8 +35,6 @@ export class Condition implements ICondition {
     parseData(data: DemosWorkOutputKey | any) {
         // INFO: Converts the conditional data to the script format
         if (data instanceof Condition) {
-            console.error("Data is a condition")
-            console.error(data)
             // INFO: Copy condition work to this condition
 
             if (data.work) {
@@ -63,8 +58,7 @@ export class Condition implements ICondition {
                 }
             }
         } catch (error) {
-            console.error("Error parsing data", error)
-            console.error("Data", data)
+            console.log("Static data:", data)
         }
 
         // INFO: If the data is not a work output, it is a static value
