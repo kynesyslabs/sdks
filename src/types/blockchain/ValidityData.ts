@@ -3,8 +3,8 @@ import { Operation } from "../gls/Operation"
 import { Transaction } from "./Transaction"
 import { Cryptography } from "@/encryption/Cryptography"
 import { Hashing } from "@/encryption/Hashing"
-import terminalkit from "terminal-kit"
-const term = terminalkit.terminal
+// import terminalkit from "terminal-kit"
+// const term = terminalkit.terminal
 
 export interface ValidityData {
     data: {
@@ -56,7 +56,8 @@ export class CValidityData implements ValidityData {
     ): ValidityData {
         validityData.data.message = message
         if (!valid) {
-            term.bold.red(message)
+            // term.bold.red(message)
+            console.log(message)
             validityData.data.valid = false
         } else {
             validityData.data.valid = true
