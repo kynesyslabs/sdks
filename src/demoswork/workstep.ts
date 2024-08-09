@@ -1,14 +1,14 @@
 import forge from "node-forge"
 
-// import { Hashing } from "@/encryption"
+import { Hashing } from "@/encryption/Hashing"
 import { HexToForge } from "@/utils/dataManipulation"
 import { getNewUID } from "./utils"
 
+import { skeletons } from "@/websdk"
 import { IWeb2Request, XMScript } from "@/types"
+import { INativePayload } from "@/types/native"
 import { DataTypes } from "@/types/demoswork/datatypes"
 import { StepOutputKey, WorkStepInput } from "@/types/demoswork/steps"
-import { INativePayload } from "@/types/native"
-import { skeletons } from "@/websdk"
 
 export class WorkStep {
     id: string
@@ -31,8 +31,7 @@ export class WorkStep {
 
     get hash() {
         // REVIEW: What fields should be hashed?
-        // return Hashing.sha256(JSON.stringify(this))
-        return JSON.stringify(this)
+        return Hashing.sha256(JSON.stringify(this))
     }
 
     /**
@@ -89,14 +88,14 @@ export class XmWorkStep extends WorkStep {
     override output = {
         // REVIEW: What result fields do developers need?
         result: {
-            type: DataTypes.work  as DataTypes.work,
+            type: DataTypes.work as DataTypes.work,
             src: {
                 self: this as XmWorkStep,
                 key: "output.result",
             },
         },
         hash: {
-            type: DataTypes.work  as DataTypes.work,
+            type: DataTypes.work as DataTypes.work,
             src: {
                 self: this as XmWorkStep,
                 key: "output.hash",
@@ -113,7 +112,7 @@ export class NativeWorkStep extends WorkStep {
     override context = "native"
     override output = {
         result: {
-            type: DataTypes.work  as DataTypes.work,
+            type: DataTypes.work as DataTypes.work,
             src: {
                 self: this as NativeWorkStep,
                 key: "output.result",

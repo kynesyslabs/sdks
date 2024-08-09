@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk-beta",
-    "version": "1.0.13",
+    "version": "1.1.0",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -49,7 +49,6 @@
         "rijndael-js": "^2.0.0",
         "socket.io-client": "^4.7.2",
         "superdilithium": "^2.0.6",
-        "uuid": "^10.0.0",
         "web3": "^4.9.0",
         "xrpl": "^3.0.0"
     },

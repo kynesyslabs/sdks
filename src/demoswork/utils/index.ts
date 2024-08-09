@@ -1,7 +1,5 @@
-import { v4 as uuidv4 } from "uuid"
-
 export function getNewUID() {
-    return uuidv4().replaceAll("-", "")
+    return crypto.randomUUID().replaceAll("-", "")
 }
 
 /**
