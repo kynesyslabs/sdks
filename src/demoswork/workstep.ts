@@ -1,6 +1,6 @@
 import forge from "node-forge"
 
-import { Hashing } from "@/encryption"
+// import { Hashing } from "@/encryption"
 import { HexToForge } from "@/utils/dataManipulation"
 import { getNewUID } from "./utils"
 
@@ -31,7 +31,8 @@ export class WorkStep {
 
     get hash() {
         // REVIEW: What fields should be hashed?
-        return Hashing.sha256(JSON.stringify(this))
+        // return Hashing.sha256(JSON.stringify(this))
+        return JSON.stringify(this)
     }
 
     /**
