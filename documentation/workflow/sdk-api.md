@@ -131,4 +131,5 @@ The pushed operation(s) will drive the execution of the script.
 work.toJSON()
 ```
 
-> [!NOTE] > `toJSON()` won't export the script to a stringified JSON string, but rather a JSON-serializable `DemoScript` object. The method just removes circular references from the steps and operations and return a clean script.
+> [!NOTE]
+> `toJSON()` won't export the script to a stringified JSON string, but rather a JSON-serializable `DemoScript` object. The method just removes circular references from the steps and operations and return a clean script.
