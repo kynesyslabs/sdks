@@ -36,3 +36,11 @@ export interface HelloPeerRequest {
     port: number
     publicKey: string
 }
+
+// ANCHOR BrowserRequest
+export const emptyResponse: RPCResponse = {
+    result: 0,
+    response: true,
+    require_reply: false,
+    extra: null,
+}
