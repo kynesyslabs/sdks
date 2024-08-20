@@ -4,177 +4,69 @@ This library contains all the functions that are used to interact with the demos
 
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
-import { Buffer } from 'buffer/'
-import forge from 'node-forge'
-import io, { Socket } from 'socket.io-client'
-
-import { sha256 } from './utils/sha256'
-import { bufferize } from './utils/bufferizer'
-import * as skeletons from './utils/skeletons'
+import axios from "axios"
+import { Buffer } from "buffer/"
+import * as skeletons from "./utils/skeletons"
 
 // NOTE Including custom libraries from Demos
-import { DemosWebAuth } from './DemosWebAuth'
-import { prepareXMPayload } from './XMTransactions'
-import { DemosTransactions } from './DemosTransactions'
-import { prepareWeb2Payload } from './Web2Transactions'
+import { DemosWebAuth } from "./DemosWebAuth"
+import { prepareXMPayload } from "./XMTransactions"
+import { DemosTransactions } from "./DemosTransactions"
+import { prepareWeb2Payload } from "./Web2Transactions"
 
-import type { IBufferized } from './types/IBuffer'
-import type { EncryptedTransaction, Transaction, ValidityData } from '@/types'
-import { l2psCalls } from './L2PSCalls'
+import type { IBufferized } from "./types/IBuffer"
+import type { EncryptedTransaction, Transaction, ValidityData } from "@/types"
+import { l2psCalls } from "./L2PSCalls"
+import { RPCRequest, RPCResponse } from "@/types/communication/rpc"
+import { Cryptography } from "@/encryption"
+import { IKeyPair } from "./types/KeyPair"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 export const demos = {
     // ANCHOR Properties
-    socket: <Socket | null>null,
-    socket_connected: false,
-    connectedListener: function (val: any) { },
-    set connected(val) {
-        this.socket_connected = val
-        this.connectedListener(val)
-    },
-    get connected() {
-        return this.socket_connected
-    },
-    onConnectedChange: function (listener: any) {
-        this.connectedListener = listener
-    },
-    identity: null,
-    registry: <
-        {
-            [key: string]: any
-        }
-        >{},
-
-    // SECTION Registry
-    replies: {
-        // INFO Insert a muid in the reply registry
-        waitReply: function (muid: string) {
-            if (!demos.registry[muid]) {
-                demos.registry[muid] = null
-                console.log('[DEMOS] Waiting for response for ' + muid)
-                console.log(demos.registry)
-            }
-        },
-
-        // INFO Check if a muid is in the registry
-        needReply: function (muid: string | number) {
-            if (demos.registry[muid] === undefined) {
-                return false
-            } else {
-                return true
-            }
-        },
-
-        // INFO Get a reply from a muid
-        getReply: function (muid: string | number) {
-            return demos.registry[muid]
-        },
-
-        // NOTE As this method returns a promise, we can use it to asynchronously await for a reply
-        checkReply: async function (muid: any, ms = 10000) {
-            let timeout = ms // 5 seconds
-            let reply = demos.replies.getReply(muid)
-            while (reply === null && timeout > 0) {
-                await new Promise((resolve) => setTimeout(resolve, 100))
-                reply = demos.replies.getReply(muid)
-                timeout -= 100
-            }
-            if (reply === null) {
-                reply = JSON.stringify({ error: 'timeout' })
-            }
-            return reply
-        },
-    },
-    // !SECTION Registry
+    rpc_url: <string | null>null,
+    connected: false,
+    keypair: <IKeyPair>null,
 
     // SECTION Connection and listeners
-    connect: function (rpc_url: string) {
-        if (this.socket !== null) {
-            console.log('[DEMOS] Already connected')
-            return
-        }
-        // @ts-ignore
+    connect: async function (rpc_url: string) {
         try {
-            demos.socket = io(rpc_url, {
-                extraHeaders: {
-                    'Access-Control-Allow-Origin': '*',
-                },
-            })
-        } catch (e) {
-            this.connected = false
-            console.log(e)
-        }
+            const response = await axios.get(rpc_url)
 
-        if (demos.socket === null) {
-            throw new Error('Socket is null! Aborting connection')
-        }
-
-        // Listeners
-        demos.socket.on('connect', function () {
-            console.log('[DEMOS] Connected to server', demos.socket!.connected)
-            demos.connected = demos.socket!.connected
-        })
-
-        demos.socket.once('disconnect', function () {
-            console.log('[DEMOS] Disconnected from server')
-            demos.socket = null
-            demos.connected = false
-        })
-
-        // NOTE Reply to comlink messages
-        demos.socket.on(
-            'comlink_reply',
-            function (reply: {
-                chain: {
-                    current: {
-                        currentMessage: {
-                            bundle: { content: { message: any } }
-                        }
-                    }
-                }
-                muid: any
-            }) {
-                if (
-                    !reply.chain.current.currentMessage.bundle.content.message
-                ) {
-                    console.log(
-                        '[!] [DEMOS] Received a comlink_reply without a message!'
-                    )
-                    return
-                }
-                const _muid = reply.muid
-                console.log('[DEMOS] Received comlink_reply: ' + _muid)
-                if (demos.replies.needReply(_muid)) {
-                    console.log('[DEMOS] Received an expected reply!')
-                    demos.registry[_muid] =
-                        reply.chain.current.currentMessage.bundle.content.message
-                    // console.log(reply.chain.current.currentMessage.bundle.content.message)
-                } else {
-                    console.log('[DEMOS] Received an unexpected reply!')
-                }
+            if (response.status == 200) {
+                demos.rpc_url = rpc_url
             }
-        )
 
-        demos.socket.on('connect_error', (err: { message: any }) => {
-            demos.connected = demos.socket!.connected
-            demos.socket = null
-            console.log(`[DEMOS] connect_error due to ${err.message}`)
-        })
+            return true
+        } catch (error: any) {
+            throw new Error(`Failed to connect to the RPC server`)
+        }
+    },
 
-        demos.socket.on('connect_failed', (err: { message: any }) => {
-            demos.socket!.disconnect()
-            console.log(`[DEMOS] error due to ${err.message}`)
-        })
+    connectWallet: async function (privateKey: string | Buffer | Uint8Array) {
+        const webAuthInstance = new DemosWebAuth()
+        const [loggedIn, helptext] = await webAuthInstance.login(privateKey)
 
-        // ANCHOR Catch-all (mainly for debug purposes)
-        demos.socket.onAny((event: any, data: any) => {
-            console.log(event)
-            console.log(data)
-        })
+        if (loggedIn) {
+            demos.keypair = webAuthInstance.keypair
+            return demos.keypair.publicKey.toString("hex")
+        }
+
+        throw new Error(helptext)
+    },
+
+    getAddress: function () {
+        if (!demos.keypair || !demos.keypair.privateKey) {
+            throw new Error("Wallet not connected")
+        }
+
+        return demos.keypair.publicKey.toString("hex")
     },
 
     disconnect: function () {
-        demos.socket?.disconnect()
+        // remove rpc_url and wallet connection
+        demos.rpc_url = null
+        demos.keypair = null
     },
     // !SECTION Connection and listeners
 
@@ -193,43 +85,37 @@ export const demos = {
     // SECTION NodeCall prototype
     // INFO NodeCalls use the same structure
     nodeCall: async function (message: any, args = {}) {
-        return await demos.call('nodeCall', message, args)
+        return await demos.call("nodeCall", message, args)
     },
     // REVIEW: Replace call with validate / execute logic
     confirm: async function (transaction: Transaction) {
-        return await demos.call('transaction', '', transaction, 'confirmTx')
+        return await demos.call("transaction", "", transaction, "confirmTx")
     },
     broadcast: async function (validationData: ValidityData) {
         return await demos.call(
-            'transaction',
-            '',
+            "transaction",
+            "",
             validationData,
-            'broadcastTx'
+            "broadcastTx",
         )
     },
     // L2PS calls are defined here
     l2ps: l2psCalls,
     // INFO NodeCalls use the same structure
     call: async function (
-        type: any,
+        method: any,
         message: any,
         data: any = {},
-        extra: any = '',
+        extra: any = "",
         sender: any = null,
-        receiver: any = null
+        receiver: any = null,
     ) {
-        /* if (!demos.socket.connected) {
-                console.log("[ERROR] We are disconnected")
-                return
-            } */
-        const _muid = demos.generateMuid()
-
-        // TODO Typize both objects below
-
+        // NOTE: Didn't tear apart the transmission object during the http
+        // rewrite just in case we need to come back to it.
         const transmission = {
             bundle: {
                 content: {
-                    type: type,
+                    type: method,
                     message: message,
                     sender: <Buffer | IBufferized | null>null,
                     receiver: null,
@@ -237,151 +123,85 @@ export const demos = {
                     data: data, // REVIEW Does it works this way or should we pass it as a non-dict argument?
                     extra: extra,
                 },
-                hash: '',
+                hash: "",
                 signature: <IBufferized | null>null,
             },
         }
 
-        const comlink = {
-            muid: _muid,
-            properties: {
-                connection_string: null, // NOTE We don't have a connection_string as we are clients
-                require_reply: true,
-                is_reply: false,
-            },
-            chain: {
-                current: {
-                    currentMessage: transmission,
-                    currentMessageHash: '',
-                    previousHashes: [], // Keep track of the previous hashes to have full integrity
-                },
-                comlinkCurrentHash: '', // is the hashed version of .current
-                comlinkCurrentHashSignature: <IBufferized | null>null, // is the signature of the hashed version of.current
-            },
+        const request: RPCRequest = {
+            method: method,
+            params: [transmission.bundle.content],
         }
 
-        // REVIEW Getting our shared identity
-        let keys: { privateKey: any; publicKey: any }
-        try {
-            const id = DemosWebAuth.getInstance()
-            if (id.keypair === null) {
-                throw new Error('No keypair found')
+        let pubkey_string: string
+        let pubkey_signature: string
+        let isAuthenticated: boolean = method !== "nodeCall"
+
+        if (isAuthenticated) {
+            if (demos.keypair == null || demos.keypair.privateKey == null) {
+                throw new Error(
+                    "Error: Wallet not connected! Please connect a private key using demos.connectWallet(privateKey) or provide one via the privateKey parameter",
+                )
             }
-            keys = id.keypair
-        } catch (e) {
-            console.log('[ERROR LOADING IDENTITY]')
-            console.log(e)
-            // FIXME and // TODO Eliminate this: generating a random identity for the signature
-            const seed = forge.random.getBytesSync(32)
-            keys = forge.pki.ed25519.generateKeyPair({ seed })
-            // megabudino was here
+
+            pubkey_string = demos.keypair.publicKey.toString("hex")
+            pubkey_signature = Cryptography.sign(
+                pubkey_string,
+                demos.keypair.privateKey,
+            ).toString("hex")
         }
 
-        const privkey = keys.privateKey
-        const pubKey = keys.publicKey
-        console.log(keys)
-        // Signaling our identity
-        console.log('Parameters:')
-        comlink.chain.current.currentMessage.bundle.content.sender =
-            Buffer.from(pubKey)
+        try {
+            const response = await axios.post<RPCResponse>(
+                demos.rpc_url,
+                request,
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        identity: pubkey_string,
+                        signature: pubkey_signature,
+                    },
+                },
+            )
 
-        // NOTE Manual converting the Uint8Array to a Buffer supported by node.js and forge
-        console.log('Buffered key (uint8array):')
-        console.log(Buffer.from(pubKey))
-        const pubKeyBuffer = bufferize(pubKey)
-        console.log('Manual buffering:')
-        console.log(pubKeyBuffer)
-        comlink.chain.current.currentMessage.bundle.content.sender =
-            pubKeyBuffer
+            if (method == "nodeCall") {
+                console.log("nodecall result", response.data.response)
+                return response.data.response
+            }
 
-        console.log('Actual sender:')
-        console.log(comlink.chain.current.currentMessage.bundle.content.sender)
-        // NOTE Doing the cryptography for the transmission object
-        const stringifiedTransmissionContent = JSON.stringify(
-            comlink.chain.current.currentMessage.bundle.content
-        )
-        console.log('Transmission Content:')
-        console.log(comlink.chain.current.currentMessage.bundle.content)
-        console.log('Stringified Transmission Content:')
-        console.log(stringifiedTransmissionContent)
-        const t_hashed = await sha256(stringifiedTransmissionContent)
-        console.log(
-            t_hashed +
-            ' is the hashed version of comlink.chain.current.currentMessage.bundle.content'
-        )
-        comlink.chain.current.currentMessage.bundle.hash = t_hashed
-        comlink.chain.current.currentMessageHash = t_hashed
-        // And signing it
-        const t_signature = forge.pki.ed25519.sign({
-            message: t_hashed,
-            encoding: 'utf8',
-            privateKey: privkey,
-        })
-        console.log(
-            t_signature.toString('utf8') +
-            ' is the signature of the hashed version of comlink.chain.current.currentMessage.bundle.content'
-        )
-        comlink.chain.current.currentMessage.bundle.signature = bufferize(
-            Buffer.from(t_signature)
-        ) // REVIEW Changed to Buffer
-
-        // NOTE Also hashing the comlink current property
-        const stringifiedMessage = JSON.stringify(comlink.chain.current)
-        const hashed = await sha256(stringifiedMessage)
-        console.log(hashed + ' is the hashed version of comlink.chain.current')
-        comlink.chain.comlinkCurrentHash = hashed
-        // Signing the hash
-        // console.log(keys.publicKey.toHex() + " is the public key of the signing key")
-        // console.log(keys.privateKey.toHex() + " is the private key of the signing key")
-        const signature = forge.pki.ed25519.sign({
-            message: hashed,
-            encoding: 'utf8',
-            privateKey: privkey,
-        })
-        console.log(
-            signature.toString('utf8') +
-            ' is the signature of the hashed version of comlink.chain.current'
-        )
-        comlink.chain.comlinkCurrentHashSignature = bufferize(
-            Buffer.from(signature)
-        ) // REVIEW Changed to Buffer
-
-        // Stringifying currentMessage
-        // comlink.chain.current.currentMessage = JSON.stringify(comlink.chain.current.currentMessage)
-
-        console.log('Sending message ')
-        console.log(message)
-        console.log(' to server with muid: ' + comlink.muid)
-        console.log('Using the following comlink:')
-        console.log(comlink)
-        // Registering the reply request
-        demos.replies.waitReply(_muid)
-        console.log(comlink)
-        demos.socket!.emit('comlink', comlink)
-        // Waiting for a reply
-        return await demos.replies.checkReply(_muid)
+            return response.data
+        } catch (error) {
+            return {
+                result: 500,
+                response: error,
+                require_reply: false,
+                extra: null,
+            }
+        }
     },
     // !SECTION NodeCall prototype
 
     // SECTION Predefined calls
     getLastBlockNumber: async function () {
-        return await demos.nodeCall('getLastBlockNumber')
+        return await demos.nodeCall("getLastBlockNumber")
     },
     getLastBlockHash: async function () {
-        return await demos.nodeCall('getLastBlockHash')
+        return await demos.nodeCall("getLastBlockHash")
     },
     getBlockByNumber: async function (blockNumber: any) {
-        let block = await demos.nodeCall('getBlockByNumber', {
+        let block = await demos.nodeCall("getBlockByNumber", {
             blockNumber,
         })
+        console.log("block", block)
         block = JSON.parse(block)
         console.log(typeof block)
         return block
     },
     getBlockByHash: async function (blockHash: any) {
-        let block = await demos.nodeCall('getBlockByHash', {
+        let block = await demos.nodeCall("getBlockByHash", {
             blockHash,
         })
+
         block = JSON.parse(block)
         block.content = JSON.parse(block.content)
         console.log(typeof block)
@@ -389,10 +209,10 @@ export const demos = {
     },
 
     getTxByHash: async function (
-        txHash = 'e25860ec6a7cccff0371091fed3a4c6839b1231ccec8cf2cb36eca3533af8f11'
+        txHash = "e25860ec6a7cccff0371091fed3a4c6839b1231ccec8cf2cb36eca3533af8f11",
     ) {
         // Defaulting to the genesis tx of course
-        let tx = await demos.nodeCall('getTxByHash', {
+        let tx = await demos.nodeCall("getTxByHash", {
             hash: txHash,
         })
         tx = JSON.parse(tx)
@@ -401,20 +221,20 @@ export const demos = {
     },
 
     getPeerlist: async function () {
-        return await demos.nodeCall('getPeerlist')
+        return await demos.nodeCall("getPeerlist")
     },
     getMempool: async function () {
-        return await demos.nodeCall('getMempool')
+        return await demos.nodeCall("getMempool")
     },
     getPeerIdentity: async function () {
-        return await demos.nodeCall('getPeerIdentity')
+        return await demos.nodeCall("getPeerIdentity")
     },
 
     getAddressInfo: async function (address: any) {
         const add = JSON.parse(
-            await demos.nodeCall('getAddressInfo', {
+            await demos.nodeCall("getAddressInfo", {
                 address,
-            })
+            }),
         )
         add.native.tx_list = JSON.parse(add.native.tx_list)
         return add
@@ -453,7 +273,7 @@ export const demos = {
 }
 
 async function sleep(time: number) {
-    return new Promise((resolve) => setTimeout(resolve, time))
+    return new Promise(resolve => setTimeout(resolve, time))
 }
 
 // Creating a demos class
