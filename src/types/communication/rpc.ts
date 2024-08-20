@@ -19,3 +19,20 @@ export interface ConsensusRequest {
     message: string
     sender: string
 }
+
+export type VoteRequest = {
+    parameter: string
+    timestamp: number
+}
+
+export interface NodeCall {
+    message: string
+    data: any
+    muid: string
+}
+
+export interface HelloPeerRequest {
+    url: string
+    port: number
+    publicKey: string
+}
