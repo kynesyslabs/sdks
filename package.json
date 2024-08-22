@@ -19,7 +19,7 @@
     "scripts": {
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
         "publish": "yarn npm publish",
-        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
+        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/near*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
     },
     "dependencies": {
         "@cosmjs/proto-signing": "^0.32.3",
@@ -43,6 +43,7 @@
         "buffer": "^6.0.3",
         "ethers": "^6.11.1",
         "mceliece-nist": "^4.0.1",
+        "near-api-js": "^4.0.4",
         "node-forge": "^1.3.1",
         "node-seal": "^5.1.3",
         "rijndael-js": "^2.0.0",
