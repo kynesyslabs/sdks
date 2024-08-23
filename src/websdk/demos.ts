@@ -18,7 +18,7 @@ import type { IBufferized } from "./types/IBuffer"
 import type { EncryptedTransaction, Transaction, ValidityData } from "@/types"
 import { l2psCalls } from "./L2PSCalls"
 import { RPCRequest, RPCResponse } from "@/types/communication/rpc"
-import { Cryptography } from "@/encryption"
+import { Cryptography } from "@/encryption/Cryptography"
 import { IKeyPair } from "./types/KeyPair"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
