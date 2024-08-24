@@ -1,42 +1,60 @@
 import { DefaultChain } from "./types/defaultChain"
 import { JsonRpcProvider } from "near-api-js/lib/providers"
 import {
-    Account,
     InMemorySigner,
     KeyPair,
     Near,
-    Signer,
     connect,
-    keyStores,
     transactions,
 } from "near-api-js"
-import { InMemoryKeyStore } from "near-api-js/lib/key_stores"
 import { IPayOptions } from "."
 import { Transaction } from "near-api-js/lib/transaction"
 import { _required as required } from "@/websdk"
 import BigNumber from "bignumber.js"
-import { base_decode } from "near-api-js/lib/utils/serialize"
-import { baseDecode } from "@near-js/utils"
+import { baseDecode, parseNearAmount } from "@near-js/utils"
 
+type networkId = "testnet" | "mainnet"
+
+// @ts-expect-error
 export class NEAR extends DefaultChain {
+    networkId: networkId
+    accountId: string
+
     override provider: Near
     override signer: any
     override wallet: KeyPair
     connection: Near
 
-    constructor(rpc_url: string) {
+    constructor(rpc_url: string, networkId: networkId) {
         super(rpc_url)
+
         this.name = "near"
+        this.networkId = networkId
+    }
+
+    static override async create<T extends NEAR>(
+        this: new (rpc_url: string, networkId: networkId) => T,
+        rpc_url: string,
+        networkId: networkId
+    ): Promise<T> {
+        const instance = new this(rpc_url, networkId);
+        
+        if (rpc_url) {
+            await instance.connect();
+        }
+
+        return instance;
     }
 
     async connect() {
-        // this.provider = new JsonRpcProvider({
-        //     url: "https://rpc.testnet.near.org",
+        // const provider = new JsonRpcProvider({
+        //     url: this.rpc_url,
         // })
+
 
         try {
             this.provider = await connect({
-                networkId: "testnet",
+                networkId: this.networkId,
                 nodeUrl: this.rpc_url,
             })
             const status = await this.provider.connection.provider.status()
@@ -48,23 +66,28 @@ export class NEAR extends DefaultChain {
         return this.connected
     }
 
-    override async connectWallet(privateKey: string, options?: {}) {
-        // this.wallet = new InMemoryKeyStore()
-        this.wallet = KeyPair.fromString(privateKey as any)
-        return this.wallet
-
-        // await this.wallet.setKey(
-        //     "testnet",
-        //     keypair.getPublicKey().toString(),
-        //     keypair,
-        // )
-
-        // return this.wallet
+    getAddress(): string {
+        return this.wallet.getPublicKey().toString()
     }
 
-    // override preparePay(receiver: string, amount: string, options?: any) {
+    async getBalance(address: string, options?: {}) {
+        const account = await this.provider.account(address)
+        const balance = await account.getAccountBalance()
+        return balance.total
+    }
 
-    // }
+    async connectWallet(privateKey: string, options: {
+        /**
+         * The accountId to use with this private key
+         */
+        accountId: string
+    }) {
+        required(options && options.accountId, "AccountId is required")
+
+        this.wallet = KeyPair.fromString(privateKey as any)
+        this.accountId = options.accountId
+        return this.wallet
+    }
 
     async preparePays(payments: IPayOptions[], options?: {}) {
         required(this.wallet, "Wallet not connected")
@@ -87,10 +110,11 @@ export class NEAR extends DefaultChain {
             finality: "final",
         })
         const lastBlockHash = block.header.hash
-        console.log(lastBlockHash)
 
         const txs = payments.map(payment => {
-            const amount = parseFloat(payment.amount as string)
+            currentNonce = currentNonce + BigInt(1)
+            const parsed = parseNearAmount(payment.amount as string)
+            const amount = parseFloat(parsed)
 
             const tx = new Transaction({
                 receiverId: payment.address,
@@ -101,37 +125,73 @@ export class NEAR extends DefaultChain {
                 publicKey: this.wallet.getPublicKey(),
             })
 
-            currentNonce = currentNonce + BigInt(1)
             return tx
         })
 
         return await this.signTransactions(txs)
     }
 
+    async preparePay(receiver: string, amount: string, options?: any) {
+        const txs = await this.preparePays([{ address: receiver, amount }], options)
+        return txs[0]
+    }
+
     async signTransactions(
         txs: Transaction[],
         options?: { privateKey?: string },
     ) {
-        const accountId = "cwilvx.testnet" // Ensure this is the correct account ID
-        // const signer = await InMemorySigner.fromKeyPair(
-        //     "testnet",
-        //     accountId,
-        //     this.wallet,
-        // )
+        const accountId = "cwilvx.testnet"
         const signer = await InMemorySigner.fromKeyPair(
-            "testnet",
+            this.networkId,
             accountId,
             this.wallet,
         )
 
-        console.log(signer.getPublicKey())
-
         return Promise.all(
             txs.map(async tx => {
-                const res = await transactions.signTransaction(tx, signer, accountId, 'testnet')
-                return res[0]
+                const res = await transactions.signTransaction(tx, signer, accountId, this.networkId)
+                return res[1].encode()
             }),
         )
+    }
+
+    async signTransaction(tx: Transaction, options?: any) {
+        const txs = await this.signTransactions([tx], options)
+        return txs[0]
+    }
+
+    getEmptyTransaction() {
+        return new Transaction({
+            receiverId: "",
+            actions: [],
+            nonce: null,
+            signerId: "",
+            blockHash: "",
+            publicKey: this.wallet.getPublicKey(),
+        })
+    }
+
+    /**
+     * Create a new account
+     * @param accountId The new accountId
+     * @param options 
+     * @returns 
+     */
+    async createAccount(accountId: string, options?: {
+        /**
+         * The amount of NEAR to transfer to the new account. Default is 1Ⓝ
+         */
+        amount?: string
+    }) {
+        const account = await this.provider.account(this.accountId)
+        console.log(account)
+        const res = await account.createAccount(
+            "other.cwilvx.testnet",
+            "ed25519:829U4DTgQqdhxZX71Evh3GrPxjvi2azut1H6kLV1utu6",
+            BigInt(parseNearAmount(options?.amount || "1")),
+        )
+
+        return res
     }
 }
 
