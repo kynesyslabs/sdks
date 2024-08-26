@@ -7,11 +7,17 @@ describe("NEAR CHAIN TESTS", () => {
 
     beforeAll(async () => {
         instance = await NEAR.create("https://rpc.testnet.near.org", "testnet")
-        localInstance = await LocalNEAR.create("https://rpc.testnet.near.org", "testnet")
+        localInstance = await LocalNEAR.create(
+            "https://rpc.testnet.near.org",
+            "testnet",
+        )
 
-        await instance.connectWallet('ed25519:4QRNiJk7A584sU3aV1xhqdbdairYJybjHwo8h6F2advriyVu2JMoz319HK5dKAGJq9z78s7ntw2JVeBYybZ4r4Ec', {
-            accountId: "cwilvx.testnet"
-        })
+        await instance.connectWallet(
+            "ed25519:4QRNiJk7A584sU3aV1xhqdbdairYJybjHwo8h6F2advriyVu2JMoz319HK5dKAGJq9z78s7ntw2JVeBYybZ4r4Ec",
+            {
+                accountId: "cwilvx.testnet",
+            },
+        )
     })
 
     test.skip("getBalance", async () => {
@@ -19,7 +25,7 @@ describe("NEAR CHAIN TESTS", () => {
         console.log(balance)
     })
 
-    test.only("preparePays", async () => {
+    test.skip("preparePays", async () => {
         const signedTxs = await instance.preparePays([
             {
                 address: "cwilvx.testnet",
@@ -33,8 +39,13 @@ describe("NEAR CHAIN TESTS", () => {
         console.log(res)
     })
 
-    test("createAccount", async () => {
-        const res = await instance.createAccount("other.cwilvx.testnet")
-        console.log(res)
+    test.only("createAccount", async () => {
+        const { privateKey, signedTx } = await instance.createAccount(
+            "other2.cwilvx.testnet",
+            "1",
+        )
+        console.log(signedTx, privateKey)
+        const res2 = await localInstance.sendTransaction(signedTx)
+        console.log(res2)
     })
 })

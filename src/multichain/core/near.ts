@@ -5,7 +5,8 @@ import {
     KeyPair,
     Near,
     connect,
-    transactions,
+    keyStores,
+    transactions as actions,
 } from "near-api-js"
 import { IPayOptions } from "."
 import { Transaction } from "near-api-js/lib/transaction"
@@ -35,22 +36,21 @@ export class NEAR extends DefaultChain {
     static override async create<T extends NEAR>(
         this: new (rpc_url: string, networkId: networkId) => T,
         rpc_url: string,
-        networkId: networkId
+        networkId: networkId,
     ): Promise<T> {
-        const instance = new this(rpc_url, networkId);
-        
+        const instance = new this(rpc_url, networkId)
+
         if (rpc_url) {
-            await instance.connect();
+            await instance.connect()
         }
 
-        return instance;
+        return instance
     }
 
     async connect() {
         // const provider = new JsonRpcProvider({
         //     url: this.rpc_url,
         // })
-
 
         try {
             this.provider = await connect({
@@ -76,12 +76,15 @@ export class NEAR extends DefaultChain {
         return balance.total
     }
 
-    async connectWallet(privateKey: string, options: {
-        /**
-         * The accountId to use with this private key
-         */
-        accountId: string
-    }) {
+    async connectWallet(
+        privateKey: string,
+        options: {
+            /**
+             * The accountId to use with this private key
+             */
+            accountId: string
+        },
+    ) {
         required(options && options.accountId, "AccountId is required")
 
         this.wallet = KeyPair.fromString(privateKey as any)
@@ -92,6 +95,34 @@ export class NEAR extends DefaultChain {
     async preparePays(payments: IPayOptions[], options?: {}) {
         required(this.wallet, "Wallet not connected")
         const accountId = "cwilvx.testnet"
+
+        const txs = payments.map(payment => {
+            const parsed = parseNearAmount(payment.amount as string)
+            const amount = parseFloat(parsed)
+
+            const tx = new Transaction({
+                receiverId: payment.address,
+                actions: [actions.transfer(BigNumber(amount) as any)],
+                signerId: accountId,
+                publicKey: this.wallet.getPublicKey(),
+            })
+
+            return tx
+        })
+
+        return await this.signTransactions(txs)
+    }
+
+    async signTransactions(
+        txs: Transaction[],
+        options?: { privateKey?: string },
+    ) {
+        const accountId = "cwilvx.testnet"
+        const signer = await InMemorySigner.fromKeyPair(
+            this.networkId,
+            accountId,
+            this.wallet,
+        )
 
         const publicKey = this.wallet.getPublicKey().toString()
         const account = await this.provider.account(accountId)
@@ -111,48 +142,29 @@ export class NEAR extends DefaultChain {
         })
         const lastBlockHash = block.header.hash
 
-        const txs = payments.map(payment => {
-            currentNonce = currentNonce + BigInt(1)
-            const parsed = parseNearAmount(payment.amount as string)
-            const amount = parseFloat(parsed)
-
-            const tx = new Transaction({
-                receiverId: payment.address,
-                actions: [transactions.transfer(BigNumber(amount) as any)],
-                nonce: currentNonce,
-                signerId: accountId,
-                blockHash: baseDecode(lastBlockHash),
-                publicKey: this.wallet.getPublicKey(),
-            })
-
-            return tx
-        })
-
-        return await this.signTransactions(txs)
-    }
-
-    async preparePay(receiver: string, amount: string, options?: any) {
-        const txs = await this.preparePays([{ address: receiver, amount }], options)
-        return txs[0]
-    }
-
-    async signTransactions(
-        txs: Transaction[],
-        options?: { privateKey?: string },
-    ) {
-        const accountId = "cwilvx.testnet"
-        const signer = await InMemorySigner.fromKeyPair(
-            this.networkId,
-            accountId,
-            this.wallet,
-        )
-
         return Promise.all(
             txs.map(async tx => {
-                const res = await transactions.signTransaction(tx, signer, accountId, this.networkId)
+                currentNonce = currentNonce + BigInt(1)
+                tx.nonce = currentNonce
+                tx.blockHash = baseDecode(lastBlockHash)
+
+                const res = await actions.signTransaction(
+                    tx,
+                    signer,
+                    accountId,
+                    this.networkId,
+                )
                 return res[1].encode()
             }),
         )
+    }
+
+    async preparePay(receiver: string, amount: string, options?: any) {
+        const txs = await this.preparePays(
+            [{ address: receiver, amount }],
+            options,
+        )
+        return txs[0]
     }
 
     async signTransaction(tx: Transaction, options?: any) {
@@ -161,11 +173,14 @@ export class NEAR extends DefaultChain {
     }
 
     getEmptyTransaction() {
+        required(this.accountId, "AccountId is required")
+        required(this.wallet, "Wallet not connected")
+
         return new Transaction({
             receiverId: "",
             actions: [],
             nonce: null,
-            signerId: "",
+            signerId: this.accountId,
             blockHash: "",
             publicKey: this.wallet.getPublicKey(),
         })
@@ -174,26 +189,34 @@ export class NEAR extends DefaultChain {
     /**
      * Create a new account
      * @param accountId The new accountId
-     * @param options 
-     * @returns 
+     * @param options
+     * @returns
      */
-    async createAccount(accountId: string, options?: {
-        /**
-         * The amount of NEAR to transfer to the new account. Default is 1Ⓝ
-         */
-        amount?: string
-    }) {
-        const account = await this.provider.account(this.accountId)
-        console.log(account)
-        const res = await account.createAccount(
-            "other.cwilvx.testnet",
-            "ed25519:829U4DTgQqdhxZX71Evh3GrPxjvi2azut1H6kLV1utu6",
-            BigInt(parseNearAmount(options?.amount || "1")),
-        )
+    async createAccount(accountId: string, amount: string) {
+        const newAccountKey = KeyPair.fromRandom("ed25519")
 
-        return res
+        const tx = this.getEmptyTransaction()
+        tx.receiverId = accountId
+        tx.actions = [
+            actions.createAccount(),
+            actions.transfer(BigInt(parseNearAmount(amount))),
+            actions.addKey(
+                newAccountKey.getPublicKey(),
+                actions.fullAccessKey(),
+            ),
+        ]
+        const signedTx = await this.signTransaction(tx)
+
+        return {
+            signedTx,
+            privateKey: newAccountKey.toString(),
+        }
+    }
+
+    async deleteAccount(beneficiallyId: string) {
+        const tx = this.getEmptyTransaction()
+        tx.receiverId = beneficiallyId
+        tx.actions = [actions.deleteAccount(beneficiallyId)]
+        return await this.signTransaction(tx)
     }
 }
-
-// NOTES:
-// - We need to get the accountId from the publicKey
