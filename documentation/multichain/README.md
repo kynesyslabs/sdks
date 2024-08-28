@@ -1,6 +1,8 @@
 ## General layout of the multichain SDKs
 
-SDKs can be imported from `@kynesyslabs/demosdk/xm-localsdk/` or `@kynesyslabs/demosdk/xm-websdk`.
+The crosschain SDKs provide methods for reading blockchain state, creating and signing transactions on supported blockchains.
+
+SDKs can be imported from `@kynesyslabs/demosdk/xm-websdk/` (browser) or `@kynesyslabs/demosdk/xm-localsdk` (node).
 
 ```ts
 import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@kynesyslabs/demosdk/xm-websdk'
@@ -24,7 +26,7 @@ assert(instance.connected === true)
 ### Changing the RPC url
 
 ```ts
-instance.setRpc('<new_rpc_url>')
+instance.setRpc("<new_rpc_url>")
 await instance.connect()
 ```
 
@@ -51,27 +53,27 @@ const address = instance.getAddress()
 
 ### Payments
 
-You can initiate and sign a transaction to transfer the _default chain currency_ to an address using `preparePay`.
+You can create and sign a transaction to transfer the _default chain currency_ to an address using `preparePay`.
 
 ```ts
-const signed_tx = instance.preparePay(address, '1')
+const signedTx = instance.preparePay(address, "1")
 ```
 
-You can initiate multiple transfers using `preparePays`.
+You can create multiple transfers using `preparePays`.
 
 ```ts
 const transfers = [
     {
-        address: '<address>',
-        amount: '1',
+        address: "<address>",
+        amount: "1",
     },
     {
-        address: '<another address>',
-        amount: '0.25',
+        address: "<another address>",
+        amount: "0.25",
     },
 ]
 
-const signed_txs = instance.preparePays(transfers)
+const signedTxs = instance.preparePays(transfers)
 ```
 
 `prepareTransfer` and `prepareTransfers` are aliases of the above methods.

@@ -25,7 +25,7 @@ describe("NEAR CHAIN TESTS", () => {
         console.log(balance)
     })
 
-    test.skip("preparePays", async () => {
+    test.only("preparePays", async () => {
         const signedTxs = await instance.preparePays([
             {
                 address: "cwilvx.testnet",
@@ -39,13 +39,19 @@ describe("NEAR CHAIN TESTS", () => {
         console.log(res)
     })
 
-    test.only("createAccount", async () => {
-        const { privateKey, signedTx } = await instance.createAccount(
+    test.skip("createAccount", async () => {
+        const { keyPair, signedTx } = await instance.createAccount(
             "other2.cwilvx.testnet",
             "1",
         )
-        console.log(signedTx, privateKey)
+        console.log(signedTx, keyPair)
         const res2 = await localInstance.sendTransaction(signedTx)
         console.log(res2)
+
+    })
+
+    test.skip("hacking", async () => {
+        const tx = instance.actions.createAccount()
+        console.log(tx)
     })
 })
