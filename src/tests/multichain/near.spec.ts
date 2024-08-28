@@ -111,5 +111,6 @@ describe("NEAR CHAIN TESTS", () => {
     test.skip("hacking", async () => {
         const tx = instance.actions.createAccount()
         console.log(tx)
+        // TEST COMMENT!
     })
 })
