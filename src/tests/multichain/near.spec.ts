@@ -1,5 +1,11 @@
 import { NEAR } from "@/multichain/core/near"
 import { NEAR as LocalNEAR } from "@/multichain/localsdk/near"
+import {
+    decodeSignedTransaction,
+    decodeTransaction,
+} from "@near-js/transactions"
+import bigInt from "big-integer"
+import { getSampleTranfers, verifyNumberOrder } from "../utils"
 
 describe("NEAR CHAIN TESTS", () => {
     let instance: NEAR
@@ -20,12 +26,65 @@ describe("NEAR CHAIN TESTS", () => {
         )
     })
 
-    test.skip("getBalance", async () => {
-        const balance = await instance.getBalance("cwilvx.testnet")
-        console.log(balance)
+    test("preparePay returns a signed tx", async () => {
+        const address = instance.getAddress()
+        const signedTx = await instance.preparePay(address, "1.5")
+
+        const decodedSignedTx = decodeSignedTransaction(signedTx)
+        expect(decodedSignedTx.signature.ed25519Signature.data.length).toBe(64)
     })
 
-    test.only("preparePays", async () => {
+    test("A tx is signed with the ledger nonce", async () => {
+        // Read the ledger nonce
+        const address = instance.getAddress()
+        const account = await instance.provider.account(instance.accountId)
+        // INFO: Get the access keys
+        const info = await account.getAccessKeys()
+        // INFO: Find the access key for this address
+        const ledgeNonce = info.find(key => key.public_key === address)
+            ?.access_key.nonce
+
+        const signedTx = await instance.preparePay(address, "1.5")
+        const decodedTx = decodeTransaction(signedTx)
+
+        // INFO: The nonce is 1 more than the ledger nonce
+        expect(bigInt(decodedTx.nonce).toString()).toBe(
+            bigInt(ledgeNonce).add(1).toString(),
+        )
+    })
+
+    test("Transactions are signed with increasing nonces", async () => {
+        const address = instance.getAddress()
+        const transfers = getSampleTranfers(address)
+        const signed_txs = await instance.preparePays(transfers)
+
+        const txs = signed_txs.map(tx => decodeTransaction(tx))
+        const nonces_sorted = verifyNumberOrder(txs, "nonce", {
+            isNonce: true,
+        })
+
+        expect(nonces_sorted).toBe(true)
+    })
+
+    test("Transactions are signed in order of appearance", async () => {
+        const address = instance.getAddress()
+        const transfers = getSampleTranfers(address)
+        const signed_txs = await instance.preparePays(transfers)
+
+        const txs = signed_txs.map(tx => decodeTransaction(tx))
+        const amounts = txs.map(tx => {
+            return {
+                amount: tx.actions[0].transfer.deposit,
+            }
+        })
+        const values_sorted = verifyNumberOrder(amounts, "amount")
+
+        expect(values_sorted).toBe(true)
+    })
+
+    // SECTION: Local tests
+
+    test.skip("preparePays", async () => {
         const signedTxs = await instance.preparePays([
             {
                 address: "cwilvx.testnet",
@@ -47,7 +106,6 @@ describe("NEAR CHAIN TESTS", () => {
         console.log(signedTx, keyPair)
         const res2 = await localInstance.sendTransaction(signedTx)
         console.log(res2)
-
     })
 
     test.skip("hacking", async () => {
