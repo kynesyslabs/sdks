@@ -86,10 +86,10 @@ export async function prepareDemosWorkPayload(
     tx.content.from = DemosWebAuth.getInstance()!.keypair
         .publicKey as Uint8Array
     tx.content.to = tx.content.from
-    tx.content.type = "demosWork"
+    tx.content.type = "demoswork"
 
     // @ts-expect-error
-    tx.content.data = ["demosWork", script]
+    tx.content.data = ["demoswork", script]
     tx.content.timestamp = Date.now()
     tx = await DemosTransactions.sign(tx)
 
