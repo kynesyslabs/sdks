@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "1.1.6",
+    "version": "1.1.7",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -19,7 +19,7 @@
     "scripts": {
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
         "publish": "yarn npm publish",
-        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
+        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/**/multiversx* **/tests/utils/* **/tests/**/template*  --verbose"
     },
     "dependencies": {
         "@cosmjs/proto-signing": "^0.32.3",

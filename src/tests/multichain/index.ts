@@ -16,11 +16,11 @@ import { Near } from "near-api-js"
 
 // INFO: Chains and their RPCs
 const chains = [
-    {
-        name: "EGLD",
-        sdk: MULTIVERSX,
-        rpc: chainProviders.egld.testnet,
-    },
+    // {
+    //     name: "EGLD",
+    //     sdk: MULTIVERSX,
+    //     rpc: chainProviders.egld.testnet,
+    // },
     {
         name: "XRPL",
         sdk: XRPL,
