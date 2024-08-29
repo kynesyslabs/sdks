@@ -52,7 +52,7 @@ export const demos = {
     },
 
     getAddress: function () {
-        if (!demos.keypair || !demos.keypair.privateKey) {
+        if (!demos.keypair && !demos.keypair.privateKey) {
             throw new Error("Wallet not connected")
         }
 
