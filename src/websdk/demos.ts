@@ -138,7 +138,7 @@ export const demos = {
         let isAuthenticated: boolean = method !== "nodeCall"
 
         if (isAuthenticated) {
-            if (demos.keypair == null || demos.keypair.privateKey == null) {
+            if (demos.keypair == null && demos.keypair.privateKey == null) {
                 throw new Error(
                     "Error: Wallet not connected! Please connect a private key using demos.connectWallet(privateKey) or provide one via the privateKey parameter",
                 )
