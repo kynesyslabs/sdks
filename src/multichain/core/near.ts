@@ -1,17 +1,16 @@
-import { DefaultChain } from "./types/defaultChain"
 import {
     InMemorySigner,
     KeyPair,
     Near,
-    connect,
     transactions as actions,
     Signer,
 } from "near-api-js"
-import { IPayOptions } from "."
-import { Transaction } from "near-api-js/lib/transaction"
-import { _required as required } from "@/websdk"
-import { baseDecode, parseNearAmount } from "@near-js/utils"
 import bigInt from "big-integer"
+import { IPayOptions } from "."
+import { _required as required } from "@/websdk"
+import { DefaultChain } from "./types/defaultChain"
+import { Transaction } from "near-api-js/lib/transaction"
+import { baseDecode, parseNearAmount } from "@near-js/utils"
 
 type networkId = "testnet" | "mainnet"
 
@@ -30,6 +29,7 @@ export class NEAR extends DefaultChain {
 
         this.name = "near"
         this.networkId = networkId
+        this.setRpc(rpc_url, networkId)
     }
 
     static override async create<T extends NEAR>(
@@ -46,20 +46,21 @@ export class NEAR extends DefaultChain {
         return instance
     }
 
-    async connect() {
-        // const provider = new JsonRpcProvider({
-        //     url: this.rpc_url,
-        // })
+    override setRpc(rpc_url: string, networkId: networkId = "testnet"): void {
+        this.rpc_url = rpc_url
+        this.provider = new Near({
+            networkId: this.networkId,
+            nodeUrl: this.rpc_url,
+        })
+    }
 
+    async connect() {
         try {
-            this.provider = await connect({
-                networkId: this.networkId,
-                nodeUrl: this.rpc_url,
-            })
             const status = await this.provider.connection.provider.status()
             this.connected = !!status
         } catch (error) {
-            throw new Error(error as any)
+            console.error(error)
+            this.connected = false
         }
 
         return this.connected
