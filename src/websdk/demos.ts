@@ -18,7 +18,7 @@ import type { IBufferized } from "./types/IBuffer"
 import type { EncryptedTransaction, Transaction, ValidityData } from "@/types"
 import { l2psCalls } from "./L2PSCalls"
 import { RPCRequest, RPCResponse } from "@/types/communication/rpc"
-import { Cryptography } from "@/encryption"
+import { Cryptography } from "@/encryption/Cryptography"
 import { IKeyPair } from "./types/KeyPair"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
@@ -30,17 +30,13 @@ export const demos = {
 
     // SECTION Connection and listeners
     connect: async function (rpc_url: string) {
-        try {
-            const response = await axios.get(rpc_url)
+        const response = await axios.get(rpc_url)
 
-            if (response.status == 200) {
-                demos.rpc_url = rpc_url
-            }
-
-            return true
-        } catch (error: any) {
-            throw new Error(`Failed to connect to the RPC server`)
+        if (response.status == 200) {
+            demos.rpc_url = rpc_url
         }
+
+        return true
     },
 
     connectWallet: async function (privateKey: string | Buffer | Uint8Array) {
