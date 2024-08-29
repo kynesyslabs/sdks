@@ -52,7 +52,7 @@ export const demos = {
     },
 
     getAddress: function () {
-        if (!demos.keypair && !demos.keypair.privateKey) {
+        if (!demos.keypair || !demos.keypair.privateKey) {
             throw new Error("Wallet not connected")
         }
 
@@ -134,7 +134,7 @@ export const demos = {
         let isAuthenticated: boolean = method !== "nodeCall"
 
         if (isAuthenticated) {
-            if (demos.keypair == null && demos.keypair.privateKey == null) {
+            if (demos.keypair == null || demos.keypair.privateKey == null) {
                 throw new Error(
                     "Error: Wallet not connected! Please connect a private key using demos.connectWallet(privateKey) or provide one via the privateKey parameter",
                 )
@@ -161,7 +161,6 @@ export const demos = {
             )
 
             if (method == "nodeCall") {
-                console.log("nodecall result", response.data.response)
                 return response.data.response
             }
 
