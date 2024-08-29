@@ -227,7 +227,7 @@ export interface IDefaultChainLocal extends DefaultChain {
     /**
      * Broadcasts a signed transaction
      * @param tx The signed transaction
-     * @returns The transaction hash
+     * @returns The status and transaction hash, or a (maybe) error object
      */
     sendTransaction: (signed_tx: any) => Promise<XmTransactionResponse>
 }

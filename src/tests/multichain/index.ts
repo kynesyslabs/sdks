@@ -11,7 +11,8 @@ import { StargateClient } from "@cosmjs/stargate"
 import { INetworkProvider } from "@multiversx/sdk-network-providers/out/interface"
 
 import chainProviders from "./chainProviders"
-import { EVM, IBC, MULTIVERSX, XRPL, SOLANA, TON } from "@/multichain/core"
+import { EVM, IBC, MULTIVERSX, XRPL, SOLANA, TON, NEAR } from "@/multichain/core"
+import { Near } from "near-api-js"
 
 // INFO: Chains and their RPCs
 const chains = [
@@ -45,11 +46,16 @@ const chains = [
         sdk: TON,
         rpc: chainProviders.ton.testnet,
     },
+    {
+        name: "NEAR",
+        sdk: NEAR,
+        rpc: chainProviders.near.testnet,
+    },
 ]
 
 // INFO: For loop to test each chain sdk
 describe.each(chains)("GENERIC CHAIN TESTS › $name", ({ name, rpc, sdk }) => {
-    let instance: IBC | EVM | MULTIVERSX | XRPL | SOLANA | TON
+    let instance: IBC | EVM | MULTIVERSX | XRPL | SOLANA | TON | NEAR
 
     beforeAll(async () => {
         if (name === "TON") {
@@ -99,6 +105,10 @@ describe.each(chains)("GENERIC CHAIN TESTS › $name", ({ name, rpc, sdk }) => {
 
             case "TON":
                 ;(instance.provider as TonClient).getMasterchainInfo = mock
+                break
+
+            case "NEAR":
+                ;(instance.provider as Near).connection.provider.status = mock
                 break
 
             default:

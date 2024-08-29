@@ -28,3 +28,4 @@ export { TON } from "./ton"
 
 // The official XRPL Library is called "xrpl" which conflicts with the name of our XRPL SDK
 export { XRPL, xrplGetLastSequence } from './xrp'
+export { NEAR } from './near'

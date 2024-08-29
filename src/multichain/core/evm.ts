@@ -56,6 +56,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
             this.chainId = toNumber(network.chainId)
             this.connected = this.chainId > 0
         } catch (error) {
+            console.error(error)
             this.connected = false
         }
 
