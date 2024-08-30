@@ -29,6 +29,10 @@ await identity.create()
 const pubKey = await demos.connectWallet(identity.keypair.privateKey)
 ```
 
+> [!TIP]
+> You can get the address of the connected wallet using the `demos.getAddress()` method.
+
+
 With the wallet connected, you can now send authenticated requests to the node.
 
 ```ts
@@ -42,5 +46,5 @@ Once you're done, you can reset the demos object.
 demos.disconnect()
 ```
 
-> [!TIP]
-> You can get the address of the connected wallet using the `demos.getAddress()` method.
+> [!IMPORTANT]
+> Calling `demos.disconnect` won't log out the `DemosWebAuth` instance. You need to call `identity.logout()` to reset that.
