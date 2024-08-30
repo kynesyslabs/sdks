@@ -55,7 +55,10 @@ demos.disconnect()
 > [!IMPORTANT]
 > Calling `demos.disconnect` won't log out the `DemosWebAuth` instance. You need to call `identity.logout()` to reset that.
 
-## Changelog: Decoupling DemosWebAuth from the websdk
+<br>
+<br>
+
+# Changelog: Decoupling DemosWebAuth from the websdk
 
 We've decoupled the `DemosWebAuth` from the helper methods and objects in the websdk. That simply means that you'll now need to pass the keypair to the methods that need it, instead of them reference the global `DemosWebAuth` instance.
 
