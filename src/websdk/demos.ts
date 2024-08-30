@@ -20,13 +20,16 @@ import { l2psCalls } from "./L2PSCalls"
 import { RPCRequest, RPCResponse } from "@/types/communication/rpc"
 import { Cryptography } from "@/encryption/Cryptography"
 import { IKeyPair } from "./types/KeyPair"
+import { _required as required } from "./utils/required"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 export const demos = {
     // ANCHOR Properties
     rpc_url: <string | null>null,
     connected: false,
-    walletConnected: false,
+    get walletConnected(): boolean {
+        return this.keypair !== null && this.keypair.privateKey !== null;
+    },
     keypair: <IKeyPair>null,
 
     // SECTION Connection and listeners
@@ -47,7 +50,6 @@ export const demos = {
 
         if (loggedIn) {
             demos.keypair = webAuthInstance.keypair
-            demos.walletConnected = true
             return demos.keypair.publicKey.toString("hex")
         }
 
@@ -55,10 +57,7 @@ export const demos = {
     },
 
     getAddress: function () {
-        if (!demos.keypair || !demos.keypair.privateKey) {
-            throw new Error("Wallet not connected")
-        }
-
+        required(demos.walletConnected, "Wallet not connected")
         return demos.keypair.publicKey.toString("hex")
     },
 
@@ -68,7 +67,6 @@ export const demos = {
         demos.keypair = null
 
         demos.connected = false
-        demos.walletConnected = false
     },
     // !SECTION Connection and listeners
 
@@ -140,7 +138,7 @@ export const demos = {
         let isAuthenticated: boolean = method !== "nodeCall"
 
         if (isAuthenticated) {
-            if (demos.keypair == null || demos.keypair.privateKey == null) {
+            if (!demos.walletConnected) {
                 throw new Error(
                     "Error: Wallet not connected! Please connect a private key using demos.connectWallet(privateKey) or provide one via the privateKey parameter",
                 )
