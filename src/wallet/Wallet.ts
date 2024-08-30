@@ -7,6 +7,7 @@ import { Address } from "@/types/blockchain/WalletTypes"
 import * as websdk from "@/websdk"
 import { DemosTransactions } from "@/websdk"
 import { ValidityData } from "@/types"
+import { IKeyPair } from "@/websdk/types/KeyPair"
 
 export default class Wallet {
     // A wallet class is a singleton class, so we need to make sure that only one instance per id is created.
@@ -79,13 +80,13 @@ export default class Wallet {
     /* SECTION Basic writes */
     // NOTE All the writes return a validity object that needs to be confirmed and broadcasted
 
-    async transfer(to: Address, amount: number): Promise<ValidityData> {
+    async transfer(to: Address, amount: number, keypair: IKeyPair): Promise<ValidityData> {
         let tx = DemosTransactions.empty()
         // Putting the right data in the transaction
         tx.content.from = this.ed25519_hex.publicKey
         tx.content.to = to
         tx.content.amount = amount
-        tx = await DemosTransactions.sign(tx)
+        tx = await DemosTransactions.sign(tx, keypair)
         // Sending the transaction and getting the validity data
         let validity = await DemosTransactions.confirm(tx)
         return validity

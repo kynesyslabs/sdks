@@ -12,10 +12,18 @@ import * as skeletons from "./utils/skeletons"
 import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 import { DemosTransactions } from "./DemosTransactions"
-import { prepareWeb2Payload } from "./Web2Transactions"
+import {
+    IPrepareWeb2PayloadParams,
+    prepareWeb2Payload,
+} from "./Web2Transactions"
 
 import type { IBufferized } from "./types/IBuffer"
-import type { EncryptedTransaction, Transaction, ValidityData } from "@/types"
+import type {
+    EncryptedTransaction,
+    Transaction,
+    ValidityData,
+    XMScript,
+} from "@/types"
 import { l2psCalls } from "./L2PSCalls"
 import { RPCRequest, RPCResponse } from "@/types/communication/rpc"
 import { Cryptography } from "@/encryption/Cryptography"
@@ -28,7 +36,7 @@ export const demos = {
     rpc_url: <string | null>null,
     connected: false,
     get walletConnected(): boolean {
-        return this.keypair !== null && this.keypair.privateKey !== null;
+        return this.keypair !== null && this.keypair.privateKey !== null
     },
     keypair: <IKeyPair>null,
 
@@ -92,12 +100,7 @@ export const demos = {
         return await demos.call("execute", "", transaction, "confirmTx")
     },
     broadcast: async function (validationData: ValidityData) {
-        return await demos.call(
-            "execute",
-            "",
-            validationData,
-            "broadcastTx",
-        )
+        return await demos.call("execute", "", validationData, "broadcastTx")
     },
     // L2PS calls are defined here
     l2ps: l2psCalls,
@@ -250,15 +253,49 @@ export const demos = {
      */
     // ANCHOR Web2 Endpoints
     web2: {
-        createPayload: prepareWeb2Payload, // REVIEW It returns a tx that needs to be broadcasted and then confirmed due to the new method
+        createPayload: (
+            params: IPrepareWeb2PayloadParams,
+            keypair?: IKeyPair,
+        ) => {
+            const usedKeypair = keypair || demos.keypair
+            if (!usedKeypair) {
+                throw new Error("No keypair provided and no wallet connected")
+            }
+
+            return prepareWeb2Payload(params, usedKeypair)
+        },
     },
     // ANCHOR Crosschain support endpoints
     xm: {
         // INFO Working with XMTransactions
-        createPayload: prepareXMPayload, // REVIEW It returns a tx that needs to be broadcasted and then confirmed due to the new method
+        createPayload: (xm_payload: XMScript, keypair?: IKeyPair) => {
+            const usedKeypair = keypair || demos.keypair
+            if (!usedKeypair) {
+                throw new Error("No keypair provided and no wallet connected")
+            }
+            return prepareXMPayload(xm_payload, usedKeypair)
+        },
+    },
+    tx: {
+        ...DemosTransactions,
+        /**
+         * Signs a transaction after hashing its content.
+         *
+         * @param raw_tx - The transaction to be signed.
+         * @param keypair - The keypair to use for signing. If not provided, the keypair connected to the wallet will be used.
+         * @returns A Promise that resolves to the signed transaction.
+         */
+        sign: (raw_tx: Transaction, keypair?: IKeyPair) => {
+            const usedKeypair = keypair || demos.keypair
+            if (!usedKeypair) {
+                throw new Error("No keypair provided and no wallet connected")
+            }
+            return DemosTransactions.sign(raw_tx, usedKeypair)
+        },
     },
 
     // ANCHOR Supporting txs
+    // REVIEW: These two are deprecated, in favor of `demos.tx` (but kept to avoid breaking references)
     DemosTransactions,
     transactions: DemosTransactions,
 

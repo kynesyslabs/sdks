@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk-http",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -14,7 +14,8 @@
         "./types": "./build/types/index.js",
         "./websdk": "./build/websdk/index.js",
         "./xm-websdk": "./build/multichain/websdk/index.js",
-        "./xm-localsdk": "./build/multichain/localsdk/index.js"
+        "./xm-localsdk": "./build/multichain/localsdk/index.js",
+        "./wallet": "./build/wallet/index.js"
     },
     "scripts": {
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
