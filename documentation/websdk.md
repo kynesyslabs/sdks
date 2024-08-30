@@ -1,4 +1,4 @@
-## Using the websdk
+# Using the websdk
 
 The SDK with the HTTP rewrite of the `demos` object is published at [@kynesyslabs/demosdk-http](https://www.npmjs.com/package/@kynesyslabs/demosdk-http) on NPM.
 
@@ -69,10 +69,10 @@ Here's a list of affected methods:
 This method was previously using the global `DemosWebAuth` instance to sign transactions. Now you need to pass the keypair to the method.
 
 ```ts
-// from
+// from:
 DemosTransactions.sign(raw_tx: Transaction)
 
-// to
+// to:
 DemosTransactions.sign(raw_tx: Transaction, keypair: IKeyPair)
 ```
 
