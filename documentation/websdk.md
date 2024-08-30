@@ -12,6 +12,7 @@ To connect to a node, use the `connect` method.
 const rpc_url = "http://localhost:53550"
 
 await demos.connect(rpc_url)
+assert(demos.connected === true)
 ```
 
 This will ping the rpc and return a `true` if the rpc is found, or throw an error. Once connected, you can now make unauthenticated requests (node calls).
@@ -27,6 +28,7 @@ const identity = demos.DemosWebAuth.getInstance()
 await identity.create()
 
 const pubKey = await demos.connectWallet(identity.keypair.privateKey)
+assert(demos.walletConnected === true)
 ```
 
 > [!TIP]

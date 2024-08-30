@@ -26,6 +26,7 @@ export const demos = {
     // ANCHOR Properties
     rpc_url: <string | null>null,
     connected: false,
+    walletConnected: false,
     keypair: <IKeyPair>null,
 
     // SECTION Connection and listeners
@@ -36,7 +37,8 @@ export const demos = {
             demos.rpc_url = rpc_url
         }
 
-        return true
+        demos.connected = true
+        return demos.connected
     },
 
     connectWallet: async function (privateKey: string | Buffer | Uint8Array) {
@@ -45,6 +47,7 @@ export const demos = {
 
         if (loggedIn) {
             demos.keypair = webAuthInstance.keypair
+            demos.walletConnected = true
             return demos.keypair.publicKey.toString("hex")
         }
 
@@ -63,6 +66,9 @@ export const demos = {
         // remove rpc_url and wallet connection
         demos.rpc_url = null
         demos.keypair = null
+
+        demos.connected = false
+        demos.walletConnected = false
     },
     // !SECTION Connection and listeners
 
@@ -85,11 +91,11 @@ export const demos = {
     },
     // REVIEW: Replace call with validate / execute logic
     confirm: async function (transaction: Transaction) {
-        return await demos.call("transaction", "", transaction, "confirmTx")
+        return await demos.call("execute", "", transaction, "confirmTx")
     },
     broadcast: async function (validationData: ValidityData) {
         return await demos.call(
-            "transaction",
+            "execute",
             "",
             validationData,
             "broadcastTx",
