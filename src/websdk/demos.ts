@@ -217,9 +217,17 @@ export const demos = {
         let tx = await demos.nodeCall("getTxByHash", {
             hash: txHash,
         })
-        tx = JSON.parse(tx)
-        console.log(typeof tx)
-        return tx
+
+        if (tx) {
+            return tx
+        }
+
+        return null
+    },
+    getAllTxs: async function () {
+        let txs = await demos.nodeCall("getAllTxs")
+        txs = JSON.parse(txs)
+        return txs
     },
 
     getPeerlist: async function () {
