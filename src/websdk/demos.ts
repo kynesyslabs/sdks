@@ -191,43 +191,26 @@ export const demos = {
         return await demos.nodeCall("getLastBlockHash")
     },
     getBlockByNumber: async function (blockNumber: any) {
-        let block = await demos.nodeCall("getBlockByNumber", {
+        return await demos.nodeCall("getBlockByNumber", {
             blockNumber,
         })
-        console.log("block", block)
-        block = JSON.parse(block)
-        console.log(typeof block)
-        return block
     },
     getBlockByHash: async function (blockHash: any) {
-        let block = await demos.nodeCall("getBlockByHash", {
-            blockHash,
+        return await demos.nodeCall("getBlockByHash", {
+            hash: blockHash,
         })
-
-        block = JSON.parse(block)
-        block.content = JSON.parse(block.content)
-        console.log(typeof block)
-        return block
     },
 
     getTxByHash: async function (
         txHash = "e25860ec6a7cccff0371091fed3a4c6839b1231ccec8cf2cb36eca3533af8f11",
     ) {
         // Defaulting to the genesis tx of course
-        let tx = await demos.nodeCall("getTxByHash", {
+        return await demos.nodeCall("getTxByHash", {
             hash: txHash,
         })
-
-        if (tx) {
-            return tx
-        }
-
-        return null
     },
     getAllTxs: async function () {
-        let txs = await demos.nodeCall("getAllTxs")
-        txs = JSON.parse(txs)
-        return txs
+        return await demos.nodeCall("getAllTxs")
     },
 
     getPeerlist: async function () {
@@ -241,13 +224,9 @@ export const demos = {
     },
 
     getAddressInfo: async function (address: any) {
-        const add = JSON.parse(
-            await demos.nodeCall("getAddressInfo", {
-                address,
-            }),
-        )
-        add.native.tx_list = JSON.parse(add.native.tx_list)
-        return add
+        return await demos.nodeCall("getAddressInfo", {
+            address,
+        })
     },
     // !SECTION Predefined calls
 
