@@ -40,7 +40,9 @@ You can also connect a wallet using a mnemonic.
 ```ts
 const mnemonic = "property gym walk decorate laundry grab cabin outer artist nest castle vote"
 
-const pubKey = await demos.connectWallet(mnemonic)
+const pubKey = await demos.connectWallet(mnemonic, {
+    isSeed: true,
+})
 ```
 
 Or if you have a bip39 seed.
@@ -49,7 +51,9 @@ Or if you have a bip39 seed.
 const mnemonic = "property gym walk decorate laundry grab cabin outer artist nest castle vote"
 const seed = bip39.mnemonicToSeedSync(mnemonic)
 
-const pubKey = await demos.connectWallet(seed)
+const pubKey = await demos.connectWallet(seed, {
+    isSeed: true,
+})
 ```
 
 > [!TIP]
