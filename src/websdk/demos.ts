@@ -52,7 +52,20 @@ export const demos = {
         return demos.connected
     },
 
-    connectWallet: async function (privateKey: string | Buffer | Uint8Array) {
+    connectWallet: async function (
+        privateKey: string | Buffer | Uint8Array,
+        options?: {
+            /**
+             * Whether the private key is a seed.
+             * If true, the seed will be converted to an ed25519 keypair.
+             */
+            isSeed?: boolean
+        },
+    ) {
+        if (options?.isSeed) {
+            privateKey = Cryptography.newFromSeed(privateKey).privateKey
+        }
+
         const webAuthInstance = new DemosWebAuth()
         const [loggedIn, helptext] = await webAuthInstance.login(privateKey)
 

@@ -13,13 +13,13 @@ import * as crypto from "crypto"
 import { promises as fs } from "fs"
 import forge from "node-forge"
 
+import * as bip39 from "@scure/bip39"
 import { HexToForge } from "@/utils/dataManipulation"
-
+import { Hashing } from "./Hashing"
 
 const algorithm = "aes-256-cbc"
 
 export class Cryptography {
-
     static new() {
         const seed = forge.random.getBytesSync(32)
         const keys = forge.pki.ed25519.generateKeyPair({ seed })
@@ -28,8 +28,21 @@ export class Cryptography {
     }
 
     // INFO Method to generate a new key pair from a seed
-    static newFromSeed(stringSeed: string) {
-        return forge.pki.ed25519.generateKeyPair({ seed: stringSeed })
+    /**
+     * Creates a new keypair from a mnemonic
+     * @param seed White-space separated string of words
+     * @returns A new keypair
+     */
+    static newFromSeed(seed: string | Buffer | Uint8Array) {
+        if (typeof seed === "string") {
+            seed = bip39.mnemonicToSeedSync(seed)
+        }
+
+        const stringSeed = seed.toString()
+        const hashedSeed = Hashing.sha256(stringSeed)
+        const bufferSeed = Buffer.from(hashedSeed)
+
+        return forge.pki.ed25519.generateKeyPair({ seed: bufferSeed })
     }
 
     // TODO Eliminate the old legacy compatibility
@@ -251,7 +264,7 @@ export class Cryptography {
                 signature: signature,
                 publicKey: publicKey,
             })
-        }
+        },
     }
 
     static rsa = {
@@ -291,9 +304,7 @@ export class Cryptography {
             // Converting back the message and decrypting it
             // NOTE If no private key is provided, we try to use our one
             if (!privateKey) {
-                console.log(
-                    "[DECRYPTION] No private key provided!\n",
-                )
+                console.log("[DECRYPTION] No private key provided!\n")
                 return [false, "No private key found"]
             }
             let debased = forge.util.decode64(message)

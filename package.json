@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk-http",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -20,7 +20,8 @@
     "scripts": {
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
         "publish": "yarn npm publish",
-        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/communication/index.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
+        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/communication/index.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "typedoc": "typedoc --out docs src/index.ts --excludeExternals --excludePrivate --excludeProtected"
     },
     "dependencies": {
         "@cosmjs/proto-signing": "^0.32.3",
@@ -63,6 +64,7 @@
         "resolve-tspaths": "^0.8.18",
         "ts-jest": "^29.1.2",
         "ts-node": "^10.9.2",
+        "typedoc": "^0.26.6",
         "typescript": "^5.4.3"
     }
 }

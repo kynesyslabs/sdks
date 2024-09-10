@@ -35,6 +35,28 @@ const pubKey = await demos.connectWallet(identity.keypair.privateKey)
 assert(demos.walletConnected === true)
 ```
 
+You can also connect a wallet using a mnemonic.
+
+```ts
+const mnemonic =
+    "property gym walk decorate laundry grab cabin outer artist nest castle vote"
+
+const pubKey = await demos.connectWallet(mnemonic)
+```
+
+Or if you have a bip39 seed.
+
+```ts
+const mnemonic =
+    "property gym walk decorate laundry grab cabin outer artist nest castle vote"
+const seed = bip39.mnemonicToSeedSync(mnemonic)
+
+const pubKey = await demos.connectWallet(seed)
+```
+
+> [!TIP]
+> The process of converting a mnemonic to a keypair is defined at `Cryptography.newFromSeed` (in `@/encryption/Cryptography.ts`).
+
 > [!TIP]
 > You can get the address of the connected wallet using the `demos.getAddress()` method.
 
