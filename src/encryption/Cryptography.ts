@@ -40,7 +40,7 @@ export class Cryptography {
 
         const stringSeed = seed.toString()
         const hashedSeed = Hashing.sha256(stringSeed)
-        const bufferSeed = Buffer.from(hashedSeed)
+        const bufferSeed = Buffer.from(hashedSeed, "hex")
 
         return forge.pki.ed25519.generateKeyPair({ seed: bufferSeed })
     }
