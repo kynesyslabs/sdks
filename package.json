@@ -20,7 +20,7 @@
     "scripts": {
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
         "publish": "yarn npm publish",
-        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/**/multiversx* **/tests/utils/* **/tests/**/template*  --verbose"
+        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/**/multiversx* **/tests/utils/* **/tests/**/template*  --verbose",
         "typedoc": "typedoc --out docs src/index.ts --excludeExternals --excludePrivate --excludeProtected"
     },
     "dependencies": {

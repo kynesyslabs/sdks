@@ -6,4 +6,4 @@ TODO.md
 .yarn
 # yarn.lock
 package-lock.json
-# yarn.lock
+yarn.lock
