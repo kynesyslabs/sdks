@@ -68,7 +68,7 @@ export class DemosWebAuth {
 	}
 
 	// NOTE We just have to accept valid private keys and derive the public key from them
-	async login(privKey: boolean | Uint8Array) {
+	async login(privKey: string | boolean | Uint8Array): Promise<[boolean, string]> {
 		if (typeof privKey === 'string') {
 			console.log('[LOGIN] Converting private key from string...');
 			privKey = forge_converter.stringToForge(privKey);

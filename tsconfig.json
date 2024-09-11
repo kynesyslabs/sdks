@@ -30,5 +30,11 @@
     }
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/archive/**/*"]
+  "exclude": ["src/**/archive/**/*"],
+  "typedocOptions": {
+    "entryPoints": ["src/index.ts"],
+    "out": "docs",
+    "exclude": ["**/node_modules/**"],
+    "modifierTags": ["@alias"]
+  }
 }
