@@ -47,4 +47,8 @@ export default {
             network: "testnet",
         }),
     },
+    near: {
+        mainnet: "https://rpc.near.org",
+        testnet: "https://rpc.testnet.near.org",
+    },
 }
