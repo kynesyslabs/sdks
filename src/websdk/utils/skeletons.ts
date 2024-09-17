@@ -6,6 +6,7 @@ import { EnumWeb2Methods } from '@/types/web2'
 // INFO An empty transaction
 const transaction: Transaction = {
     content: {
+        // @ts-expect-error
         type: '', // string
         from: '', // forge.pki.ed25519.BinaryBuffer
         to: '', // forge.pki.ed25519.BinaryBuffer
