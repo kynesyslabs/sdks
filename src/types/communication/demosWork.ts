@@ -1,21 +1,21 @@
 import * as forge from "node-forge"
-import { XMPayload } from "@/types/blockchain/Transaction"
-import { Web2Payload } from "@/types/blockchain/Transaction"
-import { NativePayload } from "@/types/blockchain/Transaction"
+import { XMScript } from "../xm"
+import { IWeb2Request } from "../web2"
+import { INativePayload } from "../native"
 
 // Strictly declaring the type of a step of a demosWork enables us to
 // easily manage the various steps with the appropriate types.
 export type XMStep = {
     context: "xm",
-    payload: XMPayload,
+    payload: XMScript,
 }
 export type Web2Step = {
     context: "web2",
-    payload: Web2Payload,
+    payload: IWeb2Request,
 }
 export type NativeStep = {
     context: "native",
-    payload: NativePayload,
+    payload: INativePayload,
 }
 // Here we define the type of a demosWork based on the type of the steps.
 export type demosStepType = XMStep | Web2Step | NativeStep

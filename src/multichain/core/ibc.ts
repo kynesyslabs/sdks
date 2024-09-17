@@ -221,7 +221,9 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
         // NOTE: Sequence management happens here
         // INFO: Get account on network
         const address = this.getAddress()
+        console.log("address: ", address)
         const account = await this.wallet.getAccount(address)
+        console.log("account: ", account)
 
         if (!account) {
             throw new Error(`Account ${address} not found`)

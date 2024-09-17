@@ -1,42 +1,22 @@
-import { XMPayload } from "./blockchain/Transaction"
-import { XMScript, ITask, IOperation } from "./xm/index"
-
-export {
-    XMStep,
-    Web2Step,
-    NativeStep,
-    demosStepType,
-} from "./communication/demosWork"
-export {
-    demosStep,
-    demosStepContent,
-    demosWork,
-} from "./communication/demosWork"
-
 export {
     GenesisArtifact,
     GenesisImmutableProperties,
     GenesisMutableProperties,
     StandardGenesis,
-    forkGenesis,
+    forkGenesis
 } from "./blockchain/genesisTypes"
 
+export { Block, BlockContent } from "./blockchain/blocks"
+export { EncryptedTransaction } from "./blockchain/encryptedTransaction"
 export { ISignature } from "./blockchain/ISignature"
-export { TxFee } from "./blockchain/TxFee"
-export { CValidityData, ValidityData } from "./blockchain/ValidityData"
-export { BlockContent, Block } from "./blockchain/blocks"
-// ! Remove _ temporary exports here!
+export { RawTransaction } from "./blockchain/rawTransaction"
 export {
     Transaction,
     TransactionContent,
-    _TransactionContent,
-    XMPayload,
-    Web2Payload,
-    NativePayload,
-    StringifiedPayload,
+    TransactionContentData
 } from "./blockchain/Transaction"
-export { EncryptedTransaction } from "./blockchain/encryptedTransaction"
-export { RawTransaction } from "./blockchain/rawTransaction"
+export { TxFee } from "./blockchain/TxFee"
+export { CValidityData, ValidityData } from "./blockchain/ValidityData"
 export { Bundle, BundleContent } from "./communication/transmit"
 
 export { AddressInfo } from "./blockchain/addressInfo"
@@ -46,7 +26,7 @@ export { statusNative as StatusProperties } from "./blockchain/statusProperties"
 export {
     Operation,
     OperationRegistrySlot,
-    OperationResult,
+    OperationResult
 } from "./gls/Operation"
 export { StateChange } from "./gls/StateChange"
 
@@ -56,7 +36,7 @@ export { ExecutionResult } from "./network/ExecutionResult"
 export {
     ISecurityReport,
     SIComlink,
-    SIResponseRegistry,
+    SIResponseRegistry
 } from "./network/SecurityTypes"
 
 // peer
@@ -69,10 +49,29 @@ export {
     IWeb2Attestation,
     IWeb2Payload,
     IWeb2Request,
-    IWeb2Result,
+    IWeb2Result
 } from "./web2"
 
-export { XMScript, ITask, IOperation } from "./xm"
+export { IOperation, ITask, XMScript } from "./xm"
+
+// DemosWork
+export { DemoScript } from "./demoswork"
+export { DataTypes, operators } from "./demoswork/datatypes"
+export {
+    ConditionalOperationScript,
+    DemosWorkOperationScripts,
+    OperationScript,
+    OperationType
+} from "./demoswork/operations"
+export {
+    ICondition,
+    Conditional,
+    StepOutputKey,
+    WorkStepInput,
+    XmStepResult,
+    stepKeys,
+    stepKeysEnum
+} from "./demoswork/steps"
 
 export {
     BrowserRequest,

@@ -139,9 +139,7 @@ async function prepareXMPayload(xm_payload: XMScript, keypair: IKeyPair): Promis
   // Producing a timestamp
   xm_transaction.content.timestamp = Date.now()
   // Signing the transaction
-  xm_transaction = await DemosTransactions.sign(xm_transaction, keypair)
-  // Returning the transaction
-  return xm_transaction
+  return await DemosTransactions.sign(xm_transaction, keypair)
 }
 
 export { XMTransactions, prepareXMPayload }

@@ -1,39 +1,26 @@
-import * as forge from 'node-forge'
-import { ISignature } from './ISignature'
-import { TxFee } from './TxFee'
+import * as forge from "node-forge"
+import { ISignature } from "./ISignature"
+import { TxFee } from "./TxFee"
+import { DemoScript } from "../demoswork"
+import { IWeb2Request } from "../web2"
+import { XMScript } from "../xm"
 
-import { IWeb2Request } from '../web2'
-import { XMScript } from '../xm'
+// export type StringifiedPayload = [string, string]
 
-export type XMPayload = ["crosschainOperation", XMScript]
-export type Web2Payload = ["web2Request", IWeb2Request]
-export type NativePayload = ["native", any] // TODO
-export type StringifiedPayload = [string, string]
+export type TransactionContentData =
+    | ["web2Request", IWeb2Request]
+    | ["crosschainOperation", XMScript]
+    | ["demoswork", DemoScript]
 
-import { demosWork } from '../communication/demosWork'
-
-
+// NOTE: This type replaced the above _TransactionContent
+// It uses a DemoScript to handle the data field as per the DEMOS specifications
 export interface TransactionContent {
-    type: string
+    type: "web2Request" | "crosschainOperation" | "demoswork"
     from: forge.pki.ed25519.BinaryBuffer | forge.pki.PublicKey | ISignature
     to: forge.pki.ed25519.BinaryBuffer | forge.pki.PrivateKey | ISignature
     amount: number
     // TODO Replace below with data: XMPayload | Web2Payload | NativePayload when ready
-    data: StringifiedPayload | XMPayload | Web2Payload | NativePayload
-    nonce: number // Increments every time a transaction is sent from the same account
-    timestamp: number // Is the registered unix timestamp when the transaction was sent the first time
-    transaction_fee: TxFee // Is the signed message where the sender locks X tokens until the tx is confirmed
-}
-
-// NOTE: This type will replace TransactionContent in the future
-// It uses demosWork to handle the data field as per the DEMOS specifications
-export interface _TransactionContent {
-    type: string
-    from: forge.pki.ed25519.BinaryBuffer | forge.pki.PublicKey | ISignature
-    to: forge.pki.ed25519.BinaryBuffer | forge.pki.PrivateKey | ISignature
-    amount: number
-    // TODO Replace below with data: XMPayload | Web2Payload | NativePayload when ready
-    data: demosWork
+    data: TransactionContentData
     nonce: number // Increments every time a transaction is sent from the same account
     timestamp: number // Is the registered unix timestamp when the transaction was sent the first time
     transaction_fee: TxFee // Is the signed message where the sender locks X tokens until the tx is confirmed
