@@ -24,4 +24,8 @@ export class BaseOperation extends DemosWorkOperation {
             super.addWork(w)
         }
     }
+
+    override addWork(...work: Array<WorkStep | DemosWorkOperation>): void {
+        this.add(...work)
+    }
 }

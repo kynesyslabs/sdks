@@ -8,6 +8,7 @@ import { XmStepResult } from "@/types/demoswork/steps"
 import { DemosWebAuth } from "@/websdk"
 import { Transaction } from "@/types"
 import { ConditionalOperation } from "../operations/conditional"
+import { BaseOperation } from "../operations/baseoperation"
 
 export default async function createTestWorkScript(): Promise<Transaction> {
     const work = new DemosWork()
@@ -54,7 +55,12 @@ export default async function createTestWorkScript(): Promise<Transaction> {
         .elif(sendEth.output.result, "==", XmStepResult.error)
         .then(sendHash)
 
-    work.push(operation)
+    const baseOperation = new BaseOperation()
+    baseOperation.addWork(sendEth)
+
+    console.log("baseOperation", baseOperation)
+
+    work.push(baseOperation)
     const script = work.toJSON()
     console.log(script)
 
