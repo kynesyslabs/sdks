@@ -70,7 +70,7 @@ export const DemosTransactions = {
     // NOTE Sending a transaction after signing it
     confirm: async function (signedPayload: Transaction) {
         let response = await demos.confirm(signedPayload)
-        response = JSON.parse(response)
+        // response = JSON.parse(response)
         return response
     },
     broadcast: async function (validityData: ValidityData) {

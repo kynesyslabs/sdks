@@ -1,3 +1,5 @@
+import { ValidityData } from "../blockchain/ValidityData"
+
 export interface RPCRequest {
     method: string
     params: any[]
@@ -8,6 +10,12 @@ export interface RPCResponse {
     response: any
     require_reply: boolean
     extra: any
+}
+
+export interface RPCResponseWithValidationData extends RPCResponse {
+    response: {
+        data: ValidityData
+    }
 }
 
 export interface BrowserRequest {

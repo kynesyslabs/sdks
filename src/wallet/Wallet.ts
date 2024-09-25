@@ -80,7 +80,7 @@ export default class Wallet {
     /* SECTION Basic writes */
     // NOTE All the writes return a validity object that needs to be confirmed and broadcasted
 
-    async transfer(to: Address, amount: number, keypair: IKeyPair): Promise<ValidityData> {
+    async transfer(to: Address, amount: number, keypair: IKeyPair) {
         let tx = DemosTransactions.empty()
         // Putting the right data in the transaction
         tx.content.from = this.ed25519_hex.publicKey

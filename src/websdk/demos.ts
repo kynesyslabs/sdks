@@ -25,7 +25,7 @@ import type {
     XMScript,
 } from "@/types"
 import { l2psCalls } from "./L2PSCalls"
-import { RPCRequest, RPCResponse } from "@/types/communication/rpc"
+import { RPCRequest, RPCResponse, RPCResponseWithValidationData } from "@/types/communication/rpc"
 import { Cryptography } from "@/encryption/Cryptography"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
@@ -110,7 +110,7 @@ export const demos = {
     },
     // REVIEW: Replace call with validate / execute logic
     confirm: async function (transaction: Transaction) {
-        return await demos.call("execute", "", transaction, "confirmTx")
+        return await demos.call("execute", "", transaction, "confirmTx") as RPCResponseWithValidationData
     },
     broadcast: async function (validationData: ValidityData) {
         return await demos.call("execute", "", validationData, "broadcastTx")
@@ -191,17 +191,18 @@ export const demos = {
                 response: error,
                 require_reply: false,
                 extra: null,
-            }
+            } as RPCResponse
         }
+
     },
     // !SECTION NodeCall prototype
 
     // SECTION Predefined calls
     getLastBlockNumber: async function () {
-        return await demos.nodeCall("getLastBlockNumber")
+        return await demos.nodeCall("getLastBlockNumber") as number
     },
     getLastBlockHash: async function () {
-        return await demos.nodeCall("getLastBlockHash")
+        return await demos.nodeCall("getLastBlockHash") as string
     },
     getBlockByNumber: async function (blockNumber: any) {
         return await demos.nodeCall("getBlockByNumber", {
