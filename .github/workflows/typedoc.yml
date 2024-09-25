@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   build-and-deploy:
+    name: Build and Deploy TypeDoc Site
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -35,6 +36,9 @@ jobs:
         env:
           YARN_ENABLE_IMMUTABLE_INSTALLS: false
         run: yarn install
+      - name: Add ts-ignore to superdilithium
+        run: |
+          echo '// @ts-ignore' | cat - node_modules/superdilithium/index.d.ts > temp && mv temp node_modules/superdilithium/index.d.ts
 
       - name: Generate TypeDoc
         run: yarn typedoc
