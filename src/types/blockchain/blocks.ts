@@ -11,6 +11,7 @@ KyneSys Labs: https://www.kynesys.xyz/
 
 import { pki } from "node-forge"
 import { EncryptedTransaction } from '@/types/blockchain/encryptedTransaction';
+import { IPeer } from '@/types/peers/Peer'
 
 export interface BlockContent {
     ordered_transactions: string[]
@@ -18,7 +19,9 @@ export interface BlockContent {
     per_address_transactions: Map<string, string[]>
     web2data: {} // TODO Add Web2 class
     previousHash: string
-    timestamp: number
+    timestamp: number,
+
+    peerlist: IPeer[]
 }
 
 export interface Block {
