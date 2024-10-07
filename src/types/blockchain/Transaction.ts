@@ -15,7 +15,7 @@ export type TransactionContentData =
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
 export interface TransactionContent {
-    type: "web2Request" | "crosschainOperation" | "demoswork"
+    type: "web2Request" | "crosschainOperation" | "demoswork" | "genesis"
     from: forge.pki.ed25519.BinaryBuffer | forge.pki.PublicKey | ISignature
     to: forge.pki.ed25519.BinaryBuffer | forge.pki.PrivateKey | ISignature
     amount: number

@@ -10,8 +10,8 @@ KyneSys Labs: https://www.kynesys.xyz/
 */
 
 import { pki } from "node-forge"
-import { EncryptedTransaction } from '@/types/blockchain/encryptedTransaction';
-import { IPeer } from '@/types/peers/Peer'
+import { EncryptedTransaction } from "@/types/blockchain/encryptedTransaction"
+import { IPeer } from "@/types/peers/Peer"
 
 export interface BlockContent {
     ordered_transactions: string[]
