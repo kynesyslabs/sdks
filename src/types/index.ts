@@ -40,7 +40,7 @@ export {
 } from "./network/SecurityTypes"
 
 // peer
-export { IPeerConfig } from "./peers/Peer"
+export { IPeerConfig, IPeer } from "./peers/Peer"
 
 // web2
 export {
