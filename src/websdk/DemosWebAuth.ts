@@ -5,7 +5,7 @@ import { required } from "./utils/required"
 import * as forge_converter from "./utils/forge_converter"
 import { RSA } from "./rsa"
 import { IKeyPair, IStringifiedKeyPair } from "./types/KeyPair"
-import { Cryptography } from "@/encryption"
+import { Cryptography } from "@/encryption/Cryptography"
 
 // TODO Could this be an universal "Sign in with DEMOS" ? Maybe
 

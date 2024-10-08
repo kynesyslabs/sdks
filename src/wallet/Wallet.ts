@@ -2,7 +2,7 @@
 
 import * as forge from "node-forge"
 import * as fs from "fs"
-import { Cryptography } from "@/encryption"
+import { Cryptography } from "@/encryption/Cryptography"
 import { Address } from "@/types/blockchain/WalletTypes"
 import * as websdk from "@/websdk"
 import { DemosTransactions } from "@/websdk"
