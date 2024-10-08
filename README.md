@@ -53,5 +53,7 @@ The release pre-push hook will prevent you from pushing a release commit, if the
 yarn setup:pre-push
 ```
 
+The command will copy the pre-push file from `.github/hooks/pre-push` to the `.git/hooks` directory.
+
 > [!TIP]
 > This hook is not pushed to Github, so you need to run the command again if you reclone the repository.
