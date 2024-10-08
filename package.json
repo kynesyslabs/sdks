@@ -24,7 +24,7 @@
         "typedoc": "typedoc --out docs src/index.ts --excludeExternals --excludePrivate --excludeProtected",
         "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/evm*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:demoswork": "rm -rf build && jest --testMatch '**/tests/**/demoswork*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
-        "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push"
+        "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push"
     },
     "dependencies": {
         "@cosmjs/proto-signing": "^0.32.3",
