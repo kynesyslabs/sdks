@@ -6,7 +6,6 @@ Demos SDKs metapackage
 
 Check out the [multichain documentation](./documentation/multichain/README.md).
 
-
 ### Adding stuff
 
 Create a new folder in the `src` directory and add your stuff. Export items on the `index.ts` file in your new folder. Then add an export entry in `package.json` as shown:
@@ -21,7 +20,7 @@ Create a new folder in the `src` directory and add your stuff. Export items on t
 This will allow users to use the new things as follows:
 
 ```js
-import { Stuff, otherStuff } from '@kynesyslabs/demosdk/stuff'
+import { Stuff, otherStuff } from "@kynesyslabs/demosdk/stuff"
 ```
 
 ### Running tests
@@ -45,3 +44,14 @@ git commit -m "release v1.0.5"
 ```
 
 The commit will trigger a workflow run to build the files and publish a new version on NPM.
+
+### Setup pre-push hook
+
+The release pre-push hook will prevent you from pushing a release commit, if the code can't build.
+
+```sh
+yarn setup:pre-push
+```
+
+> [!TIP]
+> This hook is not pushed to Github, so you need to run the command again if you reclone the repository.

@@ -17,7 +17,7 @@ describe("TEN CHAIN TESTS", () => {
             : chainProviders.eth.sepolia
     const privateKey = wallets["ten"].privateKey
 
-    const instance = new TEN(rpc_url)
+    const instance = new EVM(rpc_url)
 
     beforeAll(async () => {
         const connected = await instance.connect()
