@@ -40,7 +40,7 @@ export async function prepareWeb2Payload(
     required(keypair, "Keypair is required")
 
     // Generating an empty one and filling it
-    const web2_payload: IWeb2Request = skeletons.web2_request
+    const web2_payload: IWeb2Request = structuredClone(skeletons.web2_request)
     web2_payload.raw.action = params.action
     web2_payload.raw.url = params.url
 

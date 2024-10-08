@@ -48,9 +48,9 @@ export class DemosWork {
         return this
     }
 
-    async execute() {
-        return await executeScript(this)
-    }
+    // async execute() {
+    //     return await executeScript(this)
+    // }
 
     toJSON() {
         let script = this.script

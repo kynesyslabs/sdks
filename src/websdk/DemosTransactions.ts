@@ -12,12 +12,12 @@ export const DemosTransactions = {
     // REVIEW All this part
     // NOTE A courtesy to get a skeleton of transactions
     empty: function () {
-        return skeletons.transaction
+        return structuredClone(skeletons.transaction)
     },
     // NOTE Building a transaction without signing or hashing it
     prepare: async function (data: any = null) {
         // sourcery skip: inline-immediately-returned-variable
-        const thisTx = skeletons.transaction
+        const thisTx = structuredClone(skeletons.transaction)
         // if (!data.timestamp) data.timestamp = Date.now()
         // Assigning the transaction data to our object
         if (data) thisTx.content.data = data

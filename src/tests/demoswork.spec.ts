@@ -1,14 +1,77 @@
-import { DemosWork } from "@/demoswork/work"
+import { DemosWork, prepareDemosWorkPayload } from "@/demoswork/work"
 import { Web2WorkStep, XmWorkStep } from "@/demoswork/workstep"
 import { XmStepResult } from "@/types/demoswork/steps"
 
-import { BaseOperation, Condition, ConditionalOperation } from "@/demoswork"
+import {
+    BaseOperation,
+    Condition,
+    ConditionalOperation,
+    prepareWeb2Step,
+} from "@/demoswork"
 import createTestScript from "@/demoswork/utils/createTestWorkScript"
 import pprint from "@/utils/pprint"
+import { DemosWebAuth } from "@/websdk"
 
 describe("Demos Workflow", () => {
-    test.only("Creating a demoswork tx", async () => {
+    test("Creating a demoswork tx", async () => {
         const tx = await createTestScript()
+        pprint(tx)
+    })
+
+    test.only("It works", async () => {
+        const work = new DemosWork()
+
+        const action = prepareWeb2Step("GET", "https://google.com")
+        const action2 = prepareWeb2Step("GET", "https://youtube.com")
+        action.description = "Google"
+
+        const condition1 = new Condition({
+            value_a: action.output.statusCode,
+            operator: "==",
+            value_b: 200,
+            action: action2,
+        })
+
+        const fallback = new Condition({
+            operator: null,
+            value_a: null,
+            value_b: null,
+            action: action2,
+        })
+
+        const operation = new ConditionalOperation(condition1, fallback)
+
+        const conditionMain = new Condition({
+            value_a: "value_c",
+            operator: "==",
+            value_b: "value_d",
+            action: operation,
+        })
+
+        const fallbackActionMain = prepareWeb2Step(
+            "GET",
+            "https://icanhazip.com",
+        )
+        fallbackActionMain.description = "IcanhaZIP"
+
+        const fallbackMain = new Condition({
+            operator: null,
+            value_a: null,
+            value_b: null,
+            action: fallbackActionMain,
+        })
+
+        const mainConditional = new ConditionalOperation(
+            fallbackMain,
+            conditionMain,
+        )
+
+        work.push(mainConditional)
+
+        const identity = DemosWebAuth.getInstance()
+        await identity.create()
+
+        const tx = await prepareDemosWorkPayload(work, identity.keypair)
         pprint(tx)
     })
 

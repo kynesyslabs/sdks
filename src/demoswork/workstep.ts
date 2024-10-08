@@ -139,7 +139,7 @@ export function prepareWeb2Step(
     minAttestations = 2,
 ) {
     // Generating an empty request and filling it
-    const web2_payload: IWeb2Request = skeletons.web2_request
+    const web2_payload: IWeb2Request = structuredClone(skeletons.web2_request)
     web2_payload.raw.action = action
     web2_payload.raw.url = url
     web2_payload.raw.parameters = parameters

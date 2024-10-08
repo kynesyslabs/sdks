@@ -63,4 +63,19 @@ describe("EVM CHAIN TESTS", () => {
 
         expect(values_sorted).toBe(true)
     })
+
+    test.skip("Type of Read contract", async () => {
+        const contract = await instance.getContractInstance(
+            "0xa2f64eec3E69C0B2E9978AB371A16eaA3a1Cf793",
+            '[{"inputs":[{"internalType":"string","name":"name","type":"string"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"greet","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"}]',
+        )
+        const data = await instance.readFromContract(contract, "greet", [])
+        console.log(data)
+
+        interface contractReadParams {
+            address: string
+            abi: string
+            method: string
+        }
+    })
 })

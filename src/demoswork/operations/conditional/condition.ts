@@ -28,7 +28,7 @@ export class Condition implements ICondition {
 
         // INFO: If the operator is "not", there should be no operand
         if (params.operator !== "not") {
-            this.value_b = this.parseData(params.value_a)
+            this.value_b = this.parseData(params.value_b)
         }
     }
 

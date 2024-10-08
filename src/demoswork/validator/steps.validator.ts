@@ -89,7 +89,7 @@ function collectAllSteps(script: DemoScript, scriptSteps: Map<string, string>) {
 
     Object.keys(script.operations).forEach(opUID => {
         let operation = script.operations[opUID]
-        steps = extractStepsFromOperation(operation, scriptSteps)
+        steps = new Set([...steps, ...extractStepsFromOperation(operation, scriptSteps)])
     })
 
     return steps

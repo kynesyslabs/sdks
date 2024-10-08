@@ -1,5 +1,5 @@
 import { Web3 } from "web3"
-import { Transaction } from "ethers"
+import { getAddress, Transaction, Wallet, JsonRpcProvider } from "ethers"
 import { toWei, toNumber } from "web3-utils"
 
 import { TEN } from "@/multichain/core/ten"
@@ -7,16 +7,17 @@ import { TEN as TENLOCAL } from "@/multichain/localsdk/ten"
 import chainProviders from "./chainProviders"
 import { wallets } from "../utils/wallets"
 import { getSampleTranfers, verifyNumberOrder } from "../utils"
+import { EVM } from "@/multichain/core"
 
-describe.skip("TEN CHAIN TESTS", () => {
+describe("TEN CHAIN TESTS", () => {
     const chain = "ten"
     const rpc_url =
         chain === "ten"
-            ? chainProviders.ten.testnetAlt
+            ? chainProviders.ten.testnet
             : chainProviders.eth.sepolia
     const privateKey = wallets["ten"].privateKey
 
-    const instance = new TEN(rpc_url)
+    const instance = new EVM(rpc_url)
 
     beforeAll(async () => {
         const connected = await instance.connect()
@@ -26,13 +27,38 @@ describe.skip("TEN CHAIN TESTS", () => {
         expect(instance.getAddress()).toBeDefined()
     })
 
-    test("PreparePay returns a signed tx", async () => {
-        const signedTx = await instance.preparePay(
-            instance.getAddress(),
-            "0.00014533",
-        )
-        expect(signedTx.transactionHash).toBeDefined()
-    })
+    test.skip("Sending a tx using ethers v6", async () => {
+
+        const provider = new JsonRpcProvider(rpc_url)
+        const wallet = new Wallet(privateKey)
+
+        const chainId = (await provider.getNetwork()).chainId
+        const nonce = await provider.getTransactionCount(wallet.address)
+
+        const feeData = await provider.getFeeData()
+        console.log("feeData: ", feeData)
+
+        const tx = {
+            nonce,
+            chainId,
+            type: 2,
+            to: "0x4298A9D2A573dA64102255d11d6908b7e3d89b02",
+            value: toNumber(toWei("0.01", "ether")),
+            gasLimit: 21000,
+            maxFeePerGas: feeData.maxFeePerGas,
+            maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+        }
+
+        const signedTx = await wallet.signTransaction(tx)
+        console.log("signedTx: ", signedTx)
+
+        const res = await provider.broadcastTransaction(signedTx)
+        console.log("res: ", res)
+
+        const receipt = await provider.waitForTransaction(res.hash)
+        console.log("receipt: ", receipt)
+
+    }, 30000000)
 
     test("A tx is signed with the ledger nonce", async () => {
         const address = instance.getAddress()
@@ -75,7 +101,7 @@ describe.skip("TEN CHAIN TESTS", () => {
         console.log("Transaction result: ", res)
     })
 
-    test.only("Sending a tx using web3js", async () => {
+    test("Sending a tx using web3js", async () => {
         const rpc_url = chainProviders.ten.testnet
         const privateKey = "0x" + wallets["ten"].privateKey
 
