@@ -19,3 +19,4 @@ export type operators =
     | "&&"
     | "||"
     | "not"
+    | null

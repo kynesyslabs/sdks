@@ -21,7 +21,6 @@ export class WorkStep {
         [key: string]: StepOutputKey
     }
     description: string
-    signature: forge.pki.ed25519.BinaryBuffer
     timestamp: number = Date.now()
 
     constructor(payload: WorkStepInput) {
@@ -29,10 +28,11 @@ export class WorkStep {
         this.id = "step_" + getNewUID()
     }
 
-    get hash() {
-        // REVIEW: What fields should be hashed?
-        return Hashing.sha256(JSON.stringify(this))
-    }
+    // signature: forge.pki.ed25519.BinaryBuffer
+    // get hash() {
+    //     // REVIEW: What fields should be hashed?
+    //     return Hashing.sha256(JSON.stringify(this))
+    // }
 
     /**
      * Sign a work step using a private key
@@ -40,19 +40,19 @@ export class WorkStep {
      * @param privateKey The private key
      * @returns The signature
      */
-    sign(privateKey: forge.pki.ed25519.BinaryBuffer | any) {
-        if (privateKey.type == "string") {
-            privateKey = HexToForge(privateKey)
-        }
+    // sign(privateKey: forge.pki.ed25519.BinaryBuffer | any) {
+    //     if (privateKey.type == "string") {
+    //         privateKey = HexToForge(privateKey)
+    //     }
 
-        this.signature = forge.pki.ed25519.sign({
-            message: this.hash,
-            encoding: "utf8",
-            privateKey,
-        })
+    //     this.signature = forge.pki.ed25519.sign({
+    //         message: this.hash,
+    //         encoding: "utf8",
+    //         privateKey,
+    //     })
 
-        return this.signature
-    }
+    //     return this.signature
+    // }
 
     execute() {
         // INFO: Send payload or execute web2 request here
@@ -130,17 +130,17 @@ export function prepareXMStep(xm_payload: XMScript) {
     return new XmWorkStep(xm_payload)
 }
 
-export function prepareWeb2Step(
-    action = "GET",
+export function prepareWeb2Step({
+    method = "GET",
     url = "https://icanhazip.com",
     parameters = [],
     requestedParameters = null,
     headers = null,
     minAttestations = 2,
-) {
+}) {
     // Generating an empty request and filling it
     const web2_payload: IWeb2Request = structuredClone(skeletons.web2_request)
-    web2_payload.raw.action = action
+    web2_payload.raw.action = method
     web2_payload.raw.url = url
     web2_payload.raw.parameters = parameters
     web2_payload.raw.headers = headers

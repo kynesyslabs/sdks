@@ -57,7 +57,7 @@ export abstract class DemosWorkOperation {
         throw new Error("Invalid work unit with id:" + work.id)
     }
 
-    execute() {
-        throw new Error("Method not implemented.")
-    }
+    // execute() {
+    //     throw new Error("Method not implemented.")
+    // }
 }

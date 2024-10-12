@@ -5,10 +5,10 @@ import { DemosWorkOutputKey } from "."
 
 export type OperationType =
     | "conditional"
-    | "loop"
-    | "operation"
-    | "function"
     | "base"
+    // | "loop"
+    // | "operation"
+    // | "function"
 export interface OperationScript {
     id: string
     operationType: OperationType
@@ -50,7 +50,7 @@ export interface ConditionalOperationScript extends OperationScript {
 
 export interface BaseOperationScript extends OperationScript {
     operationType: "base"
-    work: Array<string>
+    order: string[]
 }
 
 // SECTION: GENERAL

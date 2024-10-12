@@ -112,7 +112,7 @@ export const demos = {
     confirm: async function (transaction: Transaction) {
         return await demos.call("execute", "", transaction, "confirmTx") as RPCResponseWithValidationData
     },
-    broadcast: async function (validationData: ValidityData) {
+    broadcast: async function (validationData: RPCResponseWithValidationData) {
         return await demos.call("execute", "", validationData, "broadcastTx")
     },
     // L2PS calls are defined here
