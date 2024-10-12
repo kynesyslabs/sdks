@@ -23,6 +23,9 @@ export class WorkStep {
     description: string
     timestamp: number = Date.now()
 
+    critical: boolean = false
+    depends_on: string[] = []
+
     constructor(payload: WorkStepInput) {
         this.content = payload
         this.id = "step_" + getNewUID()

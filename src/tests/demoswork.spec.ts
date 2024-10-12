@@ -22,7 +22,22 @@ describe("Demos Workflow", () => {
         pprint(tx)
     })
 
-    test.only("base operation", async () => {
+    test.skip("depends on + critical", () => {
+        const operation = new ConditionalOperation()
+
+        console.log("operation", operation)
+        console.log("operation.depends_on", operation.depends_on)
+        console.log("operation.critical", operation.critical)
+
+        operation.depends_on.push("step_1")
+        operation.depends_on.push("step_2")
+
+        operation.critical = false
+        console.log("operation.depends_on", operation.depends_on)
+        console.log("operation.critical", operation.critical)
+    })
+
+    test.skip("base operation", async () => {
         const base = new BaseOperation()
         const checkBTCPrice = prepareWeb2Step({
             url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
@@ -38,14 +53,15 @@ describe("Demos Workflow", () => {
         pprint(base)
     })
 
-    test.skip("conditional", async () => {
+    test.only("conditional", async () => {
         // Web2 step to do a GET API call
         const address = "0x8A6575025DE23CB2DcB0fE679E588da9fE62f3B6"
         const isMember = prepareWeb2Step({
             url: `https://api.[redacted].com/v1/eth_sepolia/address/${address}`,
             method: "GET",
         })
-
+        isMember.description = "Check if address is a member"
+        
         // Web2 step to do a POST API call
         const addMember = prepareWeb2Step({
             url: `https://api.[redacted].com/v1/eth_sepolia/address/${address}?key=ckey_5a044cf0034a43089e6b308b023`,
@@ -56,7 +72,7 @@ describe("Demos Workflow", () => {
         const evm = await EVM.create("https://rpc.ankr.com/eth_sepolia")
         await evm.connectWallet(wallets.evm.privateKey)
         const payload = await evm.prepareTransfer(address, "0.25")
-
+        
         const xmscript = prepareXMScript({
             chain: "eth",
             subchain: "sepolia",
@@ -64,11 +80,12 @@ describe("Demos Workflow", () => {
             signedPayloads: [payload],
         })
         const releaseFunds = prepareXMStep(xmscript)
-
+        
         // Conditional operation
-
+        
         // ==============================
         let operation = new ConditionalOperation()
+        operation.depends_on.push(isMember.id)
         operation
             .if(isMember.output.statusCode, "==", 200)
             .then(releaseFunds)
@@ -175,10 +192,10 @@ describe("Demos Workflow", () => {
             action: operation,
         })
 
-        const fallbackActionMain = prepareWeb2Step(
-            "GET",
-            "https://icanhazip.com",
-        )
+        const fallbackActionMain = prepareWeb2Step({
+            url: "https://icanhazip.com",
+            method: "GET",
+        })
         fallbackActionMain.description = "IcanhaZIP"
 
         const fallbackMain = new Condition({

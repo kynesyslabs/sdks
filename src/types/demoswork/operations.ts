@@ -12,6 +12,8 @@ export type OperationType =
 export interface OperationScript {
     id: string
     operationType: OperationType
+    critical: boolean
+    depends_on: string[]
 }
 
 // SECTION: CONDITIONAL OPERATION

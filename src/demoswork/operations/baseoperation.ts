@@ -11,6 +11,8 @@ export class BaseOperation extends DemosWorkOperation {
         id: this.id,
         operationType: "base",
         order: [],
+        critical: false,
+        depends_on: [],
     }
 
     constructor(...work: Array<WorkStep | DemosWorkOperation>) {

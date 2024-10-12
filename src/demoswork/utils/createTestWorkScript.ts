@@ -38,14 +38,10 @@ export default async function createTestWorkScript(): Promise<Transaction> {
     sendEth.description = "Send ETH"
 
     // WEB2 STEP
-    const sendHash = prepareWeb2Step(
-        "POST",
-        "https://icanhazip.com",
-        null,
-        null,
-        null,
-        2,
-    )
+    const sendHash = prepareWeb2Step({
+        url: "https://icanhazip.com",
+        method: "POST",
+    })
     sendHash.description = "Send xm hash to HTTP API"
 
     const operation = new ConditionalOperation()

@@ -12,7 +12,7 @@ export interface RPCResponse {
     extra: any
 }
 
-export interface RPCResponseWithValidationData extends RPCResponse {
+export interface RPCResponseWithValidityData extends RPCResponse {
     response: {
         data: ValidityData
     }

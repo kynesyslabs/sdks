@@ -14,10 +14,7 @@ export abstract class DemosWorkOperation {
 
     steps: Record<string, WorkStep> = {}
     operations: Set<DemosWorkOperation> = new Set()
-    operationScript: OperationScript = {
-        id: this.id,
-        operationType: null,
-    }
+
     output = {
         success: {
             type: DataTypes.work as DataTypes.work,
@@ -27,6 +24,28 @@ export abstract class DemosWorkOperation {
             },
         },
     }
+
+    operationScript: OperationScript = {
+        id: this.id,
+        operationType: null,
+        critical: false,
+        depends_on: [],
+    }
+
+    // GETTERS AND SETTERS
+    get critical() {
+        return this.operationScript.critical
+    }
+
+    get depends_on() {
+        return this.operationScript.depends_on
+    }
+
+    set critical(value: boolean) {
+        this.operationScript.critical = value
+    }
+
+    // GETTERS AND SETTERS END
 
     addWork(work: WorkStep | DemosWorkOperation) {
         // INFO: The action can be a step or an operation

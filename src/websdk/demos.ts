@@ -9,24 +9,22 @@ import { Buffer } from "buffer/"
 import * as skeletons from "./utils/skeletons"
 
 // NOTE Including custom libraries from Demos
-import { DemosWebAuth } from "./DemosWebAuth"
-import { prepareXMPayload } from "./XMTransactions"
 import { DemosTransactions } from "./DemosTransactions"
+import { DemosWebAuth } from "./DemosWebAuth"
 import {
     IPrepareWeb2PayloadParams,
     prepareWeb2Payload,
 } from "./Web2Transactions"
+import { prepareXMPayload } from "./XMTransactions"
 
-import type { IBufferized } from "./types/IBuffer"
-import type {
-    EncryptedTransaction,
-    Transaction,
-    ValidityData,
-    XMScript,
-} from "@/types"
-import { l2psCalls } from "./L2PSCalls"
-import { RPCRequest, RPCResponse, RPCResponseWithValidationData } from "@/types/communication/rpc"
 import { Cryptography } from "@/encryption/Cryptography"
+import type {
+    Transaction,
+    XMScript
+} from "@/types"
+import { RPCRequest, RPCResponse, RPCResponseWithValidityData } from "@/types/communication/rpc"
+import { l2psCalls } from "./L2PSCalls"
+import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 
@@ -110,9 +108,9 @@ export const demos = {
     },
     // REVIEW: Replace call with validate / execute logic
     confirm: async function (transaction: Transaction) {
-        return await demos.call("execute", "", transaction, "confirmTx") as RPCResponseWithValidationData
+        return await demos.call("execute", "", transaction, "confirmTx") as RPCResponseWithValidityData
     },
-    broadcast: async function (validationData: RPCResponseWithValidationData) {
+    broadcast: async function (validationData: RPCResponseWithValidityData) {
         return await demos.call("execute", "", validationData, "broadcastTx")
     },
     // L2PS calls are defined here

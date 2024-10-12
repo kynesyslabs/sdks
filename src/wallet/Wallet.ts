@@ -1,13 +1,12 @@
 // TODO & REVIEW See if the fs methods are useful in this context or nah (also the public ip)
 
-import * as forge from "node-forge"
-import * as fs from "fs"
 import { Cryptography } from "@/encryption/Cryptography"
 import { Address } from "@/types/blockchain/WalletTypes"
+import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 import * as websdk from "@/websdk"
 import { DemosTransactions } from "@/websdk"
-import { ValidityData } from "@/types"
 import { IKeyPair } from "@/websdk/types/KeyPair"
+import * as forge from "node-forge"
 
 export default class Wallet {
     // A wallet class is a singleton class, so we need to make sure that only one instance per id is created.
@@ -95,7 +94,7 @@ export default class Wallet {
     // TODO Implement other methods too
 
     // NOTE  This is a quick wrapper to avoid having to write the same code over and over again
-    async broadcast(validityData: ValidityData): Promise<any> {
+    async broadcast(validityData: RPCResponseWithValidityData): Promise<any> {
         return await websdk.demos.broadcast(validityData)
     }
 }

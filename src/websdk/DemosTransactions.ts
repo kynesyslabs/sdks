@@ -4,9 +4,10 @@ import { demos } from "./demos"
 import { sha256 } from "./utils/sha256"
 import * as skeletons from "./utils/skeletons"
 
-import type { ValidityData, Transaction } from "@/types"
-import { _required as required } from "./utils/required"
+import type { Transaction } from "@/types"
+import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 import { IKeyPair } from "./types/KeyPair"
+import { _required as required } from "./utils/required"
 
 export const DemosTransactions = {
     // REVIEW All this part
@@ -73,7 +74,7 @@ export const DemosTransactions = {
         // response = JSON.parse(response)
         return response
     },
-    broadcast: async function (validityData: ValidityData) {
+    broadcast: async function (validityData: RPCResponseWithValidityData) {
         // ValidityData does not need to be signed as it already contains a signature (in the Transaction object)
         // and is sent as a ComLink (thus authenticated and signed by the sender)
         let response = await demos.broadcast(validityData)

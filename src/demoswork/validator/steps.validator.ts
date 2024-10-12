@@ -70,7 +70,7 @@ function extractStepsFromOperation(
 
         case "base":
             let baseSteps = new Set(
-                operation.work.filter(step => step.startsWith("step_")),
+                operation.order.filter(step => step.startsWith("step_")),
             )
             steps = new Set([...steps, ...baseSteps])
             break
@@ -115,3 +115,4 @@ export function noUnusedSteps(script: DemoScript) {
         }
     }
 }
+
