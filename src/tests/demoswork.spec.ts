@@ -80,9 +80,8 @@ describe("Demos Workflow", () => {
             signedPayloads: [payload],
         })
         const releaseFunds = prepareXMStep(xmscript)
-        
+
         // Conditional operation
-        
         // ==============================
         let operation = new ConditionalOperation()
         operation.depends_on.push(isMember.id)
