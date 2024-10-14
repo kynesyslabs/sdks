@@ -15,13 +15,22 @@ import { IPeer } from "@/types/peers/Peer"
 
 export interface BlockContent {
     ordered_transactions: string[]
-    encrypted_transactions: EncryptedTransaction[] // REVIEW This should work already as it is not enforced in the database as a field
     per_address_transactions: Map<string, string[]>
     web2data: {} // TODO Add Web2 class
     previousHash: string
     timestamp: number,
 
-    peerlist: IPeer[]
+    peerlist: IPeer[],
+    // SECTION L2PS
+    l2ps_partecipating_nodes: Map<string, Map<string, string>> // ? "l2ps_uid": {"public_key": "connection_string"}
+    l2ps_banned_nodes: Map<string, string> // ? "l2ps_uid": "public_key" (to implement)
+    encrypted_transactions_hashes: string[] // REVIEW This should work already as it is not enforced in the database as a field
+
+}
+
+// Partecipating nodes to the L2PS will have the full transactions (encrypted) of the L2PS
+export interface L2PSBlockExtension extends BlockContent {
+    l2ps_transactions: EncryptedTransaction[]
 }
 
 export interface Block {

@@ -13,9 +13,11 @@ export default class L2PS {
     pam: string
     decryptionKey: forge.pki.rsa.PrivateKey
 
+    // This will be retrieved from the db (blocks)
+    partecipatingNodes: Map<string, string> = new Map() // ? Map<publicKey, connectionstring (as in Peer)>
+
     // Transactions that belong to the L2PS (hash -> transaction)
     encryptedTransactions: Map<string, EncryptedTransaction> = new Map()
-    // TODO Add encryptedTransactions to the Block class and edit the db consequently
 
 
     constructor() {
@@ -25,6 +27,21 @@ export default class L2PS {
         this.pam = forge.pki.publicKeyToRSAPublicKeyPem(this.uid)
         this.decryptionKey = rsaKeyPair.privateKey
     }
+
+    // SECTION L2PS methods
+    async getPartecipatingNodes(): Promise<Map<string, string>> {
+        var lastBlockResponse = await demos.nodeCall("getLastBlock", {})
+        var lastBlock = lastBlockResponse.response as Block
+        // REVIEW Is toString() the correct way to convert the public key to string?
+        this.partecipatingNodes = lastBlock.content.l2ps_partecipating_nodes[this.uid.toString()]
+        return this.partecipatingNodes
+    }
+
+    // ! TODO Add a method to set the partecipating nodes
+    // The above method should be authorized through an encrypted message: if decryption succeeds, then the node is authorized to enter in the partecipating nodes
+    // ? The above method does not take into account the public key of the node, it should be added (bans and so on)
+
+    // ! TODO Add a method to create a new L2PS with a new set of partecipating nodes
 
     // SECTION Control methods
 
