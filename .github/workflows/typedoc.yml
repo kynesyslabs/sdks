@@ -3,13 +3,14 @@ name: Generate and Deploy TypeDoc
 on:
   push:
     branches:
-      - typedoc-setup
+      - main
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
-    name: Build and Deploy TypeDoc Site
+    name: Build TypeDoc Site
     runs-on: ubuntu-latest
+    if: startsWith(github.event.head_commit.message, 'release')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3

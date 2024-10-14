@@ -1,5 +1,3 @@
-# @kynesyslabs/demosdk
-
 Demos SDKs metapackage
 
 ### Multichain SDKs Usage
