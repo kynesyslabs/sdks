@@ -16,6 +16,8 @@ export class ConditionalOperation extends DemosWorkOperation {
     override operationScript: ConditionalOperationScript = {
         id: this.id,
         operationType: "conditional",
+        critical: true,
+        depends_on: [],
         conditions: new Map(),
         order: [],
     }

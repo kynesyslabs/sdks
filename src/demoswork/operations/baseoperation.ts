@@ -10,7 +10,9 @@ export class BaseOperation extends DemosWorkOperation {
     override operationScript: BaseOperationScript = {
         id: this.id,
         operationType: "base",
-        work: [],
+        order: [],
+        critical: false,
+        depends_on: [],
     }
 
     constructor(...work: Array<WorkStep | DemosWorkOperation>) {
@@ -20,8 +22,8 @@ export class BaseOperation extends DemosWorkOperation {
 
     add(...work: Array<WorkStep | DemosWorkOperation>) {
         for (const w of work) {
-            this.operationScript.work.push(w.id)
             super.addWork(w)
+            this.operationScript.order.push(w.id)
         }
     }
 

@@ -7,10 +7,14 @@ import {
     Condition,
     ConditionalOperation,
     prepareWeb2Step,
+    prepareXMStep,
 } from "@/demoswork"
 import createTestScript from "@/demoswork/utils/createTestWorkScript"
+import { EVM } from "@/multichain/websdk"
 import pprint from "@/utils/pprint"
-import { DemosWebAuth } from "@/websdk"
+import { demos, DemosWebAuth } from "@/websdk"
+import { prepareXMScript } from "@/websdk/XMTransactions"
+import { wallets } from "./utils/wallets"
 
 describe("Demos Workflow", () => {
     test("Creating a demoswork tx", async () => {
@@ -18,11 +22,150 @@ describe("Demos Workflow", () => {
         pprint(tx)
     })
 
-    test.only("It works", async () => {
+    test.skip("depends on + critical", () => {
+        const operation = new ConditionalOperation()
+
+        console.log("operation", operation)
+        console.log("operation.depends_on", operation.depends_on)
+        console.log("operation.critical", operation.critical)
+
+        operation.depends_on.push("step_1")
+        operation.depends_on.push("step_2")
+
+        operation.critical = false
+        console.log("operation.depends_on", operation.depends_on)
+        console.log("operation.critical", operation.critical)
+    })
+
+    test.skip("base operation", async () => {
+        const base = new BaseOperation()
+        const checkBTCPrice = prepareWeb2Step({
+            url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+            method: "GET",
+        })
+
+        const checkEthPrice = prepareWeb2Step({
+            url: "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
+            method: "GET",
+        })
+
+        base.addWork(checkBTCPrice, checkEthPrice)
+        pprint(base)
+    })
+
+    test.only("conditional", async () => {
+        // Web2 step to do a GET API call
+        const address = "0x8A6575025DE23CB2DcB0fE679E588da9fE62f3B6"
+        const isMember = prepareWeb2Step({
+            url: `https://api.[redacted].com/v1/eth_sepolia/address/${address}`,
+            method: "GET",
+        })
+        isMember.description = "Check if address is a member"
+        
+        // Web2 step to do a POST API call
+        const addMember = prepareWeb2Step({
+            url: `https://api.[redacted].com/v1/eth_sepolia/address/${address}?key=ckey_5a044cf0034a43089e6b308b023`,
+            method: "POST",
+        })
+
+        // XM step to send ETH
+        const evm = await EVM.create("https://rpc.ankr.com/eth_sepolia")
+        await evm.connectWallet(wallets.evm.privateKey)
+        const payload = await evm.prepareTransfer(address, "0.25")
+        
+        const xmscript = prepareXMScript({
+            chain: "eth",
+            subchain: "sepolia",
+            type: "pay",
+            signedPayloads: [payload],
+        })
+        const releaseFunds = prepareXMStep(xmscript)
+
+        // Conditional operation
+        // ==============================
+        let operation = new ConditionalOperation()
+        operation.depends_on.push(isMember.id)
+        operation
+            .if(isMember.output.statusCode, "==", 200)
+            .then(releaseFunds)
+            .else(addMember)
+
+        // ==============================
+
+        // const checkIsMember = new Condition({
+        //     value_a: isMember.output.statusCode,
+        //     operator: "==",
+        //     value_b: 200,
+        //     action: releaseFunds,
+        // })
+
+        // const notMember = new Condition({
+        //     value_a: null,
+        //     operator: null,
+        //     value_b: null,
+        //     action: addMember,
+        // })
+
+        // operation = new ConditionalOperation(checkIsMember, notMember)
+
+        const work = new DemosWork()
+        work.push(operation)
+
+        const identity = DemosWebAuth.getInstance()
+        await identity.create()
+
+        const tx = await prepareDemosWorkPayload(work, identity.keypair)
+        pprint(tx)
+
+        const rpc_url = "https://mungaist.com"
+        await demos.connect(rpc_url)
+        await demos.connectWallet(identity.keypair.privateKey as any)
+
+        const validityData = await demos.confirm(tx)
+        pprint(validityData)
+
+        const res = await demos.broadcast(validityData)
+
+        pprint(res)
+    })
+
+    test.skip("workstep", async () => {
+        // const step = prepareWeb2Step({ method: "GET", url: "https://google.com" })
+        // const evm_key = process.env.EVM_KEY
+        const evm_key = wallets.evm.privateKey
+
+        const evm_rpc = "https://rpc.ankr.com/eth_sepolia"
+
+        const evm = await EVM.create(evm_rpc)
+        await evm.connectWallet(evm_key)
+
+        const payload = await evm.prepareTransfer(
+            "0x8A6575025DE23CB2DcB0fE679E588da9fE62f3B6",
+            "0.25",
+        )
+        const xmscript = prepareXMScript({
+            chain: "eth",
+            subchain: "sepolia",
+            type: "pay",
+            signedPayloads: [payload],
+        })
+
+        const step = prepareXMStep(xmscript)
+
+        pprint(step)
+    })
+
+    test("It works", async () => {
         const work = new DemosWork()
 
-        const action = prepareWeb2Step("GET", "https://google.com")
-        const action2 = prepareWeb2Step("GET", "https://youtube.com")
+        const action = prepareWeb2Step({
+            method: "GET",
+            url: "https://google.com",
+        })
+        const action2 = prepareWeb2Step({
+            method: "GET",
+            url: "https://youtube.com",
+        })
         action.description = "Google"
 
         const condition1 = new Condition({
@@ -48,10 +191,10 @@ describe("Demos Workflow", () => {
             action: operation,
         })
 
-        const fallbackActionMain = prepareWeb2Step(
-            "GET",
-            "https://icanhazip.com",
-        )
+        const fallbackActionMain = prepareWeb2Step({
+            url: "https://icanhazip.com",
+            method: "GET",
+        })
         fallbackActionMain.description = "IcanhaZIP"
 
         const fallbackMain = new Condition({
