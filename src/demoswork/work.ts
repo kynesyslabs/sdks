@@ -60,7 +60,7 @@ export class DemosWork {
 
         // remove all step outputs
         for (const stepUID in script.steps) {
-            delete script.steps[stepUID].output
+            console.log("stepUID", script.steps[stepUID])
             delete script.steps[stepUID].id
         }
 

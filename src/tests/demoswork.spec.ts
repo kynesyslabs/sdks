@@ -17,6 +17,60 @@ import { prepareXMScript } from "@/websdk/XMTransactions"
 import { wallets } from "./utils/wallets"
 
 describe("Demos Workflow", () => {
+    test.only("cheatsheet: workstep output dynamic acess", () => {
+        // SECTION: WorkStep ouput access cheatsheet
+        const getBTCPrice = prepareWeb2Step({
+            url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+            method: "GET",
+        })
+
+        // 1. reference base output
+        const base_output = getBTCPrice.base_output
+        console.log("base_output", base_output)
+
+        // Or.
+
+        const still_base_output = getBTCPrice.output // when you don't need typings
+        console.log("still base_output", still_base_output)
+
+        // 2. reference arbitrary keys
+        const level1 = getBTCPrice.output.bitcoin
+        console.log("level1", level1)
+
+        // OR
+
+        const still_level1 = getBTCPrice.output["bitcoin"]
+        console.log("still level1 nesting", still_level1)
+
+        // 3. reference nested keys
+        const nestedValue = getBTCPrice.output["bitcoin.usd"]
+        console.log("nestedValue", nestedValue)
+
+        // !SECTION
+    })
+
+    test.only("Example usage", () => {
+        const getBTCPrice = prepareWeb2Step({
+            url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+            method: "GET",
+        })
+
+        const pingNode = prepareWeb2Step({
+            url: "https://mungaist.com",
+            method: "GET",
+        })
+
+        const isGreater = new Condition({
+            value_a: getBTCPrice.output["bitcoin.usd"],
+            operator: ">",
+            value_b: 60000,
+            action: pingNode,
+        })
+
+        const operation = new ConditionalOperation(isGreater)
+        pprint(operation)
+    })
+
     test("Creating a demoswork tx", async () => {
         const tx = await createTestScript()
         pprint(tx)
@@ -61,7 +115,7 @@ describe("Demos Workflow", () => {
             method: "GET",
         })
         isMember.description = "Check if address is a member"
-        
+
         // Web2 step to do a POST API call
         const addMember = prepareWeb2Step({
             url: `https://api.[redacted].com/v1/eth_sepolia/address/${address}?key=ckey_5a044cf0034a43089e6b308b023`,
@@ -72,7 +126,7 @@ describe("Demos Workflow", () => {
         const evm = await EVM.create("https://rpc.ankr.com/eth_sepolia")
         await evm.connectWallet(wallets.evm.privateKey)
         const payload = await evm.prepareTransfer(address, "0.25")
-        
+
         const xmscript = prepareXMScript({
             chain: "eth",
             subchain: "sepolia",
