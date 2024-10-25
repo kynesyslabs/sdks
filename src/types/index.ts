@@ -6,7 +6,7 @@ export {
     forkGenesis
 } from "./blockchain/genesisTypes"
 
-export { Block, BlockContent } from "./blockchain/blocks"
+export { Block, BlockContent, NativeTablesHashes } from "./blockchain/blocks"
 export { EncryptedTransaction } from "./blockchain/encryptedTransaction"
 export { ISignature } from "./blockchain/ISignature"
 export { RawTransaction } from "./blockchain/rawTransaction"
