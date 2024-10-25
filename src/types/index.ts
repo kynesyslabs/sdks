@@ -49,7 +49,8 @@ export {
     IWeb2Attestation,
     IWeb2Payload,
     IWeb2Request,
-    IWeb2Result
+    IWeb2Result,
+    EnumWeb2Methods
 } from "./web2"
 
 export { IOperation, ITask, XMScript } from "./xm"
