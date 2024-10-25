@@ -13,6 +13,13 @@ import { pki } from "node-forge"
 import { EncryptedTransaction } from "@/types/blockchain/encryptedTransaction"
 import { IPeer } from "@/types/peers/Peer"
 
+// ? This will be probably improved for performance reasons
+export interface NativeTablesHashes {
+    native_status: string
+    native_properties: string
+    native_subnets_txs: string
+}
+
 export interface BlockContent {
     ordered_transactions: string[]
     per_address_transactions: Map<string, string[]>
@@ -26,6 +33,9 @@ export interface BlockContent {
     l2ps_partecipating_nodes: Map<string, Map<string, string>> // ? "l2ps_uid": {"public_key": "connection_string"}
     l2ps_banned_nodes: Map<string, string> // ? "l2ps_uid": "public_key" (to implement)
     encrypted_transactions_hashes: Map<string, string> // ? "l2ps_uid": "hash"
+
+    // SECTION Native tables
+    native_tables_hashes: NativeTablesHashes
 
 }
 
