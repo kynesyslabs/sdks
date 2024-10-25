@@ -72,5 +72,5 @@ export interface IWeb2Attestation {
     timestamp: number
     identity: forge.pki.PublicKey
     signature: forge.pki.ed25519.BinaryBuffer
-    valid: boolean
+    valid: boolean 
 }
