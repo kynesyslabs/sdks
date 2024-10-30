@@ -22,6 +22,7 @@ export { Bundle, BundleContent } from "./communication/transmit"
 export { AddressInfo } from "./blockchain/addressInfo"
 export { StatusNative } from "./blockchain/statusNative"
 export { statusNative as StatusProperties } from "./blockchain/statusProperties"
+export { StoredIdentities, Context, ProviderIdentities } from "./blockchain/identities"
 
 export {
     Operation,
