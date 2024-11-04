@@ -6,7 +6,7 @@ import { prepareWeb2Step, prepareXMStep } from "../workstep"
 import { EVM } from "@/multichain/core"
 import { XmStepResult } from "@/types/demoswork/steps"
 import { DemosWebAuth } from "@/websdk"
-import { Transaction } from "@/types"
+import { EnumWeb2Methods, Transaction } from "@/types"
 import { ConditionalOperation } from "../operations/conditional"
 import { BaseOperation } from "../operations/baseoperation"
 
@@ -40,7 +40,7 @@ export default async function createTestWorkScript(): Promise<Transaction> {
     // WEB2 STEP
     const sendHash = prepareWeb2Step({
         url: "https://icanhazip.com",
-        method: "POST",
+        method: EnumWeb2Methods.GET,
     })
     sendHash.description = "Send xm hash to HTTP API"
 
