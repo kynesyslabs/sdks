@@ -27,7 +27,7 @@ export interface IWeb2Request {
     hash: string;
     signature?: forge.pki.ed25519.BinaryBuffer;
 }
-export declare enum EnumWeb2Methods {
+export enum EnumWeb2Methods {
     GET = "GET",
     POST = "POST",
     PUT = "PUT",
