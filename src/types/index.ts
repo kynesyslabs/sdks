@@ -83,5 +83,6 @@ export {
     HelloPeerRequest,
     NodeCall,
     VoteRequest,
+    RPCResponseWithValidityData,
     emptyResponse as RPCResponseSkeleton
 } from "./communication/rpc"
