@@ -15,13 +15,14 @@ import pprint from "@/utils/pprint"
 import { demos, DemosWebAuth } from "@/websdk"
 import { prepareXMScript } from "@/websdk/XMTransactions"
 import { wallets } from "./utils/wallets"
+import { EnumWeb2Methods } from "@/types"
 
 describe("Demos Workflow", () => {
     test.only("cheatsheet: workstep output dynamic acess", () => {
         // SECTION: WorkStep ouput access cheatsheet
         const getBTCPrice = prepareWeb2Step({
             url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-            method: "GET",
+            method: EnumWeb2Methods.GET,
         })
 
         // 1. reference base output
@@ -52,12 +53,12 @@ describe("Demos Workflow", () => {
     test.only("Example usage", () => {
         const getBTCPrice = prepareWeb2Step({
             url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-            method: "GET",
+            method: EnumWeb2Methods.GET,
         })
 
         const pingNode = prepareWeb2Step({
             url: "https://mungaist.com",
-            method: "GET",
+            method: EnumWeb2Methods.GET,
         })
 
         const isGreater = new Condition({
@@ -95,12 +96,12 @@ describe("Demos Workflow", () => {
         const base = new BaseOperation()
         const checkBTCPrice = prepareWeb2Step({
             url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-            method: "GET",
+            method: EnumWeb2Methods.GET,
         })
 
         const checkEthPrice = prepareWeb2Step({
             url: "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
-            method: "GET",
+            method: EnumWeb2Methods.GET,
         })
 
         base.addWork(checkBTCPrice, checkEthPrice)
@@ -112,14 +113,14 @@ describe("Demos Workflow", () => {
         const address = "0x8A6575025DE23CB2DcB0fE679E588da9fE62f3B6"
         const isMember = prepareWeb2Step({
             url: `https://api.[redacted].com/v1/eth_sepolia/address/${address}`,
-            method: "GET",
+            method: EnumWeb2Methods.GET,
         })
         isMember.description = "Check if address is a member"
 
         // Web2 step to do a POST API call
         const addMember = prepareWeb2Step({
             url: `https://api.[redacted].com/v1/eth_sepolia/address/${address}?key=ckey_5a044cf0034a43089e6b308b023`,
-            method: "POST",
+            method: EnumWeb2Methods.POST,
         })
 
         // XM step to send ETH
@@ -184,7 +185,7 @@ describe("Demos Workflow", () => {
     })
 
     test.skip("workstep", async () => {
-        // const step = prepareWeb2Step({ method: "GET", url: "https://google.com" })
+        // const step = prepareWeb2Step({ method: EnumWeb2Methods.GET, url: "https://google.com" })
         // const evm_key = process.env.EVM_KEY
         const evm_key = wallets.evm.privateKey
 
@@ -213,11 +214,11 @@ describe("Demos Workflow", () => {
         const work = new DemosWork()
 
         const action = prepareWeb2Step({
-            method: "GET",
+            method: EnumWeb2Methods.GET,
             url: "https://google.com",
         })
         const action2 = prepareWeb2Step({
-            method: "GET",
+            method: EnumWeb2Methods.GET,
             url: "https://youtube.com",
         })
         action.description = "Google"
@@ -247,7 +248,7 @@ describe("Demos Workflow", () => {
 
         const fallbackActionMain = prepareWeb2Step({
             url: "https://icanhazip.com",
-            method: "GET",
+            method: EnumWeb2Methods.GET,
         })
         fallbackActionMain.description = "IcanhaZIP"
 
