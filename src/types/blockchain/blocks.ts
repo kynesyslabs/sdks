@@ -15,8 +15,7 @@ import { IPeer } from "@/types/peers/Peer"
 
 // ? This will be probably improved for performance reasons
 export interface NativeTablesHashes {
-    native_status: string
-    native_properties: string
+    native_gcr: string
     native_subnets_txs: string
 }
 
