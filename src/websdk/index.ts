@@ -6,7 +6,7 @@ export { RSA } from './rsa'
 export { DemosWebAuth } from './DemosWebAuth'
 
 export { prepareWeb2Payload } from './Web2Transactions'
-export { XMTransactions, prepareXMPayload } from './XMTransactions'
+export { XMTransactions, prepareXMPayload, prepareXMScript } from './XMTransactions'
 
 // Utils
 export { sha256 } from './utils/sha256'
