@@ -6,6 +6,7 @@ import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 import * as websdk from "@/websdk"
 import { DemosTransactions } from "@/websdk"
 import { IKeyPair } from "@/websdk/types/KeyPair"
+import { PasskeyGenerator } from "./passkeys/passkeys"
 import * as forge from "node-forge"
 
 export default class Wallet {
@@ -96,5 +97,11 @@ export default class Wallet {
     // NOTE  This is a quick wrapper to avoid having to write the same code over and over again
     async broadcast(validityData: RPCResponseWithValidityData): Promise<any> {
         return await websdk.demos.broadcast(validityData)
+    }
+
+    // REVIEW Passkeys support
+    async generatePasskey(): Promise<string> {
+        const passkeyGenerator = new PasskeyGenerator()
+        return await passkeyGenerator.generate()
     }
 }

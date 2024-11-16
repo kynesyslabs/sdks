@@ -8,3 +8,6 @@ TODO.md
 package-lock.json
 yarn.lock
 docs
+*.pkl
+.setup_done
+__pycache__
