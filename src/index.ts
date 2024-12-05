@@ -10,3 +10,4 @@ export * as wallet from "./wallet"
 export * as demoswork from "./demoswork"
 
 export * as websdk from './websdk'
+export * as abstraction from './abstraction'
