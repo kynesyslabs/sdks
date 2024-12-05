@@ -1,5 +1,5 @@
 // Import the singleton instance of the Providers class (already registered with all providers)
-import { Providers } from "./providers"
+import Providers from "./providers"
 
 // ! Use the Providers singleton with the methods of each chain RPC to find tokens
 /** 

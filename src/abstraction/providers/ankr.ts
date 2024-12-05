@@ -4,28 +4,40 @@
  *  - Note how the providers are registered for each chain.
  *  - You can use this as a template for registering new providers.
  */
-import Providers from "./Providers"
+import AbstractionProvidersInstance from "./AbstractionProviders"
 
-// ANCHOR Evm chains
+export default function registerAnkrProviders() {
+    // ANCHOR Evm chains
 
-// SECTION Ethereum
-Providers().registerEVM("ethereum", ["https://rpc.ankr.com/eth"])
-Providers().registerEVM("ethereum_holesky", ["https://rpc.ankr.com/eth_holesky"])
-Providers().registerEVM("ethereum_sepolia", ["https://rpc.ankr.com/eth_sepolia"])
+    // SECTION Ethereum
+    AbstractionProvidersInstance().registerEVM("ethereum", [
+        "https://rpc.ankr.com/eth",
+    ])
+    AbstractionProvidersInstance().registerEVM("ethereum_holesky", [
+        "https://rpc.ankr.com/eth_holesky",
+    ])
+    AbstractionProvidersInstance().registerEVM("ethereum_sepolia", [
+        "https://rpc.ankr.com/eth_sepolia",
+    ])
 
-// ANCHOR Non-EVM chains
+    // ANCHOR Non-EVM chains
 
-// SECTION Bitcoin
-Providers().registerChainProviders("bitcoin", "mainnet", [
-    "https://rpc.ankr.com/btc",
-])
-Providers().registerChainProviders("bitcoin", "testnet", [
-    "https://rpc.ankr.com/btc_signet",
-])
+    // SECTION Bitcoin
+    AbstractionProvidersInstance().registerChainProviders(
+        "bitcoin",
+        "mainnet",
+        ["https://rpc.ankr.com/btc"],
+    )
+    AbstractionProvidersInstance().registerChainProviders(
+        "bitcoin",
+        "testnet",
+        ["https://rpc.ankr.com/btc_signet"],
+    )
 
-// SECTION Solana
-Providers().registerChainProviders("solana", "devnet", [
-    "https://rpc.ankr.com/solana_devnet",
-])
+    // SECTION Solana
+    AbstractionProvidersInstance().registerChainProviders("solana", "devnet", [
+        "https://rpc.ankr.com/solana_devnet",
+    ])
 
-// TODO Add providers from ankr for other chains
+    // TODO Add providers from ankr for other chains
+}
