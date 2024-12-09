@@ -7,5 +7,7 @@
 
 import EvmCoinFinder from "./EvmCoinFinder";
 import CoinFinder from "./CoinFinder";
+import Identities from "./Identities";
+import { InferFromWritePayload, InferFromSignaturePayload } from "./Identities";
 
-export { EvmCoinFinder, CoinFinder };
+export { EvmCoinFinder, CoinFinder, Identities, InferFromWritePayload, InferFromSignaturePayload };
