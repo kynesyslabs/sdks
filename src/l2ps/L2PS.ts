@@ -6,7 +6,8 @@ import { Block } from "@/types";
 import { Transaction } from '@/types'
 import { Hashing } from "@/encryption";
 import { demos } from "@/websdk";
-
+import { KeyPair } from '@ton/crypto';
+import { Message, MessageMap } from "./L2PSMessagingSystem";
 export default class L2PS {
     encryptionKey: forge.pki.rsa.PublicKey
     uid: forge.pki.rsa.PublicKey
@@ -14,27 +15,35 @@ export default class L2PS {
     decryptionKey: forge.pki.rsa.PrivateKey
 
     // This will be retrieved from the db (blocks)
-    partecipatingNodes: Map<string, string> = new Map() // ? Map<publicKey, connectionstring (as in Peer)>
+    participatingNodes: Map<string, string> = new Map() // ? Map<publicKey, connectionstring (as in Peer)>
 
     // Transactions that belong to the L2PS (hash -> transaction)
     encryptedTransactions: Map<string, EncryptedTransaction> = new Map()
 
 
-    constructor() {
-        let rsaKeyPair = forge.pki.rsa.generateKeyPair({ bits: 2048, e: 0x10001 })
-        this.encryptionKey = rsaKeyPair.publicKey
-        this.uid = rsaKeyPair.publicKey
+    constructor(privateKey?: forge.pki.rsa.PrivateKey) {
+        let keyPair: forge.pki.rsa.KeyPair
+        if (!privateKey) {
+            keyPair = forge.pki.rsa.generateKeyPair({ bits: 2048, e: 0x10001 })
+        } else {
+            // Obtaining the public key from the private key
+            keyPair.privateKey = privateKey
+            // REVIEW Is this the correct way to set the public key?
+            keyPair.publicKey = forge.pki.rsa.setPublicKey(privateKey.n, privateKey.e) 
+        }
+        this.encryptionKey = keyPair.publicKey
+        this.uid = keyPair.publicKey
         this.pam = forge.pki.publicKeyToRSAPublicKeyPem(this.uid)
-        this.decryptionKey = rsaKeyPair.privateKey
+        this.decryptionKey = keyPair.privateKey
     }
 
     // SECTION L2PS methods
-    async getPartecipatingNodes(): Promise<Map<string, string>> {
+    async getParticipatingNodes(): Promise<Map<string, string>> {
         var lastBlockResponse = await demos.nodeCall("getLastBlock", {})
         var lastBlock = lastBlockResponse.response as Block
         // REVIEW Is toString() the correct way to convert the public key to string?
-        this.partecipatingNodes = lastBlock.content.l2ps_partecipating_nodes[this.uid.toString()]
-        return this.partecipatingNodes
+        this.participatingNodes = lastBlock.content.l2ps_partecipating_nodes[this.uid.toString()]
+        return this.participatingNodes
     }
 
     // ! TODO Add a method to set the partecipating nodes
@@ -84,8 +93,8 @@ export default class L2PS {
     // SECTION Retrieval methods
 
     // Retrieve a transaction from the L2PS
-    getTx(eHash: string): Transaction {
-        let eTx = this.encryptedTransactions.get(eHash)
+    async getTx(eHash: string): Promise<Transaction> {
+        let eTx = await this.encryptedTransactions.get(eHash)
         let tx = this.decryptTx(eTx)
         return tx
     }
@@ -93,9 +102,31 @@ export default class L2PS {
     // SECTION Registration methods
 
     // Register a transaction in the L2PS
-    registerTx(tx: Transaction): void {
+    async registerTx(tx: Transaction): Promise<string> {
         let eTx = this.encryptTx(tx)
         this.encryptedTransactions.set(eTx.encryptedHash, eTx)
+        // TODO Add the transaction to the L2PS remotely
+        return eTx.encryptedHash
+    }
+
+    // SECTION Messaging methods
+
+    // Send a message to a specific address
+    async sendMessage(address: string, message: string): Promise<string> { // Returns the messageId
+        // TODO Implement the method
+        return ""
+    }
+
+    // Retrieve all messages sent to a specific address
+    async retrieveMessages(address: string): Promise<MessageMap> {
+        // TODO Implement the method
+        return new Map()
+    }
+
+    // Retrieve a single message from a specific address specified by its messageId
+    async retrieveSingleMessage(address: string, messageId: string): Promise<Message> {
+        // TODO Implement the method
+        return null
     }
 
 }

@@ -9,5 +9,7 @@ export * as xmwebsdk from "./multichain/websdk"
 export * as wallet from "./wallet"
 export * as demoswork from "./demoswork"
 
+export * as l2ps from "./l2ps"
+
 export * as websdk from './websdk'
 export * as abstraction from './abstraction'
