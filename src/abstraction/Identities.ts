@@ -3,6 +3,7 @@
 
 // Interface for the payload of the inferIdentityFromWrite method
 export interface InferFromWritePayload {
+    method: "identity_assign_from_write"
     demos_identity: {
         address: string
         signedData: string
@@ -19,6 +20,7 @@ export interface InferFromWritePayload {
 
 // Interface for the payload of the inferIdentityFromSignature method
 export interface InferFromSignaturePayload {
+    method: "identity_assign_from_signature"
     demos_identity: {
         address: string
         signedData: string
@@ -37,13 +39,19 @@ export default class Identities {
     constructor() {}
 
     // Infer identity from either a write transaction or a signature
-    async inferIdentity(payload: InferFromWritePayload | InferFromSignaturePayload): Promise<string | false> {
+    async inferIdentity(
+        payload: InferFromWritePayload | InferFromSignaturePayload,
+    ): Promise<string | false> {
         const basePayload = {
             method: "gcr_routine",
-            params: [payload],
+            params: [
+                {
+                    method: payload.method,
+                    params: [payload],
+                },
+            ],
         }
         // TODO Implement the RPC call
         return false
     }
-
 }
