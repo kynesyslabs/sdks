@@ -1,11 +1,14 @@
 import AbstractionProvidersInstance from "./AbstractionProviders"
-import registerAnkrProviders from "./ankr"
+import registerEthereumProviders from "./ethereum"
+import registerBscProviders from "./bsc"
+import registerArbitrumProviders from "./arbitrum"
+import registerOptimismProviders from "./optimism"
 
-// Register the providers
-registerAnkrProviders()
+// Register all blockchain providers
+registerEthereumProviders()
+registerBscProviders()
+registerArbitrumProviders()
+registerOptimismProviders()
 
-// Exporting the singleton instance of the Providers class, already registered with all providers
-// Being a const, it should maintain the snapshot of the instance at the time of the import
 const Providers = AbstractionProvidersInstance()
-
 export default Providers
