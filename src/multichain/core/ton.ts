@@ -66,6 +66,17 @@ export class TON extends DefaultChain {
         return new BigNumber(bal as any).toString()
     }
 
+    override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
+        required(this.signer || options?.privateKey, "Wallet not connected")
+        // TODO Implement the signMessage method
+        return "Not implemented"
+    }
+
+    override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
+        // TODO Implement the verifyMessage method
+        return false
+    }
+
     // SECTION: Transactions
     async signTransaction(tx: Cell) {
         const txs = await this.signTransactions([tx])

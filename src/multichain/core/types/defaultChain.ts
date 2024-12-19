@@ -176,11 +176,28 @@ export abstract class DefaultChain {
     abstract getAddress(): string
 
     /**
+     * Signs a message using the connected wallet
+     * @param message The message to sign
+     * @param options Options
+     * @returns The signed message
+     */
+    abstract signMessage(message: string, options?: { privateKey?: string }): Promise<string| Uint8Array>
+
+    /**
+     * Verifies a message using the connected wallet
+     * @param message The message to verify
+     * @param signature The signature to verify
+     * @returns A boolean indicating if the message was verified
+     */
+    abstract verifyMessage(message: string, signature: string|Uint8Array, publicKey: string|Uint8Array): Promise<boolean>
+
+    /**
      * Signs a transaction using the connected wallet
      * @param tx The transaction to sign
      * @param options Options
      * @returns The signed transaction
      */
+
     abstract signTransaction<
         T extends DefaultChain,
         Tx extends Parameters<T["signTransactions"]>[0][number],

@@ -114,6 +114,17 @@ export class MULTIVERSX extends DefaultChain {
         return this.provider.getNonFungibleTokensOfAccount(account)
     }
 
+    override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
+        required(this.wallet || options?.privateKey, "Wallet not connected")
+        // TODO Implement the signMessage method
+        return "Not implemented"
+    }
+
+    override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
+        // TODO Implement the verifyMessage method
+        return false
+    }
+
     // SECTION: Writes
     /**
      * Signs a single transaction. Calls `signTransactions` with a single transaction and returns the first element of the result.

@@ -56,6 +56,7 @@
         "rijndael-js": "^2.0.0",
         "socket.io-client": "^4.7.2",
         "superdilithium": "^2.0.6",
+        "tweetnacl-util": "^0.15.1",
         "web3": "^4.9.0",
         "xrpl": "^3.0.0"
     },

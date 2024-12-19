@@ -184,6 +184,17 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
         return await this.signTransactions(txs)
     }
 
+    override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
+        required(this.wallet || options?.privateKey, "Wallet not connected")
+        // TODO Implement the signMessage method
+        return "Not implemented"
+    }
+
+    override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
+        // TODO Implement the verifyMessage method
+        return false
+    }
+
     async signTransaction(tx: IBCTransaction, options?: IBCSignTxOptions) {
         // INFO: Call signTransactions with a single tx
         const signed_txs = await this.signTransactions([tx], options)

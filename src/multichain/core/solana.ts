@@ -128,11 +128,11 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
     }
 
     // Verifying messages using tweetnacl and a keypair
-    override async verifyMessage(message: string, signature: Uint8Array): Promise<boolean> {
+    override async verifyMessage(message: string, signature: Uint8Array, publicKey: Uint8Array): Promise<boolean> {
         // converting base58 to bytes
         const messageBytes = decodeUTF8(message)
         // verifying the message
-        return nacl.sign.detached.verify(messageBytes, signature, this.wallet.publicKey.toBuffer())
+        return nacl.sign.detached.verify(messageBytes, signature, publicKey)
     }
 
     override async signTransaction(
