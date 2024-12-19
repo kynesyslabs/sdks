@@ -72,6 +72,17 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         return this.wallet
     }
 
+    // INFO Signing a message
+    async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
+        required(this.wallet || options?.privateKey, "Wallet not connected")
+        let wallet = this.wallet
+        if (options?.privateKey) {
+            wallet = new Wallet(options.privateKey, this.provider)
+        }
+
+        return wallet.signMessage(message)
+    }
+
     // INFO Signing a transaction
     // with a private key or by using our stored wallet
     // REVIEW should private key be a string or a Buffer?
