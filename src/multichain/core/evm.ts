@@ -6,6 +6,7 @@ import {
     formatEther,
     parseEther,
     toNumber,
+    verifyMessage
 } from "ethers"
 import { DefaultChain, IEVMDefaultChain } from "./types/defaultChain"
 import { IPayParams } from "./types/interfaces"
@@ -81,6 +82,12 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         }
 
         return wallet.signMessage(message)
+    }
+
+    // INFO Verifying a message
+    override async verifyMessage(message: string, signature: string,publicKey: string): Promise<boolean> {
+        let recoveredAddress = verifyMessage(message, signature)
+        return recoveredAddress === publicKey
     }
 
     // INFO Signing a transaction
