@@ -14,8 +14,13 @@ import {
     Transaction,
     TransactionInstruction,
     TransactionMessage,
-    VersionedTransaction,
+    VersionedTransaction,    
 } from "@solana/web3.js"
+
+// nacl is needed for signing and verifying messages
+import nacl from "tweetnacl";
+import { decodeUTF8 } from "tweetnacl-util"
+
 import base58 from "bs58"
 
 import { ns64, struct, u32 } from "@solana/buffer-layout"
@@ -27,6 +32,7 @@ import {
     SolanarunProgramParams,
 } from "./types/interfaces"
 import { required } from "./utils"
+import { sign } from '@ton/crypto';
 
 /* LICENSE
 
@@ -103,6 +109,30 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         const publicKey = new PublicKey(address)
         const balance = await this.provider.getBalance(publicKey)
         return balance.toString()
+    }
+
+    // Signing messages using tweetnacl and a keypair
+    override async signMessage(message: string, options?: { privateKey?: string }): Promise<Uint8Array> {
+        required(this.wallet || options?.privateKey, "Wallet not connected")
+        // Encoding the message
+        const messageBytes = decodeUTF8(message)
+        let signers = [this.wallet]
+        if (options?.privateKey) {
+            const privateKeyBuffer = base58.decode(options.privateKey)
+            const keypair = Keypair.fromSecretKey(privateKeyBuffer)
+            signers = [keypair]
+        }
+        // Signing the message
+        const signedBytes = nacl.sign.detached(messageBytes, signers[0].secretKey)
+        return signedBytes
+    }
+
+    // Verifying messages using tweetnacl and a keypair
+    override async verifyMessage(message: string, signature: Uint8Array): Promise<boolean> {
+        // converting base58 to bytes
+        const messageBytes = decodeUTF8(message)
+        // verifying the message
+        return nacl.sign.detached.verify(messageBytes, signature, this.wallet.publicKey.toBuffer())
     }
 
     override async signTransaction(
