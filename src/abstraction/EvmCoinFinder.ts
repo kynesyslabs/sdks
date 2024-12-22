@@ -1,12 +1,32 @@
 import Providers from "./providers"
-import { tokenAddresses } from "./providers/CoinAddresses"
+import { tokenAddresses, chainIds } from "./providers/CoinAddresses"
 import * as ethers from "ethers"
-import { chainIds } from "./providers/CoinAddresses"
-export type SupportedChain = "ethereum" | "bsc" | "arbitrum" | "optimism"
+
+export enum EvmChain {
+    ETHEREUM = "ethereum",
+    BSC = "bsc",
+    ARBITRUM = "arbitrum",
+    OPTIMISM = "optimism",
+}
 
 export class EvmCoinFinder {
     private static isValidAddress(address: string): boolean {
         return ethers.isAddress(address)
+    }
+
+    private static getChainNameFromId(chainId: number): EvmChain | undefined {
+        switch (chainId) {
+            case chainIds.eth.mainnet:
+                return EvmChain.ETHEREUM
+            case chainIds.bsc.mainnet:
+                return EvmChain.BSC
+            case chainIds.arbitrum.mainnet:
+                return EvmChain.ARBITRUM
+            case chainIds.optimism.mainnet:
+                return EvmChain.OPTIMISM
+            default:
+                return undefined
+        }
     }
 
     private static async getRandomProvider(chainId: number) {
@@ -41,23 +61,26 @@ export class EvmCoinFinder {
         throw new Error(`All RPC providers failed for chain ${chainId}`)
     }
 
+    private static validateChainId(chainId: number): void {
+        if (
+            ![
+                chainIds.eth.mainnet,
+                chainIds.bsc.mainnet,
+                chainIds.arbitrum.mainnet,
+                chainIds.optimism.mainnet,
+            ].includes(chainId)
+        ) {
+            throw new Error(`Invalid chain ID: ${chainId}`)
+        }
+    }
+
     static async findNativeEth(
         targetChainIds: number[],
     ): Promise<Record<number, { eth: string; weth: string }>> {
         const result: Record<number, { eth: string; weth: string }> = {}
 
         for (const chainId of targetChainIds) {
-            // First validate if chainId is supported
-            if (
-                ![
-                    chainIds.eth.mainnet,
-                    chainIds.bsc.mainnet,
-                    chainIds.arbitrum.mainnet,
-                    chainIds.optimism.mainnet,
-                ].includes(chainId)
-            ) {
-                throw new Error(`Invalid chain ID: ${chainId}`)
-            }
+            this.validateChainId(chainId)
 
             let weth
             switch (chainId) {
@@ -174,27 +197,27 @@ export class EvmCoinFinder {
     }
 
     static getNativeForSupportedChain(
-        chain: SupportedChain,
+        chain: EvmChain,
         targetChainId: number,
     ): string {
         // Validate chain matches targetChainId
         switch (chain) {
-            case "ethereum":
+            case EvmChain.ETHEREUM:
                 if (targetChainId !== chainIds.eth.mainnet) {
                     throw new Error("Chain ID doesn't match ethereum")
                 }
                 break
-            case "bsc":
+            case EvmChain.BSC:
                 if (targetChainId !== chainIds.bsc.mainnet) {
                     throw new Error("Chain ID doesn't match bsc")
                 }
                 break
-            case "arbitrum":
+            case EvmChain.ARBITRUM:
                 if (targetChainId !== chainIds.arbitrum.mainnet) {
                     throw new Error("Chain ID doesn't match arbitrum")
                 }
                 break
-            case "optimism":
+            case EvmChain.OPTIMISM:
                 if (targetChainId !== chainIds.optimism.mainnet) {
                     throw new Error("Chain ID doesn't match optimism")
                 }
@@ -205,20 +228,5 @@ export class EvmCoinFinder {
 
         // Return native address (0x0)
         return tokenAddresses.eth.mainnet
-    }
-
-    private static getChainNameFromId(chainId: number): string | undefined {
-        switch (chainId) {
-            case chainIds.eth.mainnet:
-                return "ethereum"
-            case chainIds.bsc.mainnet:
-                return "bsc"
-            case chainIds.arbitrum.mainnet:
-                return "arbitrum"
-            case chainIds.optimism.mainnet:
-                return "optimism"
-            default:
-                return undefined
-        }
     }
 }

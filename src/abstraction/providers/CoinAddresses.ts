@@ -98,6 +98,23 @@ export const tokenAddresses = {
             mainnet: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
             testnet: "0x0000000000000000000000000000000000000000", // TODO: Cannot verify this address on Sepolia
         },
+        solana: {
+            mainnet: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+            testnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+        },
+        multiversx: {
+            mainnet: "USDT-c76f1f",
+            testnet: "USDT-8d4068",
+        },
+        xrp: {
+            mainnet: "usdt",
+            testnet: "usdt",
+        },
+        ton: {
+            mainnet:
+                "0:a519f99bb5d6d51ef958ed24d337ad75a1c770885dcd42d51d6663f9fcdacfb2",
+            testnet: "",
+        },
     },
     // Non-EVM chains
     sol: {

@@ -1,4 +1,4 @@
-import AbstractionProvidersInstance from "./AbstractionProviders"
+import AbstractionProvidersInstance from "../AbstractionProviders"
 
 export default function registerXrpProviders() {
     // Mainnet

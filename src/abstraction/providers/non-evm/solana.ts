@@ -1,4 +1,4 @@
-import AbstractionProvidersInstance from "./AbstractionProviders"
+import AbstractionProvidersInstance from "../AbstractionProviders"
 import { clusterApiUrl } from "@solana/web3.js"
 
 export default function registerSolanaProviders() {

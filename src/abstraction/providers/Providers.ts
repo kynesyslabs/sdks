@@ -1,12 +1,16 @@
 import AbstractionProvidersInstance from "./AbstractionProviders"
-import registerEthereumProviders from "./ethereum"
-import registerBscProviders from "./bsc"
-import registerArbitrumProviders from "./arbitrum"
-import registerOptimismProviders from "./optimism"
-import registerSolanaProviders from "./solana"
-import registerMultiversxProviders from "./multiversx"
-import registerXrpProviders from "./xrp"
-import registerBitcoinProviders from "./bitcoin"
+import {
+    registerEthereumProviders,
+    registerBscProviders,
+    registerArbitrumProviders,
+    registerOptimismProviders,
+} from "./evm"
+import {
+    registerSolanaProviders,
+    registerMultiversxProviders,
+    registerXrpProviders,
+    registerBitcoinProviders,
+} from "./non-evm"
 
 // Register all blockchain providers
 // EVM

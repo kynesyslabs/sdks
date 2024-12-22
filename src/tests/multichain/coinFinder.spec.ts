@@ -113,5 +113,28 @@ describe("COIN FINDER TESTS", () => {
                 ),
             ).rejects.toThrow("Invalid token address")
         })
+
+        test("should map USDT across chains", async () => {
+            const result = await CoinFinder.findTokenPairs(
+                tokenAddresses.usdt.solana.mainnet,
+                Chain.SOLANA,
+                [Chain.MULTIVERSX, Chain.XRP],
+                ChainEnvironment.MAINNET,
+            )
+
+            if (tokenAddresses.usdt.multiversx?.mainnet) {
+                expect(result[Chain.MULTIVERSX]).toBe(
+                    tokenAddresses.usdt.multiversx.mainnet,
+                )
+            } else {
+                expect(result[Chain.MULTIVERSX]).toBe(false)
+            }
+
+            if (tokenAddresses.usdt.xrp?.mainnet) {
+                expect(result[Chain.XRP]).toBe(tokenAddresses.usdt.xrp.mainnet)
+            } else {
+                expect(result[Chain.XRP]).toBe(false)
+            }
+        })
     })
 })

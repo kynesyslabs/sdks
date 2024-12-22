@@ -25,26 +25,6 @@ export class CoinFinder {
         }
     }
 
-    // TODO: Add more chains when we support them
-    private static getChainKey(chain: Chain): string {
-        this.validateChain(chain)
-
-        switch (chain) {
-            case Chain.SOLANA:
-                return "sol"
-            case Chain.MULTIVERSX:
-                return "multiversx"
-            case Chain.XRP:
-                return "xrp"
-            case Chain.TON:
-                return "ton"
-            case Chain.BITCOIN:
-                return "btc"
-            default:
-                throw new Error(`Unsupported chain: ${chain}`)
-        }
-    }
-
     private static validateChainEnvironment(environment: ChainEnvironment) {
         if (
             ![ChainEnvironment.MAINNET, ChainEnvironment.TESTNET].includes(
@@ -123,7 +103,6 @@ export class CoinFinder {
             Chain,
             string | false
         >
-        const sourceChainKey = this.getChainKey(sourceChain)
 
         for (const targetChain of targetChains) {
             if (targetChain === sourceChain) {
@@ -142,8 +121,7 @@ export class CoinFinder {
 
             // Check USDT mapping
             if (
-                tokenAddress ===
-                tokenAddresses.usdt[sourceChainKey]?.[environment]
+                tokenAddress === tokenAddresses.usdt[sourceChain]?.[environment]
             ) {
                 result[targetChain] =
                     tokenAddresses.usdt[targetChain]?.[environment] || false

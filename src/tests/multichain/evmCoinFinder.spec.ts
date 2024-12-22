@@ -1,4 +1,4 @@
-import { EvmCoinFinder } from "../../abstraction/EvmCoinFinder"
+import { EvmChain, EvmCoinFinder } from "../../abstraction/EvmCoinFinder"
 import { ethers } from "ethers"
 // Mock the JsonRpcProvider
 jest.mock("ethers", () => ({
@@ -80,22 +80,25 @@ describe("EVM COIN FINDER TESTS", () => {
     test("getNativeForSupportedChain returns native addresses for all supported chains", () => {
         expect(
             EvmCoinFinder.getNativeForSupportedChain(
-                "ethereum",
+                EvmChain.ETHEREUM,
                 ETHEREUM_CHAIN_ID,
             ),
         ).toBeDefined()
         expect(
-            EvmCoinFinder.getNativeForSupportedChain("bsc", BSC_CHAIN_ID),
+            EvmCoinFinder.getNativeForSupportedChain(
+                EvmChain.BSC,
+                BSC_CHAIN_ID,
+            ),
         ).toBeDefined()
         expect(
             EvmCoinFinder.getNativeForSupportedChain(
-                "arbitrum",
+                EvmChain.ARBITRUM,
                 ARBITRUM_CHAIN_ID,
             ),
         ).toBeDefined()
         expect(
             EvmCoinFinder.getNativeForSupportedChain(
-                "optimism",
+                EvmChain.OPTIMISM,
                 OPTIMISM_CHAIN_ID,
             ),
         ).toBeDefined()
