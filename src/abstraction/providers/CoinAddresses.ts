@@ -22,6 +22,7 @@ export const chainIds = {
 }
 
 export const tokenAddresses = {
+    // EVM chains
     eth: {
         mainnet: "0x0000000000000000000000000000000000000000",
         sepolia: "0x0000000000000000000000000000000000000000",
@@ -44,6 +45,7 @@ export const tokenAddresses = {
             },
         },
     },
+    // Stablecoins
     usdc: {
         ethereum: {
             mainnet: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -60,6 +62,23 @@ export const tokenAddresses = {
         optimism: {
             mainnet: "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
             testnet: "0x0000000000000000000000000000000000000000", //TODO: Cannot verify this address on Sepolia
+        },
+        solana: {
+            mainnet: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            testnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+        },
+        multiversx: {
+            mainnet: "USDC-c76f1f",
+            testnet: "USDC-8d4068",
+        },
+        xrp: {
+            mainnet: "usdc",
+            testnet: "usdc",
+        },
+        ton: {
+            mainnet:
+                "0:c37b3fafca5bf7d3704b081fde7df54f298736ee059bf6d32fac25f5e6085bf6",
+            testnet: "",
         },
     },
     usdt: {
@@ -79,5 +98,26 @@ export const tokenAddresses = {
             mainnet: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
             testnet: "0x0000000000000000000000000000000000000000", // TODO: Cannot verify this address on Sepolia
         },
+    },
+    // Non-EVM chains
+    sol: {
+        mainnet: "So11111111111111111111111111111111111111112",
+        testnet: "So11111111111111111111111111111111111111112",
+    },
+    multiversx: {
+        mainnet: "EGLD-bd4d79",
+        testnet: "WEGLD-d7c6bb",
+    },
+    xrp: {
+        mainnet: "XRP",
+        testnet: "XRP",
+    },
+    btc: {
+        mainnet: "BTC",
+        testnet: "BTC",
+    },
+    ton: {
+        mainnet: "TON",
+        testnet: "TON",
     },
 }

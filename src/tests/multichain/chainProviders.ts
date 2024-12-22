@@ -36,8 +36,9 @@ export default {
     },
     solana: {
         mainnet: clusterApiUrl("mainnet-beta"),
+        //TODO: Change to testnet when we have a testnet faucet
         // using devnet as testnet faucet is broken 👇
-        devnet: clusterApiUrl("devnet"),
+        testnet: clusterApiUrl("devnet"),
     },
     ton: {
         mainnet: getHttpEndpoint({

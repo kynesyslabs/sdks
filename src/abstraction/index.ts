@@ -5,9 +5,15 @@
  * This also means that the SDK calls should be made locally (using the ip address of the user).
  */
 
-import EvmCoinFinder from "./EvmCoinFinder";
-import CoinFinder from "./CoinFinder";
-import Identities from "./Identities";
-import { InferFromWritePayload, InferFromSignaturePayload } from "./Identities";
+import { EvmCoinFinder } from "./EvmCoinFinder"
+import { CoinFinder } from "./CoinFinder"
+import Identities from "./Identities"
+import { InferFromWritePayload, InferFromSignaturePayload } from "./Identities"
 
-export { EvmCoinFinder, CoinFinder, Identities, InferFromWritePayload, InferFromSignaturePayload };
+export {
+    EvmCoinFinder,
+    CoinFinder,
+    Identities,
+    InferFromWritePayload,
+    InferFromSignaturePayload,
+}

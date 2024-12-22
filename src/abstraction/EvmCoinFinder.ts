@@ -4,13 +4,17 @@ import * as ethers from "ethers"
 import { chainIds } from "./providers/CoinAddresses"
 export type SupportedChain = "ethereum" | "bsc" | "arbitrum" | "optimism"
 
-export default class EvmCoinFinder {
+export class EvmCoinFinder {
     private static isValidAddress(address: string): boolean {
         return ethers.isAddress(address)
     }
 
     private static async getRandomProvider(chainId: number) {
-        const rpcUrls = Providers.evm[chainId.toString()]
+        // Filter out Flashbots and Payload RPCs
+        const rpcUrls = Providers.evm[chainId.toString()].filter(
+            url =>
+                !url.includes("flashbots.net") && !url.includes("payload.de"),
+        )
 
         if (!rpcUrls || rpcUrls.length === 0) {
             throw new Error(`No providers found for chain ${chainId}`)
@@ -23,9 +27,10 @@ export default class EvmCoinFinder {
         for (const rpcUrl of shuffledUrls) {
             try {
                 // Create ethers provider
-                const provider = new ethers.JsonRpcProvider(rpcUrl)
-                // Test the connection
-                await provider.getNetwork()
+                const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, {
+                    staticNetwork: true, // Prevent network detection
+                })
+                await provider.getNetwork() // Test the connection
                 return provider
             } catch (error) {
                 console.warn(`Failed to connect to RPC ${rpcUrl}:`, error)
@@ -129,38 +134,40 @@ export default class EvmCoinFinder {
             throw new Error("Token contract not found on source chain")
         }
 
-        // Find corresponding tokens on target chains
-        for (const chainId of targetChainIds) {
-            // If source and target chains are the same, return the same address
-            if (chainId === sourceChainId) {
-                result[chainId] = tokenAddress
+        // Get chain names for lookup
+        const sourceChain = this.getChainNameFromId(sourceChainId)
+        if (!sourceChain) {
+            throw new Error(`Unsupported chain ID: ${sourceChainId}`)
+        }
+
+        for (const targetChainId of targetChainIds) {
+            // Same chain = same address
+            if (targetChainId === sourceChainId) {
+                result[targetChainId] = tokenAddress
                 continue
             }
 
-            let mappedToken: string | false = false
-
-            // Check if it's USDC
-            if (tokenAddress === tokenAddresses.usdc.ethereum.mainnet) {
-                if (chainId === chainIds.bsc.mainnet) {
-                    mappedToken = tokenAddresses.usdc.bsc.mainnet
-                } else if (chainId === chainIds.arbitrum.mainnet) {
-                    mappedToken = tokenAddresses.usdc.arbitrum.mainnet
-                } else if (chainId === chainIds.optimism.mainnet) {
-                    mappedToken = tokenAddresses.usdc.optimism.mainnet
-                }
-            }
-            // Check if it's USDT
-            else if (tokenAddress === tokenAddresses.usdt.ethereum.mainnet) {
-                if (chainId === chainIds.bsc.mainnet) {
-                    mappedToken = tokenAddresses.usdt.bsc.mainnet
-                } else if (chainId === chainIds.arbitrum.mainnet) {
-                    mappedToken = tokenAddresses.usdt.arbitrum.mainnet
-                } else if (chainId === chainIds.optimism.mainnet) {
-                    mappedToken = tokenAddresses.usdt.optimism.mainnet
-                }
+            const targetChain = this.getChainNameFromId(targetChainId)
+            if (!targetChain) {
+                result[targetChainId] = false
+                continue
             }
 
-            result[chainId] = mappedToken
+            // Check USDC mapping
+            if (tokenAddress === tokenAddresses.usdc[sourceChain]?.mainnet) {
+                result[targetChainId] =
+                    tokenAddresses.usdc[targetChain]?.mainnet || false
+                continue
+            }
+
+            // Check USDT mapping
+            if (tokenAddress === tokenAddresses.usdt[sourceChain]?.mainnet) {
+                result[targetChainId] =
+                    tokenAddresses.usdt[targetChain]?.mainnet || false
+                continue
+            }
+
+            result[targetChainId] = false
         }
 
         return result
@@ -198,5 +205,20 @@ export default class EvmCoinFinder {
 
         // Return native address (0x0)
         return tokenAddresses.eth.mainnet
+    }
+
+    private static getChainNameFromId(chainId: number): string | undefined {
+        switch (chainId) {
+            case chainIds.eth.mainnet:
+                return "ethereum"
+            case chainIds.bsc.mainnet:
+                return "bsc"
+            case chainIds.arbitrum.mainnet:
+                return "arbitrum"
+            case chainIds.optimism.mainnet:
+                return "optimism"
+            default:
+                return undefined
+        }
     }
 }

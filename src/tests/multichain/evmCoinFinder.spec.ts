@@ -1,4 +1,4 @@
-import EvmCoinFinder from "../../abstraction/EvmCoinFinder"
+import { EvmCoinFinder } from "../../abstraction/EvmCoinFinder"
 import { ethers } from "ethers"
 // Mock the JsonRpcProvider
 jest.mock("ethers", () => ({

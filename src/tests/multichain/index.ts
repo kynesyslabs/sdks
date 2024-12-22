@@ -11,7 +11,15 @@ import { StargateClient } from "@cosmjs/stargate"
 import { INetworkProvider } from "@multiversx/sdk-network-providers/out/interface"
 
 import chainProviders from "./chainProviders"
-import { EVM, IBC, MULTIVERSX, XRPL, SOLANA, TON, NEAR } from "@/multichain/core"
+import {
+    EVM,
+    IBC,
+    MULTIVERSX,
+    XRPL,
+    SOLANA,
+    TON,
+    NEAR,
+} from "@/multichain/core"
 import { Near } from "near-api-js"
 
 // INFO: Chains and their RPCs
@@ -39,7 +47,7 @@ const chains = [
     {
         name: "SOLANA",
         sdk: SOLANA,
-        rpc: chainProviders.solana.devnet,
+        rpc: chainProviders.solana.testnet,
     },
     {
         name: "TON",

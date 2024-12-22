@@ -21,12 +21,10 @@ class _AbstractionProviders {
         this.evm = {}
         this.solana = {
             mainnet: [],
-            devnet: [],
             testnet: [],
         }
         this.multiversx = {
             mainnet: [],
-            devnet: [],
             testnet: [],
         }
         this.xrp = {
@@ -50,11 +48,11 @@ class _AbstractionProviders {
         [chainName: string]: string[] // Array of RPC URLs
     }
     solana: {
-        [key in "mainnet" | "devnet" | "testnet"]: string[] // Array of RPC URLs
+        [key in "mainnet" | "testnet"]: string[] // Array of RPC URLs
     }
 
     multiversx: {
-        [key in "mainnet" | "devnet" | "testnet"]: string[] // Array of RPC URLs
+        [key in "mainnet" | "testnet"]: string[] // Array of RPC URLs
     }
 
     xrp: {
