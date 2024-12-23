@@ -91,6 +91,52 @@ export const tokenAddresses = {
             },
         },
     },
+    // BTC on EVM chains
+    btc: {
+        mainnet: "BTC",
+        testnet: "BTC",
+        wrapped: {
+            ethereum: {
+                mainnet: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", // WBTC
+                testnet: "0x92c63d0e701CAAe670C9415d91C474F686298f00", // Sepolia WBTC
+            },
+            bsc: {
+                mainnet: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", // BTCB
+                testnet: "0x6ce8dA28E2f864420840cF74474eFf5fD80E65B8", // BSC Testnet BTCB
+            },
+            arbitrum: {
+                mainnet: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f", // WBTC
+                testnet: "", // TODO: Need to verify Arbitrum Sepolia WBTC address
+            },
+            optimism: {
+                mainnet: "0x68f180fcCe6836688e9084f035309E29Bf0A2095", // WBTC
+                testnet: "", // TODO: Need to verify Optimism Sepolia WBTC address
+            },
+        },
+    },
+    // MultiversX on EVM chains
+    multiversx: {
+        mainnet: "EGLD",
+        testnet: "EGLD",
+        wrapped: {
+            ethereum: {
+                mainnet: "", // TODO: Need to verify if WEGLD exists on Ethereum
+                testnet: "", // TODO: Need to verify Sepolia WEGLD address
+            },
+            bsc: {
+                mainnet: "0xbF7c81FFF98BbE61B40Ed186e4AfD6DDd01337fe", // WEGLD
+                testnet: "", // TODO: Need to verify BSC testnet WEGLD address
+            },
+            arbitrum: {
+                mainnet: "", // TODO: Need to verify if WEGLD exists on Arbitrum
+                testnet: "", // TODO: Need to verify if WEGLD exists on Arbitrum Sepolia
+            },
+            optimism: {
+                mainnet: "", // TODO: Need to verify if WEGLD exists on Optimism
+                testnet: "", // TODO: Need to verify if WEGLD exists on Optimism Sepolia
+            },
+        },
+    },
     // Stablecoins
     usdc: {
         ethereum: {
