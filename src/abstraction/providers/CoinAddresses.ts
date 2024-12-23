@@ -22,7 +22,7 @@ export const chainIds = {
 }
 
 export const tokenAddresses = {
-    // EVM chains
+    // ETH on EVM chains
     eth: {
         mainnet: "0x0000000000000000000000000000000000000000",
         sepolia: "0x0000000000000000000000000000000000000000",
@@ -45,6 +45,52 @@ export const tokenAddresses = {
             },
         },
     },
+    // SOL on EVM chains
+    sol: {
+        mainnet: "So11111111111111111111111111111111111111112",
+        testnet: "So11111111111111111111111111111111111111112",
+        wrapped: {
+            ethereum: {
+                mainnet: "0xD31a59c85aE9D8edEFeC411D448f90841571b89c",
+                testnet: "", // TODO: Need to verify Sepolia wSOL address
+            },
+            bsc: {
+                mainnet: "0x570A5D26f7765Ecb712C0924E4De545B89fD43dF",
+                testnet: "", // TODO: Need to verify BSC testnet wSOL address
+            },
+            arbitrum: {
+                mainnet: "0x2bcC6D6CdBbDC0a4071e48bb3B969b06B3330c07",
+                testnet: "", // TODO: Need to verify Arbitrum Sepolia wSOL address
+            },
+            optimism: {
+                mainnet: "", // TODO: Need to verify Optimism wSOL address
+                testnet: "", // TODO: Need to verify Optimism Sepolia wSOL address
+            },
+        },
+    },
+    // XRP on EVM chains
+    xrp: {
+        mainnet: "XRP",
+        testnet: "XRP",
+        wrapped: {
+            ethereum: {
+                mainnet: "0x39fBBABf11738317a448031930706cd3e612e1B9",
+                testnet: "0x0000000000000000000000000000000000000000", // TODO: Need to verify Sepolia wXRP address
+            },
+            bsc: {
+                mainnet: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE",
+                testnet: "0x0000000000000000000000000000000000000000", // TODO: Need to verify BSC testnet wXRP address
+            },
+            arbitrum: {
+                mainnet: "0x0000000000000000000000000000000000000000", // TODO: Need to verify Arbitrum wXRP address
+                testnet: "0x0000000000000000000000000000000000000000", // TODO: Need to verify Arbitrum Sepolia wXRP address
+            },
+            optimism: {
+                mainnet: "0x0000000000000000000000000000000000000000", // TODO: Need to verify Optimism wXRP address
+                testnet: "0x0000000000000000000000000000000000000000", // TODO: Need to verify Optimism Sepolia wXRP address
+            },
+        },
+    },
     // Stablecoins
     usdc: {
         ethereum: {
@@ -63,22 +109,22 @@ export const tokenAddresses = {
             mainnet: "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
             testnet: "0x0000000000000000000000000000000000000000", //TODO: Cannot verify this address on Sepolia
         },
+        // Non-EVM chains
         solana: {
             mainnet: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
             testnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
         },
         multiversx: {
             mainnet: "USDC-c76f1f",
-            testnet: "USDC-8d4068",
+            testnet: "USDC-8d4068", //TODO: Cannot verify this
         },
         xrp: {
-            mainnet: "usdc",
-            testnet: "usdc",
+            mainnet: "", // TODO: Not supported yet
+            testnet: "", // TODO: Not supported yet
         },
         ton: {
-            mainnet:
-                "0:c37b3fafca5bf7d3704b081fde7df54f298736ee059bf6d32fac25f5e6085bf6",
-            testnet: "",
+            mainnet: "", // TODO: Need authoritative source to verify USDC address on TON
+            testnet: "", // Not available on testnet
         },
     },
     usdt: {
@@ -98,43 +144,22 @@ export const tokenAddresses = {
             mainnet: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
             testnet: "0x0000000000000000000000000000000000000000", // TODO: Cannot verify this address on Sepolia
         },
+        // Non-EVM chains
         solana: {
             mainnet: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-            testnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+            testnet: "", // USDT not available on testnet
         },
         multiversx: {
-            mainnet: "USDT-c76f1f",
-            testnet: "USDT-8d4068",
+            mainnet: "", // TODO: Need authoritative source to verify USDT token ID
+            testnet: "", // TODO: Need authoritative source to verify USDT token ID
         },
         xrp: {
-            mainnet: "usdt",
-            testnet: "usdt",
+            mainnet: "", // TODO: Not supported yet
+            testnet: "", // TODO: Not supported yet
         },
         ton: {
-            mainnet:
-                "0:a519f99bb5d6d51ef958ed24d337ad75a1c770885dcd42d51d6663f9fcdacfb2",
-            testnet: "",
+            mainnet: "", // TODO: Need authoritative source to verify USDT address on TON
+            testnet: "", // Not available on testnet
         },
-    },
-    // Non-EVM chains
-    sol: {
-        mainnet: "So11111111111111111111111111111111111111112",
-        testnet: "So11111111111111111111111111111111111111112",
-    },
-    multiversx: {
-        mainnet: "EGLD-bd4d79",
-        testnet: "WEGLD-d7c6bb",
-    },
-    xrp: {
-        mainnet: "XRP",
-        testnet: "XRP",
-    },
-    btc: {
-        mainnet: "BTC",
-        testnet: "BTC",
-    },
-    ton: {
-        mainnet: "TON",
-        testnet: "TON",
     },
 }
