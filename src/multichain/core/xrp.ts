@@ -135,12 +135,12 @@ export class XRPL extends DefaultChain {
 
     override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
         required(this.wallet || options?.privateKey, "Wallet not connected")
-        // TODO Implement the signMessage method
+        // TODO Implement the signMessage method // ? Seems to not be exposed in xrpl library
         return "Not implemented"
     }
 
     override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
-        // TODO Implement the verifyMessage method
+        // TODO Implement the verifyMessage method // ? Seems to not be exposed in xrpl library
         return false
     }
 
