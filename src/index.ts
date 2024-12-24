@@ -6,6 +6,7 @@ export * as utils from "./utils"
 //  Specific features of the SDK
 export * as xmlocalsdk from "./multichain/localsdk"
 export * as xmwebsdk from "./multichain/websdk"
+export * as xmcore from "./multichain/core"
 export * as wallet from "./wallet"
 export * as demoswork from "./demoswork"
 
