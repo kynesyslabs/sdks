@@ -1,4 +1,5 @@
-import { EvmChain, EvmCoinFinder } from "../../abstraction/EvmCoinFinder"
+import { BaseChain } from "@/abstraction/providers/CoinAddresses"
+import { EvmCoinFinder } from "../../abstraction/EvmCoinFinder"
 import { ethers } from "ethers"
 // Mock the JsonRpcProvider
 jest.mock("ethers", () => ({
@@ -30,28 +31,28 @@ describe("EVM COIN FINDER TESTS", () => {
         expect(result[OPTIMISM_CHAIN_ID]).toBeDefined()
     })
 
-    test("findNativeAssets returns native and wrapped assets across chains", async () => {
-        const result = await EvmCoinFinder.findNativeAssets([
+    test("findWrappedAssets returns native and wrapped assets across chains", async () => {
+        const result = await EvmCoinFinder.findWrappedAssets([
             BSC_CHAIN_ID,
             ARBITRUM_CHAIN_ID,
             OPTIMISM_CHAIN_ID,
         ])
 
-        // Native should always exist
+        // Check each chain has native address
         expect(result[BSC_CHAIN_ID].native).toBeDefined()
         expect(result[ARBITRUM_CHAIN_ID].native).toBeDefined()
         expect(result[OPTIMISM_CHAIN_ID].native).toBeDefined()
 
-        // Wrapped might exist
-        if (result[BSC_CHAIN_ID].wrapped) {
+        // Check wrapped addresses if they exist
+        if (result[BSC_CHAIN_ID].wrapped !== false) {
             expect(ethers.isAddress(result[BSC_CHAIN_ID].wrapped)).toBe(true)
         }
-        if (result[ARBITRUM_CHAIN_ID].wrapped) {
+        if (result[ARBITRUM_CHAIN_ID].wrapped !== false) {
             expect(ethers.isAddress(result[ARBITRUM_CHAIN_ID].wrapped)).toBe(
                 true,
             )
         }
-        if (result[OPTIMISM_CHAIN_ID].wrapped) {
+        if (result[OPTIMISM_CHAIN_ID].wrapped !== false) {
             expect(ethers.isAddress(result[OPTIMISM_CHAIN_ID].wrapped)).toBe(
                 true,
             )
@@ -80,25 +81,25 @@ describe("EVM COIN FINDER TESTS", () => {
     test("getNativeForSupportedChain returns native addresses for all supported chains", () => {
         expect(
             EvmCoinFinder.getNativeForSupportedChain(
-                EvmChain.ETHEREUM,
+                BaseChain.ETHEREUM,
                 ETHEREUM_CHAIN_ID,
             ),
         ).toBeDefined()
         expect(
             EvmCoinFinder.getNativeForSupportedChain(
-                EvmChain.BSC,
+                BaseChain.BSC,
                 BSC_CHAIN_ID,
             ),
         ).toBeDefined()
         expect(
             EvmCoinFinder.getNativeForSupportedChain(
-                EvmChain.ARBITRUM,
+                BaseChain.ARBITRUM,
                 ARBITRUM_CHAIN_ID,
             ),
         ).toBeDefined()
         expect(
             EvmCoinFinder.getNativeForSupportedChain(
-                EvmChain.OPTIMISM,
+                BaseChain.OPTIMISM,
                 OPTIMISM_CHAIN_ID,
             ),
         ).toBeDefined()

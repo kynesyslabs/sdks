@@ -1,3 +1,6 @@
+/**
+ * Chain IDs for various chains
+ */
 export const chainIds = {
     eth: {
         mainnet: 1,
@@ -21,9 +24,50 @@ export const chainIds = {
     },
 }
 
+export enum BaseChain {
+    ETHEREUM = "ethereum",
+    BSC = "bsc",
+    ARBITRUM = "arbitrum",
+    OPTIMISM = "optimism",
+    SOLANA = "solana",
+    MULTIVERSX = "multiversx",
+    XRP = "xrp",
+    BITCOIN = "bitcoin",
+    TON = "ton",
+}
+
+/**
+ * Types for network types
+ */
+export type NetworkType = "mainnet" | "testnet"
+
+/**
+ * Types for chain types
+ */
+export type ChainType =
+    // EVM chains
+    | BaseChain.ETHEREUM
+    | BaseChain.BSC
+    | BaseChain.ARBITRUM
+    | BaseChain.OPTIMISM
+    // Non-EVM chains
+    | BaseChain.SOLANA
+    | BaseChain.MULTIVERSX
+    | BaseChain.XRP
+    | BaseChain.BITCOIN
+    | BaseChain.TON
+
+/**
+ * Type for supported chains
+ */
+export type SupportedChain = `${BaseChain}_${NetworkType}`
+
+/**
+ * Token addresses for various chains
+ */
 export const tokenAddresses = {
     // ETH on EVM chains
-    eth: {
+    ethereum: {
         mainnet: "0x0000000000000000000000000000000000000000",
         sepolia: "0x0000000000000000000000000000000000000000",
         wrapped: {
@@ -46,7 +90,7 @@ export const tokenAddresses = {
         },
     },
     // SOL on EVM chains
-    sol: {
+    solana: {
         mainnet: "So11111111111111111111111111111111111111112",
         testnet: "So11111111111111111111111111111111111111112",
         wrapped: {
@@ -92,7 +136,7 @@ export const tokenAddresses = {
         },
     },
     // BTC on EVM chains
-    btc: {
+    bitcoin: {
         mainnet: "BTC",
         testnet: "BTC",
         wrapped: {
