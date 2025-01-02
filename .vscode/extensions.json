@@ -1,5 +1,8 @@
 {
     "recommendations": [
-        "kisstkondoros.typelens"
+        "kisstkondoros.typelens",
+        "strigo.linear",
+        "linear.linear-connect",
+        "linearflow.linear-flow"
     ]
 }
