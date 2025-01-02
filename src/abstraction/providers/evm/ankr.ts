@@ -4,7 +4,7 @@
  *  - Note how the providers are registered for each chain.
  *  - You can use this as a template for registering new providers.
  */
-import AbstractionProvidersInstance from "./AbstractionProviders"
+import AbstractionProvidersInstance from "../AbstractionProviders"
 
 export default function registerAnkrProviders() {
     // ANCHOR Evm chains

@@ -1,5 +1,5 @@
-import AbstractionProvidersInstance from "./AbstractionProviders"
-import { chainIds } from "./CoinAddresses"
+import AbstractionProvidersInstance from "../AbstractionProviders"
+import { chainIds } from "../CoinAddresses"
 
 export default function registerEthereumProviders() {
     //TODO: Change to private third-party service providers in production for better performance and reliability

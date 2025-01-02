@@ -1,4 +1,4 @@
-import AbstractionProvidersInstance from "./AbstractionProviders"
+import AbstractionProvidersInstance from "../AbstractionProviders"
 
 export default function registerArbitrumProviders() {
     //TODO: Change to private third-party service providers in production for better performance and reliability

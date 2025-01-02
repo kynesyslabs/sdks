@@ -1,38 +1,88 @@
-// Import the singleton instance of the Providers class (already registered with all providers)
-import Providers from "./providers"
-import { tokenAddresses } from "./providers/CoinAddresses"
+import {
+    BaseChain,
+    ChainType,
+    NetworkType,
+    tokenAddresses,
+    chainIds,
+    SupportedChain,
+} from "./providers/CoinAddresses"
 
-// ! Use the Providers singleton with the methods of each chain RPC to find tokens
 /**
- * ? For each call, we should probably select a random RPC
- * ? from the Providers singleton and use that one in a for loop
- * ? that breaks when the call is successful.
- * ? This is to prevent any single RPC from being overloaded and
- * ? to be able to fail over to the next one in the list.
+ * Class for finding wrapped tokens on various chains
  */
-
-export default class CoinFinder {
-    constructor() {}
-
-    // TODO Implement supported chains (e.g. solana, multiversx, etc.) tokens cross search
-
-    static async findSol(targetChain: string) {
-        // TODO Validate the target chain id
-        // TODO Get the wrapped sol address for the target chain
+export class CoinFinder {
+    private static validateChain(chain: BaseChain) {
+        if (!Object.values(BaseChain).includes(chain)) {
+            throw new Error(`Invalid chain: ${chain}`)
+        }
     }
 
-    static async findMultiversx(targetChain: string) {
-        // TODO Validate the target chain id
-        // TODO Get the wrapped multiversx address for the target chain
+    /**
+     * Finds the wrapped token address for a given source chain on a target chain
+     * @param {BaseChain} sourceChain The chain whose token we want to find (e.g., BITCOIN, SOLANA)
+     * @param {BaseChain} targetChain The chain where we want to find the wrapped token
+     * @returns {Promise<string | false>} The wrapped token address or false if not found
+     */
+    static async findWrappedToken(
+        sourceChain: BaseChain,
+        targetChain: BaseChain,
+    ): Promise<string | false> {
+        this.validateChain(sourceChain)
+        this.validateChain(targetChain)
+        return (
+            tokenAddresses[sourceChain].wrapped?.[targetChain]?.mainnet || false
+        )
     }
 
-    static async findXRP(targetChain: string) {
-        // TODO Validate the target chain id
-        // TODO Get the wrapped xrp address for the target chain
-    }
+    /**
+     * Gets the native token address for any supported chain
+     * @param {SupportedChain} chain The supported chain to find the native address for (e.g., "ethereum_mainnet")
+     * @param {number} targetChainId The chain ID to find the native address for (e.g., 1 for Ethereum mainnet)
+     * @returns {string} The native token address for the given chain ID
+     * @throws {Error} If chain ID doesn't match the chain or if chain is unsupported
+     */
+    static getNativeForSupportedChain(
+        chain: SupportedChain,
+        targetChainId: number = 1,
+    ): string {
+        const [chainType, networkType] = chain.split("_") as [
+            ChainType,
+            NetworkType,
+        ]
 
-    static async findBTC(targetChain: string) {
-        // TODO Validate the target chain id
-        // TODO Get the wrapped btc address for the target chain
+        // Handle EVM chains
+        switch (chainType) {
+            case BaseChain.ETHEREUM:
+            case BaseChain.BSC:
+            case BaseChain.ARBITRUM:
+            case BaseChain.OPTIMISM:
+                // Validate chain ID matches the chain
+                const chainIdMap = {
+                    [BaseChain.ETHEREUM]: chainIds.eth.mainnet,
+                    [BaseChain.BSC]: chainIds.bsc.mainnet,
+                    [BaseChain.ARBITRUM]: chainIds.arbitrum.mainnet,
+                    [BaseChain.OPTIMISM]: chainIds.optimism.mainnet,
+                }
+                if (targetChainId !== chainIdMap[chainType]) {
+                    throw new Error(`Chain ID doesn't match ${chainType}`)
+                }
+                return tokenAddresses.ethereum[networkType]
+
+            // Handle non-EVM chains
+            case BaseChain.SOLANA:
+            case BaseChain.MULTIVERSX:
+            case BaseChain.XRP:
+            case BaseChain.BITCOIN:
+            case BaseChain.TON:
+                if (targetChainId !== 1) {
+                    throw new Error(
+                        "Non-EVM chains only support targetChainId 1",
+                    )
+                }
+                return tokenAddresses[chainType][networkType]
+
+            default:
+                throw new Error(`Unsupported chain: ${chain}`)
+        }
     }
 }
