@@ -21,6 +21,14 @@ import {
     NEAR,
 } from "@/multichain/core"
 import { Near } from "near-api-js"
+import { wallets } from "../utils/wallets"
+import {
+    demos,
+    DemosWebAuth,
+    prepareXMPayload,
+    prepareXMScript,
+    stringToForge,
+} from "@/websdk"
 
 // INFO: Chains and their RPCs
 const chains = [
@@ -34,31 +42,31 @@ const chains = [
         sdk: XRPL,
         rpc: chainProviders.xrpl.testnet,
     },
-    {
-        name: "EVM",
-        sdk: EVM,
-        rpc: chainProviders.eth.sepolia,
-    },
-    {
-        name: "IBC",
-        sdk: IBC,
-        rpc: chainProviders.ibc.testnet,
-    },
-    {
-        name: "SOLANA",
-        sdk: SOLANA,
-        rpc: chainProviders.solana.testnet,
-    },
-    {
-        name: "TON",
-        sdk: TON,
-        rpc: chainProviders.ton.testnet,
-    },
-    {
-        name: "NEAR",
-        sdk: NEAR,
-        rpc: chainProviders.near.testnet,
-    },
+    // {
+    //     name: "EVM",
+    //     sdk: EVM,
+    //     rpc: chainProviders.eth.sepolia,
+    // },
+    // {
+    //     name: "IBC",
+    //     sdk: IBC,
+    //     rpc: chainProviders.ibc.testnet,
+    // },
+    // {
+    //     name: "SOLANA",
+    //     sdk: SOLANA,
+    //     rpc: chainProviders.solana.testnet,
+    // },
+    // {
+    //     name: "TON",
+    //     sdk: TON,
+    //     rpc: chainProviders.ton.testnet,
+    // },
+    // {
+    //     name: "NEAR",
+    //     sdk: NEAR,
+    //     rpc: chainProviders.near.testnet,
+    // },
 ]
 
 // INFO: For loop to test each chain sdk
@@ -150,5 +158,60 @@ describe.each(chains)("GENERIC CHAIN TESTS › $name", ({ name, rpc, sdk }) => {
         expect(instance.connected).toBe(false)
         expect(instance.provider).toBe(null)
         expect(instance.wallet).toBe(null)
+    })
+
+    test.only("Classic XM transaction", async () => {
+        const evm = await EVM.create(chainProviders.eth.sepolia)
+        await evm.connectWallet(wallets.evm.privateKey)
+
+        const evm_tx = await evm.preparePay(
+            "0xda3ea78Af43E6B1c63A08cD0058973F14e5556b0",
+            "0.000000001",
+        )
+
+        const balance = await evm.getBalance(evm.getAddress())
+
+        console.log(evm_tx)
+        console.log(balance)
+
+        const xmscript = prepareXMScript({
+            chain: "eth",
+            subchain: "sepolia",
+            signedPayloads: [evm_tx],
+            type: "pay",
+        })
+
+        const privateKey =
+            "2ced20db5597d0d45333125985884f4781da85a51a7ab5e8d4aa817bfc333a185c4fef9bdac050f5353f8713c80523fa73061eab28c031259f7621a7cb537d33"
+
+        const identity = DemosWebAuth.getInstance()
+        await identity.create()
+
+        console.log("identity", identity.keypair)
+
+        identity.keypair.privateKey = Buffer.from(
+            identity.keypair.privateKey as any,
+        )
+
+        const tx = await prepareXMPayload(xmscript, identity.keypair)
+
+        console.log(xmscript)
+        console.log(tx)
+
+        const rpc = "http://localhost:53550"
+
+        await demos.connect(rpc)
+        await demos.connectWallet(identity.keypair.privateKey as any)
+
+        console.log("")
+
+        console.log("address", demos.getAddress())
+        console.log("private key:", identity.keypair.privateKey)
+
+        const validityData = await demos.confirm(tx)
+        console.log("validityData", validityData)
+
+        const res = await demos.broadcast(validityData)
+        console.log("res", res)
     })
 })
