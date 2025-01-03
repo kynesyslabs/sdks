@@ -158,7 +158,7 @@ const XMTransactions = {
 interface prepareXMScriptParams {
     chain: string
     subchain: string
-    signedPayloads: [any]
+    signedPayloads: any[]
     type: string
 
     is_evm?: boolean
