@@ -3,13 +3,13 @@
 import * as skeletons from "./utils/skeletons"
 // import demos from '../demos'
 import { DemosTransactions } from "./DemosTransactions"
-import type { IWeb2Request, Transaction } from "@/types"
+import type { IWeb2Request, Transaction, EnumWeb2Actions } from "@/types"
 import { DemosWebAuth } from "./DemosWebAuth"
 import { _required as required } from "./utils/required"
 import { IKeyPair } from "./types/KeyPair"
 
 export interface IPrepareWeb2PayloadParams {
-    action: string
+    action: EnumWeb2Actions
     url: string
     parameters?: any[]
     // requestedParameters?: any
