@@ -39,6 +39,7 @@ export default {
         //TODO: Change to testnet when we have a testnet faucet
         // using devnet as testnet faucet is broken 👇
         testnet: clusterApiUrl("devnet"),
+        devnet: clusterApiUrl("devnet"),
     },
     ton: {
         mainnet: getHttpEndpoint({
