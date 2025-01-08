@@ -20,7 +20,9 @@ export abstract class DefaultChain {
     // if the user specifies the rpc_url in the constructor,
     // as we cannot use await in the constructor
     constructor(rpc_url: string) {
-        this.setRpc(rpc_url)
+        if (rpc_url) {
+            this.setRpc(rpc_url)
+        }
     }
 
     // SECTION: Global methods
@@ -43,9 +45,10 @@ export abstract class DefaultChain {
         rpc_url: string = "",
     ): Promise<T> {
         const instance = new this(rpc_url)
-        instance.setRpc(rpc_url)
 
         if (rpc_url) {
+            console.log("setting rpc url", rpc_url)
+            instance.setRpc(rpc_url)
             await instance.connect()
         }
 
@@ -181,7 +184,10 @@ export abstract class DefaultChain {
      * @param options Options
      * @returns The signed message
      */
-    abstract signMessage(message: string, options?: { privateKey?: string }): Promise<string| Uint8Array>
+    abstract signMessage(
+        message: string,
+        options?: { privateKey?: string },
+    ): Promise<string | Uint8Array>
 
     /**
      * Verifies a message using the connected wallet
@@ -189,7 +195,11 @@ export abstract class DefaultChain {
      * @param signature The signature to verify
      * @returns A boolean indicating if the message was verified
      */
-    abstract verifyMessage(message: string, signature: string|Uint8Array, publicKey: string|Uint8Array): Promise<boolean>
+    abstract verifyMessage(
+        message: string,
+        signature: string | Uint8Array,
+        publicKey: string | Uint8Array,
+    ): Promise<boolean>
 
     /**
      * Signs a transaction using the connected wallet

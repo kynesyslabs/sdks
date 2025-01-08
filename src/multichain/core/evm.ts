@@ -6,7 +6,7 @@ import {
     formatEther,
     parseEther,
     toNumber,
-    verifyMessage
+    verifyMessage,
 } from "ethers"
 import { DefaultChain, IEVMDefaultChain } from "./types/defaultChain"
 import { IPayParams } from "./types/interfaces"
@@ -67,14 +67,25 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     // INFO Connecting a wallet through a private key (string)
     // REVIEW should private key be a string or a Buffer?
     async connectWallet(privateKey: string) {
-        required(this.provider, "Provider not connected")
-        this.wallet = new Wallet(privateKey, this.provider)
+        if (!this.rpc_url) {
+            console.warn(
+                "WARNING: No RPC URL set. Connecting wallet without provider",
+            )
+        }
+
+        this.wallet = new Wallet(
+            privateKey,
+            this.rpc_url ? this.provider : null,
+        )
 
         return this.wallet
     }
 
     // INFO Signing a message
-    async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
+    async signMessage(
+        message: string,
+        options?: { privateKey?: string },
+    ): Promise<string> {
         required(this.wallet || options?.privateKey, "Wallet not connected")
         let wallet = this.wallet
         if (options?.privateKey) {
@@ -85,7 +96,11 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     }
 
     // INFO Verifying a message
-    override async verifyMessage(message: string, signature: string,publicKey: string): Promise<boolean> {
+    override async verifyMessage(
+        message: string,
+        signature: string,
+        publicKey: string,
+    ): Promise<boolean> {
         let recoveredAddress = verifyMessage(message, signature)
         return recoveredAddress === publicKey
     }

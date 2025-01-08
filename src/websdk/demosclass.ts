@@ -30,40 +30,50 @@ import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
+
 /**
- * @deprecated Use the new `Demos` class
- * @see Demos class
- *
- * ```ts
- * import { Demos } from "@kynesyslabs/websdk"
- * const demos = new Demos()
- *
- * await demos.connect(rpc_url)
- * await demos.connectWallet(privateKey)
- * ```
+ * This class provides methods to interact with the DEMOS blockchain.
  */
-export const demos = {
-    // ANCHOR Properties
-    rpc_url: <string | null>null,
-    connected: false,
+export class Demos {
+    /** The RPC URL of the demos node */
+    rpc_url: string | null = null
+
+    /** Connection status of the RPC URL */
+    connected: boolean = false
+
+    /** Connection status of the wallet */
     get walletConnected(): boolean {
         return this.keypair !== null && this.keypair.privateKey !== null
-    },
-    keypair: <IKeyPair>null,
+    }
 
-    // SECTION Connection and listeners
-    connect: async function (rpc_url: string) {
+    /** The keypair of the connected wallet */
+    keypair: IKeyPair | null = null
+
+    /**
+     * Connects to a RPC URL. Throws an error if the connection fails.
+     *
+     * @param rpc_url - The URL of the demos node
+     * @returns Whether the connection was successful
+     */
+    async connect(rpc_url: string) {
         const response = await axios.get(rpc_url)
 
         if (response.status == 200) {
-            demos.rpc_url = rpc_url
+            this.rpc_url = rpc_url
         }
 
-        demos.connected = true
-        return demos.connected
-    },
+        this.connected = true
+        return this.connected
+    }
 
-    connectWallet: async function (
+    /**
+     * Connects to a Demos wallet using the provided private key.
+     *
+     * @param privateKey - The private key of the wallet
+     * @param options - The options for the wallet connection
+     * @returns The public key of the wallet
+     */
+    async connectWallet(
         privateKey: string | Buffer | Uint8Array,
         options?: {
             /**
@@ -81,29 +91,31 @@ export const demos = {
         const [loggedIn, helptext] = await webAuthInstance.login(privateKey)
 
         if (loggedIn) {
-            demos.keypair = webAuthInstance.keypair
-            return demos.keypair.publicKey.toString("hex")
+            this.keypair = webAuthInstance.keypair
+            return this.keypair.publicKey.toString("hex")
         }
 
         throw new Error(helptext)
-    },
+    }
 
-    getAddress: function () {
-        required(demos.walletConnected, "Wallet not connected")
-        return demos.keypair.publicKey.toString("hex")
-    },
+    /**
+     * Returns the public key of the connected wallet.
+     *
+     * @returns The public key of the wallet
+     */
+    getAddress() {
+        required(this.walletConnected, "Wallet not connected")
+        return this.keypair.publicKey.toString("hex")
+    }
 
-    disconnect: function () {
-        // remove rpc_url and wallet connection
-        demos.rpc_url = null
-        demos.keypair = null
-
-        demos.connected = false
-    },
     // !SECTION Connection and listeners
 
-    // INFO MUID generator
-    generateMuid: function () {
+    /**
+     * Generates a random MUID.
+     *
+     * @returns The MUID
+     */
+    generateMuid() {
         const number_1 =
             Math.random().toString(36).substring(2, 15) +
             Math.random().toString(36).substring(2, 15)
@@ -112,29 +124,36 @@ export const demos = {
             Math.random().toString(36).substring(2, 15)
         const muid = number_1 + number_2
         return muid
-    },
+    }
 
-    // SECTION NodeCall prototype
-    // INFO NodeCalls use the same structure
-    nodeCall: async function (message: any, args = {}) {
-        return await demos.call("nodeCall", message, args)
-    },
-    // REVIEW: Replace call with validate / execute logic
-    confirm: async function (transaction: Transaction) {
-        return (await demos.call(
+    /**
+     * Confirms a transaction.
+     *
+     * @param transaction - The transaction to confirm
+     * @returns The validity data of the transaction containing the gas information.
+     */
+    async confirm(transaction: Transaction) {
+        return (await this.call(
             "execute",
             "",
             transaction,
             "confirmTx",
         )) as RPCResponseWithValidityData
-    },
-    broadcast: async function (validationData: RPCResponseWithValidityData) {
-        return await demos.call("execute", "", validationData, "broadcastTx")
-    },
-    // L2PS calls are defined here
-    l2ps: l2psCalls,
+    }
 
-    rpcCall: async function (
+    /**
+     * Broadcasts a transaction for execution.
+     *
+     * @param validationData - The validity data of the transaction
+     * @returns The response from the node
+     */
+    async broadcast(validationData: RPCResponseWithValidityData) {
+        return await this.call("execute", "", validationData, "broadcastTx")
+    }
+
+    // L2PS calls are defined here
+
+    async rpcCall(
         request: RPCRequest,
         isAuthenticated: boolean = false,
         retries = 1,
@@ -145,16 +164,16 @@ export const demos = {
         let signature = ""
 
         if (isAuthenticated) {
-            publicKey = demos.keypair.publicKey.toString("hex")
+            publicKey = this.keypair.publicKey.toString("hex")
             signature = Cryptography.sign(
                 publicKey,
-                demos.keypair.privateKey,
+                this.keypair.privateKey,
             ).toString("hex")
         }
 
         try {
             const response = await axios.post<RPCResponse>(
-                demos.rpc_url,
+                this.rpc_url,
                 request,
                 {
                     headers: {
@@ -176,7 +195,7 @@ export const demos = {
 
             if (retries > 0) {
                 await sleep(sleepTime)
-                return await demos.rpcCall(
+                return await this.rpcCall(
                     request,
                     isAuthenticated,
                     retries - 1,
@@ -193,11 +212,10 @@ export const demos = {
                 extra: null,
             } as RPCResponse
         }
+    }
 
-        return "response.data"
-    },
     // INFO NodeCalls use the same structure
-    call: async function (
+    async call(
         method: any,
         message: any,
         data: any = {},
@@ -233,22 +251,22 @@ export const demos = {
         let isAuthenticated: boolean = method !== "nodeCall"
 
         if (isAuthenticated) {
-            if (!demos.walletConnected) {
+            if (!this.walletConnected) {
                 throw new Error(
                     "Error: Wallet not connected! Please connect a private key using demos.connectWallet(privateKey) or provide one via the privateKey parameter",
                 )
             }
 
-            pubkey_string = demos.keypair.publicKey.toString("hex")
+            pubkey_string = this.keypair.publicKey.toString("hex")
             pubkey_signature = Cryptography.sign(
                 pubkey_string,
-                demos.keypair.privateKey,
+                this.keypair.privateKey,
             ).toString("hex")
         }
 
         try {
             const response = await axios.post<RPCResponse>(
-                demos.rpc_url,
+                this.rpc_url,
                 request,
                 {
                     headers: {
@@ -272,90 +290,152 @@ export const demos = {
                 extra: null,
             } as RPCResponse
         }
-    },
-    // !SECTION NodeCall prototype
+    }
 
-    // SECTION Predefined calls
-    getLastBlockNumber: async function () {
-        return (await demos.nodeCall("getLastBlockNumber")) as number
-    },
-    getLastBlockHash: async function () {
-        return (await demos.nodeCall("getLastBlockHash")) as string
-    },
-    getBlockByNumber: async function (blockNumber: any) {
-        return await demos.nodeCall("getBlockByNumber", {
+    // SECTION: NODECALLS
+
+    /**
+     * Performs a nodeCall on the connected RPC.
+     *
+     * @param message - The message to send to the node
+     * @param args - The arguments to send to the node
+     *
+     * @returns The nodeCall response
+     */
+    async nodeCall(message: any, args = {}) {
+        return this.call("nodeCall", message, args)
+    }
+
+    // SECTION Predefined nodeCall methods
+
+    /**
+     * Get the last block number.
+     */
+    async getLastBlockNumber() {
+        return (await this.nodeCall("getLastBlockNumber")) as number
+    }
+
+    /**
+     * Get the last block hash.
+     */
+    async getLastBlockHash() {
+        return (await this.nodeCall("getLastBlockHash")) as string
+    }
+
+    /**
+     * Get block by number.
+     *
+     * @param blockNumber - The block number
+     */
+    async getBlockByNumber(blockNumber: any) {
+        return await this.nodeCall("getBlockByNumber", {
             blockNumber,
         })
-    },
-    getBlockByHash: async function (blockHash: any) {
-        return await demos.nodeCall("getBlockByHash", {
+    }
+
+    /**
+     * Get block by hash.
+     *
+     * @param blockHash - The block hash
+     */
+    async getBlockByHash(blockHash: any) {
+        return await this.nodeCall("getBlockByHash", {
             hash: blockHash,
         })
-    },
+    }
 
-    getTxByHash: async function (
+    /**
+     * Get transaction by hash.
+     *
+     * @param txHash - The transaction hash
+     */
+    async getTxByHash(
         txHash = "e25860ec6a7cccff0371091fed3a4c6839b1231ccec8cf2cb36eca3533af8f11",
     ) {
-        // Defaulting to the genesis tx of course
-        return await demos.nodeCall("getTxByHash", {
+        // Defaulting to the genesis tx
+        return await this.nodeCall("getTxByHash", {
             hash: txHash,
         })
-    },
-    getAllTxs: async function () {
-        return await demos.nodeCall("getAllTxs")
-    },
+    }
 
-    getPeerlist: async function () {
-        return await demos.nodeCall("getPeerlist")
-    },
-    getMempool: async function () {
-        return await demos.nodeCall("getMempool")
-    },
-    getPeerIdentity: async function () {
-        return await demos.nodeCall("getPeerIdentity")
-    },
+    /**
+     * Get all transactions.
+     */
+    async getAllTxs(): Promise<Transaction[]> {
+        return await this.nodeCall("getAllTxs")
+    }
 
-    getAddressInfo: async function (address: any) {
-        return await demos.nodeCall("getAddressInfo", {
+    /**
+     * Get the peerlist.
+     */
+    async getPeerlist() {
+        // TODO: Implement Peerlist type
+        return await this.nodeCall("getPeerlist")
+    }
+
+    /**
+     * Get the mempool.
+     */
+    async getMempool() {
+        return await this.nodeCall("getMempool")
+    }
+
+    /**
+     * Get the identity of the connected RPC.
+     */
+    async getPeerIdentity() {
+        return await this.nodeCall("getPeerIdentity")
+    }
+
+    /**
+     * Get information about an address.
+     *
+     * @param address - The address
+     */
+    async getAddressInfo(address: any) {
+        return await this.nodeCall("getAddressInfo", {
             address,
         })
-    },
-    // !SECTION Predefined calls
+    }
 
-    // SECTION Operation types
-    /* NOTE
-     * As per the new transaction system, we need to prepare the payload before sending it to the network.
-     * This is done by calling the createPayload method of the corresponding transaction type.
-     * You will get a Transaction object, signed and ready to be broadcasted using DemosTransactions.broadcast.
-     * After broadcasting, you will receive a ValidityData object that needs to be confirmed.
-     * This is done by calling the confirm method of DemosTransactions.
+    /**
+     * Disconnects from the RPC URL and the wallet.
      */
+    disconnect() {
+        // remove rpc_url and wallet connection
+        this.rpc_url = null
+        this.keypair = null
+
+        this.connected = false
+    }
+
     // ANCHOR Web2 Endpoints
-    web2: {
+    web2 = {
         createPayload: (
             params: IPrepareWeb2PayloadParams,
             keypair?: IKeyPair,
         ) => {
-            const usedKeypair = keypair || demos.keypair
+            const usedKeypair = keypair || this.keypair
             if (!usedKeypair) {
                 throw new Error("No keypair provided and no wallet connected")
             }
 
             return prepareWeb2Payload(params, usedKeypair)
         },
-    },
-    // ANCHOR Crosschain support endpoints
-    xm: {
+    }
+
+    xm = {
         // INFO Working with XMTransactions
         createPayload: (xm_payload: XMScript, keypair?: IKeyPair) => {
-            const usedKeypair = keypair || demos.keypair
+            const usedKeypair = keypair || this.keypair
             if (!usedKeypair) {
                 throw new Error("No keypair provided and no wallet connected")
             }
             return prepareXMPayload(xm_payload, usedKeypair)
         },
-    },
-    tx: {
+    }
+
+    tx = {
         ...DemosTransactions,
         /**
          * Signs a transaction after hashing its content.
@@ -365,26 +445,24 @@ export const demos = {
          * @returns A Promise that resolves to the signed transaction.
          */
         sign: (raw_tx: Transaction, keypair?: IKeyPair) => {
-            const usedKeypair = keypair || demos.keypair
+            const usedKeypair = keypair || this.keypair
             if (!usedKeypair) {
                 throw new Error("No keypair provided and no wallet connected")
             }
             return DemosTransactions.sign(raw_tx, usedKeypair)
         },
-    },
+    }
 
     // ANCHOR Supporting txs
     // REVIEW: These two are deprecated, in favor of `demos.tx` (but kept to avoid breaking references)
-    DemosTransactions,
-    transactions: DemosTransactions,
-
-    // !SECTION Operation types
-
+    DemosTransactions = DemosTransactions
+    transactions = DemosTransactions
     // INFO DemosWebAuthenticator
-    DemosWebAuth, // NOTE Modularized to be more elegant
+    DemosWebAuth = DemosWebAuth
 
     // INFO Calling demos.skeletons.NAME provides an empty skeleton that can be used for reference while calling other demos functions
-    skeletons,
+    skeletons = skeletons
+    l2ps = l2psCalls
 }
 
 async function sleep(time: number) {

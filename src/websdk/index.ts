@@ -1,5 +1,6 @@
 // @ts-nocheck
 export { demos } from './demos'
+export { Demos } from './demosclass'
 export { DemosTransactions } from './DemosTransactions'
 
 export { RSA } from './rsa'
