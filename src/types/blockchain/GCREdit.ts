@@ -1,3 +1,6 @@
+// TODO See handleGCR.ts for the execution of the GCREdit
+// TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
+
 export interface GCREditBalance {
     type: "balance"
     operation: "add" | "remove"
