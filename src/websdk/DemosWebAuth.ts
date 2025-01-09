@@ -73,11 +73,11 @@ export class DemosWebAuth {
         return result
     }
 
-	/**
+    /**
      * Creates a new keypair from a seed
      * @param mnemonic White-space separated string of words or a bip39 seed buffer
      * @returns A new keypair
-	 */
+     */
     static keyPairFromMnemonic(mnemonic: string | Buffer | Uint8Array) {
         return Cryptography.newFromSeed(mnemonic)
     }
@@ -88,6 +88,11 @@ export class DemosWebAuth {
     ): Promise<[boolean, string]> {
         if (typeof privKey === "string") {
             console.log("[LOGIN] Converting private key from string...")
+            // REVIEW: Should we do this?
+            if (!privKey.startsWith("0x")) {
+                privKey = "0x" + privKey
+            }
+
             privKey = forge_converter.stringToForge(privKey)
             if (!privKey) {
                 return [false, "Cannot convert private key from that string!"]
