@@ -72,6 +72,7 @@ describe.each(chains)(
             const instance = await sdk.create(null)
             await instance.connectWallet(wallet)
 
+            // INFO: Create the target_identity payload
             const _signature = await instance.signMessage(instance.getAddress())
             const target_identity: InferFromSignatureTargetIdentityPayload = {
                 chain: instance.name,
@@ -83,6 +84,7 @@ describe.each(chains)(
                 chainId: instance.chainId,
             }
 
+            // INFO: Verify the message locally
             const verified = await instance.verifyMessage(
                 instance.getAddress(),
                 _signature,
@@ -92,9 +94,11 @@ describe.each(chains)(
             // INFO: Make sure the message is verifiable
             expect(verified).toBe(true)
 
+            // INFO: Create a new Demos identity
             const identity = DemosWebAuth.getInstance()
             await identity.create()
 
+            // INFO: Create the demos_identity payload
             const publicKey = identity.keypair.publicKey.toString("hex")
             const signature = Cryptography.sign(
                 publicKey,
@@ -111,10 +115,12 @@ describe.each(chains)(
                 target_identity: target_identity,
             }
 
+            // INFO: Create a new Demos instance
             const demos = new Demos()
             await demos.connect("http://localhost:53550")
             await demos.connectWallet(identity.keypair.privateKey as any)
 
+            // INFO: Send the payload to the RPC
             const identities = new Identities()
             const res = await identities.inferIdentity(demos, payload)
             console.log(res)
