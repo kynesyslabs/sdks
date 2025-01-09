@@ -86,6 +86,7 @@ describe("EVM CHAIN TESTS", () => {
             "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
             "0x500d9257fd8eb4583684E5BEbb65DC1Fa243DDF9",
         )
+        
         console.log(balance)
     })
 })
