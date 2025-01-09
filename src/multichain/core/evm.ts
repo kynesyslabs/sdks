@@ -332,7 +332,12 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     async getTokenBalance(
         contract_address: string,
         address: string,
-    ): Promise<any> {
+    ): Promise<{
+        name: string
+        symbol: string
+        decimals: number
+        balance: string
+    }> {
         let contract = await this.getContractInstance(
             contract_address,
             JSON.stringify(ERC20_ABI),
