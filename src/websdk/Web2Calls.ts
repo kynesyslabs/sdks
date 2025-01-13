@@ -1,9 +1,9 @@
 import { EnumWeb2Actions } from "@/types"
 import type { IStartProxyParams, IWeb2Result } from "@/types"
 import { demos } from "./demos"
-import { skeletons } from "."
+import { web2_request } from "./utils/skeletons"
 
-const web2Request = { ...skeletons.web2_request }
+const web2Request = { ...web2_request }
 
 export class Web2Proxy {
     private readonly _sessionId: string
