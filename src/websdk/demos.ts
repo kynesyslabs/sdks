@@ -18,15 +18,18 @@ import {
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
-import type {
-    Transaction,
-    XMScript
-} from "@/types"
-import { RPCRequest, RPCResponse, RPCResponseWithValidityData } from "@/types/communication/rpc"
+import { EnumWeb2Methods } from "@/types"
+import type { IWeb2Result, Transaction, XMScript } from "@/types"
+import {
+    RPCRequest,
+    RPCResponse,
+    RPCResponseWithValidityData,
+} from "@/types/communication/rpc"
 import { l2psCalls } from "./L2PSCalls"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
+import { web2Calls } from "./Web2Calls"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 export const demos = {
@@ -108,7 +111,12 @@ export const demos = {
     },
     // REVIEW: Replace call with validate / execute logic
     confirm: async function (transaction: Transaction) {
-        return await demos.call("execute", "", transaction, "confirmTx") as RPCResponseWithValidityData
+        return (await demos.call(
+            "execute",
+            "",
+            transaction,
+            "confirmTx",
+        )) as RPCResponseWithValidityData
     },
     broadcast: async function (validationData: RPCResponseWithValidityData, keypair: IKeyPair) {
                 
@@ -198,16 +206,15 @@ export const demos = {
                 extra: null,
             } as RPCResponse
         }
-
     },
     // !SECTION NodeCall prototype
 
     // SECTION Predefined calls
     getLastBlockNumber: async function () {
-        return await demos.nodeCall("getLastBlockNumber") as number
+        return (await demos.nodeCall("getLastBlockNumber")) as number
     },
     getLastBlockHash: async function () {
-        return await demos.nodeCall("getLastBlockHash") as string
+        return (await demos.nodeCall("getLastBlockHash")) as string
     },
     getBlockByNumber: async function (blockNumber: any) {
         return await demos.nodeCall("getBlockByNumber", {
@@ -259,16 +266,21 @@ export const demos = {
      */
     // ANCHOR Web2 Endpoints
     web2: {
-        createPayload: (
-            params: IPrepareWeb2PayloadParams,
-            keypair?: IKeyPair,
-        ) => {
-            const usedKeypair = keypair || demos.keypair
-            if (!usedKeypair) {
-                throw new Error("No keypair provided and no wallet connected")
-            }
+        ...web2Calls,
+        legacy: {
+            createPayload: (
+                params: IPrepareWeb2PayloadParams,
+                keypair?: IKeyPair,
+            ) => {
+                const usedKeypair = keypair || demos.keypair
+                if (!usedKeypair) {
+                    throw new Error(
+                        "No keypair provided and no wallet connected",
+                    )
+                }
 
-            return prepareWeb2Payload(params, usedKeypair)
+                return prepareWeb2Payload(params, usedKeypair)
+            },
         },
     },
     // ANCHOR Crosschain support endpoints
@@ -313,11 +325,3 @@ export const demos = {
     // INFO Calling demos.skeletons.NAME provides an empty skeleton that can be used for reference while calling other demos functions
     skeletons,
 }
-
-async function sleep(time: number) {
-    return new Promise(resolve => setTimeout(resolve, time))
-}
-
-// Creating a demos class
-// let demos = new Demos()
-// export default demos

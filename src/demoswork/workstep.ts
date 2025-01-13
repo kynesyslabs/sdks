@@ -9,6 +9,7 @@ import { EnumWeb2Methods, IWeb2Request, XMScript } from "@/types"
 import { INativePayload } from "@/types/native"
 import { DataTypes } from "@/types/demoswork/datatypes"
 import { StepOutputKey, WorkStepInput } from "@/types/demoswork/steps"
+import { EnumWeb2Actions } from "@/types"
 
 export class WorkStep {
     id: string
@@ -90,7 +91,7 @@ export function prepareWeb2Step({
 }) {
     // Generating an empty request and filling it
     const web2_payload: IWeb2Request = structuredClone(skeletons.web2_request)
-    web2_payload.raw.action = "create"
+    web2_payload.raw.action = EnumWeb2Actions.CREATE
     web2_payload.raw.method = method
     web2_payload.raw.url = url
     web2_payload.raw.parameters = parameters
