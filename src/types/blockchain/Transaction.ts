@@ -4,6 +4,7 @@ import { TxFee } from "./TxFee"
 import { DemoScript } from "../demoswork"
 import { IWeb2Request } from "../web2"
 import { XMScript } from "../xm"
+import { GCREdit } from "./GCREdit"
 
 // export type StringifiedPayload = [string, string]
 
@@ -21,6 +22,8 @@ export interface TransactionContent {
     amount: number
     // TODO Replace below with data: XMPayload | Web2Payload | NativePayload when ready
     data: TransactionContentData
+    // REVIEW Operation structure
+    gcr_edits: GCREdit[] // This will be executed by the node(s) when the transaction is confirmed or synced
     nonce: number // Increments every time a transaction is sent from the same account
     timestamp: number // Is the registered unix timestamp when the transaction was sent the first time
     transaction_fee: TxFee // Is the signed message where the sender locks X tokens until the tx is confirmed

@@ -8,7 +8,10 @@
 import { EvmCoinFinder } from "./EvmCoinFinder"
 import { CoinFinder } from "./CoinFinder"
 import Identities from "./Identities"
-import { InferFromWritePayload, InferFromSignaturePayload } from "./Identities"
+import {
+    InferFromWritePayload,
+    InferFromSignaturePayload,
+} from "@/types/abstraction"
 
 export {
     EvmCoinFinder,

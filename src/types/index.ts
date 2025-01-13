@@ -98,3 +98,5 @@ export {
     RPCResponseWithValidityData,
     emptyResponse as RPCResponseSkeleton,
 } from "./communication/rpc"
+
+export { GCREdit } from "./blockchain/GCREdit"
