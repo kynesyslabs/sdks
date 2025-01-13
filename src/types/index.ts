@@ -52,10 +52,18 @@ export {
     IParam,
     IRawWeb2Request,
     IWeb2Attestation,
-    IWeb2Payload,
     IWeb2Request,
     IWeb2Result,
+    ISendHTTPRequestParams,
+    IAuthorizationException,
+    IAuthorizationConfig,
+    IWeb2RequestOptions,
+    IStartProxyParams,
+    IAttestationWithResponse,
+    IDAHRStartProxyParams,
+    IHandleWeb2ProxyRequestParams,
     EnumWeb2Methods,
+    EnumWeb2Actions,
 } from "./web2"
 
 export { IOperation, ITask, XMScript } from "./xm"
