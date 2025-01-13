@@ -179,7 +179,7 @@ describe("Demos Workflow", () => {
         const validityData = await demos.confirm(tx)
         pprint(validityData)
 
-        const res = await demos.broadcast(validityData)
+        const res = await demos.broadcast(validityData, identity.keypair)
 
         pprint(res)
     })
