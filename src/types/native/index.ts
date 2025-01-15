@@ -1,3 +1,5 @@
+// ! Add the native operation types here (start with send)
+
 export interface INativePayload {
     nativeOperation: string
     args: any[]
