@@ -43,18 +43,19 @@ describe("DEMOS Transaction", () => {
 
         const identity = DemosWebAuth.getInstance()
         await identity.create()
+
         const tx = await prepareXMPayload(xmscript, identity.keypair)
 
         console.log(xmscript)
         console.log(tx)
 
-        const rpc = "http://localhost:53550"
+        const rpc = "https://mungaist.com"
 
         await demos.connect(rpc)
         await demos.connectWallet(identity.keypair.privateKey as any)
 
         console.log("address", demos.getAddress())
-        console.log("private key:", identity.keypair.privateKey)
+        console.log("private key:", identity.keypair.privateKey.toString("hex"))
 
         const validityData = await demos.confirm(tx)
         console.log("validityData", validityData)
