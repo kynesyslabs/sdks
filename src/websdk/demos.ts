@@ -18,8 +18,7 @@ import {
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
-import { EnumWeb2Methods } from "@/types"
-import type { IWeb2Result, Transaction, XMScript } from "@/types"
+import type { Transaction, XMScript } from "@/types"
 import {
     RPCRequest,
     RPCResponse,
@@ -118,14 +117,16 @@ export const demos = {
             "confirmTx",
         )) as RPCResponseWithValidityData
     },
-    broadcast: async function (validationData: RPCResponseWithValidityData, keypair: IKeyPair) {
-                
+    broadcast: async function (
+        validationData: RPCResponseWithValidityData,
+        keypair: IKeyPair,
+    ) {
         // REVIEW Resign the Transaction hash as it has been recalculated in the node
         let tx = validationData.response.data.data.transaction
         let signedTx = await DemosTransactions.sign(tx, keypair)
         // Add the signature to the validityData
         validationData.response.data.data.transaction = signedTx
-        
+
         return await demos.call("execute", "", validationData, "broadcastTx")
     },
     // L2PS calls are defined here

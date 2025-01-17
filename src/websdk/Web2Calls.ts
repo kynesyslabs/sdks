@@ -1,5 +1,5 @@
 import { EnumWeb2Actions } from "@/types"
-import type { IStartProxyParams, IWeb2Result } from "@/types"
+import type { IAttestationWithResponse, IStartProxyParams } from "@/types"
 import { demos } from "./demos"
 import { web2_request } from "./utils/skeletons"
 
@@ -28,9 +28,10 @@ export class Web2Proxy {
     async startProxy({
         url,
         method,
+        headers,
         options = {},
-    }: IStartProxyParams): Promise<IWeb2Result> {
-        const { payload = {}, authorization = "", headers = {} } = options
+    }: IStartProxyParams): Promise<IAttestationWithResponse> {
+        const { payload = {}, authorization = "" } = options
 
         web2Request.raw = {
             ...web2Request.raw,

@@ -86,12 +86,12 @@ export interface IAuthorizationConfig {
 export interface IWeb2RequestOptions {
     payload?: unknown
     authorization?: string
-    headers?: OutgoingHttpHeaders
 }
 
 export interface IStartProxyParams {
     url: string
     method: EnumWeb2Methods
+    headers: OutgoingHttpHeaders
     options?: IWeb2RequestOptions
 }
 
