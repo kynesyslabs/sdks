@@ -95,8 +95,8 @@ export default class Wallet {
     // TODO Implement other methods too
 
     // NOTE  This is a quick wrapper to avoid having to write the same code over and over again
-    async broadcast(validityData: RPCResponseWithValidityData): Promise<any> {
-        return await websdk.demos.broadcast(validityData)
+    async broadcast(validityData: RPCResponseWithValidityData, keypair: IKeyPair): Promise<any> {
+        return await websdk.demos.broadcast(validityData, keypair)
     }
 
     // REVIEW Passkeys support

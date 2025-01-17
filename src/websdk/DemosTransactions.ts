@@ -74,10 +74,10 @@ export const DemosTransactions = {
         // response = JSON.parse(response)
         return response
     },
-    broadcast: async function (validityData: RPCResponseWithValidityData) {
+    broadcast: async function (validityData: RPCResponseWithValidityData, keypair: IKeyPair) {
         // ValidityData does not need to be signed as it already contains a signature (in the Transaction object)
         // and is sent as a ComLink (thus authenticated and signed by the sender)
-        let response = await demos.broadcast(validityData)
+        let response = await demos.broadcast(validityData, keypair)
         response = JSON.parse(response)
         return response
     },

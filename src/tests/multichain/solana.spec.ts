@@ -56,8 +56,8 @@ const idl = {
 }
 
 describe("SOLANA CHAIN TESTS", () => {
-    const instance = new SOLANA(chainProviders.solana.devnet)
-    const localInstance = new SC(chainProviders.solana.devnet)
+    const instance = new SOLANA(chainProviders.solana.testnet)
+    const localInstance = new SC(chainProviders.solana.testnet)
 
     beforeAll(async () => {
         const connected = await instance.connect()

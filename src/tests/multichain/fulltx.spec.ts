@@ -60,7 +60,7 @@ describe("DEMOS Transaction", () => {
         const validityData = await demos.confirm(tx)
         console.log("validityData", validityData)
 
-        const res = await demos.broadcast(validityData)
+        const res = await demos.broadcast(validityData, identity.keypair)
         console.log("res", res)
     })
 

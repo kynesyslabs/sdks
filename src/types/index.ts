@@ -1,3 +1,4 @@
+import { INativePayload } from "./native/INativePayload"
 export {
     GenesisArtifact,
     GenesisImmutableProperties,
@@ -15,6 +16,10 @@ export {
     TransactionContent,
     TransactionContentData,
 } from "./blockchain/Transaction"
+
+// SECTION Payload types
+export { INativePayload } from "./native/INativePayload"
+
 export { TxFee } from "./blockchain/TxFee"
 export { CValidityData, ValidityData } from "./blockchain/ValidityData"
 export { Bundle, BundleContent } from "./communication/transmit"
@@ -52,10 +57,18 @@ export {
     IParam,
     IRawWeb2Request,
     IWeb2Attestation,
-    IWeb2Payload,
     IWeb2Request,
     IWeb2Result,
+    ISendHTTPRequestParams,
+    IAuthorizationException,
+    IAuthorizationConfig,
+    IWeb2RequestOptions,
+    IStartProxyParams,
+    IAttestationWithResponse,
+    IDAHRStartProxyParams,
+    IHandleWeb2ProxyRequestParams,
     EnumWeb2Methods,
+    EnumWeb2Actions,
 } from "./web2"
 
 export { IOperation, ITask, XMScript } from "./xm"
