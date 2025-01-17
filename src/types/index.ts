@@ -1,3 +1,4 @@
+import { INativePayload } from "./native/INativePayload"
 export {
     GenesisArtifact,
     GenesisImmutableProperties,
@@ -15,6 +16,10 @@ export {
     TransactionContent,
     TransactionContentData,
 } from "./blockchain/Transaction"
+
+// SECTION Payload types
+export { INativePayload } from "./native/INativePayload"
+
 export { TxFee } from "./blockchain/TxFee"
 export { CValidityData, ValidityData } from "./blockchain/ValidityData"
 export { Bundle, BundleContent } from "./communication/transmit"

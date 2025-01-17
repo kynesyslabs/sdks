@@ -13,9 +13,7 @@ export interface RPCResponse {
 }
 
 export interface RPCResponseWithValidityData extends RPCResponse {
-    response: {
-        data: ValidityData
-    }
+    response: ValidityData
 }
 
 export interface BrowserRequest {

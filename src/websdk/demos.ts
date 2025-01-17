@@ -18,7 +18,8 @@ import {
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
-import type { Transaction, XMScript } from "@/types"
+import { EnumWeb2Methods } from "@/types"
+import type { IWeb2Result, Transaction, ValidityData, XMScript } from "@/types"
 import {
     RPCRequest,
     RPCResponse,
@@ -122,10 +123,11 @@ export const demos = {
         keypair: IKeyPair,
     ) {
         // REVIEW Resign the Transaction hash as it has been recalculated in the node
-        let tx = validationData.response.data.data.transaction
+        console.log(validationData)
+        let tx = validationData.response.data.transaction
         let signedTx = await DemosTransactions.sign(tx, keypair)
         // Add the signature to the validityData
-        validationData.response.data.data.transaction = signedTx
+        validationData.response.data.transaction = signedTx
 
         return await demos.call("execute", "", validationData, "broadcastTx")
     },
