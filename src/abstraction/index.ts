@@ -11,7 +11,7 @@ import Identities from "./Identities"
 import {
     InferFromWritePayload,
     InferFromSignaturePayload,
-    RemoveIdentityPayload
+    CoreTargetIdentityPayload,
 } from "@/types/abstraction"
 
 export {
@@ -20,5 +20,5 @@ export {
     Identities,
     InferFromWritePayload,
     InferFromSignaturePayload,
-    RemoveIdentityPayload
+    CoreTargetIdentityPayload,
 }

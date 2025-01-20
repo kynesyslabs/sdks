@@ -4,7 +4,7 @@
 import {
     InferFromWritePayload,
     InferFromSignaturePayload,
-    RemoveIdentityPayload,
+    CoreTargetIdentityPayload,
 } from "@/types/abstraction"
 import { Demos } from "@/websdk/demosclass"
 
@@ -27,12 +27,12 @@ export default class Identities {
         return await demos.rpcCall(basePayload, true)
     }
 
-    async removeIdentity(demos: Demos, payload: RemoveIdentityPayload) {
+    async removeIdentity(demos: Demos, payload: CoreTargetIdentityPayload) {
         const request = {
             method: "gcr_routine",
             params: [
                 {
-                    method: payload.method,
+                    method: "remove_identity",
                     params: [payload],
                 },
             ],

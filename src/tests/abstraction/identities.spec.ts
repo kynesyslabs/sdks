@@ -12,10 +12,7 @@ import {
 import { DemosWebAuth } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 import { wallets } from "../utils/wallets"
-import {
-    InferFromSignatureTargetIdentityPayload,
-    RemoveIdentityPayload,
-} from "@/types/abstraction"
+import { InferFromSignatureTargetIdentityPayload } from "@/types/abstraction"
 
 const chains = [
     {
@@ -120,13 +117,10 @@ describe.each(chains)(
         })
 
         test("Remove associated identity", async () => {
-            const target_identity: RemoveIdentityPayload = {
-                method: "remove_identity",
-                target_identity: {
-                    chain: instance.name,
-                    subchain: subchain,
-                    targetAddress: instance.getAddress(),
-                },
+            const target_identity = {
+                chain: instance.name,
+                subchain: subchain,
+                targetAddress: instance.getAddress(),
             }
 
             const res = await identities.removeIdentity(demos, target_identity)
