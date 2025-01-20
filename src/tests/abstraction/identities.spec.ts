@@ -1,6 +1,5 @@
 import { InferFromSignaturePayload } from "@/abstraction"
 import Identities from "@/abstraction/Identities"
-import { Cryptography } from "@/encryption"
 import {
     EVM,
     IBC,
@@ -10,27 +9,25 @@ import {
     XRPL,
     NEAR,
 } from "@/multichain/websdk"
-import { ForgeToHex, HexToForge } from "@/utils/dataManipulation"
-import { DemosWebAuth, forgeToString } from "@/websdk"
+import { DemosWebAuth } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
-import forge from "node-forge"
-import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
-import { InferFromSignatureTargetIdentityPayload } from "@/types/abstraction"
+import {
+    InferFromSignatureTargetIdentityPayload,
+    RemoveIdentityPayload,
+} from "@/types/abstraction"
 
 const chains = [
     {
         name: "EVM",
         sdk: EVM,
         subchain: "sepolia",
-        rpc: chainProviders.eth.sepolia,
         wallet: wallets.evm.privateKey,
     },
     {
         name: "SOLANA",
         sdk: SOLANA,
         subchain: "testnet",
-        rpc: chainProviders.solana.testnet,
         wallet: wallets.solana.privateKey,
     },
     // {
@@ -67,8 +64,26 @@ const chains = [
 
 describe.each(chains)(
     "Identities › $name",
-    ({ name, sdk, rpc, wallet, subchain }: any) => {
-        test("Convert hex to forge and back", async () => {
+    ({ name, sdk, wallet, subchain }: any) => {
+        let instance: any
+
+        const demos: Demos = new Demos()
+        const identities: Identities = new Identities()
+        const identity: DemosWebAuth = DemosWebAuth.getInstance()
+
+        beforeAll(async () => {
+            await identity.create()
+
+            await demos.connect("http://localhost:53550")
+            await demos.connectWallet(
+                "0x2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
+            )
+
+            instance = await sdk.create(null)
+            await instance.connectWallet(wallet)
+        })
+
+        test("Associate an identity using a signature", async () => {
             const instance = await sdk.create(null)
             await instance.connectWallet(wallet)
 
@@ -94,35 +109,27 @@ describe.each(chains)(
             // INFO: Make sure the message is verifiable
             expect(verified).toBe(true)
 
-            // INFO: Create a new Demos identity
-            const identity = DemosWebAuth.getInstance()
-            await identity.create()
-
-            // INFO: Create the demos_identity payload
-            const publicKey = identity.keypair.publicKey.toString("hex")
-            const signature = Cryptography.sign(
-                publicKey,
-                identity.keypair.privateKey,
-            ).toString("hex")
-
             const payload: InferFromSignaturePayload = {
                 method: "identity_assign_from_signature",
-                demos_identity: {
-                    address: publicKey,
-                    signature: signature,
-                    signedData: publicKey,
-                },
                 target_identity: target_identity,
             }
 
-            // INFO: Create a new Demos instance
-            const demos = new Demos()
-            await demos.connect("http://localhost:53550")
-            await demos.connectWallet(identity.keypair.privateKey as any)
-
             // INFO: Send the payload to the RPC
-            const identities = new Identities()
             const res = await identities.inferIdentity(demos, payload)
+            console.log(res)
+        })
+
+        test("Remove associated identity", async () => {
+            const target_identity: RemoveIdentityPayload = {
+                method: "remove_identity",
+                target_identity: {
+                    chain: instance.name,
+                    subchain: subchain,
+                    targetAddress: instance.getAddress(),
+                },
+            }
+
+            const res = await identities.removeIdentity(demos, target_identity)
             console.log(res)
         })
     },

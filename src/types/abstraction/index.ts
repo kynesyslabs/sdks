@@ -1,13 +1,4 @@
 /**
- * The identity of the sender within the Demos network
- */
-export interface InferFromAnyDemosIdentityPayload {
-    address: string
-    signedData: string
-    signature: string
-}
-
-/**
  * The identity of the target address to bind to the Demos identity
  */
 export interface InferFromSignatureTargetIdentityPayload {
@@ -37,10 +28,6 @@ export interface InferFromWriteTargetIdentityPayload {
 export interface InferFromWritePayload {
     method: "identity_assign_from_write"
     /**
-     * The identity of the sender within the Demos network
-     */
-    demos_identity: InferFromAnyDemosIdentityPayload
-    /**
      * The identity of the target address to bind to the Demos identity
      */
     target_identity: InferFromWriteTargetIdentityPayload
@@ -50,11 +37,20 @@ export interface InferFromWritePayload {
 export interface InferFromSignaturePayload {
     method: "identity_assign_from_signature"
     /**
-     * The identity of the sender within the Demos network
-     */
-    demos_identity: InferFromAnyDemosIdentityPayload
-    /**
      * The identity of the target address to bind to the Demos identity
      */
     target_identity: InferFromSignatureTargetIdentityPayload
+}
+
+export interface RemoveIdentityPayload {
+    method: "remove_identity"
+
+    /**
+     * The identity of the target address to remove from the Demos identity
+     */
+    target_identity: {
+        chain: string
+        subchain: string
+        targetAddress: string
+    }
 }

@@ -184,8 +184,6 @@ export class Demos {
                 },
             )
 
-            console.log("response.data", response.data)
-
             if (
                 response.data.result == 200 ||
                 allowedErrorCodes.includes(response.data.result)
