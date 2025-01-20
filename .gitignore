@@ -11,3 +11,4 @@ docs
 *.pkl
 .setup_done
 __pycache__
+bun.lockb
