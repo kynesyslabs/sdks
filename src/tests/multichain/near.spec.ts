@@ -22,6 +22,7 @@ describe("NEAR CHAIN TESTS", () => {
             "ed25519:4QRNiJk7A584sU3aV1xhqdbdairYJybjHwo8h6F2advriyVu2JMoz319HK5dKAGJq9z78s7ntw2JVeBYybZ4r4Ec",
             {
                 accountId: "cwilvx.testnet",
+                networkId: "testnet",
             },
         )
     })

@@ -246,7 +246,6 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
             connection: this.provider,
         }
 
-        // @ts-expect-error
         return await Program.fetchIdl(programId, provider)
     }
 
@@ -272,7 +271,6 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         }
 
         const program = new Program(idl, programId, {
-            // @ts-expect-error
             connection: this.provider,
         })
 
@@ -282,7 +280,6 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
     async runAnchorProgram(programId: string, params: SolanarunProgramParams) {
         // REVIEW: Do we need to connect our wallet with the anchor provider?
         const pid = new PublicKey(programId)
-        // @ts-expect-error
         const anchorProvider = new AnchorProvider(this.provider, null, {})
 
         let idl = params.idl as Idl

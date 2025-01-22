@@ -4,6 +4,7 @@ import {
     Near,
     transactions as actions,
     Signer,
+    utils,
 } from "near-api-js"
 import bigInt from "big-integer"
 import { IPayOptions } from "."
@@ -11,6 +12,10 @@ import { _required as required } from "@/websdk"
 import { DefaultChain } from "./types/defaultChain"
 import { Transaction } from "near-api-js/lib/transaction"
 import { baseDecode, parseNearAmount } from "@near-js/utils"
+import * as bip39 from "@scure/bip39"
+import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes"
+import nacl from "tweetnacl"
+import { PublicKey } from "near-api-js/lib/utils"
 
 type networkId = "testnet" | "mainnet"
 
@@ -82,13 +87,19 @@ export class NEAR extends DefaultChain {
             /**
              * The accountId to use with this private key
              */
-            accountId: string
+            accountId: string,
+            networkId: networkId,
         },
     ) {
         required(options && options.accountId, "AccountId is required")
 
-        this.wallet = KeyPair.fromString(privateKey as any)
-        this.accountId = options.accountId
+        const seed = bip39.mnemonicToSeedSync(privateKey);
+        const derivedSeed = seed.slice(0, 32);
+        const base58PrivateKey = bs58.encode(derivedSeed);
+        this.wallet = KeyPair.fromString(`ed25519:${base58PrivateKey}` as any);
+        this.accountId = options.accountId;
+        this.networkId = options?.networkId;
+
         this.signer = await InMemorySigner.fromKeyPair(
             this.networkId,
             this.accountId,
@@ -230,5 +241,43 @@ export class NEAR extends DefaultChain {
         tx.receiverId = beneficiallyId
         tx.actions = [actions.deleteAccount(beneficiallyId)]
         return await this.signTransaction(tx)
+    }
+
+    // INFO Signing a message
+    async signMessage(
+        message: string,
+        options?: { privateKey?: string },
+    ): Promise<string> {
+        required(this.wallet || options?.privateKey, "Wallet not connected")
+        let wallet = this.wallet
+        const messageBuffer = Buffer.from(message, 'utf-8');
+        const signature = wallet.sign(messageBuffer);
+        const signatureString = utils.serialize.base_encode(signature.signature);
+        
+        return signatureString;
+    }
+    
+    // INFO Verifying a message
+    override async verifyMessage(
+        message: string,
+        signature: string,
+        publicKey: string,
+    ): Promise<boolean> {
+        try {
+            const signatureDecoded = utils.serialize.base_decode(signature);
+            const messageBuffer = Buffer.from(message, 'utf-8');
+            const publicKeyObj = PublicKey.fromString(publicKey);
+            const publicKeyDecoded = publicKeyObj.data;
+            const isValid = nacl.sign.detached.verify(
+                messageBuffer,
+                signatureDecoded,
+                publicKeyDecoded
+            );
+
+            return isValid;
+        } catch (error) {
+            console.log("error", error);
+            return false;
+        }
     }
 }

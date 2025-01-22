@@ -7,6 +7,7 @@ import {
     StargateClient,
     calculateFee,
 } from '@cosmjs/stargate'
+import { fromBase64, toBase64 } from '@cosmjs/encoding';
 import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx'
 
 import { DefaultChain, IBCDefaultChain } from './types/defaultChain'
@@ -19,6 +20,10 @@ import {
     IPayParams,
 } from './types/interfaces'
 import { required } from './utils'
+import { createHash } from 'crypto';
+import { Secp256k1, Secp256k1Signature } from '@cosmjs/crypto';
+import * as bip39 from "@scure/bip39"
+import * as bip32 from "@scure/bip32"
 
 export class IBC extends DefaultChain implements IBCDefaultChain {
     address: string = ''
@@ -33,7 +38,16 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
 
     constructor(rpc_url: string) {
         super(rpc_url)
-        this.name = 'ibc'
+        this.name = 'ibc';
+        
+        if (rpc_url) {
+            this.setRpc(rpc_url);
+        }
+    }
+
+    override async setRpc(rpc_url: string) {
+        this.rpc_url = rpc_url;
+        this.provider = await StargateClient.connect(rpc_url);
     }
 
     // INFO: rpc_url used to avoid overwriting this.provider for test mocking
@@ -54,7 +68,7 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
         return this.connected
     }
 
-    async connectWallet(privateKey: string, options: IBCConnectWalletOptions) {
+    async connectWallet(privateKey: string, options: IBCConnectWalletOptions, rpc_url?: string) {
         required(options.prefix, 'Address prefix not provided')
         required(options.gasPrice, 'Gas price not provided')
 
@@ -93,6 +107,12 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
             throw new Error(`No account found for prefix: ${options.prefix}`)
         }
 
+        if (rpc_url) {
+            this.setRpc(rpc_url);
+        }
+
+        this.rpc_url = rpc_url || this.rpc_url;
+        
         this.wallet = await SigningStargateClient.connectWithSigner(
             this.rpc_url,
             this.signer
@@ -185,14 +205,29 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
     }
 
     override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
-        required(this.wallet || options?.privateKey, "Wallet not connected")
-        // TODO Implement the signMessage method
-        return "Not implemented"
+        required(this.wallet && options && options?.privateKey, "Wallet not connected")
+        
+        const seed = bip39.mnemonicToSeedSync(options.privateKey);
+        const hdkey = bip32.HDKey.fromMasterSeed(seed);
+        const derivedKey = hdkey.derive("m/44'/118'/0'/0/0");
+        const privateKey = derivedKey.privateKey;
+        const messageHash = createHash('sha256').update(message).digest();
+        const signObj = await Secp256k1.createSignature(messageHash, privateKey);
+        const fixedLengthData = signObj.toFixedLength();
+        const base64String = toBase64(fixedLengthData);
+
+        return base64String;
     }
 
     override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
-        // TODO Implement the verifyMessage method
-        return false
+        const signatureBytes = fromBase64(signature);
+        const rAndSBytes = signatureBytes.slice(0, 64); 
+        const publicKeyBytes = fromBase64(publicKey);
+        const signatureObj = Secp256k1Signature.fromFixedLength(rAndSBytes);
+        const messageHash = createHash('sha256').update(message).digest();
+        const isVerified = await Secp256k1.verifySignature(signatureObj, messageHash, publicKeyBytes);
+
+        return isVerified;
     }
 
     async signTransaction(tx: IBCTransaction, options?: IBCSignTxOptions) {

@@ -14,6 +14,8 @@ export interface InferFromSignatureTargetIdentityPayload
 
     signature: string
     signedData: string
+    targetAddress: string
+    publicKey: string
 }
 
 /**
