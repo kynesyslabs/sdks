@@ -15,13 +15,10 @@ import { baseDecode, parseNearAmount } from "@near-js/utils"
 import * as bip39 from "@scure/bip39"
 import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes"
 import nacl from "tweetnacl"
-import { PublicKey } from "near-api-js/lib/utils"
+import { decodeUTF8 } from "tweetnacl-util"
 
-type networkId = "testnet" | "mainnet"
-
-// @ts-expect-error
 export class NEAR extends DefaultChain {
-    networkId: networkId
+    networkId: string
     accountId: string
     override provider: Near
     override signer: Signer
@@ -29,7 +26,7 @@ export class NEAR extends DefaultChain {
 
     actions: typeof actions = actions
 
-    constructor(rpc_url: string, networkId: networkId) {
+    constructor(rpc_url: string, networkId: string = "testnet") {
         super(rpc_url)
 
         this.name = "near"
@@ -37,12 +34,11 @@ export class NEAR extends DefaultChain {
         this.setRpc(rpc_url, networkId)
     }
 
-    static override async create<T extends NEAR>(
-        this: new (rpc_url: string, networkId: networkId) => T,
+    static override async create<T extends DefaultChain>(
+        this: new (rpc_url: string) => T,
         rpc_url: string,
-        networkId: networkId,
     ): Promise<T> {
-        const instance = new this(rpc_url, networkId)
+        const instance = new this(rpc_url)
 
         if (rpc_url) {
             await instance.connect()
@@ -51,8 +47,9 @@ export class NEAR extends DefaultChain {
         return instance
     }
 
-    override setRpc(rpc_url: string, networkId: networkId = "testnet"): void {
+    override setRpc(rpc_url: string, networkId: string = "testnet"): void {
         this.rpc_url = rpc_url
+        this.networkId = networkId
         this.provider = new Near({
             networkId: this.networkId,
             nodeUrl: this.rpc_url,
@@ -88,7 +85,7 @@ export class NEAR extends DefaultChain {
              * The accountId to use with this private key
              */
             accountId: string,
-            networkId: networkId,
+            networkId: string,
         },
     ) {
         required(options && options.accountId, "AccountId is required")
@@ -250,8 +247,8 @@ export class NEAR extends DefaultChain {
     ): Promise<string> {
         required(this.wallet || options?.privateKey, "Wallet not connected")
         let wallet = this.wallet
-        const messageBuffer = Buffer.from(message, 'utf-8');
-        const signature = wallet.sign(messageBuffer);
+        const messageBytes = decodeUTF8(message)
+        const signature = wallet.sign(messageBytes);
         const signatureString = utils.serialize.base_encode(signature.signature);
         
         return signatureString;
@@ -263,21 +260,18 @@ export class NEAR extends DefaultChain {
         signature: string,
         publicKey: string,
     ): Promise<boolean> {
-        try {
-            const signatureDecoded = utils.serialize.base_decode(signature);
-            const messageBuffer = Buffer.from(message, 'utf-8');
-            const publicKeyObj = PublicKey.fromString(publicKey);
-            const publicKeyDecoded = publicKeyObj.data;
-            const isValid = nacl.sign.detached.verify(
-                messageBuffer,
-                signatureDecoded,
-                publicKeyDecoded
-            );
+        const signatureDecoded = utils.serialize.base_decode(signature);
+        const publicKeyObject = utils.key_pair.PublicKey.from(publicKey);
+        const publicKeyRaw = Object.values(publicKeyObject.ed25519Key.data);
+        const publicKeyDecoded = new Uint8Array(publicKeyRaw);
+        const messageBytes = decodeUTF8(message);
 
-            return isValid;
-        } catch (error) {
-            console.log("error", error);
-            return false;
-        }
+        const isValid = nacl.sign.detached.verify(
+            messageBytes,
+            signatureDecoded,
+            publicKeyDecoded
+        );
+    
+        return isValid;
     }
 }

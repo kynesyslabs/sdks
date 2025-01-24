@@ -12,10 +12,9 @@ describe("NEAR CHAIN TESTS", () => {
     let localInstance: LocalNEAR
 
     beforeAll(async () => {
-        instance = await NEAR.create("https://rpc.testnet.near.org", "testnet")
+        instance = await NEAR.create("https://rpc.testnet.near.org")
         localInstance = await LocalNEAR.create(
             "https://rpc.testnet.near.org",
-            "testnet",
         )
 
         await instance.connectWallet(

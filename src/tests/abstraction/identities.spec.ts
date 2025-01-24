@@ -55,12 +55,12 @@ const chains = [
         rpc: chainProviders.ton.testnet,
         wallet: wallets.ton.privateKey,
     },
-    // {
-    //     name: "NEAR",
-    //     sdk: NEAR,
-    //     rpc: chainProviders.near.testnet,
-    //     wallet: wallets.near.privateKey,
-    // },
+    {
+        name: "NEAR",
+        sdk: NEAR,
+        rpc: chainProviders.near.testnet,
+        wallet: wallets.near.privateKey,
+    },
 ]
 
 describe.each(chains)(
@@ -147,7 +147,7 @@ describe.each(chains)(
             // INFO: Verify the message locally
             let verified = false
 
-            if (name === "XRPL" || name === "TON") {
+            if (name === "XRPL" || name === "TON" || name === "NEAR") {
                 verified = await instance.verifyMessage(
                     instance.getAddress(),
                     _signature,
