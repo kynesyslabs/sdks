@@ -6,6 +6,7 @@ import { IWeb2Request } from "../web2"
 import { XMScript } from "../xm"
 import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
+import { SubnetPayload } from "../subnet"
 // export type StringifiedPayload = [string, string]
 
 export type TransactionContentData =
@@ -13,11 +14,11 @@ export type TransactionContentData =
     | ["crosschainOperation", XMScript]
     | ["native", INativePayload]
     | ["demoswork", DemoScript]
-
+    | ["subnet", SubnetPayload]
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
 export interface TransactionContent {
-    type: "web2Request" | "crosschainOperation" | "native" | "demoswork" | "genesis"
+    type: "web2Request" | "crosschainOperation" | "subnet" | "native" | "demoswork" | "genesis"
     from: forge.pki.ed25519.BinaryBuffer | forge.pki.PublicKey | ISignature
     to: forge.pki.ed25519.BinaryBuffer | forge.pki.PrivateKey | ISignature
     amount: number
