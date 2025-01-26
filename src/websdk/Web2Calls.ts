@@ -28,24 +28,25 @@ export class Web2Proxy {
     async startProxy({
         url,
         method,
-        headers,
-        options = {},
+        options = {
+            headers: {},
+            payload: {},
+            authorization: "",
+        },
     }: IStartProxyParams): Promise<IAttestationWithResponse> {
-        const { payload = {}, authorization = "" } = options
-
         web2Request.raw = {
             ...web2Request.raw,
             action: EnumWeb2Actions.START_PROXY,
             method,
             url,
-            headers,
+            headers: options.headers,
         }
 
         return await demos.call("web2ProxyRequest", {
             web2Request,
             sessionId: this._sessionId,
-            payload,
-            authorization,
+            payload: options.payload,
+            authorization: options.authorization,
         })
     }
 

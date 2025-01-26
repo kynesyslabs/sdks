@@ -22,7 +22,6 @@ async function tryWeb2Proxy() {
         const response = await dahr.startProxy({
             url: "https://icanhazip.com",
             method: EnumWeb2Methods.GET,
-            headers: { Accept: "application/json" },
         })
         console.log("Response:", response)
 

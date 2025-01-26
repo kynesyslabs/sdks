@@ -41,7 +41,7 @@ export interface IRawWeb2Request {
     requestedParameters: [] | null
     method: EnumWeb2Methods
     url: string
-    headers: OutgoingHttpHeaders
+    headers?: OutgoingHttpHeaders
     minAttestations: number
     stage: {
         origin: {
@@ -84,6 +84,7 @@ export interface IAuthorizationConfig {
 }
 
 export interface IWeb2RequestOptions {
+    headers?: OutgoingHttpHeaders
     payload?: unknown
     authorization?: string
 }
@@ -91,7 +92,6 @@ export interface IWeb2RequestOptions {
 export interface IStartProxyParams {
     url: string
     method: EnumWeb2Methods
-    headers: OutgoingHttpHeaders
     options?: IWeb2RequestOptions
 }
 
