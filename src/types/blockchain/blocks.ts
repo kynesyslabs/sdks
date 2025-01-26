@@ -12,6 +12,7 @@ KyneSys Labs: https://www.kynesys.xyz/
 import { pki } from "node-forge"
 import { EncryptedTransaction } from "@/types/blockchain/encryptedTransaction"
 import { IPeer } from "@/types/peers/Peer"
+import { BridgeContext, BridgeOperation } from "@/types/bridges/Bridges"
 
 // ? This will be probably improved for performance reasons
 export interface NativeTablesHashes {
@@ -20,6 +21,7 @@ export interface NativeTablesHashes {
 }
 
 export interface BlockContent {
+    // ? Should we add the cvsa seed here for a quicker access?
     ordered_transactions: string[]
     per_address_transactions: Map<string, string[]>
     web2data: {} // TODO Add Web2 class
@@ -32,6 +34,10 @@ export interface BlockContent {
     l2ps_partecipating_nodes: Map<string, Map<string, string>> // ? "l2ps_uid": {"public_key": "connection_string"}
     l2ps_banned_nodes: Map<string, string> // ? "l2ps_uid": "public_key" (to implement)
     encrypted_transactions_hashes: Map<string, string> // ? "l2ps_uid": "hash"
+
+    // SECTION Bridges
+    controlled_bridges: BridgeContext[] // Bridges controlled by the nodes in the shard
+    bridges_operations: Map<string, BridgeOperation> // operation_id: BridgeOperation (operation_id is the hash of the operation content)
 
     // SECTION Native tables
     native_tables_hashes: NativeTablesHashes

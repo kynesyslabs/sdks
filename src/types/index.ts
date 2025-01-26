@@ -105,3 +105,5 @@ export {
 } from "./communication/rpc"
 
 export { GCREdit } from "./blockchain/GCREdit"
+
+export * from "./bridges"
