@@ -49,7 +49,7 @@ const web2_request: IWeb2Request = {
         requestedParameters: null, // Means all
         method: EnumWeb2Methods.GET,
         url: "",
-        headers: null,
+        headers: {},
         minAttestations: 2,
         // Handling the various stages of an IWeb2Request
         stage: {

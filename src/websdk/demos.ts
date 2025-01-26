@@ -18,8 +18,7 @@ import {
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
-import { EnumWeb2Methods } from "@/types"
-import type { IWeb2Result, Transaction, ValidityData, XMScript } from "@/types"
+import type { Transaction, XMScript } from "@/types"
 import {
     RPCRequest,
     RPCResponse,
