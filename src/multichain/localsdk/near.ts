@@ -30,15 +30,4 @@ export class NEAR extends NearCore implements IDefaultChainLocal {
     async createWallet() {
         return KeyPair.fromRandom('ed25519')
     }
-
-    override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
-        required(this.wallet || options?.privateKey, "Wallet not connected")
-        // TODO Implement the signMessage method
-        return "Not implemented"
-    }
-
-    override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
-        // TODO Implement the verifyMessage method
-        return false
-    }
 }

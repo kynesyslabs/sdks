@@ -10,7 +10,7 @@ import {
     toNano,
 } from "@ton/ton"
 import BigNumber from "bignumber.js"
-import { KeyPair, mnemonicToPrivateKey, sign } from "@ton/crypto"
+import { KeyPair, mnemonicToPrivateKey, sign, signVerify } from "@ton/crypto"
 
 import { IPayOptions, required } from "."
 import { DefaultChain } from "./types/defaultChain"
@@ -68,13 +68,22 @@ export class TON extends DefaultChain {
 
     override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
         required(this.signer || options?.privateKey, "Wallet not connected")
-        // TODO Implement the signMessage method
-        return "Not implemented"
+
+        const messageBuffer = Buffer.from(message, 'utf-8');
+        const secretKey = this.signer.secretKey;
+        const signatureBuffer = sign(messageBuffer, secretKey);
+        const signedMessage = signatureBuffer.toString('base64');
+        
+        return signedMessage;
     }
 
     override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
-        // TODO Implement the verifyMessage method
-        return false
+        const messageBuffer = Buffer.from(message, 'utf-8');
+        const signatureBuffer = Buffer.from(signature, 'base64');
+        const publicKeyBuffer = Buffer.from(publicKey, 'hex');
+        const isVerified = signVerify(messageBuffer, signatureBuffer, publicKeyBuffer);
+        
+        return isVerified;
     }
 
     // SECTION: Transactions
