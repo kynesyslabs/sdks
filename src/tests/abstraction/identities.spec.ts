@@ -184,6 +184,9 @@ describe.each(chains)(
             // INFO: Send the payload to the RPC
             const res = await identities.inferIdentity(demos, payload)
             console.log(res)
+
+            expect(res['result']).toBe(200)
+            expect(res['response']).toBe("Identity added")
         })
 
         test("Remove associated identity", async () => {
@@ -195,6 +198,9 @@ describe.each(chains)(
 
             const res = await identities.removeIdentity(demos, target_identity)
             console.log(res)
+
+            expect(res['result']).toBe(200)
+            expect(res['response']).toBe("Identity removed")
         })
     },
 )
