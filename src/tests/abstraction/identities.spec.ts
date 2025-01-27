@@ -36,36 +36,42 @@ const chains = [
         rpc: chainProviders.egld.testnet,
         wallet: wallets.egld.privateKey,
         password: wallets.egld.password,
+        subchain: "testnet",
     },
     {
         name: "XRPL",
         sdk: XRPL,
         rpc: chainProviders.xrpl.testnet,
         wallet: wallets.xrpl.privateKey,
+        subchain: "testnet",
     },
     {
         name: "IBC",
         sdk: IBC,
         rpc: chainProviders.ibc.testnet,
         wallet: wallets.ibc.privateKey,
+        subchain: "testnet",
     },
     {
         name: "TON",
         sdk: TON,
         rpc: chainProviders.ton.testnet,
         wallet: wallets.ton.privateKey,
+        subchain: "testnet",
     },
     {
         name: "NEAR",
         sdk: NEAR,
         rpc: chainProviders.near.testnet,
         wallet: wallets.near.privateKey,
+        subchain: "testnet",
     },
 ]
 
 describe.each(chains)(
     "Identities › $name",
     ({ name, sdk, wallet, subchain, password, rpc }: any) => {
+        let instance: any;
         const demos: Demos = new Demos()
         const identities: Identities = new Identities()
         const identity: DemosWebAuth = DemosWebAuth.getInstance()
@@ -80,7 +86,7 @@ describe.each(chains)(
         })
 
         test("Associate an identity using a signature", async () => {
-            const instance = await sdk.create(null)
+            instance = await sdk.create(null)
             let ibcBase64PublicKey = "";
 
             if (name === "EGLD") {
@@ -180,15 +186,15 @@ describe.each(chains)(
             console.log(res)
         })
 
-        // test("Remove associated identity", async () => {
-        //     const target_identity = {
-        //         chain: instance.name,
-        //         subchain: subchain,
-        //         targetAddress: instance.getAddress(),
-        //     }
+        test("Remove associated identity", async () => {
+            const target_identity = {
+                chain: instance.name,
+                subchain: subchain,
+                targetAddress: instance.getAddress(),
+            }
 
-        //     const res = await identities.removeIdentity(demos, target_identity)
-        //     console.log(res)
-        // })
+            const res = await identities.removeIdentity(demos, target_identity)
+            console.log(res)
+        })
     },
 )
