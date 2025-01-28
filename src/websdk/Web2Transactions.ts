@@ -3,6 +3,7 @@
 import * as skeletons from "./utils/skeletons"
 // import demos from '../demos'
 import { DemosTransactions } from "./DemosTransactions"
+import * as demos from "./demos"
 import type { IWeb2Request, Transaction, EnumWeb2Actions } from "@/types"
 import { DemosWebAuth } from "./DemosWebAuth"
 import { _required as required } from "./utils/required"

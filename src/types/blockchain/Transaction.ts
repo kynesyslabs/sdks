@@ -6,7 +6,7 @@ import { IWeb2Request } from "../web2"
 import { XMScript } from "../xm"
 import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
-import { SubnetPayload } from "../subnet"
+import { SubnetPayload } from "../../l2ps"
 // export type StringifiedPayload = [string, string]
 
 export type TransactionContentData =

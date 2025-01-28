@@ -9,6 +9,18 @@ import { demos } from "@/websdk"
 import { KeyPair } from "@ton/crypto"
 import { Message, MessageMap } from "./L2PSMessagingSystem"
 
+// ? Should we integrate the l2psCalls in the L2PS class?
+
+
+export interface SubnetPayload {
+    type: "subnet"
+    // ? Unsure if we should use this type as it can be circular, or if we should create a data type for the subnet itself
+    // NOTE ^ Anyway, this is already being checked in the L2PS class `encryptTx` method
+    data: EncryptedTransaction 
+    // TODO Upon receiving a subnet tx at the node level, we should extract it as it is and add it to the block's proper field
+}
+
+
 export default class L2PS {
     encryptionKey: forge.pki.rsa.PublicKey
     uid: forge.pki.rsa.PublicKey
@@ -64,7 +76,7 @@ export default class L2PS {
     ): Promise<EncryptedTransaction[]> {
         // Map<string, EncryptedTransaction> {
         let encryptedTransactions: EncryptedTransaction[] =
-            await demos.l2ps.retrieveAll(this.pam, blockNumber)
+            await l2psCalls.retrieveAll(this.pam, blockNumber)
         return encryptedTransactions
     }
 
@@ -72,7 +84,7 @@ export default class L2PS {
         eHash: string,
     ): Promise<EncryptedTransaction> {
         let encryptedTransaction: EncryptedTransaction =
-            await demos.l2ps.retrieve(this.pam, eHash)
+            await l2psCalls.retrieve(this.pam, eHash)
         return encryptedTransaction
     }
 
@@ -147,5 +159,41 @@ export default class L2PS {
     ): Promise<Message> {
         // TODO Implement the method
         return null
+    }
+}
+
+
+
+// Exporting the l2ps calls for demos.ts
+export class l2psCalls {
+    // Retrieving a transaction from the L2PS
+    static async retrieve(eTxHash: string,
+        L2PSId: string): Promise<EncryptedTransaction> {
+        let response = await demos.call(
+            'l2ps',
+            '',
+            { eTxHash: eTxHash, L2PSId: L2PSId }, // Data
+            'retrieve', // Method
+        ) 
+        return response as EncryptedTransaction
+    }
+    // Retrieving all transactions from the L2PS in a specific block
+    static async retrieveAll(L2PSId: string, blockNumber: number): Promise<EncryptedTransaction[]> {
+        return await demos.call(
+            'l2ps',
+            '',
+            { L2PSId: L2PSId, blockNumber: blockNumber }, // Data
+            'retrieveAll', // Method
+        ) as EncryptedTransaction[]
+    }
+    // Registering a transaction in the L2PS
+    // ? Maybe we should use the confirm / verify logic here too
+    async register(eTx: EncryptedTransaction) {
+        return await demos.call(
+            'l2ps',
+            '',
+            { eTx: eTx }, // Data
+            'register', // Method
+        )
     }
 }

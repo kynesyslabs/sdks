@@ -8,6 +8,7 @@ import type { Transaction } from "@/types"
 import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
+import { l2psCalls } from "@/l2ps"
 
 export const DemosTransactions = {
     // REVIEW All this part
@@ -69,16 +70,25 @@ export const DemosTransactions = {
         return raw_tx // Return the hashed and signed transaction
     },
     // NOTE Sending a transaction after signing it
-    confirm: async function (signedPayload: Transaction) {
-        let response = await demos.confirm(signedPayload)
-        // response = JSON.parse(response)
-        return response
+    confirm: async function (transaction: Transaction) {
+        return (await demos.call(
+            "execute",
+            "",
+            transaction,
+            "confirmTx",
+        )) as RPCResponseWithValidityData
     },
-    broadcast: async function (validityData: RPCResponseWithValidityData, keypair: IKeyPair) {
-        // ValidityData does not need to be signed as it already contains a signature (in the Transaction object)
-        // and is sent as a ComLink (thus authenticated and signed by the sender)
-        let response = await demos.broadcast(validityData, keypair)
-        response = JSON.parse(response)
-        return response
-    },
+    broadcast: async function (validationData: RPCResponseWithValidityData, keypair: IKeyPair) {
+            // REVIEW Resign the Transaction hash as it has been recalculated in the node
+            console.log(validationData)
+            let tx = validationData.response.data.transaction
+            let signedTx = await DemosTransactions.sign(tx, keypair)
+            // Add the signature to the validityData
+            validationData.response.data.transaction = signedTx
+    
+            let response = await demos.call("execute", "", validationData, "broadcastTx")
+            return JSON.parse(response)
+        },
+    
+    // NOTE Subnet transactions methods are imported and exposed in demos.ts from the l2ps.ts file.
 }

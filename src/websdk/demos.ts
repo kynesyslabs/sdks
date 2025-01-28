@@ -24,7 +24,7 @@ import {
     RPCResponse,
     RPCResponseWithValidityData,
 } from "@/types/communication/rpc"
-import { l2psCalls } from "./L2PSCalls"
+import { l2psCalls } from "@/l2ps"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
@@ -103,35 +103,21 @@ export const demos = {
         return muid
     },
 
+    // SECTION Transaction methods
+    // NOTE These methods comes all from DemosTransactions.ts. If possible, we should use a tx: DemosTransactions object to ensure consistency
+    sign: DemosTransactions.sign,
+    // REVIEW: Replace call with validate / execute logic
+    confirm: DemosTransactions.confirm,
+    broadcast: DemosTransactions.broadcast,
+    // L2PS calls are defined here
+    l2ps: l2psCalls,
+    // !SECTION Transaction methods
+
     // SECTION NodeCall prototype
     // INFO NodeCalls use the same structure
     nodeCall: async function (message: any, args = {}) {
         return await demos.call("nodeCall", message, args)
     },
-    // REVIEW: Replace call with validate / execute logic
-    confirm: async function (transaction: Transaction) {
-        return (await demos.call(
-            "execute",
-            "",
-            transaction,
-            "confirmTx",
-        )) as RPCResponseWithValidityData
-    },
-    broadcast: async function (
-        validationData: RPCResponseWithValidityData,
-        keypair: IKeyPair,
-    ) {
-        // REVIEW Resign the Transaction hash as it has been recalculated in the node
-        console.log(validationData)
-        let tx = validationData.response.data.transaction
-        let signedTx = await DemosTransactions.sign(tx, keypair)
-        // Add the signature to the validityData
-        validationData.response.data.transaction = signedTx
-
-        return await demos.call("execute", "", validationData, "broadcastTx")
-    },
-    // L2PS calls are defined here
-    l2ps: l2psCalls,
     // INFO NodeCalls use the same structure
     call: async function (
         method: any,
