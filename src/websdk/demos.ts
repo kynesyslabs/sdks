@@ -109,6 +109,11 @@ export const demos = {
     // REVIEW: Replace call with validate / execute logic
     confirm: DemosTransactions.confirm,
     broadcast: DemosTransactions.broadcast,
+    
+    /**  NOTE Subnet / L2PS EncryptedTransaction should be handled in the same way as the other txs
+      * See l2psCalls.prepare(tx, subnet) to see how to prepare a SubnetPayload
+    */
+
     // L2PS calls are defined here
     l2ps: l2psCalls,
     // !SECTION Transaction methods

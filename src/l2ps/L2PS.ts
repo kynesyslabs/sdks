@@ -5,18 +5,20 @@ import { EncryptedTransaction } from "@/types/blockchain/encryptedTransaction"
 import { Block } from "@/types"
 import { Transaction } from "@/types"
 import { Hashing } from "@/encryption"
-import { demos } from "@/websdk"
+import { demos, skeletons } from "@/websdk"
 import { KeyPair } from "@ton/crypto"
 import { Message, MessageMap } from "./L2PSMessagingSystem"
+import { ForgeToHex } from "@/utils/dataManipulation"
 
 // ? Should we integrate the l2psCalls in the L2PS class?
 
-
+// NOTE This replaces the register method in l2psCalls integrating it into the Transaction logic
 export interface SubnetPayload {
     type: "subnet"
+    uid: string
     // ? Unsure if we should use this type as it can be circular, or if we should create a data type for the subnet itself
     // NOTE ^ Anyway, this is already being checked in the L2PS class `encryptTx` method
-    data: EncryptedTransaction 
+    data: EncryptedTransaction
     // TODO Upon receiving a subnet tx at the node level, we should extract it as it is and add it to the block's proper field
 }
 
@@ -165,6 +167,7 @@ export default class L2PS {
 
 
 // Exporting the l2ps calls for demos.ts
+// NOTE Those calls are the unencrypted ones, the encrypted ones are registered as Transactions (see SubnetPayload)
 export class l2psCalls {
     // Retrieving a transaction from the L2PS
     static async retrieve(eTxHash: string,
@@ -186,14 +189,16 @@ export class l2psCalls {
             'retrieveAll', // Method
         ) as EncryptedTransaction[]
     }
-    // Registering a transaction in the L2PS
-    // ? Maybe we should use the confirm / verify logic here too
-    async register(eTx: EncryptedTransaction) {
-        return await demos.call(
-            'l2ps',
-            '',
-            { eTx: eTx }, // Data
-            'register', // Method
-        )
+
+    // Takes a Transaction and give back a SubnetPayload ready to be sent in a subnet Transaction
+    static async prepare(tx: Transaction, subnet: L2PS): Promise<SubnetPayload> {
+        let eTxHash = await subnet.registerTx(tx)
+        let eTx = await subnet.getEncryptedTransaction(eTxHash)
+        let payload: SubnetPayload = {
+            type: "subnet",
+            uid: ForgeToHex(subnet.uid), // REVIEW Is this the correct way to convert the public key to string?
+            data: eTx,
+        }
+        return payload
     }
 }
