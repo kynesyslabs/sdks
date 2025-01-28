@@ -1,4 +1,3 @@
-import { l2psCalls } from "./L2PSCalls"
 
 // @ts-nocheck
 export { demos } from "./demos"
@@ -13,7 +12,6 @@ export {
     prepareXMPayload,
     prepareXMScript,
 } from "./XMTransactions"
-export { l2psCalls } from "./L2PSCalls" // REVIEW This is exporting the calls, but the L2PS type is in the websdk/index.ts file
 
 // Utils
 export { sha256 } from "./utils/sha256"
