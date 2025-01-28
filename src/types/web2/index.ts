@@ -21,6 +21,17 @@ export interface IWeb2Request {
     signature?: forge.pki.ed25519.BinaryBuffer
 }
 
+
+export interface IWeb2Payload {
+    message: {
+        sessionId: string
+        payload: any
+        authorization: any
+        web2Request: IWeb2Request
+    }
+}
+
+
 export enum EnumWeb2Methods {
     GET = "GET",
     POST = "POST",

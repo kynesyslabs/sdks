@@ -4,7 +4,7 @@ import * as skeletons from "./utils/skeletons"
 // import demos from '../demos'
 import { DemosTransactions } from "./DemosTransactions"
 import * as demos from "./demos"
-import type { IWeb2Request, Transaction, EnumWeb2Actions } from "@/types"
+import type { IWeb2Request, Transaction, EnumWeb2Actions, IWeb2Payload } from "@/types"
 import { DemosWebAuth } from "./DemosWebAuth"
 import { _required as required } from "./utils/required"
 import { IKeyPair } from "./types/KeyPair"
@@ -41,24 +41,33 @@ export async function prepareWeb2Payload(
     required(keypair, "Keypair is required")
 
     // Generating an empty one and filling it
-    const web2_payload: IWeb2Request = structuredClone(skeletons.web2_request)
-    web2_payload.raw.action = params.action
-    web2_payload.raw.url = params.url
+    const web2_request: IWeb2Request = structuredClone(skeletons.web2_request)
+    web2_request.raw.action = params.action
+    web2_request.raw.url = params.url
 
-    web2_payload.raw.parameters = params.parameters || []
-    web2_payload.raw.headers = params.headers || null
-    web2_payload.raw.minAttestations = params.minAttestations || 2
+    web2_request.raw.parameters = params.parameters || []
+    web2_request.raw.headers = params.headers || null
+    web2_request.raw.minAttestations = params.minAttestations || 2
 
     // Ensuring content is a known property
-    web2_payload.attestations = new Map()
-    web2_payload.hash = ""
-    web2_payload.signature = ""
-    web2_payload.result = ""
+    web2_request.attestations = new Map()
+    web2_request.hash = ""
+    web2_request.signature = ""
+    web2_request.result = ""
 
-    console.log("[Web2Transactions] Payload:")
-    console.log(web2_payload)
+    console.log("[Web2Transactions] Request:")
+    console.log(web2_request)
     // REVIEW Finish upgrading to the new transaction system
-    // Creating a web2 payload
+    // Creating a web2 payload 
+    const web2_payload: IWeb2Payload = { // TODO Compile those fields
+        message: {
+            sessionId: "",
+            payload: "",
+            authorization: "",
+            web2Request: web2_request,
+        },
+    }
+
     let web2_tx: Transaction = DemosTransactions.empty()
     // From and To are the same in Web2 transactions
     web2_tx.content.from = keypair.publicKey as Uint8Array

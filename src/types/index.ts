@@ -58,6 +58,7 @@ export {
     IRawWeb2Request,
     IWeb2Attestation,
     IWeb2Request,
+    IWeb2Payload,
     IWeb2Result,
     ISendHTTPRequestParams,
     IAuthorizationException,

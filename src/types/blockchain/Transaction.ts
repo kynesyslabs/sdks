@@ -2,7 +2,7 @@ import * as forge from "node-forge"
 import { ISignature } from "./ISignature"
 import { TxFee } from "./TxFee"
 import { DemoScript } from "../demoswork"
-import { IWeb2Request } from "../web2"
+import { IWeb2Payload, IWeb2Request } from "../web2"
 import { XMScript } from "../xm"
 import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
@@ -10,7 +10,7 @@ import { SubnetPayload } from "../../l2ps"
 // export type StringifiedPayload = [string, string]
 
 export type TransactionContentData =
-    | ["web2Request", IWeb2Request]
+    | ["web2Request", IWeb2Payload]
     | ["crosschainOperation", XMScript]
     | ["native", INativePayload]
     | ["demoswork", DemoScript]
