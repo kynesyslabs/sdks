@@ -7,6 +7,8 @@ export interface BridgeContext {
         seed: string // Seed (CVSA) of the controllers
         reference_block: number // Block number of the reference block forged by the controllers (used to check if the bridge is valid)
     }
+    valid_from: number // Block number of the block from which the bridge is valid
+    valid_to: number // Block number of the block until which the bridge is valid
 }
 
 // TODO This interface defines a bridge operation in a specific context
