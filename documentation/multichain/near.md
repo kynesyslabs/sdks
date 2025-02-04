@@ -48,6 +48,14 @@ await instance.connectWallet(
         accountId: "cwilvx.testnet",
     },
 )
+
+Or
+
+const privateKey = 
+await instance.connectWallet(privateKey, {
+    accountId: "kynesys.testnet",
+    networkId: "testnet",
+})
 ```
 
 You can view the address of your connected wallet using the `getAddress` method.
@@ -88,6 +96,28 @@ You can delete the connected account by calling the `deleteAccount` method and p
 
 ```ts
 const signedTx = await instance.deleteAccount("cwilvx.testnet")
+```
+
+## Signing a message
+
+```ts
+await instance.signMessage(message: string)
+
+returns signature: string
+```
+
+## Verifying a message
+
+```ts
+await instance.verifyMessage(
+                    message: string,
+                    signature: string,
+                    publicKey: string,
+                )
+
+`publicKey` is the public key of that wallet address, which is used to sign a message
+
+returns true or false
 ```
 
 ### Hacking

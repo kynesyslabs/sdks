@@ -119,6 +119,26 @@ To disconnect your wallet and clean up resources, you can use the `disconnect` m
 await instance.disconnect()
 ```
 
+## Signing a message
+
+```ts
+await instance.signMessage(message: string)
+
+returns signature: string
+```
+
+## Verifying a message
+
+```ts
+await instance.verifyMessage(
+                    message: string,
+                    signature: string,
+                    walletAddress: string,
+                )
+
+returns true or false             
+```
+
 ## Advanced usage
 
 For more advanced use cases, you can access underlying properties and methods of the EVM instance:

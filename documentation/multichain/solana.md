@@ -283,6 +283,26 @@ const signedTx = await instance.runRawProgram(programId, {
 })
 ```
 
+## Signing a message
+
+```ts
+await instance.signMessage(message: string)
+
+returns signature: string
+```
+
+## Verifying a message
+
+```ts
+await instance.verifyMessage(
+                    message: string,
+                    signature: string,
+                    walletAddress: string,
+                )
+
+returns true or false
+```
+
 <!-- TODO: Review this with some fresh eyes! -->
 
 ### NFTs

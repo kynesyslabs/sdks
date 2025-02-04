@@ -86,6 +86,28 @@ You can remove your wallet and RPC connections as follows:
 await instance.disconnect()
 ```
 
+## Signing a message
+
+```ts
+await instance.signMessage(message: string)
+
+returns signature: string
+```
+
+## Verifying a message
+
+```ts
+await instance.verifyMessage(
+                    message: string,
+                    signature: string,
+                    publicKey: string,
+                )
+
+`publicKey` is the public key of that wallet address, which is used to sign a message
+
+returns true or false
+```
+
 ## Hacking
 
 The DEMOS TON sdk is built on top of the [TonJs](https://github.com/ton-org/ton) library, and only provides a limited set of methods to interact with the TON blockchain.

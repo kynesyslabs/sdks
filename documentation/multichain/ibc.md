@@ -26,6 +26,14 @@ await instance.connectWallet(mnemonic, {
     prefix: "stars",
     gasPrice: "0.012ustars",
 })
+
+Or
+
+await instance.connectWallet(mnemonic, {
+    prefix: "cosmos",
+    gasPrice: "0",
+})
+
 ```
 
 When connecting your wallet, you also need to specify the address prefix for your chain and the gas price to be used when creating transactions.
@@ -74,6 +82,50 @@ When you're done with the SDK instance, you can disconnect your wallet and RPC c
 
 ```ts
 await instance.disconnect()
+```
+
+## Signing a message
+
+```ts
+await instance.signMessage(message: string)
+
+await instance.signMessage(message: string, {
+                          privateKey: string,
+                      })
+
+`privateKey` is the private key of that wallet address, which is used to connect the wallet
+
+returns signature: string
+```
+
+## Verifying a message
+
+```ts
+await instance.verifyMessage(
+                    message: string,
+                    signature,
+                    base64PublicKey: string,
+                )
+
+returns true or false
+
+`base64PublicKey` is the public key of the wallet address
+After connecting the wallet, need to get the public key and conver it to base64 format
+
+let base64PublicKey = ""
+const sep256k1HdWallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
+    prefix: "cosmos",
+})
+
+const walletAccounts = await sep256k1HdWallet.getAccounts()
+const currentAccount = walletAccounts.find(account =>
+    account.address.startsWith("cosmos"),
+    )
+
+    if (currentAccount) {
+        const pubKey = currentAccount.pubkey
+        base64PublicKey = Buffer.from(pubKey).toString("base64")
+    }
 ```
 
 ## Hacking
