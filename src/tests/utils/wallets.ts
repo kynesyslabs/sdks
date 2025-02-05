@@ -30,7 +30,7 @@ export const wallets: {
         password: "e9r#PNK7pB#?f39A",
     },
     xrpl: {
-        privateKey: "sEdTwrzv1DtUbgubVpyvmurSrT4xeCf",
+        privateKey: "sEdS12wZDLhspUBJmsSnop7GXR3G3Dn",
     },
     evm: {
         // INFO: Sepolia testnet wallet 👇
