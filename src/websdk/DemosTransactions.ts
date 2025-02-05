@@ -65,7 +65,10 @@ export const DemosTransactions = {
             signature: signatureData,
             publicKey: keypair.publicKey as Uint8Array,
         })
-        console.log("Signature verified: " + verified)
+
+        if (!verified) {
+            throw new Error("Signature verification failed")
+        }
 
         return raw_tx // Return the hashed and signed transaction
     },
@@ -78,17 +81,28 @@ export const DemosTransactions = {
             "confirmTx",
         )) as RPCResponseWithValidityData
     },
-    broadcast: async function (validationData: RPCResponseWithValidityData, keypair: IKeyPair) {
-            // REVIEW Resign the Transaction hash as it has been recalculated in the node
-            console.log(validationData)
-            let tx = validationData.response.data.transaction
-            let signedTx = await DemosTransactions.sign(tx, keypair)
-            // Add the signature to the validityData
-            validationData.response.data.transaction = signedTx
-    
-            let response = await demos.call("execute", "", validationData, "broadcastTx")
+    broadcast: async function (
+        validationData: RPCResponseWithValidityData,
+        keypair: IKeyPair,
+    ) {
+        // REVIEW Resign the Transaction hash as it has been recalculated in the node
+        let tx = validationData.response.data.transaction
+        let signedTx = await DemosTransactions.sign(tx, keypair)
+        // Add the signature to the validityData
+        validationData.response.data.transaction = signedTx
+
+        let response = await demos.call(
+            "execute",
+            "",
+            validationData,
+            "broadcastTx",
+        )
+
+        try {
             return JSON.parse(response)
-        },
-    
+        } catch (error) {
+            return response
+        }
+    },
     // NOTE Subnet transactions methods are imported and exposed in demos.ts from the l2ps.ts file.
 }

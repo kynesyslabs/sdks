@@ -41,8 +41,6 @@ export class DemosWebAuth {
         if (!seed) {
             seed = forge.random.getBytesSync(32)
         }
-        console.log("[CREATE WALLET] Creating wallet...")
-        console.log("[CREATE WALLET] Seed: " + seed)
         let result: [boolean, IStringifiedKeyPair] = [true, {} as any]
 
         try {
@@ -51,11 +49,8 @@ export class DemosWebAuth {
                 publicKey: null,
             }
             this.keypair = forge.pki.ed25519.generateKeyPair({ seed })
-            console.log(this.keypair)
             this.loggedIn = true
-            console.log("[CREATE WALLET] Keypair created!")
             // Stringify the keypair
-            console.log("[CREATE WALLET] Stringifying keypair...")
             this.stringified_keypair = {
                 privateKey: forge_converter.forgeToString(
                     this.keypair.privateKey,
@@ -65,7 +60,6 @@ export class DemosWebAuth {
                 ),
             }
             result = [true, this.stringified_keypair]
-            console.log(this.stringified_keypair)
         } catch (e) {
             // @ts-expect-error
             result = [false, "[CREATE WALLET ERROR] " + e.message]
@@ -87,7 +81,6 @@ export class DemosWebAuth {
         privKey: string | boolean | Uint8Array,
     ): Promise<[boolean, string]> {
         if (typeof privKey === "string") {
-            console.log("[LOGIN] Converting private key from string...")
             // REVIEW: Should we do this?
             if (!privKey.startsWith("0x")) {
                 privKey = "0x" + privKey
@@ -97,10 +90,7 @@ export class DemosWebAuth {
             if (!privKey) {
                 return [false, "Cannot convert private key from that string!"]
             }
-            console.log(privKey)
-            console.log("[LOGIN] Private key converted!")
         }
-        console.log("[LOGIN WALLET] Logging in...")
         if (!required(privKey, false)) {
             return [false, "You need to provide a private key!"]
         }
@@ -117,9 +107,6 @@ export class DemosWebAuth {
 
         // Logging in avoiding crashes on wrong private keys
         try {
-            console.log(
-                "[LOGIN WALLET] Deriving public key from private key...",
-            )
             this.keypair.publicKey = forge.pki.ed25519.publicKeyFromPrivateKey({
                 privateKey: privKey as Uint8Array,
             })
@@ -135,7 +122,7 @@ export class DemosWebAuth {
 
             return [true, "Successfully logged in!"]
         } catch (e) {
-            console.log(e)
+            console.error(e)
             return [false, "[LOGIN ERROR] Cannot derive publicKey!"]
         }
     }
@@ -160,7 +147,6 @@ export class DemosWebAuth {
         }
         // If needed, we derive the keys from the strings
         if (!this.keypair) {
-            console.log("[SIGN WALLET] Deriving buffer keys from strings...")
             this.keypair = {
                 privateKey: forge_converter.stringToForge(
                     this.stringified_keypair?.privateKey,

@@ -47,6 +47,12 @@ yarn test:tx
 yarn test:demoswork
 ```
 
+### 4. Native Transactions
+
+```sh
+yarn test:native
+```
+
 ### Publishing on NPM
 
 Publishing to NPM is automated using a Github Workflow. To publish a new version:

@@ -11,7 +11,7 @@ import * as forge from "node-forge"
 
 export default class Wallet {
     // A wallet class is a singleton class, so we need to make sure that only one instance per id is created.
-    private static instances: Wallet[]
+    private static instances: { [key: string]: Wallet } = {}
     // A DEMOS wallet is comprised of both an ed25519 keypair and an rsa keypair.
     public ed25519: forge.pki.KeyPair
     public ed25519_hex: {
@@ -83,19 +83,29 @@ export default class Wallet {
     async transfer(to: Address, amount: number, keypair: IKeyPair) {
         let tx = DemosTransactions.empty()
         // Putting the right data in the transaction
-        tx.content.from = this.ed25519_hex.publicKey
-        tx.content.to = to
-        tx.content.amount = amount
+        tx.content.from = keypair.publicKey.toString("hex")
+        // tx.content.to = to
+        tx.content.type = "native"
+        tx.content.data = [
+            "native",
+            {
+                nativeOperation: "send",
+                args: [to, amount],
+            },
+        ]
+        // tx.content.amount = amount
         tx = await DemosTransactions.sign(tx, keypair)
         // Sending the transaction and getting the validity data
-        let validity = await DemosTransactions.confirm(tx)
-        return validity
+        return await DemosTransactions.confirm(tx)
     }
 
     // TODO Implement other methods too
 
     // NOTE  This is a quick wrapper to avoid having to write the same code over and over again
-    async broadcast(validityData: RPCResponseWithValidityData, keypair: IKeyPair): Promise<any> {
+    async broadcast(
+        validityData: RPCResponseWithValidityData,
+        keypair: IKeyPair,
+    ): Promise<any> {
         return await websdk.demos.broadcast(validityData, keypair)
     }
 
