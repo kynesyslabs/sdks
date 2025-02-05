@@ -49,7 +49,7 @@ describe("DEMOS Transaction", () => {
         console.log(xmscript)
         console.log(tx)
 
-        const rpc = "https://mungaist.com"
+        const rpc = "http://localhost:53550"
 
         await demos.connect(rpc)
         await demos.connectWallet(identity.keypair.privateKey as any)
