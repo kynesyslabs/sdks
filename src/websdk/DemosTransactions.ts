@@ -83,15 +83,15 @@ export const DemosTransactions = {
     },
     broadcast: async function (
         validationData: RPCResponseWithValidityData,
-        keypair: IKeyPair,
+        keyPair: IKeyPair,
     ) {
         // REVIEW Resign the Transaction hash as it has been recalculated in the node
-        let tx = validationData.response.data.transaction
-        let signedTx = await DemosTransactions.sign(tx, keypair)
+        const tx = validationData.response.data.transaction
+        const signedTx = await DemosTransactions.sign(tx, keyPair)
         // Add the signature to the validityData
         validationData.response.data.transaction = signedTx
 
-        let response = await demos.call(
+        const response = await demos.call(
             "execute",
             "",
             validationData,
@@ -99,7 +99,7 @@ export const DemosTransactions = {
         )
 
         try {
-            return JSON.parse(response)
+            response
         } catch (error) {
             return response
         }

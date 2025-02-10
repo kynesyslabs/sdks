@@ -11,10 +11,6 @@ import * as skeletons from "./utils/skeletons"
 // NOTE Including custom libraries from Demos
 import { DemosTransactions } from "./DemosTransactions"
 import { DemosWebAuth } from "./DemosWebAuth"
-import {
-    IPrepareWeb2PayloadParams,
-    prepareWeb2Payload,
-} from "./Web2Transactions"
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
@@ -109,10 +105,10 @@ export const demos = {
     // REVIEW: Replace call with validate / execute logic
     confirm: DemosTransactions.confirm,
     broadcast: DemosTransactions.broadcast,
-    
+
     /**  NOTE Subnet / L2PS EncryptedTransaction should be handled in the same way as the other txs
-      * See l2psCalls.prepare(tx, subnet) to see how to prepare a SubnetPayload
-    */
+     * See l2psCalls.prepare(tx, subnet) to see how to prepare a SubnetPayload
+     */
 
     // L2PS calls are defined here
     l2ps: l2psCalls,
@@ -260,21 +256,6 @@ export const demos = {
     // ANCHOR Web2 Endpoints
     web2: {
         ...web2Calls,
-        legacy: {
-            createPayload: (
-                params: IPrepareWeb2PayloadParams,
-                keypair?: IKeyPair,
-            ) => {
-                const usedKeypair = keypair || demos.keypair
-                if (!usedKeypair) {
-                    throw new Error(
-                        "No keypair provided and no wallet connected",
-                    )
-                }
-
-                return prepareWeb2Payload(params, usedKeypair)
-            },
-        },
     },
     // ANCHOR Crosschain support endpoints
     xm: {
