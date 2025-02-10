@@ -1,4 +1,3 @@
-
 // @ts-nocheck
 export { demos } from "./demos"
 export { DemosTransactions } from "./DemosTransactions"
@@ -13,6 +12,7 @@ export {
     prepareXMScript,
 } from "./XMTransactions"
 
+export { GCRGeneration, HandleNativeOperations } from "./GCRGeneration"
 // Utils
 export { sha256 } from "./utils/sha256"
 export { bufferize } from "./utils/bufferizer"
