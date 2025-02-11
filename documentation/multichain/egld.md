@@ -75,6 +75,26 @@ When you're done with the SDK instance, you can disconnect your wallet:
 await instance.disconnect()
 ```
 
+## Signing a message
+
+```ts
+await instance.signMessage(message: string)
+
+returns signature: string
+```
+
+## Verifying a message
+
+```ts
+await instance.verifyMessage(
+                    message: string,
+                    signature: string,
+                    walletAddress: string,
+                )
+
+returns true or false
+```
+
 ## Hacking
 
 The DEMOS MultiversX SDK provides a limited set of methods to interact with the blockchain. For more advanced usage, you can access the underlying objects:
