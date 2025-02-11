@@ -24,7 +24,7 @@ import {
     RPCResponse,
     RPCResponseWithValidityData,
 } from "@/types/communication/rpc"
-import { l2psCalls } from "./L2PSCalls"
+import { l2psCalls } from "@/l2ps"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
