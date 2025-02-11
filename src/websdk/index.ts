@@ -1,11 +1,11 @@
 // @ts-nocheck
-export { demos } from "./demos"
-export { DemosTransactions } from "./DemosTransactions"
+export { demos } from './demos'
+export { Demos } from './demosclass'
+export { DemosTransactions } from './DemosTransactions'
 
 export { RSA } from "./rsa"
 export { DemosWebAuth } from "./DemosWebAuth"
 
-export { prepareWeb2Payload } from "./Web2Transactions"
 export {
     XMTransactions,
     prepareXMPayload,

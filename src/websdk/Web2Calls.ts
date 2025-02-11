@@ -1,7 +1,14 @@
 import { EnumWeb2Actions } from "@/types"
-import type { IAttestationWithResponse, IStartProxyParams } from "@/types"
+import type {
+    IAttestationWithResponse,
+    IStartProxyParams,
+    Transaction,
+    IWeb2Payload,
+} from "@/types"
 import { demos } from "./demos"
 import { web2_request } from "./utils/skeletons"
+import { IKeyPair } from "./types/KeyPair"
+import { DemosTransactions } from "./DemosTransactions"
 
 const web2Request = { ...web2_request }
 
@@ -39,14 +46,14 @@ export class Web2Proxy {
             action: EnumWeb2Actions.START_PROXY,
             method,
             url,
-            headers: options.headers,
+            headers: options?.headers,
         }
 
         return await demos.call("web2ProxyRequest", {
             web2Request,
             sessionId: this._sessionId,
-            payload: options.payload,
-            authorization: options.authorization,
+            payload: options?.payload,
+            authorization: options?.authorization,
         })
     }
 
@@ -68,9 +75,15 @@ export class Web2Proxy {
 export const web2Calls = {
     /**
      * Create a new DAHR instance.
+     * @param {IKeyPair} keyPair - The key pair to use for the request.
      * @returns {Promise<Web2Proxy>} A new Web2Proxy instance.
      */
-    createDahr: async (): Promise<Web2Proxy> => {
+    createDahr: async (keyPair?: IKeyPair): Promise<Web2Proxy> => {
+        const usedKeyPair = keyPair || demos.keypair
+        if (!usedKeyPair) {
+            throw new Error("No keypair provided and no wallet connected")
+        }
+
         const response = await demos.call("web2ProxyRequest", {
             web2Request: {
                 ...web2Request,
@@ -81,9 +94,34 @@ export const web2Calls = {
             },
         })
 
-        if (!response.response?.dahr?.sessionId) {
+        const sessionId = response.response?.dahr?.sessionId
+        if (!sessionId) {
             throw new Error("Failed to create proxy session")
         }
-        return new Web2Proxy(response.response.dahr.sessionId)
+
+        // Creating a web2 payload
+        const web2Payload: IWeb2Payload = {
+            message: {
+                sessionId: sessionId,
+                payload: "",
+                authorization: "",
+                web2Request: web2Request,
+            },
+        }
+
+        const web2Tx: Transaction = DemosTransactions.empty()
+        // From and To are the same in Web2 transactions
+        web2Tx.content.from = usedKeyPair.publicKey as Uint8Array
+        web2Tx.content.to = web2Tx.content.from
+        web2Tx.content.type = "web2Request"
+        web2Tx.content.data = ["web2Request", web2Payload]
+        web2Tx.content.timestamp = Date.now()
+
+        // Signing and broadcasting the transaction
+        const signedWeb2Tx = await DemosTransactions.sign(web2Tx, usedKeyPair)
+        const validityData = await DemosTransactions.confirm(signedWeb2Tx)
+        await DemosTransactions.broadcast(validityData, usedKeyPair)
+
+        return new Web2Proxy(sessionId)
     },
 }

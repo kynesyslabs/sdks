@@ -11,10 +11,6 @@ import * as skeletons from "./utils/skeletons"
 // NOTE Including custom libraries from Demos
 import { DemosTransactions } from "./DemosTransactions"
 import { DemosWebAuth } from "./DemosWebAuth"
-import {
-    IPrepareWeb2PayloadParams,
-    prepareWeb2Payload,
-} from "./Web2Transactions"
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
@@ -24,6 +20,7 @@ import {
     RPCResponse,
     RPCResponseWithValidityData,
 } from "@/types/communication/rpc"
+
 import { l2psCalls } from "@/l2ps"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
@@ -31,6 +28,18 @@ import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
+/**
+ * @deprecated Use the new `Demos` class
+ * @see Demos class
+ *
+ * ```ts
+ * import { Demos } from "@kynesyslabs/websdk"
+ * const demos = new Demos()
+ *
+ * await demos.connect(rpc_url)
+ * await demos.connectWallet(privateKey)
+ * ```
+ */
 export const demos = {
     // ANCHOR Properties
     rpc_url: <string | null>null,
@@ -109,10 +118,10 @@ export const demos = {
     // REVIEW: Replace call with validate / execute logic
     confirm: DemosTransactions.confirm,
     broadcast: DemosTransactions.broadcast,
-    
+
     /**  NOTE Subnet / L2PS EncryptedTransaction should be handled in the same way as the other txs
-      * See l2psCalls.prepare(tx, subnet) to see how to prepare a SubnetPayload
-    */
+     * See l2psCalls.prepare(tx, subnet) to see how to prepare a SubnetPayload
+     */
 
     // L2PS calls are defined here
     l2ps: l2psCalls,
@@ -260,21 +269,6 @@ export const demos = {
     // ANCHOR Web2 Endpoints
     web2: {
         ...web2Calls,
-        legacy: {
-            createPayload: (
-                params: IPrepareWeb2PayloadParams,
-                keypair?: IKeyPair,
-            ) => {
-                const usedKeypair = keypair || demos.keypair
-                if (!usedKeypair) {
-                    throw new Error(
-                        "No keypair provided and no wallet connected",
-                    )
-                }
-
-                return prepareWeb2Payload(params, usedKeypair)
-            },
-        },
     },
     // ANCHOR Crosschain support endpoints
     xm: {

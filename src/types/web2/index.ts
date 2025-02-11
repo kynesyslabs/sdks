@@ -21,16 +21,14 @@ export interface IWeb2Request {
     signature?: forge.pki.ed25519.BinaryBuffer
 }
 
-
 export interface IWeb2Payload {
     message: {
         sessionId: string
-        payload: any
+        payload: unknown
         authorization: any
         web2Request: IWeb2Request
     }
 }
-
 
 export enum EnumWeb2Methods {
     GET = "GET",
@@ -49,7 +47,6 @@ export enum EnumWeb2Actions {
 export interface IRawWeb2Request {
     action: EnumWeb2Actions
     parameters: IParam[]
-    requestedParameters: [] | null
     method: EnumWeb2Methods
     url: string
     headers?: OutgoingHttpHeaders
@@ -102,20 +99,13 @@ export interface IWeb2RequestOptions {
 
 export interface IStartProxyParams {
     url: string
-    method: EnumWeb2Methods
+    method: IWeb2Request["raw"]["method"]
     options?: IWeb2RequestOptions
 }
 
 export interface IDAHRStartProxyParams {
     method: IWeb2Request["raw"]["method"]
     headers: IWeb2Request["raw"]["headers"]
-    payload?: unknown
-    authorization?: string
-}
-
-export interface IHandleWeb2ProxyRequestParams {
-    request: IWeb2Request
-    sessionId: string
-    payload: unknown
-    authorization: string
+    payload?: IWeb2RequestOptions["payload"]
+    authorization?: IWeb2RequestOptions["authorization"]
 }

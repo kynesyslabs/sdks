@@ -67,7 +67,6 @@ export {
     IStartProxyParams,
     IAttestationWithResponse,
     IDAHRStartProxyParams,
-    IHandleWeb2ProxyRequestParams,
     EnumWeb2Methods,
     EnumWeb2Actions,
 } from "./web2"

@@ -85,6 +85,28 @@ const transfers = [
 const signedTxs = await instance.preparePays(transfers)
 ```
 
+## Signing a message
+
+```ts
+await instance.signMessage(message: string)
+
+returns signature: string
+```
+
+## Verifying a message
+
+```ts
+await instance.verifyMessage(
+                    message: string,
+                    signature: string,
+                    publicKey: string,
+                )
+
+`publicKey` is the public key of that wallet address, which is used to sign a message
+
+returns true or false
+```
+
 ## Advanced Usage
 
 The DEMOS XRPL SDK is built on top of the [XRPL JS Library](https://js.xrpl.org/), and provides a limited set of methods to interact with the XRP Ledger.

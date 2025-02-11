@@ -4,6 +4,7 @@ import {
     Near,
     transactions as actions,
     Signer,
+    utils,
 } from "near-api-js"
 import bigInt from "big-integer"
 import { IPayOptions } from "."
@@ -11,12 +12,13 @@ import { _required as required } from "@/websdk"
 import { DefaultChain } from "./types/defaultChain"
 import { Transaction } from "near-api-js/lib/transaction"
 import { baseDecode, parseNearAmount } from "@near-js/utils"
+import * as bip39 from "@scure/bip39"
+import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes"
+import nacl from "tweetnacl"
+import { decodeUTF8 } from "tweetnacl-util"
 
-type networkId = "testnet" | "mainnet"
-
-// @ts-expect-error
 export class NEAR extends DefaultChain {
-    networkId: networkId
+    networkId: string
     accountId: string
     override provider: Near
     override signer: Signer
@@ -24,7 +26,7 @@ export class NEAR extends DefaultChain {
 
     actions: typeof actions = actions
 
-    constructor(rpc_url: string, networkId: networkId) {
+    constructor(rpc_url: string, networkId: string = "testnet") {
         super(rpc_url)
 
         this.name = "near"
@@ -32,12 +34,11 @@ export class NEAR extends DefaultChain {
         this.setRpc(rpc_url, networkId)
     }
 
-    static override async create<T extends NEAR>(
-        this: new (rpc_url: string, networkId: networkId) => T,
+    static override async create<T extends DefaultChain>(
+        this: new (rpc_url: string) => T,
         rpc_url: string,
-        networkId: networkId,
     ): Promise<T> {
-        const instance = new this(rpc_url, networkId)
+        const instance = new this(rpc_url)
 
         if (rpc_url) {
             await instance.connect()
@@ -46,8 +47,9 @@ export class NEAR extends DefaultChain {
         return instance
     }
 
-    override setRpc(rpc_url: string, networkId: networkId = "testnet"): void {
+    override setRpc(rpc_url: string, networkId: string = "testnet"): void {
         this.rpc_url = rpc_url
+        this.networkId = networkId
         this.provider = new Near({
             networkId: this.networkId,
             nodeUrl: this.rpc_url,
@@ -82,13 +84,19 @@ export class NEAR extends DefaultChain {
             /**
              * The accountId to use with this private key
              */
-            accountId: string
+            accountId: string,
+            networkId: string,
         },
     ) {
         required(options && options.accountId, "AccountId is required")
 
-        this.wallet = KeyPair.fromString(privateKey as any)
-        this.accountId = options.accountId
+        const seed = bip39.mnemonicToSeedSync(privateKey);
+        const derivedSeed = seed.slice(0, 32);
+        const base58PrivateKey = bs58.encode(derivedSeed);
+        this.wallet = KeyPair.fromString(`ed25519:${base58PrivateKey}` as any);
+        this.accountId = options.accountId;
+        this.networkId = options?.networkId;
+
         this.signer = await InMemorySigner.fromKeyPair(
             this.networkId,
             this.accountId,
@@ -230,5 +238,40 @@ export class NEAR extends DefaultChain {
         tx.receiverId = beneficiallyId
         tx.actions = [actions.deleteAccount(beneficiallyId)]
         return await this.signTransaction(tx)
+    }
+
+    // INFO Signing a message
+    async signMessage(
+        message: string,
+        options?: { privateKey?: string },
+    ): Promise<string> {
+        required(this.wallet || options?.privateKey, "Wallet not connected")
+        let wallet = this.wallet
+        const messageBytes = decodeUTF8(message)
+        const signature = wallet.sign(messageBytes);
+        const signatureString = utils.serialize.base_encode(signature.signature);
+        
+        return signatureString;
+    }
+    
+    // INFO Verifying a message
+    override async verifyMessage(
+        message: string,
+        signature: string,
+        publicKey: string,
+    ): Promise<boolean> {
+        const signatureDecoded = utils.serialize.base_decode(signature);
+        const publicKeyObject = utils.key_pair.PublicKey.from(publicKey);
+        const publicKeyRaw = Object.values(publicKeyObject.ed25519Key.data);
+        const publicKeyDecoded = new Uint8Array(publicKeyRaw);
+        const messageBytes = decodeUTF8(message);
+
+        const isValid = nacl.sign.detached.verify(
+            messageBytes,
+            signatureDecoded,
+            publicKeyDecoded
+        );
+    
+        return isValid;
     }
 }

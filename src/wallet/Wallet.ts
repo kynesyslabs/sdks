@@ -1,13 +1,13 @@
 // TODO & REVIEW See if the fs methods are useful in this context or nah (also the public ip)
 
+import * as forge from "node-forge"
+
+import * as websdk from "@/websdk"
+import { DemosTransactions } from "@/websdk"
+import { PasskeyGenerator } from "./passkeys/passkeys"
 import { Cryptography } from "@/encryption/Cryptography"
 import { Address } from "@/types/blockchain/WalletTypes"
 import { RPCResponseWithValidityData } from "@/types/communication/rpc"
-import * as websdk from "@/websdk"
-import { DemosTransactions } from "@/websdk"
-import { IKeyPair } from "@/websdk/types/KeyPair"
-import { PasskeyGenerator } from "./passkeys/passkeys"
-import * as forge from "node-forge"
 
 export default class Wallet {
     // A wallet class is a singleton class, so we need to make sure that only one instance per id is created.
@@ -80,10 +80,11 @@ export default class Wallet {
     /* SECTION Basic writes */
     // NOTE All the writes return a validity object that needs to be confirmed and broadcasted
 
-    async transfer(to: Address, amount: number, keypair: IKeyPair) {
+    async transfer(to: Address, amount: number, demos: websdk.Demos) {
         let tx = DemosTransactions.empty()
         // Putting the right data in the transaction
-        tx.content.from = keypair.publicKey.toString("hex")
+        // tx.content.from = keypair.publicKey.toString("hex")
+        tx.content.from = demos.keypair.publicKey.toString("hex")
         // tx.content.to = to
         tx.content.type = "native"
         tx.content.data = [
@@ -94,9 +95,9 @@ export default class Wallet {
             },
         ]
         // tx.content.amount = amount
-        tx = await DemosTransactions.sign(tx, keypair)
+        tx = await demos.sign(tx)
         // Sending the transaction and getting the validity data
-        return await DemosTransactions.confirm(tx)
+        return await demos.confirm(tx)
     }
 
     // TODO Implement other methods too
@@ -104,9 +105,9 @@ export default class Wallet {
     // NOTE  This is a quick wrapper to avoid having to write the same code over and over again
     async broadcast(
         validityData: RPCResponseWithValidityData,
-        keypair: IKeyPair,
+        demos: websdk.Demos,
     ): Promise<any> {
-        return await websdk.demos.broadcast(validityData, keypair)
+        return await demos.broadcast(validityData)
     }
 
     // REVIEW Passkeys support

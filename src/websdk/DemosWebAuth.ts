@@ -102,7 +102,9 @@ export class DemosWebAuth {
 
         this.keypair = {
             privateKey: privKey as Uint8Array,
-            publicKey: null,
+            publicKey: forge.pki.ed25519.publicKeyFromPrivateKey({
+                privateKey: privKey as Uint8Array,
+            }),
         }
 
         // Logging in avoiding crashes on wrong private keys

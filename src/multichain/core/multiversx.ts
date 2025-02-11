@@ -6,11 +6,13 @@ import {
     TokenTransfer,
     Transaction,
     TransferTransactionsFactory,
+    UserVerifier,
 } from "@multiversx/sdk-core"
 import { ExtensionProvider } from "@multiversx/sdk-extension-provider"
 import { ApiNetworkProvider } from "@multiversx/sdk-network-providers"
 import { INetworkProvider } from "@multiversx/sdk-network-providers/out/interface"
 import { UserSigner } from "@multiversx/sdk-wallet"
+import bech32 from 'bech32'; 
 
 import {
     DefaultChain,
@@ -80,7 +82,7 @@ export class MULTIVERSX extends DefaultChain {
         return (this.wallet as UserSigner).getAddress().bech32()
     }
 
-    // SECTION: Reads
+    // SECTION: ReadsIntegrated 
 
     async getBalance(address: string): Promise<string> {
         required(address, "address is required to get the balance")
@@ -116,13 +118,21 @@ export class MULTIVERSX extends DefaultChain {
 
     override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
         required(this.wallet || options?.privateKey, "Wallet not connected")
-        // TODO Implement the signMessage method
-        return "Not implemented"
+        let wallet = this.wallet as UserSigner;
+        const signedMessage = wallet.sign(Buffer.from(message))
+        const signedMessageString = (await signedMessage).toString('hex');
+
+        return signedMessageString;
     }
 
     override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
-        // TODO Implement the verifyMessage method
-        return false
+        const decodedAddress = bech32.decode(publicKey);
+        const publicKeyBuffer = Buffer.from(bech32.fromWords(decodedAddress.words));
+        const address = new Address(publicKeyBuffer);
+        const userVerifier = UserVerifier.fromAddress(address);
+        const isVerified = userVerifier.verify(Buffer.from(message), Buffer.from(signature, 'hex'));
+
+        return isVerified
     }
 
     // SECTION: Writes

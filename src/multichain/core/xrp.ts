@@ -1,12 +1,14 @@
 import {
     AccountInfoRequest,
     Client,
+    convertStringToHex,
     Transaction,
     Wallet,
     xrpToDrops,
 } from 'xrpl'
 
 import { DefaultChain, IPayOptions, required } from '@/multichain/core'
+import { sign, verify } from 'ripple-keypairs'
 
 /**
  * Get the last sequence number of an address
@@ -135,13 +137,23 @@ export class XRPL extends DefaultChain {
 
     override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
         required(this.wallet || options?.privateKey, "Wallet not connected")
-        // TODO Implement the signMessage method // ? Seems to not be exposed in xrpl library
-        return "Not implemented"
+        const hexMessage = convertStringToHex(message);
+        const privateKey = this.wallet.privateKey;
+        let formattedPrivateKey = privateKey;
+        if (privateKey.startsWith('0x')) {
+            formattedPrivateKey = privateKey.slice(2);
+        }
+
+        const signedMessage = sign(hexMessage, formattedPrivateKey)
+        
+        return signedMessage;
     }
 
     override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
-        // TODO Implement the verifyMessage method // ? Seems to not be exposed in xrpl library
-        return false
+        const hexMessage = convertStringToHex(message);
+        const isValid = verify(hexMessage, signature, publicKey)
+
+        return isValid;
     }
 
     // SECTION: Writes

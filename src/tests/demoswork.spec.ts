@@ -12,7 +12,7 @@ import {
 import createTestScript from "@/demoswork/utils/createTestWorkScript"
 import { EVM } from "@/multichain/websdk"
 import pprint from "@/utils/pprint"
-import { demos, DemosWebAuth } from "@/websdk"
+import { Demos, DemosWebAuth } from "@/websdk"
 import { prepareXMScript } from "@/websdk/XMTransactions"
 import { wallets } from "./utils/wallets"
 import { EnumWeb2Methods } from "@/types"
@@ -172,6 +172,8 @@ describe("Demos Workflow", () => {
         const tx = await prepareDemosWorkPayload(work, identity.keypair)
         pprint(tx)
 
+        const demos = new Demos()
+
         const rpc_url = "https://mungaist.com"
         await demos.connect(rpc_url)
         await demos.connectWallet(identity.keypair.privateKey as any)
@@ -179,7 +181,7 @@ describe("Demos Workflow", () => {
         const validityData = await demos.confirm(tx)
         pprint(validityData)
 
-        const res = await demos.broadcast(validityData, identity.keypair)
+        const res = await demos.broadcast(validityData)
 
         pprint(res)
     })
