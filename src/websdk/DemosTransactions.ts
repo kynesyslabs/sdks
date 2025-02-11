@@ -4,7 +4,7 @@ import { demos } from "./demos"
 import { sha256 } from "./utils/sha256"
 import * as skeletons from "./utils/skeletons"
 
-import type { Transaction } from "@/types"
+import type { GCREdit, Transaction } from "@/types"
 import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
@@ -22,8 +22,6 @@ export const DemosTransactions = {
         // sourcery skip: inline-immediately-returned-variable
         const thisTx = structuredClone(skeletons.transaction)
 
-        // TODO Generate the GCREdit in the client (will be compared on the node)
-        thisTx.content.gcr_edits = await GCRGeneration.generate(thisTx)
 
         // if (!data.timestamp) data.timestamp = Date.now()
         // Assigning the transaction data to our object
@@ -42,13 +40,21 @@ export const DemosTransactions = {
         raw_tx: Transaction,
         keypair: IKeyPair,
     ): Promise<Transaction> {
+
         required(keypair, "Private key not provided")
 
         // Set the public key in the transaction
         raw_tx.content.from = keypair.publicKey as Uint8Array
 
+
+        // REVIEW Generate the GCREdit in the client (will be compared on the node)
+        // NOTE They are created without the tx hash, which is added in the node
+        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
+
+
         // Hash the content of the transaction
         raw_tx.hash = await sha256(JSON.stringify(raw_tx.content))
+
 
         // Sign the hash of the content
         let signatureData = forge.pki.ed25519.sign({
