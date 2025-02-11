@@ -96,6 +96,7 @@ export const DemosTransactions = {
     },
     broadcast: async function (
         validationData: RPCResponseWithValidityData,
+
         demos: Demos,
     ) {
         // If the tx is not valid, we don't broadcast it
@@ -113,7 +114,7 @@ export const DemosTransactions = {
         // See prepare(data) for a possible solution
         //validationData.response.data.transaction = signedTx
 
-        let response = await demos.call(
+        const response = await demos.call(
             "execute",
             "",
             validationData,
@@ -121,7 +122,7 @@ export const DemosTransactions = {
         )
 
         try {
-            return JSON.parse(response)
+            response
         } catch (error) {
             return response
         }

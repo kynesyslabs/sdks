@@ -46,7 +46,6 @@ const web2_request: IWeb2Request = {
     raw: {
         action: EnumWeb2Actions.CREATE,
         parameters: [],
-        requestedParameters: null, // Means all
         method: EnumWeb2Methods.GET,
         url: "",
         headers: {},

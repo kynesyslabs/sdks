@@ -85,7 +85,6 @@ export function prepareWeb2Step({
     method = EnumWeb2Methods.GET,
     url = "https://icanhazip.com",
     parameters = [],
-    requestedParameters = null,
     headers = null,
     minAttestations = 2,
 }) {
