@@ -31,7 +31,7 @@
         "test:tx": "rm -rf build && jest --testMatch '**/tests/multichain**/fulltx*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:demoswork": "rm -rf build && jest --testMatch '**/tests/**/demoswork*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:identities": "rm -rf build && jest --testMatch '**/tests/**/identities*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
-        "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\""
+        "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",
         "test:native": "rm -rf build && jest --testMatch '**/tests/native*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
     },
     "dependencies": {
