@@ -29,7 +29,10 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
-import { sleep } from "@/utils"
+
+async function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+}
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 
@@ -475,4 +478,3 @@ export class Demos {
     skeletons = skeletons
     l2ps = l2psCalls
 }
-

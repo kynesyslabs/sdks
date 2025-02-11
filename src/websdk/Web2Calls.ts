@@ -9,6 +9,7 @@ import { demos } from "./demos"
 import { web2_request } from "./utils/skeletons"
 import { IKeyPair } from "./types/KeyPair"
 import { DemosTransactions } from "./DemosTransactions"
+import { Demos } from "./demosclass"
 
 const web2Request = { ...web2_request }
 
@@ -79,6 +80,7 @@ export const web2Calls = {
      * @returns {Promise<Web2Proxy>} A new Web2Proxy instance.
      */
     createDahr: async (keyPair?: IKeyPair): Promise<Web2Proxy> => {
+        const demos = new Demos()
         const usedKeyPair = keyPair || demos.keypair
         if (!usedKeyPair) {
             throw new Error("No keypair provided and no wallet connected")
@@ -119,8 +121,8 @@ export const web2Calls = {
 
         // Signing and broadcasting the transaction
         const signedWeb2Tx = await DemosTransactions.sign(web2Tx, usedKeyPair)
-        const validityData = await DemosTransactions.confirm(signedWeb2Tx)
-        await DemosTransactions.broadcast(validityData, usedKeyPair)
+        const validityData = await DemosTransactions.confirm(signedWeb2Tx, demos)
+        await DemosTransactions.broadcast(validityData, demos)
 
         return new Web2Proxy(sessionId)
     },
