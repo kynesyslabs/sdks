@@ -114,10 +114,18 @@ export const demos = {
 
     // SECTION Transaction methods
     // NOTE These methods comes all from DemosTransactions.ts. If possible, we should use a tx: DemosTransactions object to ensure consistency
-    sign: DemosTransactions.sign,
+    sign: (tx: Transaction) => {
+        return DemosTransactions.sign(tx, demos.keypair)
+    },
     // REVIEW: Replace call with validate / execute logic
-    confirm: DemosTransactions.confirm,
-    broadcast: DemosTransactions.broadcast,
+    confirm: (tx: Transaction) => {
+        // @ts-expect-error
+        return DemosTransactions.confirm(tx, demos)
+    },
+    broadcast: (validityData: RPCResponseWithValidityData) => {
+        // @ts-expect-error
+        return DemosTransactions.broadcast(validityData, demos)
+    },
 
     /**  NOTE Subnet / L2PS EncryptedTransaction should be handled in the same way as the other txs
      * See l2psCalls.prepare(tx, subnet) to see how to prepare a SubnetPayload

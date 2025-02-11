@@ -9,9 +9,12 @@ describe("Native transactions", () => {
 
     beforeAll(async () => {
         senderWebAuth = DemosWebAuth.getInstance()
+
+        // NOTE: Replace with funded account
+        // await senderWebAuth.login(<private key>)
         await senderWebAuth.create()
 
-        recepientWebAuth = DemosWebAuth.getInstance()
+        recepientWebAuth = new DemosWebAuth()
         await recepientWebAuth.create()
 
         demos = new Demos()
