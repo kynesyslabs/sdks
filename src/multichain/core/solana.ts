@@ -14,12 +14,12 @@ import {
     Transaction,
     TransactionInstruction,
     TransactionMessage,
-    VersionedTransaction,    
+    VersionedTransaction,
 } from "@solana/web3.js"
 
 // nacl is needed for signing and verifying messages
-import nacl from "tweetnacl";
-import { decodeUTF8 } from "tweetnacl-util"
+import nacl from "tweetnacl"
+import { decodeBase64, decodeUTF8, encodeBase64 } from "tweetnacl-util"
 
 import base58 from "bs58"
 
@@ -32,7 +32,7 @@ import {
     SolanarunProgramParams,
 } from "./types/interfaces"
 import { required } from "./utils"
-import { sign } from '@ton/crypto';
+import { sign } from "@ton/crypto"
 
 /* LICENSE
 
@@ -112,7 +112,10 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
     }
 
     // Signing messages using tweetnacl and a keypair
-    override async signMessage(message: string, options?: { privateKey?: string }): Promise<Uint8Array> {
+    override async signMessage(
+        message: string,
+        options?: { privateKey?: string },
+    ): Promise<string> {
         required(this.wallet || options?.privateKey, "Wallet not connected")
         // Encoding the message
         const messageBytes = decodeUTF8(message)
@@ -123,16 +126,30 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
             signers = [keypair]
         }
         // Signing the message
-        const signedBytes = nacl.sign.detached(messageBytes, signers[0].secretKey)
-        return signedBytes
+        const signedBytes = nacl.sign.detached(
+            messageBytes,
+            signers[0].secretKey,
+        )
+        return encodeBase64(signedBytes)
     }
 
     // Verifying messages using tweetnacl and a keypair
-    override async verifyMessage(message: string, signature: Uint8Array, publicKey: Uint8Array): Promise<boolean> {
+    override async verifyMessage(
+        message: string,
+        signature: string,
+        publicKey: string,
+    ): Promise<boolean> {
         // converting base58 to bytes
         const messageBytes = decodeUTF8(message)
+        const publicKeyBytes = base58.decode(publicKey)
+        const signatureBytes = decodeBase64(signature)
+
         // verifying the message
-        return nacl.sign.detached.verify(messageBytes, signature, publicKey)
+        return nacl.sign.detached.verify(
+            messageBytes,
+            signatureBytes,
+            publicKeyBytes,
+        )
     }
 
     override async signTransaction(

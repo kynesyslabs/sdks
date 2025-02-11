@@ -36,9 +36,9 @@ export class MULTIVERSX extends EGLDCore implements IDefaultChainWeb {
             password: string
         },
     ) {
-        if (privateKey && options?.password) {
-            await this.connectKeyFileWallet(privateKey, options.password)
-            return this.wallet as UserSigner
+        if (privateKey && options && options?.password) {
+            this.wallet = await this.connectKeyFileWallet(privateKey, options.password)
+            return this.wallet
         }
 
         this.wallet = ExtensionProvider.getInstance()
