@@ -2,7 +2,7 @@ import { XRPL, EVM } from "@/multichain/websdk"
 import chainProviders from "./chainProviders"
 import { wallets } from "../utils/wallets"
 import {
-    demos,
+    Demos,
     DemosWebAuth,
     prepareXMPayload,
     prepareXMScript,
@@ -51,6 +51,8 @@ describe("DEMOS Transaction", () => {
 
         const rpc = "http://localhost:53550"
 
+        const demos = new Demos()
+
         await demos.connect(rpc)
         await demos.connectWallet(identity.keypair.privateKey as any)
 
@@ -60,7 +62,7 @@ describe("DEMOS Transaction", () => {
         const validityData = await demos.confirm(tx)
         console.log("validityData", validityData)
 
-        const res = await demos.broadcast(validityData, identity.keypair)
+        const res = await demos.broadcast(validityData)
         console.log("res", res)
     })
 
@@ -92,6 +94,8 @@ describe("DEMOS Transaction", () => {
 
         const rpc = "https://node2.demos.sh"
 
+        const demos = new Demos()
+
         // 6. Connect to the DEMOS node
         await demos.connect(rpc)
         await demos.connectWallet(identity.keypair.privateKey as any)
@@ -100,7 +104,7 @@ describe("DEMOS Transaction", () => {
         const validityData = await demos.confirm(tx)
         console.log("validityData", validityData)
 
-        const res = await demos.broadcast(validityData, identity.keypair)
+        const res = await demos.broadcast(validityData)
         console.log("res", res)
     })
 

@@ -58,6 +58,10 @@ export const wallets: {
         privateKey:
             "fence agent vivid want verb early surface margin hunt return baby cute april torch smooth village item illegal edge lobster dune owner rate habit",
     },
+    near: {
+        // INFO: Testnet accountId: "kynesys.testnet"
+        privateKey: "drift uniform trend awkward will hope cheap sell matter month release prison"
+    }
 }
 
 export const addresses = {

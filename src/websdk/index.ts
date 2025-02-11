@@ -1,6 +1,7 @@
 // @ts-nocheck
-export { demos } from "./demos"
-export { DemosTransactions } from "./DemosTransactions"
+export { demos } from './demos'
+export { Demos } from './demosclass'
+export { DemosTransactions } from './DemosTransactions'
 
 export { RSA } from "./rsa"
 export { DemosWebAuth } from "./DemosWebAuth"
@@ -11,6 +12,7 @@ export {
     prepareXMScript,
 } from "./XMTransactions"
 
+export { GCRGeneration, HandleNativeOperations } from "./GCRGeneration"
 // Utils
 export { sha256 } from "./utils/sha256"
 export { bufferize } from "./utils/bufferizer"

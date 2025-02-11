@@ -4,13 +4,14 @@
 import {
     InferFromWritePayload,
     InferFromSignaturePayload,
+    CoreTargetIdentityPayload,
 } from "@/types/abstraction"
+import { Demos } from "@/websdk/demosclass"
 
 export default class Identities {
-    constructor() {}
-
     // Infer identity from either a write transaction or a signature
     async inferIdentity(
+        demos: Demos,
         payload: InferFromWritePayload | InferFromSignaturePayload,
     ): Promise<string | false> {
         const basePayload = {
@@ -22,7 +23,21 @@ export default class Identities {
                 },
             ],
         }
-        // TODO Implement the RPC call
-        return false
+
+        return await demos.rpcCall(basePayload, true)
+    }
+
+    async removeIdentity(demos: Demos, payload: CoreTargetIdentityPayload) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "remove_identity",
+                    params: [payload],
+                },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
     }
 }

@@ -1,33 +1,48 @@
+export interface CoreTargetIdentityPayload {
+    chain: string
+    subchain: string
+    targetAddress: string
+}
+
+/**
+ * The identity of the target address to bind to the Demos identity
+ */
+export interface InferFromSignatureTargetIdentityPayload
+    extends CoreTargetIdentityPayload {
+    chainId: number | string
+    isEVM: boolean
+
+    signature: string
+    signedData: string
+    targetAddress: string
+    publicKey: string
+}
+
+/**
+ * The identity of the target address to bind to the Demos identity
+ */
+export interface InferFromWriteTargetIdentityPayload
+    extends CoreTargetIdentityPayload {
+    txHash: string
+    isEVM: boolean
+    chainId: number | string
+    rpcUrl?: string
+}
+
 // Interface for the payload of the inferIdentityFromWrite method
 export interface InferFromWritePayload {
     method: "identity_assign_from_write"
-    demos_identity: {
-        address: string
-        signedData: string
-        signature: string
-    } // The identity of the sender within the Demos network
-    target_identity: {
-        txHash: string
-        targetAddress: string
-        isEVM: boolean
-        chainId: number | string
-        rpcUrl?: string
-    } // The identity of the target address to bind to the Demos identity
+    /**
+     * The identity of the target address to bind to the Demos identity
+     */
+    target_identity: InferFromWriteTargetIdentityPayload
 }
 
 // Interface for the payload of the inferIdentityFromSignature method
 export interface InferFromSignaturePayload {
     method: "identity_assign_from_signature"
-    demos_identity: {
-        address: string
-        signedData: string
-        signature: string
-    } // The identity of the sender within the Demos network
-    target_identity: {
-        signature: string
-        signedData: string
-        targetAddress: string
-        isEVM: boolean
-        chainId: number | string
-    } // The identity of the target address to bind to the Demos identity
+    /**
+     * The identity of the target address to bind to the Demos identity
+     */
+    target_identity: InferFromSignatureTargetIdentityPayload
 }

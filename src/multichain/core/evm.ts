@@ -163,8 +163,16 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     // INFO Connecting a wallet through a private key (string)
     // REVIEW should private key be a string or a Buffer?
     async connectWallet(privateKey: string) {
-        required(this.provider, "Provider not connected")
-        this.wallet = new Wallet(privateKey, this.provider)
+        if (!this.rpc_url) {
+            console.warn(
+                "WARNING: No RPC URL set. Connecting wallet without provider",
+            )
+        }
+
+        this.wallet = new Wallet(
+            privateKey,
+            this.rpc_url ? this.provider : null,
+        )
 
         return this.wallet
     }

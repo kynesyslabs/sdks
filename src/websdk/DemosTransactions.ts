@@ -1,14 +1,14 @@
 import forge from "node-forge"
 
-import { demos } from "./demos"
+import { Demos } from "./demosclass"
 import { sha256 } from "./utils/sha256"
 import * as skeletons from "./utils/skeletons"
 
 import type { Transaction } from "@/types"
-import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 import { IKeyPair } from "./types/KeyPair"
+import { GCRGeneration } from "./GCRGeneration"
 import { _required as required } from "./utils/required"
-import { l2psCalls } from "@/l2ps"
+import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 
 export const DemosTransactions = {
     // REVIEW All this part
@@ -20,6 +20,10 @@ export const DemosTransactions = {
     prepare: async function (data: any = null) {
         // sourcery skip: inline-immediately-returned-variable
         const thisTx = structuredClone(skeletons.transaction)
+
+        // TODO Generate the GCREdit in the client (will be compared on the node)
+        thisTx.content.gcr_edits = await GCRGeneration.generate(thisTx)
+
         // if (!data.timestamp) data.timestamp = Date.now()
         // Assigning the transaction data to our object
         if (data) thisTx.content.data = data
@@ -73,23 +77,42 @@ export const DemosTransactions = {
         return raw_tx // Return the hashed and signed transaction
     },
     // NOTE Sending a transaction after signing it
-    confirm: async function (transaction: Transaction) {
-        return (await demos.call(
-            "execute",
-            "",
-            transaction,
-            "confirmTx",
-        )) as RPCResponseWithValidityData
+    /**
+     * Confirms a transaction.
+     *
+     * @param transaction - The transaction to confirm
+     * @returns The validity data of the transaction containing the gas information.
+     */
+    confirm: async function (transaction: Transaction, demos: Demos) {
+        let response = await demos.call("execute", "", transaction, "confirmTx")
+        // If the tx is not valid, we notify the user
+        if (!response.response.data.valid) {
+            throw new Error(
+                "[Confirm] Transaction is not valid: " +
+                    response.response.data.message,
+            )
+        }
+        return response as RPCResponseWithValidityData
     },
     broadcast: async function (
         validationData: RPCResponseWithValidityData,
-        keyPair: IKeyPair,
+
+        demos: Demos,
     ) {
+        // If the tx is not valid, we don't broadcast it
+        if (!validationData.response.data.valid) {
+            throw new Error(
+                "[Broadcast] Transaction is not valid: " +
+                    validationData.response.data.message,
+            )
+        }
         // REVIEW Resign the Transaction hash as it has been recalculated in the node
-        const tx = validationData.response.data.transaction
-        const signedTx = await DemosTransactions.sign(tx, keyPair)
+        //let tx = validationData.response.data.transaction
+        //let signedTx = await DemosTransactions.sign(tx, keypair)
         // Add the signature to the validityData
-        validationData.response.data.transaction = signedTx
+        // ! Problem: we are tampering the ValidityData, so the tx will fail miserably (see validateTransaction.ts -> signValidityData)
+        // See prepare(data) for a possible solution
+        //validationData.response.data.transaction = signedTx
 
         const response = await demos.call(
             "execute",

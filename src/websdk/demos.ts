@@ -20,6 +20,7 @@ import {
     RPCResponse,
     RPCResponseWithValidityData,
 } from "@/types/communication/rpc"
+
 import { l2psCalls } from "@/l2ps"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
@@ -27,6 +28,18 @@ import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
+/**
+ * @deprecated Use the new `Demos` class
+ * @see Demos class
+ *
+ * ```ts
+ * import { Demos } from "@kynesyslabs/websdk"
+ * const demos = new Demos()
+ *
+ * await demos.connect(rpc_url)
+ * await demos.connectWallet(privateKey)
+ * ```
+ */
 export const demos = {
     // ANCHOR Properties
     rpc_url: <string | null>null,
