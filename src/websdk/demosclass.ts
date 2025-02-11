@@ -11,10 +11,6 @@ import * as skeletons from "./utils/skeletons"
 // NOTE Including custom libraries from Demos
 import { DemosTransactions } from "./DemosTransactions"
 import { DemosWebAuth } from "./DemosWebAuth"
-import {
-    IPrepareWeb2PayloadParams,
-    prepareWeb2Payload,
-} from "./Web2Transactions"
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
@@ -420,7 +416,7 @@ export class Demos {
     // ANCHOR Web2 Endpoints
     web2 = {
         ...web2Calls,
-        legacy: {
+        /*legacy: {
             createPayload: (
                 params: IPrepareWeb2PayloadParams,
                 keypair?: IKeyPair,
@@ -435,7 +431,7 @@ export class Demos {
 
                 return prepareWeb2Payload(params, usedKeypair)
             },
-        },
+        },*/
     }
 
     xm = {
