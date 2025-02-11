@@ -21,11 +21,36 @@ This will allow users to use the new things as follows:
 import { Stuff, otherStuff } from "@kynesyslabs/demosdk/stuff"
 ```
 
-### Running tests
+### Tests
+
+Here are all the available tests:
+
+### 1. Multichain
+
+Tests for the multichain SDKs.
 
 ```sh
-# multichain
 yarn test:multichain
+```
+
+### 2. A crosschain write transaction on DEMOS
+
+Creates a demos crosschain transaction to send tokens on Sepolia via the DEMOS testnet.
+
+```sh
+yarn test:tx
+```
+
+### 3. Demoswork
+
+```sh
+yarn test:demoswork
+```
+
+### 4. Native Transactions
+
+```sh
+yarn test:native
 ```
 
 ### Publishing on NPM

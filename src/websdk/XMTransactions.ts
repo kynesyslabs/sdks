@@ -210,4 +210,3 @@ async function prepareXMPayload(
 }
 
 export { prepareXMPayload, XMTransactions }
-

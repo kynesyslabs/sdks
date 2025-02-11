@@ -1,4 +1,4 @@
-import { EVM } from "@/multichain/websdk"
+import { XRPL, EVM } from "@/multichain/websdk"
 import chainProviders from "./chainProviders"
 import { wallets } from "../utils/wallets"
 import {
@@ -43,6 +43,7 @@ describe("DEMOS Transaction", () => {
 
         const identity = DemosWebAuth.getInstance()
         await identity.create()
+
         const tx = await prepareXMPayload(xmscript, identity.keypair)
 
         console.log(xmscript)
@@ -54,12 +55,52 @@ describe("DEMOS Transaction", () => {
         await demos.connectWallet(identity.keypair.privateKey as any)
 
         console.log("address", demos.getAddress())
-        console.log("private key:", identity.keypair.privateKey)
+        console.log("private key:", identity.keypair.privateKey.toString("hex"))
 
         const validityData = await demos.confirm(tx)
         console.log("validityData", validityData)
 
-        const res = await demos.broadcast(validityData)
+        const res = await demos.broadcast(validityData, identity.keypair)
+        console.log("res", res)
+    })
+
+    test.skip("XRPL Send tokens", async () => {
+        // 1. Create XRPL SDK instance
+        const sdk = await XRPL.create(chainProviders.xrpl.testnet)
+        await sdk.connectWallet(wallets.xrpl.privateKey)
+
+        // 2. Prepare the XRPL payload
+        const payload = await sdk.preparePay(
+            "rGT8xyrpWTNnTAvAZKsccu5456ArfJ7SMb",
+            "1",
+        )
+
+        // 3. Prepare the XMScript
+        const xmscript = prepareXMScript({
+            chain: "xrpl",
+            subchain: "testnet",
+            signedPayloads: [payload],
+            type: "pay",
+        })
+
+        // 4. Create the DEMOS identity
+        const identity = DemosWebAuth.getInstance()
+        await identity.create()
+
+        // 5. Convert the XMScript to a DEMOS transaction
+        const tx = await prepareXMPayload(xmscript, identity.keypair)
+
+        const rpc = "https://node2.demos.sh"
+
+        // 6. Connect to the DEMOS node
+        await demos.connect(rpc)
+        await demos.connectWallet(identity.keypair.privateKey as any)
+
+        // 7. Broadcast the transaction
+        const validityData = await demos.confirm(tx)
+        console.log("validityData", validityData)
+
+        const res = await demos.broadcast(validityData, identity.keypair)
         console.log("res", res)
     })
 

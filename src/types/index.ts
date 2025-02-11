@@ -1,9 +1,10 @@
+import { INativePayload } from "./native/INativePayload"
 export {
     GenesisArtifact,
     GenesisImmutableProperties,
     GenesisMutableProperties,
     StandardGenesis,
-    forkGenesis
+    forkGenesis,
 } from "./blockchain/genesisTypes"
 
 export { Block, BlockContent, NativeTablesHashes } from "./blockchain/blocks"
@@ -13,8 +14,12 @@ export { RawTransaction } from "./blockchain/rawTransaction"
 export {
     Transaction,
     TransactionContent,
-    TransactionContentData
+    TransactionContentData,
 } from "./blockchain/Transaction"
+
+// SECTION Payload types
+export { INativePayload } from "./native/INativePayload"
+
 export { TxFee } from "./blockchain/TxFee"
 export { CValidityData, ValidityData } from "./blockchain/ValidityData"
 export { Bundle, BundleContent } from "./communication/transmit"
@@ -22,12 +27,16 @@ export { Bundle, BundleContent } from "./communication/transmit"
 export { AddressInfo } from "./blockchain/addressInfo"
 export { StatusNative } from "./blockchain/statusNative"
 export { statusNative as StatusProperties } from "./blockchain/statusProperties"
-export { StoredIdentities, Context, ProviderIdentities } from "./blockchain/identities"
+export {
+    StoredIdentities,
+    Context,
+    ProviderIdentities,
+} from "./blockchain/identities"
 
 export {
     Operation,
     OperationRegistrySlot,
-    OperationResult
+    OperationResult,
 } from "./gls/Operation"
 export { StateChange } from "./gls/StateChange"
 
@@ -37,7 +46,7 @@ export { ExecutionResult } from "./network/ExecutionResult"
 export {
     ISecurityReport,
     SIComlink,
-    SIResponseRegistry
+    SIResponseRegistry,
 } from "./network/SecurityTypes"
 
 // peer
@@ -48,10 +57,19 @@ export {
     IParam,
     IRawWeb2Request,
     IWeb2Attestation,
-    IWeb2Payload,
     IWeb2Request,
+    IWeb2Payload,
     IWeb2Result,
-    EnumWeb2Methods
+    ISendHTTPRequestParams,
+    IAuthorizationException,
+    IAuthorizationConfig,
+    IWeb2RequestOptions,
+    IStartProxyParams,
+    IAttestationWithResponse,
+    IDAHRStartProxyParams,
+    IHandleWeb2ProxyRequestParams,
+    EnumWeb2Methods,
+    EnumWeb2Actions,
 } from "./web2"
 
 export { IOperation, ITask, XMScript } from "./xm"
@@ -63,7 +81,7 @@ export {
     ConditionalOperationScript,
     DemosWorkOperationScripts,
     OperationScript,
-    OperationType
+    OperationType,
 } from "./demoswork/operations"
 export {
     ICondition,
@@ -72,7 +90,7 @@ export {
     WorkStepInput,
     XmStepResult,
     stepKeys,
-    stepKeysEnum
+    stepKeysEnum,
 } from "./demoswork/steps"
 
 export {
@@ -84,5 +102,7 @@ export {
     NodeCall,
     VoteRequest,
     RPCResponseWithValidityData,
-    emptyResponse as RPCResponseSkeleton
+    emptyResponse as RPCResponseSkeleton,
 } from "./communication/rpc"
+
+export { GCREdit } from "./blockchain/GCREdit"

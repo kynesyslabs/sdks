@@ -4,6 +4,7 @@ import {
     TransactionRequest,
     Wallet,
     formatEther,
+    isAddress,
     parseEther,
     toNumber,
     verifyMessage,
@@ -11,6 +12,101 @@ import {
 import { DefaultChain, IEVMDefaultChain } from "./types/defaultChain"
 import { IPayParams } from "./types/interfaces"
 import { required } from "./utils"
+
+const ERC20_ABI = [
+    {
+        constant: true,
+        inputs: [],
+        name: "name",
+        outputs: [{ name: "", type: "string" }],
+        payable: false,
+        stateMutability: "view",
+        type: "function",
+    },
+    {
+        constant: false,
+        inputs: [
+            { name: "src", type: "address" },
+            { name: "dst", type: "address" },
+            { name: "wad", type: "uint256" },
+        ],
+        name: "transferFrom",
+        outputs: [{ name: "", type: "bool" }],
+        payable: false,
+        stateMutability: "nonpayable",
+        type: "function",
+    },
+    {
+        constant: false,
+        inputs: [{ name: "wad", type: "uint256" }],
+        name: "withdraw",
+        outputs: [],
+        payable: false,
+        stateMutability: "nonpayable",
+        type: "function",
+    },
+    {
+        constant: true,
+        inputs: [],
+        name: "decimals",
+        outputs: [{ name: "", type: "uint8" }],
+        payable: false,
+        stateMutability: "view",
+        type: "function",
+    },
+    {
+        constant: true,
+        inputs: [{ name: "", type: "address" }],
+        name: "balanceOf",
+        outputs: [{ name: "", type: "uint256" }],
+        payable: false,
+        stateMutability: "view",
+        type: "function",
+    },
+    {
+        constant: true,
+        inputs: [],
+        name: "symbol",
+        outputs: [{ name: "", type: "string" }],
+        payable: false,
+        stateMutability: "view",
+        type: "function",
+    },
+    {
+        constant: false,
+        inputs: [
+            { name: "dst", type: "address" },
+            { name: "wad", type: "uint256" },
+        ],
+        name: "transfer",
+        outputs: [{ name: "", type: "bool" }],
+        payable: false,
+        stateMutability: "nonpayable",
+        type: "function",
+    },
+    {
+        constant: false,
+        inputs: [],
+        name: "deposit",
+        outputs: [],
+        payable: true,
+        stateMutability: "payable",
+        type: "function",
+    },
+    {
+        constant: true,
+        inputs: [
+            { name: "", type: "address" },
+            { name: "", type: "address" },
+        ],
+        name: "allowance",
+        outputs: [{ name: "", type: "uint256" }],
+        payable: false,
+        stateMutability: "view",
+        type: "function",
+    },
+    { payable: true, stateMutability: "payable", type: "fallback" },
+]
 
 export class EVM extends DefaultChain implements IEVMDefaultChain {
     declare provider: JsonRpcProvider
@@ -219,9 +315,55 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         return this.wallet.address
     }
 
+    /**
+     * Check if an address is valid
+     *
+     * @param address The address to check
+     * @returns A boolean indicating whether the address is valid
+     */
+    isAddress(address: string): boolean {
+        return isAddress(address)
+    }
+
     async getBalance(address: string): Promise<string> {
         let balance_raw = await this.provider.getBalance(address)
         return formatEther(balance_raw)
+    }
+
+    /**
+     * Get the balance of a token
+     *
+     * @param contract_address The address of the token contract
+     * @param address The address of the wallet
+     * @returns The balance of the token
+     */
+    async getTokenBalance(
+        contract_address: string,
+        address: string,
+    ): Promise<{
+        name: string
+        symbol: string
+        decimals: number
+        balance: string
+    }> {
+        let contract = await this.getContractInstance(
+            contract_address,
+            JSON.stringify(ERC20_ABI),
+        )
+
+        const fields = ["name", "symbol", "decimals"]
+        const promises = fields.map(field =>
+            this.readFromContract(contract, field, []),
+        )
+        promises.push(contract.balanceOf(address))
+
+        const [name, symbol, decimals, balance] = await Promise.all(promises)
+        return {
+            name,
+            symbol,
+            decimals,
+            balance,
+        }
     }
 
     // SECTION EVM Exclusive methods

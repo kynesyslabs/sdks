@@ -1,5 +1,5 @@
-import type { Transaction } from '@/types'
-import { EnumWeb2Methods } from '@/types/web2'
+import type { IWeb2Request, Transaction } from "@/types"
+import { EnumWeb2Methods, EnumWeb2Actions } from "@/types"
 // TODO This should be a collection of classes now that we use TypeScript
 // FIXME ^
 
@@ -7,12 +7,12 @@ import { EnumWeb2Methods } from '@/types/web2'
 const transaction: Transaction = {
     content: {
         // @ts-expect-error
-        type: '', // string
-        from: '', // forge.pki.ed25519.BinaryBuffer
-        to: '', // forge.pki.ed25519.BinaryBuffer
+        type: "", // string
+        from: "", // forge.pki.ed25519.BinaryBuffer
+        to: "", // forge.pki.ed25519.BinaryBuffer
         amount: 0, // number
         // @ts-expect-error
-        data: ['', ''], // [string, string] // type as string and content in hex string
+        data: ["", ""], // [string, string] // type as string and content in hex string
         nonce: 0, // number // Increments every time a transaction is sent from the same account
         timestamp: 0, // number // Is the registered unix timestamp when the transaction was sent the first time
         transaction_fee: {
@@ -22,8 +22,8 @@ const transaction: Transaction = {
         },
     },
     signature: null, // pki.ed25519.BinaryBuffer
-    hash: '', // string
-    status: '', // string
+    hash: "", // string
+    status: "", // string
     blockNumber: null, // number
 }
 
@@ -42,30 +42,30 @@ const crosschain_operation = {
 }
 
 // INFO An empty web2 request object
-const web2_request = {
+const web2_request: IWeb2Request = {
     raw: {
-        action: '',
+        action: EnumWeb2Actions.CREATE,
         parameters: [],
         requestedParameters: null, // Means all
         method: EnumWeb2Methods.GET,
-        url: '',
-        headers: null,
+        url: "",
+        headers: {},
         minAttestations: 2,
         // Handling the various stages of an IWeb2Request
         stage: {
             // The one that will handle the response too
             origin: {
-                identity: '',
-                connection_url: '',
+                identity: "",
+                connection_url: "",
             },
             // Starting from 0, each attestation it is increased
             hop_number: 0,
         },
     },
     result: null,
-    attestations: new Map(),
-    hash: '',
-    signature: '',
+    attestations: {},
+    hash: "",
+    signature: "",
 }
 
 export { crosschain_operation, transaction, web2_request }

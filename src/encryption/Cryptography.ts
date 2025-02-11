@@ -23,7 +23,6 @@ export class Cryptography {
     static new() {
         const seed = forge.random.getBytesSync(32)
         const keys = forge.pki.ed25519.generateKeyPair({ seed })
-        console.log("Generated new keypair")
         return keys
     }
 
@@ -47,7 +46,6 @@ export class Cryptography {
 
     // TODO Eliminate the old legacy compatibility
     static async save(keypair: forge.pki.KeyPair, path: string, mode = "hex") {
-        console.log(keypair.privateKey)
         if (mode === "hex") {
             let hexPrivKey = Cryptography.saveToHex(keypair.privateKey)
             await fs.writeFile(path, hexPrivKey)
@@ -57,11 +55,8 @@ export class Cryptography {
     }
 
     static saveToHex(forgeBuffer: forge.pki.PrivateKey): string {
-        console.log("[forge to string encoded]")
         //console.log(forgeBuffer) // REVIEW if it is like this
         let stringBuffer = forgeBuffer.toString("hex")
-        console.log("DECODED INTO:")
-        console.log("0x" + stringBuffer)
         return "0x" + stringBuffer
     }
 
@@ -123,24 +118,16 @@ export class Cryptography {
         let keypair = { publicKey: null, privateKey: null }
         content = content.slice(2)
         let finalArray = new Uint8Array(64)
-        console.log("[string to forge encoded]")
-        console.log(content)
         for (let i = 0; i < content.length; i += 2) {
             const hexValue = content.substr(i, 2)
             const decimalValue = parseInt(hexValue, 16)
             finalArray[i / 2] = decimalValue
         }
-        console.log("ENCODED INTO:")
-        //console.log(finalArray)
-        // Condensing
-        console.log("That means:")
+
         keypair.privateKey = Buffer.from(finalArray)
-        console.log(keypair.privateKey)
-        console.log("And the public key is:")
         keypair.publicKey = forge.pki.ed25519.publicKeyFromPrivateKey({
             privateKey: keypair.privateKey,
         })
-        console.log(keypair.publicKey)
         return keypair
     }
 
@@ -159,7 +146,6 @@ export class Cryptography {
     ) {
         // REVIEW Test HexToForge support
         if (privateKey.type == "string") {
-            console.log("[HexToForge] Deriving a buffer from privateKey...")
             privateKey = HexToForge(privateKey)
         }
 
@@ -177,30 +163,20 @@ export class Cryptography {
     ) {
         // REVIEW Test HexToForge support
         if (signature.type == "string") {
-            console.log("[HexToForge] Deriving a buffer from signature...")
             signature = HexToForge(signature)
         }
         if (publicKey.type == "string") {
-            console.log("[HexToForge] Deriving a buffer from publicKey...")
             publicKey = HexToForge(publicKey)
         }
 
         // Also, we have to sanitize buffers so that they are forge compatible
         if (signature.type == "Buffer") {
-            console.log("[*] Normalizing signature...")
-            console.log(typeof signature)
             signature = Buffer.from(signature) // REVIEW Does not work in bun
         }
         if (publicKey.type == "Buffer") {
-            console.log("[*] Normalizing publicKey...")
             publicKey = Buffer.from(publicKey) // REVIEW Does not work in bun
         }
 
-        console.log("[*] Verifying the signature of: " + signed + "\n")
-        console.log("[*] Using the signature: ")
-        console.log(signature)
-        console.log("[*] And the public key: ")
-        console.log(publicKey)
         return forge.pki.ed25519.verify({
             message: signed,
             encoding: "utf8",
@@ -234,30 +210,20 @@ export class Cryptography {
         ) => {
             // REVIEW Test HexToForge support
             if (signature.type == "string") {
-                console.log("[HexToForge] Deriving a buffer from signature...")
                 signature = HexToForge(signature)
             }
             if (publicKey.type == "string") {
-                console.log("[HexToForge] Deriving a buffer from publicKey...")
                 publicKey = HexToForge(publicKey)
             }
 
             // Also, we have to sanitize buffers so that they are forge compatible
             if (signature.type == "Buffer") {
-                console.log("[*] Normalizing signature...")
-                console.log(typeof signature)
                 signature = Buffer.from(signature) // REVIEW Does not work in bun
             }
             if (publicKey.type == "Buffer") {
-                console.log("[*] Normalizing publicKey...")
                 publicKey = Buffer.from(publicKey) // REVIEW Does not work in bun
             }
 
-            console.log("[*] Verifying the signature of: " + signed + "\n")
-            console.log("[*] Using the signature: ")
-            console.log(signature)
-            console.log("[*] And the public key: ")
-            console.log(publicKey)
             return forge.pki.ed25519.verify({
                 message: signed,
                 encoding: "utf8",
@@ -275,7 +241,6 @@ export class Cryptography {
         ): [boolean, any] => {
             // NOTE Supporting "fake buffers" from web browsers
             if (publicKey.type == "Buffer") {
-                console.log("[ENCRYPTION] Normalizing publicKey...")
                 publicKey = Buffer.from(publicKey)
             }
             // Converting the message and decrypting it
@@ -292,19 +257,17 @@ export class Cryptography {
             // NOTE Supporting "fake buffers" from web browsers
             try {
                 if (privateKey.type == "Buffer") {
-                    console.log("[DECRYPTION] Normalizing privateKey...\n")
                     privateKey = Buffer.from(privateKey)
                 }
             } catch (e) {
-                console.log(
+                console.error(
                     "[DECRYPTION] Looks like there is nothing to normalize here, let's proceed\n",
                 )
-                console.log(e)
+                console.error(e)
             }
             // Converting back the message and decrypting it
             // NOTE If no private key is provided, we try to use our one
             if (!privateKey) {
-                console.log("[DECRYPTION] No private key provided!\n")
                 return [false, "No private key found"]
             }
             let debased = forge.util.decode64(message)

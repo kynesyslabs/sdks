@@ -78,4 +78,15 @@ describe("EVM CHAIN TESTS", () => {
             method: string
         }
     })
+
+    test.skip("getTokenBalance", async () => {
+        // NOTE: This is USDC on Ethereum mainnet
+        // Switch to mainnet on the rpc to test
+        const balance = await instance.getTokenBalance(
+            "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+            "0x500d9257fd8eb4583684E5BEbb65DC1Fa243DDF9",
+        )
+        
+        console.log(balance)
+    })
 })

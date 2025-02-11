@@ -24,10 +24,12 @@ import {
     RPCResponse,
     RPCResponseWithValidityData,
 } from "@/types/communication/rpc"
-import { l2psCalls } from "./L2PSCalls"
+
+import { l2psCalls } from "@/l2ps"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
+import { web2Calls } from "./Web2Calls"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 /**
@@ -114,87 +116,25 @@ export const demos = {
         return muid
     },
 
+    // SECTION Transaction methods
+    // NOTE These methods comes all from DemosTransactions.ts. If possible, we should use a tx: DemosTransactions object to ensure consistency
+    sign: DemosTransactions.sign,
+    // REVIEW: Replace call with validate / execute logic
+    confirm: DemosTransactions.confirm,
+    broadcast: DemosTransactions.broadcast,
+    
+    /**  NOTE Subnet / L2PS EncryptedTransaction should be handled in the same way as the other txs
+      * See l2psCalls.prepare(tx, subnet) to see how to prepare a SubnetPayload
+    */
+
+    // L2PS calls are defined here
+    l2ps: l2psCalls,
+    // !SECTION Transaction methods
+
     // SECTION NodeCall prototype
     // INFO NodeCalls use the same structure
     nodeCall: async function (message: any, args = {}) {
         return await demos.call("nodeCall", message, args)
-    },
-    // REVIEW: Replace call with validate / execute logic
-    confirm: async function (transaction: Transaction) {
-        return (await demos.call(
-            "execute",
-            "",
-            transaction,
-            "confirmTx",
-        )) as RPCResponseWithValidityData
-    },
-    broadcast: async function (validationData: RPCResponseWithValidityData) {
-        return await demos.call("execute", "", validationData, "broadcastTx")
-    },
-    // L2PS calls are defined here
-    l2ps: l2psCalls,
-
-    rpcCall: async function (
-        request: RPCRequest,
-        isAuthenticated: boolean = false,
-        retries = 1,
-        sleepTime = 250,
-        allowedErrorCodes: number[] = [],
-    ) {
-        let publicKey = ""
-        let signature = ""
-
-        if (isAuthenticated) {
-            publicKey = demos.keypair.publicKey.toString("hex")
-            signature = Cryptography.sign(
-                publicKey,
-                demos.keypair.privateKey,
-            ).toString("hex")
-        }
-
-        try {
-            const response = await axios.post<RPCResponse>(
-                demos.rpc_url,
-                request,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        identity: publicKey,
-                        signature: signature,
-                    },
-                },
-            )
-
-            console.log("response.data", response.data)
-
-            if (
-                response.data.result == 200 ||
-                allowedErrorCodes.includes(response.data.result)
-            ) {
-                return response.data
-            }
-
-            if (retries > 0) {
-                await sleep(sleepTime)
-                return await demos.rpcCall(
-                    request,
-                    isAuthenticated,
-                    retries - 1,
-                    sleepTime,
-                    allowedErrorCodes,
-                )
-            }
-        } catch (error) {
-            console.error(error)
-            return {
-                result: 500,
-                response: error,
-                require_reply: false,
-                extra: null,
-            } as RPCResponse
-        }
-
-        return "response.data"
     },
     // INFO NodeCalls use the same structure
     call: async function (
@@ -332,16 +272,21 @@ export const demos = {
      */
     // ANCHOR Web2 Endpoints
     web2: {
-        createPayload: (
-            params: IPrepareWeb2PayloadParams,
-            keypair?: IKeyPair,
-        ) => {
-            const usedKeypair = keypair || demos.keypair
-            if (!usedKeypair) {
-                throw new Error("No keypair provided and no wallet connected")
-            }
+        ...web2Calls,
+        legacy: {
+            createPayload: (
+                params: IPrepareWeb2PayloadParams,
+                keypair?: IKeyPair,
+            ) => {
+                const usedKeypair = keypair || demos.keypair
+                if (!usedKeypair) {
+                    throw new Error(
+                        "No keypair provided and no wallet connected",
+                    )
+                }
 
-            return prepareWeb2Payload(params, usedKeypair)
+                return prepareWeb2Payload(params, usedKeypair)
+            },
         },
     },
     // ANCHOR Crosschain support endpoints
@@ -385,8 +330,4 @@ export const demos = {
 
     // INFO Calling demos.skeletons.NAME provides an empty skeleton that can be used for reference while calling other demos functions
     skeletons,
-}
-
-async function sleep(time: number) {
-    return new Promise(resolve => setTimeout(resolve, time))
 }

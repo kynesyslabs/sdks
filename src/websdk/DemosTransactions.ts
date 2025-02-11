@@ -8,6 +8,8 @@ import type { Transaction } from "@/types"
 import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
+import { l2psCalls } from "@/l2ps"
+import { GCRGeneration } from "./GCRGeneration"
 
 export const DemosTransactions = {
     // REVIEW All this part
@@ -19,6 +21,10 @@ export const DemosTransactions = {
     prepare: async function (data: any = null) {
         // sourcery skip: inline-immediately-returned-variable
         const thisTx = structuredClone(skeletons.transaction)
+
+        // TODO Generate the GCREdit in the client (will be compared on the node)
+        thisTx.content.gcr_edits = await GCRGeneration.generate(thisTx)
+
         // if (!data.timestamp) data.timestamp = Date.now()
         // Assigning the transaction data to our object
         if (data) thisTx.content.data = data
@@ -64,21 +70,56 @@ export const DemosTransactions = {
             signature: signatureData,
             publicKey: keypair.publicKey as Uint8Array,
         })
-        console.log("Signature verified: " + verified)
+
+        if (!verified) {
+            throw new Error("Signature verification failed")
+        }
 
         return raw_tx // Return the hashed and signed transaction
     },
     // NOTE Sending a transaction after signing it
-    confirm: async function (signedPayload: Transaction) {
-        let response = await demos.confirm(signedPayload)
-        // response = JSON.parse(response)
-        return response
+    confirm: async function (transaction: Transaction) {
+        let response = await demos.call(
+            "execute",
+            "",
+            transaction,
+            "confirmTx",
+        )
+        // If the tx is not valid, we notify the user
+        if (!response.response.data.valid) {
+            throw new Error("[Confirm] Transaction is not valid: " + response.response.data.message)
+        }
+        return response as RPCResponseWithValidityData
     },
-    broadcast: async function (validityData: RPCResponseWithValidityData) {
-        // ValidityData does not need to be signed as it already contains a signature (in the Transaction object)
-        // and is sent as a ComLink (thus authenticated and signed by the sender)
-        let response = await demos.broadcast(validityData)
-        response = JSON.parse(response)
-        return response
+    broadcast: async function (
+        validationData: RPCResponseWithValidityData,
+        keypair: IKeyPair,
+    ) {
+        // If the tx is not valid, we don't broadcast it
+        if (!validationData.response.data.valid) {
+            throw new Error("[Broadcast] Transaction is not valid: " + validationData.response.data.message)
+        }
+        // REVIEW Resign the Transaction hash as it has been recalculated in the node
+        //let tx = validationData.response.data.transaction
+        //let signedTx = await DemosTransactions.sign(tx, keypair)
+        // Add the signature to the validityData
+        // ! Problem: we are tampering the ValidityData, so the tx will fail miserably (see validateTransaction.ts -> signValidityData)
+        // See prepare(data) for a possible solution
+        //validationData.response.data.transaction = signedTx
+        
+
+        let response = await demos.call(
+            "execute",
+            "",
+            validationData,
+            "broadcastTx",
+        )
+
+        try {
+            return JSON.parse(response)
+        } catch (error) {
+            return response
+        }
     },
+    // NOTE Subnet transactions methods are imported and exposed in demos.ts from the l2ps.ts file.
 }
