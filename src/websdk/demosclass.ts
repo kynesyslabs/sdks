@@ -28,6 +28,8 @@ import { l2psCalls } from "@/l2ps"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
+import { web2Calls } from "./Web2Calls"
+import { sleep } from "@/utils"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 
@@ -132,13 +134,8 @@ export class Demos {
      * @param transaction - The transaction to confirm
      * @returns The validity data of the transaction containing the gas information.
      */
-    async confirm(transaction: Transaction) {
-        return (await this.call(
-            "execute",
-            "",
-            transaction,
-            "confirmTx",
-        )) as RPCResponseWithValidityData
+    confirm(transaction: Transaction) {
+        return DemosTransactions.confirm(transaction, this)
     }
 
     /**
@@ -147,8 +144,18 @@ export class Demos {
      * @param validationData - The validity data of the transaction
      * @returns The response from the node
      */
-    async broadcast(validationData: RPCResponseWithValidityData) {
-        return await this.call("execute", "", validationData, "broadcastTx")
+    broadcast(validationData: RPCResponseWithValidityData) {
+        return DemosTransactions.broadcast(validationData, this)
+    }
+
+    /**
+     * Signs a transaction.
+     *
+     * @param raw_tx - The transaction to sign
+     * @returns The signed transaction
+     */
+    sign(raw_tx: Transaction) {
+        return DemosTransactions.sign(raw_tx, this.keypair)
     }
 
     // L2PS calls are defined here
@@ -409,16 +416,22 @@ export class Demos {
 
     // ANCHOR Web2 Endpoints
     web2 = {
-        createPayload: (
-            params: IPrepareWeb2PayloadParams,
-            keypair?: IKeyPair,
-        ) => {
-            const usedKeypair = keypair || this.keypair
-            if (!usedKeypair) {
-                throw new Error("No keypair provided and no wallet connected")
-            }
+        ...web2Calls,
+        legacy: {
+            createPayload: (
+                params: IPrepareWeb2PayloadParams,
+                keypair?: IKeyPair,
+            ) => {
+                const usedKeypair = keypair || this.keypair
 
-            return prepareWeb2Payload(params, usedKeypair)
+                if (!usedKeypair) {
+                    throw new Error(
+                        "No keypair provided and no wallet connected",
+                    )
+                }
+
+                return prepareWeb2Payload(params, usedKeypair)
+            },
         },
     }
 
@@ -463,6 +476,3 @@ export class Demos {
     l2ps = l2psCalls
 }
 
-async function sleep(time: number) {
-    return new Promise(resolve => setTimeout(resolve, time))
-}
