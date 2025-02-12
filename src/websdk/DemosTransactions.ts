@@ -21,7 +21,6 @@ export const DemosTransactions = {
         // sourcery skip: inline-immediately-returned-variable
         const thisTx = structuredClone(skeletons.transaction)
 
-
         // if (!data.timestamp) data.timestamp = Date.now()
         // Assigning the transaction data to our object
         if (data) thisTx.content.data = data
@@ -39,21 +38,17 @@ export const DemosTransactions = {
         raw_tx: Transaction,
         keypair: IKeyPair,
     ): Promise<Transaction> {
-
         required(keypair, "Private key not provided")
 
         // Set the public key in the transaction
         raw_tx.content.from = keypair.publicKey as Uint8Array
 
-
         // REVIEW Generate the GCREdit in the client (will be compared on the node)
         // NOTE They are created without the tx hash, which is added in the node
         raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
 
-
         // Hash the content of the transaction
         raw_tx.hash = await sha256(JSON.stringify(raw_tx.content))
-
 
         // Sign the hash of the content
         let signatureData = forge.pki.ed25519.sign({
@@ -98,11 +93,11 @@ export const DemosTransactions = {
                     response.response.data.message,
             )
         }
+
         return response as RPCResponseWithValidityData
     },
     broadcast: async function (
         validationData: RPCResponseWithValidityData,
-
         demos: Demos,
     ) {
         // If the tx is not valid, we don't broadcast it
@@ -120,18 +115,7 @@ export const DemosTransactions = {
         // See prepare(data) for a possible solution
         //validationData.response.data.transaction = signedTx
 
-        const response = await demos.call(
-            "execute",
-            "",
-            validationData,
-            "broadcastTx",
-        )
-
-        try {
-            response
-        } catch (error) {
-            return response
-        }
+        return await demos.call("execute", "", validationData, "broadcastTx")
     },
     // NOTE Subnet transactions methods are imported and exposed in demos.ts from the l2ps.ts file.
 }
