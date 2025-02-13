@@ -1,6 +1,6 @@
-import { EnumWeb2Methods } from "@/types"
 import { Demos } from "@/websdk"
-import { DemosWebAuth, prepareXMPayload } from "@/websdk"
+import { DemosWebAuth } from "@/websdk"
+import { EnumWeb2Methods } from "@/types"
 
 describe("Web2", () => {
     test("Simple Web2 Transaction", async () => {
@@ -22,7 +22,6 @@ describe("Web2", () => {
 
         const res2 = await proxy.stopProxy()
         console.log(res2)
-
         demos.disconnect()
     })
 })
