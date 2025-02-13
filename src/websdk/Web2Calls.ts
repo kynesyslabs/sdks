@@ -7,7 +7,6 @@ import type {
 } from "@/types"
 import { demos } from "./demos"
 import { web2_request } from "./utils/skeletons"
-import { IKeyPair } from "./types/KeyPair"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"
 
@@ -15,9 +14,11 @@ const web2Request = { ...web2_request }
 
 export class Web2Proxy {
     private readonly _sessionId: string
+    private readonly _demos: Demos
 
-    constructor(sessionId: string) {
+    constructor(sessionId: string, demos: Demos) {
         this._sessionId = sessionId
+        this._demos = demos
     }
 
     /**
@@ -50,7 +51,7 @@ export class Web2Proxy {
             headers: options?.headers,
         }
 
-        return await demos.call("web2ProxyRequest", {
+        return await this._demos.call("web2ProxyRequest", {
             web2Request,
             sessionId: this._sessionId,
             payload: options?.payload,
@@ -63,7 +64,7 @@ export class Web2Proxy {
      * @returns {Promise<void>}
      */
     async stopProxy(): Promise<void> {
-        await demos.call("web2ProxyRequest", {
+        await this._demos.call("web2ProxyRequest", {
             sessionId: this.sessionId,
             action: EnumWeb2Actions.STOP_PROXY,
         })
@@ -79,9 +80,10 @@ export const web2Calls = {
      * @param {IKeyPair} keyPair - The key pair to use for the request.
      * @returns {Promise<Web2Proxy>} A new Web2Proxy instance.
      */
-    createDahr: async (keyPair?: IKeyPair): Promise<Web2Proxy> => {
-        const demos = new Demos()
-        const usedKeyPair = keyPair || demos.keypair
+    createDahr: async (demos: Demos): Promise<Web2Proxy> => {
+        // const demos = new Demos()
+        const usedKeyPair = demos.keypair
+
         if (!usedKeyPair) {
             throw new Error("No keypair provided and no wallet connected")
         }
@@ -121,9 +123,11 @@ export const web2Calls = {
 
         // Signing and broadcasting the transaction
         const signedWeb2Tx = await DemosTransactions.sign(web2Tx, usedKeyPair)
-        const validityData = await DemosTransactions.confirm(signedWeb2Tx, demos)
+        const validityData = await DemosTransactions.confirm(
+            signedWeb2Tx,
+            demos,
+        )
         await DemosTransactions.broadcast(validityData, demos)
-
-        return new Web2Proxy(sessionId)
+        return new Web2Proxy(sessionId, demos)
     },
 }
