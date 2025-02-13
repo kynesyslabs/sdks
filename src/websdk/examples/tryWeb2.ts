@@ -1,10 +1,12 @@
 import { demos } from "../demos"
 import { EnumWeb2Methods } from "../../types"
 import { DemosWebAuth } from "../DemosWebAuth"
+import { Demos } from "../demosclass"
 
 async function tryWeb2Proxy() {
     try {
         // Connect to demos
+        const demos = new Demos()
         await demos.connect("http://localhost:53550")
         console.log("Connected to demos")
 
@@ -15,7 +17,7 @@ async function tryWeb2Proxy() {
         console.log("Wallet connected")
 
         // Create proxy instance
-        const dahr = await demos.web2.createDahr()
+        const dahr = await demos.web2.createDahr(demos)
         console.log("Created proxy with sessionId:", dahr.sessionId)
 
         // Make request
@@ -33,4 +35,4 @@ async function tryWeb2Proxy() {
     }
 }
 
-tryWeb2Proxy()
+// tryWeb2Proxy()
