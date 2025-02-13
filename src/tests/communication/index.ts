@@ -3,7 +3,7 @@ import * as forge from "node-forge"
 
 import { DemosWebAuth } from "@/websdk"
 import * as bip39 from "@scure/bip39"
-import { Cryptography, Hashing } from "@/encryption"
+import { Cryptography } from "@/encryption/Cryptography"
 
 describe("COMMUNICATION TESTS", () => {
     beforeAll(async () => {
