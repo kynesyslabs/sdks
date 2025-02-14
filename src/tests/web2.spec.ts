@@ -7,16 +7,20 @@ describe("Web2", () => {
         const identity = DemosWebAuth.getInstance()
         await identity.create()
 
-        const rpc = "http://localhost:53550"
+        const rpc = "https://demos.mungaist.com"
         const demos = new Demos()
         await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as any)
 
-        const proxy = await demos.web2.createDahr(demos)
+        const keypair = identity.keypair
+        await demos.connectWallet(keypair.privateKey as any)
+
+        const proxy = await demos.web2.createDahr()
         const res = await proxy.startProxy({
             method: EnumWeb2Methods.GET,
             url: "https://node2.demos.sh/info",
         })
+
+        demos.web2.createDahr
 
         console.log(res)
 

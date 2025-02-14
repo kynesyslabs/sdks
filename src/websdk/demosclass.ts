@@ -416,6 +416,9 @@ export class Demos {
     // ANCHOR Web2 Endpoints
     web2 = {
         ...web2Calls,
+        createDahr: async () => {
+            return await web2Calls.createDahr(this)
+        },
         /*legacy: {
             createPayload: (
                 params: IPrepareWeb2PayloadParams,

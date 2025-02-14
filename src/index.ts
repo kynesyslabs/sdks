@@ -14,5 +14,6 @@ export * as demoswork from "./demoswork"
 
 export * as l2ps from "./l2ps" // REVIEW This is exporting the type of the L2PS, but the l2psCalls is in the websdk
 
-export * as websdk from './websdk'
-export * as abstraction from './abstraction'
+export * as websdk from "./websdk"
+export * as abstraction from "./abstraction"
+export * as web2 from "./websdk/Web2Calls"

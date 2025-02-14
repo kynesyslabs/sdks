@@ -17,7 +17,7 @@ async function tryWeb2Proxy() {
         console.log("Wallet connected")
 
         // Create proxy instance
-        const dahr = await demos.web2.createDahr(demos)
+        const dahr = await demos.web2.createDahr()
         console.log("Created proxy with sessionId:", dahr.sessionId)
 
         // Make request

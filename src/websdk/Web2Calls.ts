@@ -77,11 +77,10 @@ export class Web2Proxy {
 export const web2Calls = {
     /**
      * Create a new DAHR instance.
-     * @param {IKeyPair} keyPair - The key pair to use for the request.
+     * @param {Demos} demos - The demos instance to use for the request.
      * @returns {Promise<Web2Proxy>} A new Web2Proxy instance.
      */
     createDahr: async (demos: Demos): Promise<Web2Proxy> => {
-        // const demos = new Demos()
         const usedKeyPair = demos.keypair
 
         if (!usedKeyPair) {
