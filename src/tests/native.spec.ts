@@ -1,6 +1,6 @@
 import pprint from "@/utils/pprint"
 import Wallet from "@/wallet/Wallet"
-import { Demos, DemosWebAuth } from "@/websdk"
+import { Demos, DemosTransactions, DemosWebAuth } from "@/websdk"
 
 describe("Native transactions", () => {
     let demos: Demos = new Demos()
@@ -59,7 +59,24 @@ describe("Native transactions", () => {
         console.log("Validity data", validityData)
 
         // 4. Broadcast the transaction
-        const broadcastRes = await demos.broadcast(validityData)
-        console.log("Broadcast result", broadcastRes)
+        if (validityData.result == 200) {
+            const broadcastRes = await demos.broadcast(validityData)
+            console.log("Broadcast result", broadcastRes)
+        } else {
+            console.log("Tx confirm failed", validityData)
+        }
+    })
+
+    test("Signing a native tx using DemosTransactions", async () => {
+        const identity = DemosWebAuth.getInstance()
+        await identity.create()
+
+        const tx = await DemosTransactions.transfer(
+            "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
+            100,
+            identity.keypair,
+        )
+
+        console.log("Tx", tx)
     })
 })
