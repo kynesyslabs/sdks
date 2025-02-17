@@ -7,6 +7,7 @@ import { SOLANA as SC } from "@/multichain/localsdk"
 import { BN } from "@project-serum/anchor"
 import { wallets } from "../utils/wallets"
 import chainProviders from "./chainProviders"
+import BigNumber from "bignumber.js"
 
 const idl = {
     version: "0.1.0",
@@ -132,9 +133,8 @@ describe("SOLANA CHAIN TESTS", () => {
             },
         )
 
-        console.log("data: ", acc.data.toNumber())
-
-        expect(acc.data.toNumber()).toEqual(42)
+        console.log("data: ", (acc.data as BigNumber)?.toNumber());
+        expect((acc.data as BigNumber)?.toNumber()).toEqual(42);
     }, 25000)
 
     test("Reading program owned account data", async () => {
@@ -146,8 +146,9 @@ describe("SOLANA CHAIN TESTS", () => {
                 name: "newAccount",
             },
         )
-        console.log("data: ", acc.data.toNumber())
-        expect(acc.data.toNumber()).toEqual(42)
+
+        console.log("data: ", (acc.data as BigNumber)?.toNumber());
+        expect((acc.data as BigNumber)?.toNumber()).toEqual(42);
     })
 
     test.skip("Running raw program", async () => {
