@@ -3,46 +3,63 @@ import Wallet from "@/wallet/Wallet"
 import { Demos, DemosWebAuth } from "@/websdk"
 
 describe("Native transactions", () => {
-    let demos: Demos
-    let senderWebAuth: DemosWebAuth
-    let recepientWebAuth: DemosWebAuth
+    let demos: Demos = new Demos()
+    let senderWebAuth = new DemosWebAuth()
+    let recepientWebAuth = new DemosWebAuth()
 
     beforeAll(async () => {
-        senderWebAuth = DemosWebAuth.getInstance()
-
-        // NOTE: Replace with funded account
+        // NOTE: Replace with funded account on PROD
         // await senderWebAuth.login(<private key>)
-        await senderWebAuth.create()
-
-        recepientWebAuth = new DemosWebAuth()
+        await senderWebAuth.login(
+            "0x874626ac0c81016405fb0dcda1007361138e927262e0f21abc771eddc8b2502fccc6ba0c609435a05fdbf236e7df7d60f024ed26c19d8f64b024e6163036247a",
+        )
         await recepientWebAuth.create()
 
-        demos = new Demos()
-
-        await demos.connect("http://localhost:53550")
+        await demos.connect("https://demos.mungaist.com")
         await demos.connectWallet(
             senderWebAuth.keypair.privateKey as Uint8Array,
         )
     })
 
     test("Pay", async () => {
-        const wallet = Wallet.getInstance("test")
-
-        // INFO: This will create the tx and confirm it
-        const res = await wallet.transfer(
-            `0x${recepientWebAuth.keypair.publicKey.toString("hex")}`, // to
-            100, // amount
-            demos,
+        const tx = await demos.transfer(
+            "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
+            100,
         )
 
+        const res = await demos.confirm(tx)
         pprint("Tx confirm result", res)
-        expect(res.result).toBe(200)
 
         if (res.result == 200) {
-            const broadcastRes = await wallet.broadcast(res, demos)
+            const broadcastRes = await demos.broadcast(res)
             pprint("Tx broadcast result", broadcastRes)
         } else {
             pprint("Tx confirm failed", res)
         }
+    })
+
+    test.only("Full Native Transaction", async () => {
+        // 1. Initialize the demos instance
+        const rpc = "https://demosnode.discus.sh"
+        const demos = new Demos()
+        await demos.connect(rpc)
+
+        const identity = DemosWebAuth.getInstance()
+        await identity.create()
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+
+        // 2. Create a transaction
+        const tx = await demos.transfer(
+            "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
+            100,
+        )
+
+        // 3. Confirm the transaction
+        const validityData = await demos.confirm(tx)
+        console.log("Validity data", validityData)
+
+        // 4. Broadcast the transaction
+        const broadcastRes = await demos.broadcast(validityData)
+        console.log("Broadcast result", broadcastRes)
     })
 })

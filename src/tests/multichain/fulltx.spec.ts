@@ -66,7 +66,7 @@ describe("DEMOS Transaction", () => {
         console.log("res", res)
     })
 
-    test.skip("XRPL Send tokens", async () => {
+    test.only("XRPL Send tokens", async () => {
         // 1. Create XRPL SDK instance
         const sdk = await XRPL.create(chainProviders.xrpl.testnet)
         await sdk.connectWallet(wallets.xrpl.privateKey)
@@ -92,7 +92,7 @@ describe("DEMOS Transaction", () => {
         // 5. Convert the XMScript to a DEMOS transaction
         const tx = await prepareXMPayload(xmscript, identity.keypair)
 
-        const rpc = "https://node2.demos.sh"
+        const rpc = "https://demosnode.discus.sh"
 
         const demos = new Demos()
 
