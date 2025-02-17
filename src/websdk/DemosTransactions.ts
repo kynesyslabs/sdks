@@ -40,6 +40,11 @@ export const DemosTransactions = {
     ): Promise<Transaction> {
         required(keypair, "Private key not provided")
 
+        // REVIEW If for some reason the tx timestamp is not set, we set it to the current time
+        if (!raw_tx.content.timestamp || raw_tx.content.timestamp === 0) {
+            raw_tx.content.timestamp = Date.now()
+        }
+
         // Set the public key in the transaction
         raw_tx.content.from = keypair.publicKey as Uint8Array
 
