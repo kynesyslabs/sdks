@@ -128,6 +128,30 @@ export class Demos {
     }
 
     /**
+     * Create a signed DEMOS transaction to send native tokens to a given address.
+     *
+     * @param to - The reciever
+     * @param amount - The amount in DEM
+     *
+     * @returns The signed transaction.
+     */
+    pay(to: string, amount: number) {
+        return DemosTransactions.pay(to, amount, this.keypair)
+    }
+
+    /**
+     * Create a signed DEMOS transaction to send native tokens to a given address.
+     *
+     * @param to - The reciever
+     * @param amount - The amount in DEM
+     *
+     * @returns The signed transaction.
+     */
+    transfer(to: string, amount: number) {
+        return DemosTransactions.pay(to, amount, this.keypair)
+    }
+
+    /**
      * Confirms a transaction.
      *
      * @param transaction - The transaction to confirm
@@ -419,22 +443,6 @@ export class Demos {
         createDahr: async () => {
             return await web2Calls.createDahr(this)
         },
-        /*legacy: {
-            createPayload: (
-                params: IPrepareWeb2PayloadParams,
-                keypair?: IKeyPair,
-            ) => {
-                const usedKeypair = keypair || this.keypair
-
-                if (!usedKeypair) {
-                    throw new Error(
-                        "No keypair provided and no wallet connected",
-                    )
-                }
-
-                return prepareWeb2Payload(params, usedKeypair)
-            },
-        },*/
     }
 
     xm = {

@@ -26,6 +26,33 @@ export const DemosTransactions = {
         if (data) thisTx.content.data = data
         return thisTx
     },
+    /**
+     * Create a signed DEMOS transaction to send native tokens to a given address.
+     *
+     * @param to - The reciever
+     * @param amount - The amount in DEM
+     * @param keypair - The keypair to sign the transaction
+     *
+     * @returns The signed transaction.
+     */
+    async pay(to: string, amount: number, keypair: IKeyPair) {
+        let tx = DemosTransactions.empty()
+        tx.content.from = keypair.publicKey.toString("hex")
+        tx.content.to = to
+        tx.content.nonce = 300
+        tx.content.amount = amount
+        tx.content.type = "native"
+        tx.content.timestamp = Date.now()
+        tx.content.data = [
+            "native",
+            { nativeOperation: "send", args: [to, amount] },
+        ]
+
+        return await DemosTransactions.sign(tx, keypair)
+    },
+    transfer(to: string, amount: number, keypair: IKeyPair) {
+        return DemosTransactions.pay(to, amount, keypair)
+    },
     // NOTE Signing a transaction after hashing it
     /**
      * Signs a transaction after hashing its content.
