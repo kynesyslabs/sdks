@@ -14,7 +14,8 @@ import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
-import type { Transaction, XMScript } from "@/types"
+import { Block, IPeer, RawTransaction, Transaction, XMScript } from "@/types"
+import { AddressInfo } from "@/types/blockchain/address"
 import {
     RPCRequest,
     RPCResponse,
@@ -220,18 +221,29 @@ export const demos = {
     // !SECTION NodeCall prototype
 
     // SECTION Predefined calls
-    getLastBlockNumber: async function () {
+    getLastBlockNumber: async function (): Promise<number> {
         return (await demos.nodeCall("getLastBlockNumber")) as number
     },
-    getLastBlockHash: async function () {
+
+    getLastBlockHash: async function (): Promise<string | null> {
         return (await demos.nodeCall("getLastBlockHash")) as string
     },
-    getBlockByNumber: async function (blockNumber: any) {
+
+    getBlocks: async function (
+        start?: number,
+        limit?: number,
+        fromEnd?: boolean,
+    ): Promise<Block[]> {
+        return await demos.nodeCall("getBlocks", { start, limit, fromEnd })
+    },
+
+    getBlockByNumber: async function (blockNumber: number): Promise<Block> {
         return await demos.nodeCall("getBlockByNumber", {
             blockNumber,
         })
     },
-    getBlockByHash: async function (blockHash: any) {
+
+    getBlockByHash: async function (blockHash: string): Promise<Block> {
         return await demos.nodeCall("getBlockByHash", {
             hash: blockHash,
         })
@@ -239,27 +251,44 @@ export const demos = {
 
     getTxByHash: async function (
         txHash = "e25860ec6a7cccff0371091fed3a4c6839b1231ccec8cf2cb36eca3533af8f11",
-    ) {
+    ): Promise<Transaction> {
         // Defaulting to the genesis tx of course
         return await demos.nodeCall("getTxByHash", {
             hash: txHash,
         })
     },
+
     getAllTxs: async function () {
         return await demos.nodeCall("getAllTxs")
     },
 
-    getPeerlist: async function () {
+    getTransactions: async function (
+        start?: number,
+        limit?: number,
+        fromEnd?: boolean,
+    ): Promise<RawTransaction[]> {
+        return await demos.nodeCall("getTransactions", {
+            start,
+            limit,
+            fromEnd,
+        })
+    },
+
+    getPeerlist: async function (): Promise<IPeer[]> {
         return await demos.nodeCall("getPeerlist")
     },
-    getMempool: async function () {
+
+    getMempool: async function (): Promise<Transaction[]> {
         return await demos.nodeCall("getMempool")
     },
-    getPeerIdentity: async function () {
+
+    getPeerIdentity: async function (): Promise<string> {
         return await demos.nodeCall("getPeerIdentity")
     },
 
-    getAddressInfo: async function (address: any) {
+    getAddressInfo: async function (
+        address: string,
+    ): Promise<AddressInfo | null> {
         return await demos.nodeCall("getAddressInfo", {
             address,
         })
