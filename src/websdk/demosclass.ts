@@ -356,11 +356,10 @@ export class Demos {
      *
      */
     async getBlocks(
-        start?: number,
+        start?: number | "latest",
         limit?: number,
-        fromEnd?: boolean,
     ): Promise<Block[]> {
-        return await this.nodeCall("getBlocks", { start, limit, fromEnd })
+        return await this.nodeCall("getBlocks", { start, limit })
     }
 
     /**
@@ -411,11 +410,10 @@ export class Demos {
      * Get all transactions.
      */
     async getTransactions(
-        start?: number,
+        start?: number | "latest",
         limit?: number,
-        fromEnd?: boolean,
     ): Promise<RawTransaction[]> {
-        return await this.nodeCall("getTransactions", { start, limit, fromEnd })
+        return await this.nodeCall("getTransactions", { start, limit })
     }
 
     /**
