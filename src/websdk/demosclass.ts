@@ -452,6 +452,17 @@ export class Demos {
     }
 
     /**
+     * Get address nonce.
+     *
+     * @param address - The address
+     */
+    async getAddressNonce(address: string): Promise<number> {
+        return await this.nodeCall("getAddressNonce", {
+            address,
+        })
+    }
+
+    /**
      * Disconnects from the RPC URL and the wallet.
      */
     disconnect() {

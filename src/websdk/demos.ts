@@ -297,6 +297,12 @@ export const demos = {
             address,
         })
     },
+
+    getAddressNonce: async function (address: string): Promise<number> {
+        return await demos.nodeCall("getAddressNonce", {
+            address,
+        })
+    },
     // !SECTION Predefined calls
 
     // SECTION Operation types
