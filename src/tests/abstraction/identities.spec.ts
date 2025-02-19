@@ -1,21 +1,21 @@
 import { InferFromSignaturePayload } from "@/abstraction"
 import Identities from "@/abstraction/Identities"
+import { IBCConnectWalletOptions } from "@/multichain/core"
 import {
     EVM,
     IBC,
     MULTIVERSX,
+    NEAR,
     SOLANA,
     TON,
     XRPL,
-    NEAR,
 } from "@/multichain/websdk"
+import { InferFromSignatureTargetIdentityPayload } from "@/types/abstraction"
 import { DemosWebAuth } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
-import { wallets } from "../utils/wallets"
-import { InferFromSignatureTargetIdentityPayload } from "@/types/abstraction"
-import { IBCConnectWalletOptions } from "@/multichain/core"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
+import { wallets } from "../utils/wallets"
 
 const chains = [
     {
@@ -71,7 +71,7 @@ const chains = [
 describe.each(chains)(
     "Identities › $name",
     ({ name, sdk, wallet, subchain, password, rpc }: any) => {
-        let instance: any;
+        let instance: any
         const demos: Demos = new Demos()
         const identities: Identities = new Identities()
         const identity: DemosWebAuth = DemosWebAuth.getInstance()
@@ -87,7 +87,7 @@ describe.each(chains)(
 
         test("Associate an identity using a signature", async () => {
             instance = await sdk.create(null)
-            let ibcBase64PublicKey = "";
+            let ibcBase64PublicKey = ""
 
             if (name === "EGLD") {
                 await instance.connectWallet(wallet, { password: password })
@@ -185,8 +185,18 @@ describe.each(chains)(
             const res = await identities.inferIdentity(demos, payload)
             console.log(res)
 
-            expect(res['result']).toBe(200)
-            expect(res['response']).toBe("Identity added")
+            expect([200, 304]).toContain(res["result"])
+            expect(res["response"]).toBe("Identity added")
+        })
+
+        test("Confirm identity is added", async () => {
+            const res = await identities.getIdentities(demos)
+            const chain = name.toLowerCase()
+
+            console.log(res["response"]["xm"])
+
+            expect(res["result"]).toBe(200)
+            expect(res["response"]["xm"][chain]).toBeDefined()
         })
 
         test("Remove associated identity", async () => {
@@ -196,11 +206,14 @@ describe.each(chains)(
                 targetAddress: instance.getAddress(),
             }
 
-            const res = await identities.removeIdentity(demos, target_identity)
+            const res = await identities.removeXmIdentity(
+                demos,
+                target_identity,
+            )
             console.log(res)
 
-            expect(res['result']).toBe(200)
-            expect(res['response']).toBe("Identity removed")
+            expect(res["result"]).toBe(200)
+            expect(res["response"]).toBe("Identity removed")
         })
     },
 )

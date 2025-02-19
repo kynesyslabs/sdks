@@ -186,7 +186,7 @@ export class Demos {
     async rpcCall(
         request: RPCRequest,
         isAuthenticated: boolean = false,
-        retries = 1,
+        retries = 0,
         sleepTime = 250,
         allowedErrorCodes: number[] = [],
     ) {
@@ -231,6 +231,8 @@ export class Demos {
                     allowedErrorCodes,
                 )
             }
+
+            return response.data
         } catch (error) {
             console.error(error)
             return {
