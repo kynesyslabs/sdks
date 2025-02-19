@@ -10,6 +10,7 @@ KyneSys Labs: https://www.kynesys.xyz/
 */
 
 export interface RawTransaction {
+    id: number
     blockNumber: number
     signature: string
     status: string
