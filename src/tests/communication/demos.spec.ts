@@ -6,56 +6,6 @@ describe("DEMOS METHODS TESTS", () => {
         await demos.connect(rpc_url)
     })
 
-    test("get blocks with default parameters", async () => {
-        const blocks = await demos.getBlocks()
-        expect(Array.isArray(blocks)).toBe(true)
-
-        if (blocks.length > 0) {
-            expect(blocks[0]).toHaveProperty("id")
-            expect(blocks[0]).toHaveProperty("number")
-            expect(blocks[0]).toHaveProperty("hash")
-        }
-    })
-
-    test("get last 50 blocks", async () => {
-        const blocks = await demos.getBlocks("latest", 50)
-
-        expect(Array.isArray(blocks)).toBe(true)
-        expect(blocks?.length).toBeLessThanOrEqual(50)
-
-        if (blocks.length > 0) {
-            expect(blocks[0]).toHaveProperty("id")
-            expect(blocks[0]).toHaveProperty("number")
-            expect(blocks[0]).toHaveProperty("hash")
-        }
-    })
-
-    test("get last block", async () => {
-        const blocks = await demos.getBlocks("latest", 1)
-
-        expect(Array.isArray(blocks)).toBe(true)
-        expect(blocks?.length).toBe(1)
-
-        if (blocks.length > 0) {
-            expect(blocks[0]).toHaveProperty("id")
-            expect(blocks[0]).toHaveProperty("number")
-            expect(blocks[0]).toHaveProperty("hash")
-        }
-    })
-
-    test("get previous block", async () => {
-        const lastBlockNumber = await demos.getLastBlockNumber()
-        const firstBlock = await demos.getBlocks(lastBlockNumber, 1)
-
-        expect(Array.isArray(firstBlock)).toBe(true)
-        expect(firstBlock?.length).toBe(1)
-
-        if (firstBlock.length > 0) {
-            expect(firstBlock[0]).toHaveProperty("id", 1)
-            expect(firstBlock[0]).toHaveProperty("number", 0)
-        }
-    })
-
     test("get transactions with default parameters", async () => {
         const transactions = await demos.getTransactions()
         expect(Array.isArray(transactions)).toBe(true)
@@ -69,7 +19,6 @@ describe("DEMOS METHODS TESTS", () => {
 
     test("get last transaction", async () => {
         const transactions = await demos.getTransactions("latest", 1)
-        console.log(transactions)
 
         expect(Array.isArray(transactions)).toBe(true)
         expect(transactions?.length).toBe(1)
@@ -92,11 +41,59 @@ describe("DEMOS METHODS TESTS", () => {
         )
     })
 
-    test.only("Get address nonce", async () => {
+    test("Get address nonce", async () => {
         const addressNonce = await demos.getAddressNonce(
             "ccc6ba0c609435a05fdbf236e7df7d60f024ed26c19d8f64b024e6163036247a",
         )
         console.log(addressNonce)
         expect(addressNonce).not.toBeNull()
+    })
+
+    test("Get Blocks", async () => {
+        // Get the last 25 blocks
+        const blocks = await demos.getBlocks("latest", 25)
+        expect(Array.isArray(blocks)).toBe(true)
+        expect(blocks.length).toBe(25)
+
+        // Get from block 50 to 25
+        const nextBlocks = await demos.getBlocks(50, 25)
+
+        expect(nextBlocks.length).toBe(25)
+        expect(nextBlocks[0].number).toBe(50)
+        expect(nextBlocks[nextBlocks.length - 1].number).toBe(26)
+
+        // Get Blocks with invalid start block number
+        const invalidBlocks = await demos.getBlocks("something" as any, 25)
+        expect(Array.isArray(invalidBlocks)).toBe(true)
+        expect(invalidBlocks.length).toBe(0)
+
+        // Get Blocks with invalid block limit
+        const invalidBlocksLimit = await demos.getBlocks(0, "something" as any)
+        expect(Array.isArray(invalidBlocksLimit)).toBe(true)
+        expect(invalidBlocksLimit.length).toBe(0)
+    })
+
+    test("Get Transactions", async () => {
+        // Get 25 transactions from latest
+        const transactions = await demos.getTransactions("latest", 25)
+        expect(Array.isArray(transactions)).toBe(true)
+        expect(transactions.length).toBe(25)
+
+        // Get 25 transactions from block 100
+        const tx2 = await demos.getTransactions(100, 25)
+        expect(Array.isArray(tx2)).toBe(true)
+        expect(tx2.length).toBe(25)
+        expect(tx2[0].id).toBe(100)
+        expect(tx2[tx2.length - 1].id).toBe(76)
+
+        // Get transactions with invalid block number
+        const invalidTx = await demos.getTransactions("something" as any, 25)
+        expect(Array.isArray(invalidTx)).toBe(true)
+        expect(invalidTx.length).toBe(0)
+
+        // Get transactions with invalid block limit
+        const invalidTxLimit = await demos.getTransactions(100, "something" as any)
+        expect(Array.isArray(invalidTxLimit)).toBe(true)
+        expect(invalidTxLimit.length).toBe(0)
     })
 })

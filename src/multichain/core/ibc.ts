@@ -205,8 +205,8 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
     }
 
     override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
-        required(this.wallet && options && options?.privateKey, "Wallet not connected")
-        
+        required(options && options?.privateKey, "Wallet not connected")
+
         const seed = bip39.mnemonicToSeedSync(options.privateKey);
         const hdkey = bip32.HDKey.fromMasterSeed(seed);
         const derivedKey = hdkey.derive("m/44'/118'/0'/0/0");
