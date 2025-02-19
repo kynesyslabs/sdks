@@ -147,7 +147,8 @@ export class Demos {
      * @returns The signed transaction.
      */
     pay(to: string, amount: number) {
-        return DemosTransactions.pay(to, amount, this.keypair)
+        required(this.keypair, "Wallet not connected")
+        return DemosTransactions.pay(to, amount, this)
     }
 
     /**
@@ -159,7 +160,8 @@ export class Demos {
      * @returns The signed transaction.
      */
     transfer(to: string, amount: number) {
-        return DemosTransactions.pay(to, amount, this.keypair)
+        required(this.keypair, "Wallet not connected")
+        return DemosTransactions.pay(to, amount, this)
     }
 
     /**
@@ -478,9 +480,15 @@ export class Demos {
      * @param address - The address
      */
     async getAddressNonce(address: string): Promise<number> {
-        return await this.nodeCall("getAddressNonce", {
+        const nonce = await this.nodeCall("getAddressNonce", {
             address,
         })
+
+        if (nonce) {
+            return nonce as number
+        }
+
+        return 0
     }
 
     /**

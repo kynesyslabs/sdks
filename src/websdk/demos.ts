@@ -29,6 +29,7 @@ import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
 import { Demos } from "./demosclass"
 
+// TODO WIP modularize this behemoth (see l2psCalls as an example)
 /**
  * @deprecated Use the new `Demos` class
  * @see Demos class
@@ -40,8 +41,9 @@ import { Demos } from "./demosclass"
  * await demos.connect(rpc_url)
  * await demos.connectWallet(privateKey)
  * ```
- */
+*/
 export const _demos = {
+    // NOTE: demos is now exported from Demos.instance at the bottom of the file
     // ANCHOR Properties
     rpc_url: <string | null>null,
     connected: false,

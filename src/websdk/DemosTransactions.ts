@@ -4,7 +4,7 @@ import { Demos } from "./demosclass"
 import { sha256 } from "./utils/sha256"
 import * as skeletons from "./utils/skeletons"
 
-import type { GCREdit, Transaction } from "@/types"
+import type { Transaction } from "@/types"
 import { IKeyPair } from "./types/KeyPair"
 import { GCRGeneration } from "./GCRGeneration"
 import { _required as required } from "./utils/required"
@@ -31,15 +31,21 @@ export const DemosTransactions = {
      *
      * @param to - The reciever
      * @param amount - The amount in DEM
-     * @param keypair - The keypair to sign the transaction
+     * @param demos - The demos instance (for getting the address nonce)
      *
      * @returns The signed transaction.
      */
-    async pay(to: string, amount: number, keypair: IKeyPair) {
+    async pay(to: string, amount: number, demos: Demos) {
+        required(demos.keypair, "Wallet not connected")
         let tx = DemosTransactions.empty()
-        tx.content.from = keypair.publicKey.toString("hex")
+
+        const from = demos.keypair.publicKey.toString("hex")
+        const nonce = await demos.getAddressNonce(from)
+
+        // REVIEW Get the address nonce
+        tx.content.from = from
         tx.content.to = to
-        tx.content.nonce = 300
+        tx.content.nonce = nonce + 1
         tx.content.amount = amount
         tx.content.type = "native"
         tx.content.timestamp = Date.now()
@@ -48,10 +54,19 @@ export const DemosTransactions = {
             { nativeOperation: "send", args: [to, amount] },
         ]
 
-        return await DemosTransactions.sign(tx, keypair)
+        return await demos.sign(tx)
     },
-    transfer(to: string, amount: number, keypair: IKeyPair) {
-        return DemosTransactions.pay(to, amount, keypair)
+    /**
+     * Create a signed DEMOS transaction to send native tokens to a given address.
+     *
+     * @param to - The reciever
+     * @param amount - The amount in DEM
+     * @param demos - The demos instance (for getting the address nonce)
+     *
+     * @returns The signed transaction.
+     */
+    transfer(to: string, amount: number, demos: Demos) {
+        return DemosTransactions.pay(to, amount, demos)
     },
     // NOTE Signing a transaction after hashing it
     /**
@@ -128,6 +143,14 @@ export const DemosTransactions = {
 
         return response as RPCResponseWithValidityData
     },
+    /**
+     * Broadcasts a transaction for execution.
+     *
+     * @param validationData - The validity data of the transaction
+     * @param demos - The demos instance
+     *
+     * @returns The response from the node
+     */
     broadcast: async function (
         validationData: RPCResponseWithValidityData,
         demos: Demos,

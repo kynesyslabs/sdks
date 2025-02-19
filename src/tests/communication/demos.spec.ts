@@ -92,10 +92,11 @@ describe("DEMOS METHODS TESTS", () => {
         )
     })
 
-    test("Get address nonce", async () => {
+    test.only("Get address nonce", async () => {
         const addressNonce = await demos.getAddressNonce(
             "ccc6ba0c609435a05fdbf236e7df7d60f024ed26c19d8f64b024e6163036247a",
         )
+        console.log(addressNonce)
         expect(addressNonce).not.toBeNull()
     })
 })

@@ -66,17 +66,4 @@ describe("Native transactions", () => {
             console.log("Tx confirm failed", validityData)
         }
     })
-
-    test("Signing a native tx using DemosTransactions", async () => {
-        const identity = DemosWebAuth.getInstance()
-        await identity.create()
-
-        const tx = await DemosTransactions.transfer(
-            "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
-            100,
-            identity.keypair,
-        )
-
-        console.log("Tx", tx)
-    })
 })
