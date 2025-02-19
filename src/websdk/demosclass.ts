@@ -398,12 +398,14 @@ export class Demos {
         })
     }
 
-    // Deprecated
     /**
+     * @deprecated
+     * Use `demos.getTransactions()` instead
+     *
      * Get all transactions.
      */
-    async getAllTxs(): Promise<Transaction[]> {
-        return await this.nodeCall("getAllTxs")
+    async getAllTxs(): Promise<RawTransaction[]> {
+        return await this.getTransactions("latest", 50)
     }
 
     /**

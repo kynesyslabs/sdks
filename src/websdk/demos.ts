@@ -257,8 +257,15 @@ export const demos = {
         })
     },
 
+    /**
+     * @deprecated
+     * Use `demos.getTransactions()` instead
+     *
+     * Gets the latest 50 transactions from the network.
+     */
     getAllTxs: async function () {
-        return await demos.nodeCall("getAllTxs")
+        // return await demos.nodeCall("getAllTxs")
+        return await demos.getTransactions("latest", 50)
     },
 
     getTransactions: async function (
