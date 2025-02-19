@@ -81,13 +81,15 @@ describe("DEMOS METHODS TESTS", () => {
         }
     })
 
-    test.only("Get address Info", async () => {
+    test("Get address Info", async () => {
         const addressInfo = await demos.getAddressInfo(
             "ccc6ba0c609435a05fdbf236e7df7d60f024ed26c19d8f64b024e6163036247a",
         )
         console.log(addressInfo)
 
-        expect(addressInfo).not.toBeNull()
+        expect(addressInfo?.pubkey).toBe(
+            "ccc6ba0c609435a05fdbf236e7df7d60f024ed26c19d8f64b024e6163036247a",
+        )
     })
 
     test("Get address nonce", async () => {

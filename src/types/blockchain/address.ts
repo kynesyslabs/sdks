@@ -19,8 +19,12 @@ interface Extended {
 }
 
 export interface AddressInfo {
-    id: number
-    publicKey: string
-    details: Details
-    extended: Extended
+    pubkey: string
+    assignedTxs: string[]
+    identities: {
+        xm: Map<string, string[]>
+        web2: Map<string, string[]>
+    }
+    nonce: number
+    balance: bigint
 }

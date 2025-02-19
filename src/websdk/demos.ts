@@ -27,8 +27,8 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
+import { Demos } from "./demosclass"
 
-// TODO WIP modularize this behemoth (see l2psCalls as an example)
 /**
  * @deprecated Use the new `Demos` class
  * @see Demos class
@@ -41,7 +41,7 @@ import { web2Calls } from "./Web2Calls"
  * await demos.connectWallet(privateKey)
  * ```
  */
-export const demos = {
+export const _demos = {
     // ANCHOR Properties
     rpc_url: <string | null>null,
     connected: false,
@@ -120,11 +120,9 @@ export const demos = {
     },
     // REVIEW: Replace call with validate / execute logic
     confirm: (tx: Transaction) => {
-        // @ts-expect-error
         return DemosTransactions.confirm(tx, demos)
     },
     broadcast: (validityData: RPCResponseWithValidityData) => {
-        // @ts-expect-error
         return DemosTransactions.broadcast(validityData, demos)
     },
 
@@ -293,9 +291,18 @@ export const demos = {
     getAddressInfo: async function (
         address: string,
     ): Promise<AddressInfo | null> {
-        return await demos.nodeCall("getAddressInfo", {
+        const info = await demos.nodeCall("getAddressInfo", {
             address,
         })
+
+        if (info) {
+            return {
+                ...info,
+                balance: BigInt(info.balance),
+            } as AddressInfo
+        }
+
+        return null
     },
 
     getAddressNonce: async function (address: string): Promise<number> {
@@ -359,3 +366,10 @@ export const demos = {
     // INFO Calling demos.skeletons.NAME provides an empty skeleton that can be used for reference while calling other demos functions
     skeletons,
 }
+
+/**
+ * A global instance of the Demos class.
+ *
+ * @see Demos class
+ */
+export const demos = Demos.instance

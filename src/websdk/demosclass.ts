@@ -37,6 +37,8 @@ async function sleep(ms: number) {
  * This class provides methods to interact with the DEMOS blockchain.
  */
 export class Demos {
+    private static _instance: Demos | null = null
+
     /** The RPC URL of the demos node */
     rpc_url: string | null = null
 
@@ -50,6 +52,14 @@ export class Demos {
 
     /** The keypair of the connected wallet */
     keypair: IKeyPair | null = null
+
+    static get instance() {
+        if (!Demos._instance) {
+            Demos._instance = new Demos()
+        }
+
+        return Demos._instance
+    }
 
     /**
      * Connects to a RPC URL. Throws an error if the connection fails.
@@ -446,9 +456,18 @@ export class Demos {
      * @param address - The address
      */
     async getAddressInfo(address: string): Promise<AddressInfo | null> {
-        return await this.nodeCall("getAddressInfo", {
+        const info = await this.nodeCall("getAddressInfo", {
             address,
         })
+
+        if (info) {
+            return {
+                ...info,
+                balance: BigInt(info.balance),
+            } as AddressInfo
+        }
+
+        return null
     }
 
     /**
