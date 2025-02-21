@@ -7,7 +7,7 @@ describe("RubicService", () => {
 
     beforeEach(() => {
         const privateKey =
-            "8a4bd30f4c20716e78f52889313b3eda3badbfe0f150fc20ad9f9f0b49da6d58" // Replace with your actual private key
+            "YOUR_PRIVATE_KEY" // Replace with your actual private key
         mockSigner = new ethers.Wallet(privateKey)
         rubicService = new RubicService(mockSigner, 1, "ALL")
     })
@@ -31,20 +31,20 @@ describe("RubicService", () => {
         expect(trade.error).not.toBeDefined()
     })
 
-    // test('should execute trade', async () => {
-    //     await rubicService['initializeSDK']();
-    //     const trade = await rubicService.getTrade('USDT', 'USDT', '8', 137, 1);
-    //     console.log("trade", trade);
+    test('should execute trade', async () => {
+        await rubicService['initializeSDK']();
+        const trade = await rubicService.getTrade('USDT', 'USDT', '8', 137, 1);
+        console.log("trade", trade);
 
-    //     if (trade.error) {
-    //         throw new Error(`Trade calculation failed: ${trade.error.message}`);
-    //     }
+        if (trade.error) {
+            throw new Error(`Trade calculation failed: ${trade.error.message}`);
+        }
 
-    //     const receipt = await rubicService.executeTrade(trade);
-    //     console.log("receipt", receipt);
+        const receipt = await rubicService.executeTrade(trade);
+        console.log("receipt", receipt);
 
-    //     expect(receipt).toBeDefined();
-    // });
+        expect(receipt).toBeDefined();
+    });
 
     test("should get blockchain name", () => {
         const blockchainName = rubicService.getBlockchainName(1)
