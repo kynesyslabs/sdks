@@ -14,7 +14,8 @@ import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
-import type { Transaction, XMScript } from "@/types"
+import { Block, IPeer, RawTransaction, Transaction, XMScript } from "@/types"
+import { AddressInfo } from "@/types/blockchain/address"
 import {
     RPCRequest,
     RPCResponse,
@@ -36,6 +37,8 @@ async function sleep(ms: number) {
  * This class provides methods to interact with the DEMOS blockchain.
  */
 export class Demos {
+    private static _instance: Demos | null = null
+
     /** The RPC URL of the demos node */
     rpc_url: string | null = null
 
@@ -49,6 +52,14 @@ export class Demos {
 
     /** The keypair of the connected wallet */
     keypair: IKeyPair | null = null
+
+    static get instance() {
+        if (!Demos._instance) {
+            Demos._instance = new Demos()
+        }
+
+        return Demos._instance
+    }
 
     /**
      * Connects to a RPC URL. Throws an error if the connection fails.
@@ -136,7 +147,8 @@ export class Demos {
      * @returns The signed transaction.
      */
     pay(to: string, amount: number) {
-        return DemosTransactions.pay(to, amount, this.keypair)
+        required(this.keypair, "Wallet not connected")
+        return DemosTransactions.pay(to, amount, this)
     }
 
     /**
@@ -148,7 +160,8 @@ export class Demos {
      * @returns The signed transaction.
      */
     transfer(to: string, amount: number) {
-        return DemosTransactions.pay(to, amount, this.keypair)
+        required(this.keypair, "Wallet not connected")
+        return DemosTransactions.pay(to, amount, this)
     }
 
     /**
@@ -186,7 +199,7 @@ export class Demos {
     async rpcCall(
         request: RPCRequest,
         isAuthenticated: boolean = false,
-        retries = 1,
+        retries = 0,
         sleepTime = 250,
         allowedErrorCodes: number[] = [],
     ) {
@@ -231,6 +244,8 @@ export class Demos {
                     allowedErrorCodes,
                 )
             }
+
+            return response.data
         } catch (error) {
             console.error(error)
             return {
@@ -339,15 +354,26 @@ export class Demos {
     /**
      * Get the last block number.
      */
-    async getLastBlockNumber() {
+    async getLastBlockNumber(): Promise<number> {
         return (await this.nodeCall("getLastBlockNumber")) as number
     }
 
     /**
      * Get the last block hash.
      */
-    async getLastBlockHash() {
+    async getLastBlockHash(): Promise<string | null> {
         return (await this.nodeCall("getLastBlockHash")) as string
+    }
+
+    /**
+     * Get list of blocks.
+     *
+     */
+    async getBlocks(
+        start?: number | "latest",
+        limit?: number,
+    ): Promise<Block[]> {
+        return await this.nodeCall("getBlocks", { start, limit })
     }
 
     /**
@@ -355,7 +381,7 @@ export class Demos {
      *
      * @param blockNumber - The block number
      */
-    async getBlockByNumber(blockNumber: any) {
+    async getBlockByNumber(blockNumber: number): Promise<Block> {
         return await this.nodeCall("getBlockByNumber", {
             blockNumber,
         })
@@ -366,7 +392,7 @@ export class Demos {
      *
      * @param blockHash - The block hash
      */
-    async getBlockByHash(blockHash: any) {
+    async getBlockByHash(blockHash: string): Promise<Block> {
         return await this.nodeCall("getBlockByHash", {
             hash: blockHash,
         })
@@ -379,7 +405,7 @@ export class Demos {
      */
     async getTxByHash(
         txHash = "e25860ec6a7cccff0371091fed3a4c6839b1231ccec8cf2cb36eca3533af8f11",
-    ) {
+    ): Promise<Transaction> {
         // Defaulting to the genesis tx
         return await this.nodeCall("getTxByHash", {
             hash: txHash,
@@ -387,16 +413,29 @@ export class Demos {
     }
 
     /**
+     * @deprecated
+     * Use `demos.getTransactions()` instead
+     *
      * Get all transactions.
      */
-    async getAllTxs(): Promise<Transaction[]> {
-        return await this.nodeCall("getAllTxs")
+    async getAllTxs(): Promise<RawTransaction[]> {
+        return await this.getTransactions("latest", 50)
+    }
+
+    /**
+     * Get all transactions.
+     */
+    async getTransactions(
+        start?: number | "latest",
+        limit?: number,
+    ): Promise<RawTransaction[]> {
+        return await this.nodeCall("getTransactions", { start, limit })
     }
 
     /**
      * Get the peerlist.
      */
-    async getPeerlist() {
+    async getPeerlist(): Promise<IPeer[]> {
         // TODO: Implement Peerlist type
         return await this.nodeCall("getPeerlist")
     }
@@ -404,14 +443,14 @@ export class Demos {
     /**
      * Get the mempool.
      */
-    async getMempool() {
+    async getMempool(): Promise<Transaction[]> {
         return await this.nodeCall("getMempool")
     }
 
     /**
      * Get the identity of the connected RPC.
      */
-    async getPeerIdentity() {
+    async getPeerIdentity(): Promise<string> {
         return await this.nodeCall("getPeerIdentity")
     }
 
@@ -420,10 +459,36 @@ export class Demos {
      *
      * @param address - The address
      */
-    async getAddressInfo(address: any) {
-        return await this.nodeCall("getAddressInfo", {
+    async getAddressInfo(address: string): Promise<AddressInfo | null> {
+        const info = await this.nodeCall("getAddressInfo", {
             address,
         })
+
+        if (info) {
+            return {
+                ...info,
+                balance: BigInt(info.balance),
+            } as AddressInfo
+        }
+
+        return null
+    }
+
+    /**
+     * Get address nonce.
+     *
+     * @param address - The address
+     */
+    async getAddressNonce(address: string): Promise<number> {
+        const nonce = await this.nodeCall("getAddressNonce", {
+            address,
+        })
+
+        if (nonce) {
+            return nonce as number
+        }
+
+        return 0
     }
 
     /**

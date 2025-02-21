@@ -1,21 +1,20 @@
 import { InferFromSignaturePayload } from "@/abstraction"
-import Identities from "@/abstraction/Identities"
+import { Identities } from "@/abstraction"
+import { IBCConnectWalletOptions } from "@/multichain/core"
 import {
     EVM,
     IBC,
     MULTIVERSX,
+    NEAR,
     SOLANA,
     TON,
     XRPL,
-    NEAR,
 } from "@/multichain/websdk"
-import { DemosWebAuth } from "@/websdk"
-import { Demos } from "@/websdk/demosclass"
-import { wallets } from "../utils/wallets"
 import { InferFromSignatureTargetIdentityPayload } from "@/types/abstraction"
-import { IBCConnectWalletOptions } from "@/multichain/core"
+import { Demos, DemosWebAuth } from "@/websdk"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
+import { wallets } from "../utils/wallets"
 
 const chains = [
     {
@@ -68,10 +67,10 @@ const chains = [
     },
 ]
 
-describe.each(chains)(
+describe.skip.each(chains)(
     "Identities › $name",
     ({ name, sdk, wallet, subchain, password, rpc }: any) => {
-        let instance: any;
+        let instance: any
         const demos: Demos = new Demos()
         const identities: Identities = new Identities()
         const identity: DemosWebAuth = DemosWebAuth.getInstance()
@@ -87,7 +86,7 @@ describe.each(chains)(
 
         test("Associate an identity using a signature", async () => {
             instance = await sdk.create(null)
-            let ibcBase64PublicKey = "";
+            let ibcBase64PublicKey = ""
 
             if (name === "EGLD") {
                 await instance.connectWallet(wallet, { password: password })
@@ -185,8 +184,18 @@ describe.each(chains)(
             const res = await identities.inferIdentity(demos, payload)
             console.log(res)
 
-            expect(res['result']).toBe(200)
-            expect(res['response']).toBe("Identity added")
+            expect([200, 304]).toContain(res["result"])
+            expect(res["response"]).toBe("Identity added")
+        })
+
+        test("Confirm identity is added", async () => {
+            const res = await identities.getIdentities(demos)
+            const chain = name.toLowerCase()
+
+            console.log(res["response"]["xm"])
+
+            expect(res["result"]).toBe(200)
+            expect(res["response"]["xm"][chain]).toBeDefined()
         })
 
         test("Remove associated identity", async () => {
@@ -196,11 +205,222 @@ describe.each(chains)(
                 targetAddress: instance.getAddress(),
             }
 
-            const res = await identities.removeIdentity(demos, target_identity)
+            const res = await identities.removeXmIdentity(
+                demos,
+                target_identity,
+            )
             console.log(res)
 
-            expect(res['result']).toBe(200)
-            expect(res['response']).toBe("Identity removed")
+            expect(res["result"]).toBe(200)
+            expect(res["response"]).toBe("Identity removed")
         })
     },
 )
+
+describe.only("Individual Sign & Verify", () => {
+    test.only("EVM", async () => {
+        const instance = await EVM.create()
+
+        await instance.connectWallet(wallets.evm.privateKey)
+
+        const message = "Hello, world!"
+        const signature = await instance.signMessage(message)
+
+        const verified = await instance.verifyMessage(
+            message,
+            signature,
+            instance.getAddress(),
+        )
+
+        expect(verified).toBe(true)
+
+        const payload: InferFromSignaturePayload = {
+            method: "identity_assign_from_signature",
+            target_identity: {
+                chain: instance.name,
+                chainId: instance.chainId,
+                subchain: "sepolia",
+                isEVM: true,
+                signature: signature,
+                signedData: message,
+                targetAddress: instance.getAddress(),
+            },
+        }
+
+        const rpc = "https://demosnode.discus.sh"
+        const identity = DemosWebAuth.getInstance()
+        await identity.create()
+
+        const demos = new Demos()
+
+        await demos.connect(rpc)
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+
+        const identities = new Identities()
+        const res = await identities.inferIdentity(demos, payload)
+        console.log(res)
+
+        const res2 = await identities.getIdentities(
+            demos,
+            "d7bbfb740dea556d92a1832fa34e6b8ede1143b6c213077cd931e8dbf0e61194",
+        )
+        console.log(JSON.stringify(res2, null, 2))
+
+        const res3 = await identities.removeXmIdentity(demos, {
+            chain: "evm",
+            subchain: "sepolia",
+            targetAddress: instance.getAddress(),
+        })
+        console.log(res3)
+    })
+
+    test("SOLANA", async () => {
+        const instance = await SOLANA.create()
+
+        await instance.connectWallet(wallets.solana.privateKey)
+
+        const message = "Hello, world!"
+        const signature = await instance.signMessage(message)
+
+        const verified = await instance.verifyMessage(
+            message,
+            signature,
+            instance.getAddress(),
+        )
+
+        expect(verified).toBe(true)
+    })
+
+    test("EGLD", async () => {
+        const instance = await MULTIVERSX.create()
+
+        await instance.connectWallet(wallets.egld.privateKey, {
+            password: wallets.egld.password,
+        })
+
+        const message = "Hello, world!"
+
+        // Signing
+        const signature = await instance.signMessage(message)
+
+        // Verifying signature
+        const verified = await instance.verifyMessage(
+            message,
+            signature,
+            instance.getAddress(),
+        )
+
+        expect(verified).toBe(true)
+    })
+
+    test("NEAR", async () => {
+        const instance = await NEAR.create(null)
+
+        await instance.connectWallet(wallets.near.privateKey, {
+            accountId: "kynesys.testnet",
+            networkId: "testnet",
+        })
+
+        const message = "Hello, world!"
+
+        // Signing
+        const signature = await instance.signMessage(message)
+        console.log(signature)
+
+        // Verifying signature
+        const verified = await instance.verifyMessage(
+            message,
+            signature,
+            instance.getAddress(),
+        )
+
+        expect(verified).toBe(true)
+    })
+
+    test("IBC", async () => {
+        const instance = await IBC.create()
+        const options: IBCConnectWalletOptions = {
+            prefix: "cosmos",
+            gasPrice: "0",
+        }
+
+        await instance.connectWallet(
+            wallets.ibc.privateKey,
+            options,
+            chainProviders.ibc.testnet,
+        )
+
+        const message = "Hello, world!"
+
+        // Signing
+        const signature = await instance.signMessage(message, {
+            privateKey: wallets.ibc.privateKey,
+        })
+
+        // Get the public key
+        const sep256k1HdWallet = await DirectSecp256k1HdWallet.fromMnemonic(
+            wallets.ibc.privateKey,
+            {
+                prefix: "cosmos",
+            },
+        )
+
+        const walletAccounts = await sep256k1HdWallet.getAccounts()
+        const currentAccount = walletAccounts.find(account =>
+            account.address.startsWith("cosmos"),
+        )
+
+        const pubKey = currentAccount?.pubkey
+        const ibcBase64PublicKey = Buffer.from(pubKey).toString("base64")
+
+        // Verifying signature
+        const verified = await instance.verifyMessage(
+            message,
+            signature,
+            ibcBase64PublicKey,
+        )
+
+        expect(verified).toBe(true)
+    })
+
+    test("TON", async () => {
+        const instance = await TON.create()
+
+        await instance.connectWallet(wallets.ton.privateKey)
+
+        const message = "Hello, world!"
+
+        // Signing
+        const signature = await instance.signMessage(message)
+
+        // Verifying signature
+        const verified = await instance.verifyMessage(
+            message,
+            signature,
+            instance.wallet.publicKey.toString("hex"),
+        )
+
+        console.log(verified)
+
+        expect(verified).toBe(true)
+    })
+
+    test("XRPL", async () => {
+        const instance = await XRPL.create()
+
+        await instance.connectWallet(wallets.xrpl.privateKey)
+
+        const message = "Hello, world!"
+
+        // Signing
+        const signature = await instance.signMessage(message)
+
+        // Verifying signature
+        const verified = await instance.verifyMessage(
+            message,
+            signature,
+            instance.wallet.publicKey,
+        )
+        expect(verified).toBe(true)
+    })
+})

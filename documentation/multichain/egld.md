@@ -87,10 +87,10 @@ returns signature: string
 
 ```ts
 await instance.verifyMessage(
-                    message: string,
-                    signature: string,
-                    walletAddress: string,
-                )
+    message: string,
+    signature: string,
+    walletAddress: string,
+)
 
 returns true or false
 ```

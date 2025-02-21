@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.0.4",
+    "version": "2.0.5",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -34,6 +34,7 @@
         "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",
         "test:native": "rm -rf build && jest --testMatch '**/tests/native*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:web2": "rm -rf build && jest --testMatch '**/tests/web2*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:demos": "rm -rf build && jest --testMatch '**/tests/communication/demos.spec.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:rubic-service": "rm -rf build && jest --testMatch '**/tests/**/RubicService*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
     },
     "dependencies": {

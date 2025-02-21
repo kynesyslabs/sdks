@@ -131,12 +131,12 @@ returns signature: string
 
 ```ts
 await instance.verifyMessage(
-                    message: string,
-                    signature: string,
-                    walletAddress: string,
-                )
+    message: string,
+    signature: string,
+    walletAddress: string,
+)
 
-returns true or false             
+returns true or false
 ```
 
 ## Advanced usage
@@ -162,9 +162,9 @@ todo!
 
 ## Resources
 
-- [Ethereum Website](https://ethereum.org)
-- [Ethers.js Documentation](https://docs.ethers.org/v6/)
-- [MetaMask](https://metamask.io/)
-- [Sepolia Testnet Faucet](https://sepoliafaucet.com/)
-- [Ethereum Block Explorer (Mainnet)](https://etherscan.io/)
-- [Sepolia Block Explorer](https://sepolia.etherscan.io/)
+-   [Ethereum Website](https://ethereum.org)
+-   [Ethers.js Documentation](https://docs.ethers.org/v6/)
+-   [MetaMask](https://metamask.io/)
+-   [Sepolia Testnet Faucet](https://sepoliafaucet.com/)
+-   [Ethereum Block Explorer (Mainnet)](https://etherscan.io/)
+-   [Sepolia Block Explorer](https://sepolia.etherscan.io/)

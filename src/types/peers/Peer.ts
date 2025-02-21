@@ -17,7 +17,6 @@ export interface IPeerConfig {
     identity?: string
 }
 
-
 export interface IPeer {
     // connection informations
     connection: {
@@ -27,8 +26,8 @@ export interface IPeer {
     // verification informations
     verification: {
         status: boolean // has been verified against the public key
-        message: string // message from the peer at the time of verification
-        timestamp: number // timestamp of the verification
+        message: string | null // message from the peer at the time of verification
+        timestamp: number | null // timestamp of the verification
     }
     // sync informations // TODO Implement
     sync: {
@@ -39,7 +38,7 @@ export interface IPeer {
     // status informations
     status: {
         online: boolean // is the peer online
-        timestamp: number // timestamp of the last online status check
+        timestamp: number | null // timestamp of the last online status check
         ready: boolean // is the peer ready to be used (aka 1. synced, 2. verified, 3. online, 4. not in an error state)  // TODO Implement
     }
 }

@@ -14,7 +14,8 @@ import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
-import type { Transaction, XMScript } from "@/types"
+import { Block, IPeer, RawTransaction, Transaction, XMScript } from "@/types"
+import { AddressInfo } from "@/types/blockchain/address"
 import {
     RPCRequest,
     RPCResponse,
@@ -26,6 +27,7 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
+import { Demos } from "./demosclass"
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 /**
@@ -39,8 +41,9 @@ import { web2Calls } from "./Web2Calls"
  * await demos.connect(rpc_url)
  * await demos.connectWallet(privateKey)
  * ```
- */
-export const demos = {
+*/
+export const _demos = {
+    // NOTE: demos is now exported from Demos.instance at the bottom of the file
     // ANCHOR Properties
     rpc_url: <string | null>null,
     connected: false,
@@ -119,11 +122,9 @@ export const demos = {
     },
     // REVIEW: Replace call with validate / execute logic
     confirm: (tx: Transaction) => {
-        // @ts-expect-error
         return DemosTransactions.confirm(tx, demos)
     },
     broadcast: (validityData: RPCResponseWithValidityData) => {
-        // @ts-expect-error
         return DemosTransactions.broadcast(validityData, demos)
     },
 
@@ -220,18 +221,28 @@ export const demos = {
     // !SECTION NodeCall prototype
 
     // SECTION Predefined calls
-    getLastBlockNumber: async function () {
+    getLastBlockNumber: async function (): Promise<number> {
         return (await demos.nodeCall("getLastBlockNumber")) as number
     },
-    getLastBlockHash: async function () {
+
+    getLastBlockHash: async function (): Promise<string | null> {
         return (await demos.nodeCall("getLastBlockHash")) as string
     },
-    getBlockByNumber: async function (blockNumber: any) {
+
+    getBlocks: async function (
+        start?: number | "latest",
+        limit?: number,
+    ): Promise<Block[]> {
+        return await demos.nodeCall("getBlocks", { start, limit })
+    },
+
+    getBlockByNumber: async function (blockNumber: number): Promise<Block> {
         return await demos.nodeCall("getBlockByNumber", {
             blockNumber,
         })
     },
-    getBlockByHash: async function (blockHash: any) {
+
+    getBlockByHash: async function (blockHash: string): Promise<Block> {
         return await demos.nodeCall("getBlockByHash", {
             hash: blockHash,
         })
@@ -239,28 +250,65 @@ export const demos = {
 
     getTxByHash: async function (
         txHash = "e25860ec6a7cccff0371091fed3a4c6839b1231ccec8cf2cb36eca3533af8f11",
-    ) {
+    ): Promise<Transaction> {
         // Defaulting to the genesis tx of course
         return await demos.nodeCall("getTxByHash", {
             hash: txHash,
         })
     },
+
+    /**
+     * @deprecated
+     * Use `demos.getTransactions()` instead
+     *
+     * Gets the latest 50 transactions from the network.
+     */
     getAllTxs: async function () {
-        return await demos.nodeCall("getAllTxs")
+        // return await demos.nodeCall("getAllTxs")
+        return await demos.getTransactions("latest", 50)
     },
 
-    getPeerlist: async function () {
+    getTransactions: async function (
+        start?: number | "latest",
+        limit?: number,
+    ): Promise<RawTransaction[]> {
+        return await demos.nodeCall("getTransactions", {
+            start,
+            limit,
+        })
+    },
+
+    getPeerlist: async function (): Promise<IPeer[]> {
         return await demos.nodeCall("getPeerlist")
     },
-    getMempool: async function () {
+
+    getMempool: async function (): Promise<Transaction[]> {
         return await demos.nodeCall("getMempool")
     },
-    getPeerIdentity: async function () {
+
+    getPeerIdentity: async function (): Promise<string> {
         return await demos.nodeCall("getPeerIdentity")
     },
 
-    getAddressInfo: async function (address: any) {
-        return await demos.nodeCall("getAddressInfo", {
+    getAddressInfo: async function (
+        address: string,
+    ): Promise<AddressInfo | null> {
+        const info = await demos.nodeCall("getAddressInfo", {
+            address,
+        })
+
+        if (info) {
+            return {
+                ...info,
+                balance: BigInt(info.balance),
+            } as AddressInfo
+        }
+
+        return null
+    },
+
+    getAddressNonce: async function (address: string): Promise<number> {
+        return await demos.nodeCall("getAddressNonce", {
             address,
         })
     },
@@ -320,3 +368,10 @@ export const demos = {
     // INFO Calling demos.skeletons.NAME provides an empty skeleton that can be used for reference while calling other demos functions
     skeletons,
 }
+
+/**
+ * A global instance of the Demos class.
+ *
+ * @see Demos class
+ */
+export const demos = Demos.instance
