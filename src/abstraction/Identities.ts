@@ -59,8 +59,33 @@ export default class Identities {
     }
 
     /**
+     * Add a github identity to the GCR.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to add the identity to.
+     * @returns The response from the RPC call.
+     */
+    async addGithubIdentity(demos: Demos, payload: GithubProof) {
+        let githubPayload: InferFromGithubPayload = {
+            context: "github",
+            proof: payload
+        }
+
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "add_github_identity", 
+                    params: [githubPayload], // REVIEW Is this correct?
+                },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
      * Get the identities associated with an address.
-     * If no address is provided, the address of the connected wallet will be used.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param address The address to get identities for.
