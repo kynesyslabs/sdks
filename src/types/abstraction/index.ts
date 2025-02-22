@@ -1,4 +1,7 @@
-export interface CoreTargetIdentityPayload {
+
+// SECTION Blockchain Identities
+
+export interface XMCoreTargetIdentityPayload {
     chain: string
     subchain: string
     targetAddress: string
@@ -8,7 +11,7 @@ export interface CoreTargetIdentityPayload {
  * The identity of the target address to bind to the Demos identity
  */
 export interface InferFromSignatureTargetIdentityPayload
-    extends CoreTargetIdentityPayload {
+    extends XMCoreTargetIdentityPayload {
     chainId: number | string
     isEVM: boolean
 
@@ -22,7 +25,7 @@ export interface InferFromSignatureTargetIdentityPayload
  * The identity of the target address to bind to the Demos identity
  */
 export interface InferFromWriteTargetIdentityPayload
-    extends CoreTargetIdentityPayload {
+    extends XMCoreTargetIdentityPayload {
     txHash: string
     isEVM: boolean
     chainId: number | string
@@ -45,4 +48,23 @@ export interface InferFromSignaturePayload {
      * The identity of the target address to bind to the Demos identity
      */
     target_identity: InferFromSignatureTargetIdentityPayload
+}
+
+// SECTION Web2 Identities
+
+export interface Web2CoreTargetIdentityPayload {
+    context: string
+    proof: string
+}
+
+// ANCHOR Proof types
+
+export type GithubProof = `https://github.com/${string}/${string}` // TODO Better scope for gists
+
+// Add more as needed following the above pattern
+
+// ANCHOR Payloads
+
+export interface InferFromGithubPayload extends Web2CoreTargetIdentityPayload {
+    proof: GithubProof
 }
