@@ -2,7 +2,10 @@
 // This should be able to query and set the GCR identities for a Demos address
 
 import {
-    CoreTargetIdentityPayload,
+    XMCoreTargetIdentityPayload,
+    Web2CoreTargetIdentityPayload,
+    GithubProof,
+    InferFromGithubPayload,
     InferFromSignaturePayload,
     InferFromWritePayload,
 } from "@/types/abstraction"
@@ -41,7 +44,7 @@ export default class Identities {
      * @param payload The payload to remove the identity from.
      * @returns The response from the RPC call.
      */
-    async removeXmIdentity(demos: Demos, payload: CoreTargetIdentityPayload) {
+    async removeXmIdentity(demos: Demos, payload: XMCoreTargetIdentityPayload) {
         const request = {
             method: "gcr_routine",
             params: [
