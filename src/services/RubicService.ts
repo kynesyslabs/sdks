@@ -1,3 +1,4 @@
+import { ethers } from "ethers"
 import {
     SDK,
     Configuration,
@@ -5,8 +6,11 @@ import {
     CrossChainManagerCalculationOptions,
     TEST_EVM_BLOCKCHAIN_NAME,
     CHAIN_TYPE,
+    WrappedCrossChainTrade,
+    CrossChainTrade,
+    SwapTransactionOptions,
 } from "rubic-sdk"
-import { ethers } from "ethers"
+import { AbstractProvider } from "@/types/network/Window"
 
 const SUPPORTED_TOKENS = {
     [BLOCKCHAIN_NAME.ETHEREUM]: {
@@ -93,16 +97,10 @@ export type BridgeProtocol = keyof typeof BRIDGE_PROTOCOLS
 export class RubicService {
     private sdk: SDK
     private signer: ethers.Signer
-    private chainId: number
     private selectedProtocol: BridgeProtocol = "ALL"
 
-    constructor(
-        signer: ethers.Signer,
-        chainId: number,
-        protocol: BridgeProtocol = "ALL",
-    ) {
+    constructor(signer: ethers.Signer, protocol: BridgeProtocol = "ALL") {
         this.signer = signer
-        this.chainId = chainId
         this.selectedProtocol = protocol
         this.initializeSDK()
     }
@@ -156,6 +154,15 @@ export class RubicService {
                     crossChain: signerAddress,
                 },
             },
+            walletProvider:
+                typeof window !== "undefined" && window.ethereum
+                    ? {
+                          [CHAIN_TYPE.EVM]: {
+                              core: window.ethereum as AbstractProvider,
+                              address: signerAddress,
+                          },
+                      }
+                    : undefined,
         }
 
         this.sdk = await SDK.createSDK(configuration)
@@ -175,7 +182,7 @@ export class RubicService {
         amount: string,
         fromChainId: number,
         toChainId: number,
-    ): Promise<any> {
+    ): Promise<WrappedCrossChainTrade> {
         try {
             const fromTokenAddress = this.getTokenAddress(
                 fromChainId,
@@ -205,40 +212,49 @@ export class RubicService {
                 } as ExtendedCrossChainManagerCalculationOptions,
             )
 
-            const sortedTrades = trades.sort((a, b) => {
-                const aScore = this.calculateTradeScore(a)
-                const bScore = this.calculateTradeScore(b)
-                return bScore - aScore
-            })
+            const bestTrade = trades[0]
 
-            return sortedTrades[0]
+            return bestTrade
         } catch (error) {
             console.error("Error getting trade:", error)
             throw error
         }
     }
 
-    private calculateTradeScore(trade: any): number {
-        const slippage = trade.slippage || 0.01
-        const estimatedTime = trade.estimatedTime || 300
-        const gasPrice = trade.gasPrice || 50
+    async executeTrade(wrappedTrade: WrappedCrossChainTrade) {
+        if (!wrappedTrade) throw new Error("Trade object is null or undefined")
 
-        const slippageScore = (1 / slippage) * 100
-        const speedScore = (1000 / estimatedTime) * 100
-        const costScore = (1 / gasPrice) * 100
+        if (wrappedTrade.error) {
+            console.error("Trade contains an error:", wrappedTrade.error)
+            throw wrappedTrade.error
+        }
 
-        return slippageScore * 0.4 + speedScore * 0.3 + costScore * 0.3
-    }
+        if (!wrappedTrade.trade)
+            throw new Error("Invalid trade object: trade is null")
 
-    async executeTrade(trade: any) {
+        const trade: CrossChainTrade = wrappedTrade.trade
+
         try {
-            const wrappedTrade = trade.trade
-            const receipt = await wrappedTrade.swap({
-                signer: this.signer,
+            const signerAddress = await this.signer.getAddress()
+            this.sdk.updateWalletAddress(CHAIN_TYPE.EVM, signerAddress)
+
+            const swapOptions: SwapTransactionOptions = {
                 onConfirm: (hash: string) => {
-                    console.log("Transaction confirmed:", hash)
+                    console.log("Swap transaction confirmed:", hash)
                 },
-            })
+                onApprove: (hash: string | null) => {
+                    console.log("Approval transaction:", hash)
+                },
+                receiverAddress: signerAddress,
+                skipAmountCheck: false,
+                useCacheData: false,
+                testMode: false,
+                useEip155: true,
+                refundAddress: signerAddress,
+            }
+
+            const receipt = await trade.swap(swapOptions)
+
             return receipt
         } catch (error) {
             console.error("Error executing trade:", error)
