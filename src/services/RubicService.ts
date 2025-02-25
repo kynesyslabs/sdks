@@ -1,16 +1,15 @@
-import { ethers } from "ethers"
+import Web3 from "web3"
+import { WebsocketProvider } from "web3-core"
 import {
     SDK,
     Configuration,
     BLOCKCHAIN_NAME,
     CrossChainManagerCalculationOptions,
-    TEST_EVM_BLOCKCHAIN_NAME,
     CHAIN_TYPE,
     WrappedCrossChainTrade,
     CrossChainTrade,
     SwapTransactionOptions,
 } from "rubic-sdk"
-import { AbstractProvider } from "@/types/network/Window"
 
 const SUPPORTED_TOKENS = {
     [BLOCKCHAIN_NAME.ETHEREUM]: {
@@ -58,21 +57,6 @@ const SUPPORTED_TOKENS = {
         USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
     },
-    [TEST_EVM_BLOCKCHAIN_NAME.SEPOLIA]: {
-        NATIVE: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-        USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-        USDT: "0x7169D38820dfd117C3FA1f22a697dBA58d90BA06",
-    },
-    [TEST_EVM_BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN_TESTNET]: {
-        NATIVE: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-        USDC: "0x64544969ed7EBf5f083679233325356EbE738930",
-        USDT: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd",
-    },
-    [TEST_EVM_BLOCKCHAIN_NAME.FUJI]: {
-        NATIVE: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-        USDC: "0x5425890298aed601595a70AB815c96711a31Bc65",
-        USDT: "0x02823f9B469960Bb3b1de0B3746D4b95B7E35543",
-    },
 }
 
 export const BRIDGE_PROTOCOLS = {
@@ -96,19 +80,29 @@ export type BridgeProtocol = keyof typeof BRIDGE_PROTOCOLS
 
 export class RubicService {
     private sdk: SDK
-    private signer: ethers.Signer
+    private web3: Web3
     private selectedProtocol: BridgeProtocol = "ALL"
 
-    constructor(signer: ethers.Signer, protocol: BridgeProtocol = "ALL") {
-        this.signer = signer
-        this.selectedProtocol = protocol
+    constructor(privateKey: string) {
+        const wsProvider = new Web3.providers.WebsocketProvider(
+            "wss://eth.drpc.org",
+        )
+        this.web3 = new Web3(wsProvider)
+
+        const formattedKey = privateKey.startsWith("0x")
+            ? privateKey
+            : `0x${privateKey}`
+
+        const account = this.web3.eth.accounts.privateKeyToAccount(formattedKey)
+        this.web3.eth.accounts.wallet.add(account)
+        this.web3.eth.defaultAccount = account.address
+
         this.initializeSDK()
     }
 
     private async initializeSDK() {
-        const signerAddress = this.signer
-            ? await this.signer.getAddress()
-            : undefined
+        const walletAddress = this.web3.eth.defaultAccount as string
+        const infuraKey = "" // Add Infura Key
 
         const configuration: Configuration = {
             rpcProviders: {
@@ -116,7 +110,10 @@ export class RubicService {
                     rpcList: ["https://eth.drpc.org"],
                 },
                 [BLOCKCHAIN_NAME.POLYGON]: {
-                    rpcList: ["https://polygon.drpc.org"],
+                    rpcList: [
+                        `wss://polygon-mainnet.infura.io/ws/v3/${infuraKey}`,
+                        "https://polygon-rpc.com",
+                    ],
                 },
                 [BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN]: {
                     rpcList: ["https://bsc.publicnode.com"],
@@ -139,30 +136,20 @@ export class RubicService {
                 [BLOCKCHAIN_NAME.SOLANA]: {
                     rpcList: ["https://api.mainnet-beta.solana.com"],
                 },
-                [TEST_EVM_BLOCKCHAIN_NAME.SEPOLIA]: {
-                    rpcList: ["https://sepolia.drpc.org"],
-                },
-                [TEST_EVM_BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN_TESTNET]: {
-                    rpcList: ["https://data-seed-prebsc-1-s1.binance.org:8545"],
-                },
-                [TEST_EVM_BLOCKCHAIN_NAME.FUJI]: {
-                    rpcList: ["https://api.avax-test.network/ext/bc/C/rpc"],
-                },
             },
             providerAddress: {
                 [CHAIN_TYPE.EVM]: {
-                    crossChain: signerAddress,
+                    crossChain: walletAddress,
+                    onChain: walletAddress,
                 },
             },
-            walletProvider:
-                typeof window !== "undefined" && window.ethereum
-                    ? {
-                          [CHAIN_TYPE.EVM]: {
-                              core: window.ethereum as AbstractProvider,
-                              address: signerAddress,
-                          },
-                      }
-                    : undefined,
+            walletProvider: {
+                [CHAIN_TYPE.EVM]: {
+                    core: this.web3
+                        .currentProvider as unknown as WebsocketProvider,
+                    address: walletAddress,
+                },
+            },
         }
 
         this.sdk = await SDK.createSDK(configuration)
@@ -201,8 +188,7 @@ export class RubicService {
                     blockchain: this.getBlockchainName(toChainId),
                 },
                 {
-                    enableTestnets: true,
-                    fromAddress: await this.signer.getAddress(),
+                    fromAddress: this.web3.eth.defaultAccount as string,
                     bridgeTypes:
                         this.selectedProtocol === "ALL"
                             ? Object.values(BRIDGE_PROTOCOLS)
@@ -235,7 +221,7 @@ export class RubicService {
         const trade: CrossChainTrade = wrappedTrade.trade
 
         try {
-            const signerAddress = await this.signer.getAddress()
+            const signerAddress = this.web3.eth.defaultAccount as string
             this.sdk.updateWalletAddress(CHAIN_TYPE.EVM, signerAddress)
 
             const swapOptions: SwapTransactionOptions = {
@@ -282,12 +268,6 @@ export class RubicService {
                 return BLOCKCHAIN_NAME.BASE
             case 101:
                 return BLOCKCHAIN_NAME.SOLANA
-            case 11155111:
-                return TEST_EVM_BLOCKCHAIN_NAME.SEPOLIA
-            case 97:
-                return TEST_EVM_BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN_TESTNET
-            case 43113:
-                return TEST_EVM_BLOCKCHAIN_NAME.FUJI
             default:
                 throw new Error(`Unsupported chain ID: ${chainId}`)
         }

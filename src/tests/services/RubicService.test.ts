@@ -1,4 +1,3 @@
-import { ethers } from "ethers"
 import BigNumber from "bignumber.js"
 import {
     BLOCKCHAIN_NAME,
@@ -9,12 +8,10 @@ import { RubicService } from "@/services/RubicService"
 
 describe("RubicService", () => {
     let rubicService: RubicService
-    let mockSigner: ethers.Signer
 
     beforeEach(() => {
-        const privateKey = "YOUR_WALLET_PK" // Put it on before testing
-        mockSigner = new ethers.Wallet(privateKey)
-        rubicService = new RubicService(mockSigner)
+        const privateKey = "" // Put it on before testing
+        rubicService = new RubicService(privateKey)
     })
 
     test("should get trade", async () => {
