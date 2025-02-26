@@ -83,7 +83,9 @@ export class RubicService {
     private web3: Web3
     private selectedProtocol: BridgeProtocol = "ALL"
 
-    constructor(privateKey: string) {
+    constructor(privateKey: string, selectedProtocol: BridgeProtocol = "ALL") {
+        this.selectedProtocol = selectedProtocol
+
         const wsProvider = new Web3.providers.WebsocketProvider(
             "wss://eth.drpc.org",
         )
@@ -107,12 +109,11 @@ export class RubicService {
         const configuration: Configuration = {
             rpcProviders: {
                 [BLOCKCHAIN_NAME.ETHEREUM]: {
-                    rpcList: ["https://eth.drpc.org"],
+                    rpcList: [`https://mainnet.infura.io/v3/${infuraKey}`],
                 },
                 [BLOCKCHAIN_NAME.POLYGON]: {
                     rpcList: [
-                        `wss://polygon-mainnet.infura.io/ws/v3/${infuraKey}`,
-                        "https://polygon-rpc.com",
+                        `https://polygon-mainnet.infura.io/v3/${infuraKey}`,
                     ],
                 },
                 [BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN]: {

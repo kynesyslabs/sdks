@@ -10,20 +10,21 @@ describe("RubicService", () => {
     let rubicService: RubicService
 
     beforeEach(() => {
-        const privateKey = "" // Put it on before testing
-        rubicService = new RubicService(privateKey)
+        const privateKey = "" // Add PK
+        rubicService = new RubicService(privateKey, "MULTICHAIN")
     })
 
     test("should get trade", async () => {
         const trade = await rubicService.getTrade("USDT", "USDT", "10", 137, 1)
+        const wrappedTrade = trade.trade
 
-        expect(trade).toBeDefined()
+        expect(wrappedTrade).toBeDefined()
 
-        if (trade) {
-            expect(trade.trade).toBeDefined()
-            expect(trade.trade.from).toBeDefined()
-            expect(trade.trade.to).toBeDefined()
-            expect(typeof trade.trade.swap).toBe("function")
+        if (wrappedTrade !== null) {
+            expect(wrappedTrade).toBeDefined()
+            expect(wrappedTrade.from).toBeDefined()
+            expect(wrappedTrade.to).toBeDefined()
+            expect(typeof wrappedTrade.swap).toBe("function")
             expect(trade.error).not.toBeDefined()
         }
     }, 30000)
