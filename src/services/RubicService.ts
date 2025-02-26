@@ -81,7 +81,7 @@ export type BridgeProtocol = keyof typeof BRIDGE_PROTOCOLS
 export class RubicService {
     private sdk: SDK
     private web3: Web3
-    private selectedProtocol: BridgeProtocol = "ALL"
+    private selectedProtocol: BridgeProtocol
 
     constructor(privateKey: string, selectedProtocol: BridgeProtocol = "ALL") {
         this.selectedProtocol = selectedProtocol

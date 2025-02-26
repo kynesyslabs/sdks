@@ -11,14 +11,14 @@ describe("RubicService", () => {
 
     beforeEach(() => {
         const privateKey = "" // Add PK
-        rubicService = new RubicService(privateKey, "MULTICHAIN")
+        rubicService = new RubicService(privateKey, "AXELAR")
     })
 
     test("should get trade", async () => {
         const trade = await rubicService.getTrade("USDT", "USDT", "10", 137, 1)
         const wrappedTrade = trade.trade
 
-        expect(wrappedTrade).toBeDefined()
+        expect(wrappedTrade).not.toBeNull()
 
         if (wrappedTrade !== null) {
             expect(wrappedTrade).toBeDefined()
