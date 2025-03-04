@@ -1,4 +1,4 @@
-import { InferFromSignaturePayload } from "@/abstraction"
+import { InferFromSignaturePayload, XMCoreTargetIdentityPayload } from "@/abstraction"
 import { Identities } from "@/abstraction"
 import { IBCConnectWalletOptions } from "@/multichain/core"
 import {
@@ -58,15 +58,37 @@ describe.only("IDENTITIES V2", () => {
 
         const identities = new Identities()
         const validityData = await identities.inferIdentity_v2(demos, payload)
-        console.log(JSON.stringify(validityData, null, 2))
 
         const res = await demos.broadcast(validityData)
-        console.log(JSON.stringify(res, null, 2))
+        expect(res).toBeDefined()
+        expect(res.result).toBe(200)
     })
 
-    test.skip("EVM REMOVE IDENTITY v2", async () => {
-        // TODO: Implement this using Identities.removeXmIdentity_v2
-    })
+    test("EVM REMOVE IDENTITY v2", async () => {
+        const instance = await EVM.create();
+        await instance.connectWallet(wallets.evm.privateKey);
+
+        const rpc = "http://localhost:53550";
+        const identity = DemosWebAuth.getInstance();
+        await identity.create();
+        const demos = new Demos();
+        await demos.connect(rpc);
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array);
+
+        const identities = new Identities();
+
+        const payload: XMCoreTargetIdentityPayload = {
+            chain: "evm",
+            subchain: "sepolia",
+            targetAddress: instance.getAddress(),
+        };
+
+        const validityData = await identities.removeXmIdentity_v2(demos, payload);
+        console.log(JSON.stringify(validityData, null, 2));
+
+        const res = await demos.broadcast(validityData);
+        expect(res["result"]).toBe(200)
+    });
 })
 
 const chains = [
@@ -234,11 +256,11 @@ describe.skip.each(chains)(
             }
 
             // INFO: Send the payload to the RPC
-            const res = await identities.inferIdentity(demos, payload)
-            console.log(res)
+            const validityData = await identities.inferIdentity_v2(demos, payload)
 
-            expect([200, 304]).toContain(res["result"])
-            expect(res["response"]).toBe("Identity added")
+            const res = await demos.broadcast(validityData)
+
+            expect(res.result).toBe(200)
         })
 
         test("Confirm identity is added", async () => {
@@ -258,14 +280,12 @@ describe.skip.each(chains)(
                 targetAddress: instance.getAddress(),
             }
 
-            const res = await identities.removeXmIdentity(
+            const validityData = await identities.removeXmIdentity_v2(
                 demos,
                 target_identity,
             )
-            console.log(res)
-
+            const res = await demos.broadcast(validityData)
             expect(res["result"]).toBe(200)
-            expect(res["response"]).toBe("Identity removed")
         })
     },
 )
@@ -287,48 +307,49 @@ describe.skip("Individual Sign & Verify", () => {
 
         expect(verified).toBe(true)
 
-        // const payload: InferFromSignaturePayload = {
-        //     method: "identity_assign_from_signature",
-        //     target_identity: {
-        //         chain: instance.name,
-        //         chainId: instance.chainId,
-        //         subchain: "sepolia",
-        //         isEVM: true,
-        //         signature: signature,
-        //         signedData: message,
-        //         targetAddress: instance.getAddress(),
-        //     },
-        // }
+        const payload: InferFromSignaturePayload = {
+            method: "identity_assign_from_signature",
+            target_identity: {
+                chain: instance.name,
+                chainId: instance.chainId,
+                subchain: "sepolia",
+                isEVM: true,
+                signature: signature,
+                signedData: message,
+                targetAddress: instance.getAddress(),
+            },
+        }
 
-        // // const rpc = "https://demosnode.discus.sh"
-        // const rpc = "http://localhost:53550"
-        // const identity = DemosWebAuth.getInstance()
-        // await identity.create()
+        // const rpc = "https://demosnode.discus.sh"
+        const rpc = "http://localhost:53550"
+        const identity = DemosWebAuth.getInstance()
+        await identity.create()
 
-        // const demos = new Demos()
+        const demos = new Demos()
 
-        // await demos.connect(rpc)
-        // await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+        await demos.connect(rpc)
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
 
-        // const identities = new Identities()
-        // const validityData = await identities.inferIdentity_v2(demos, payload)
-        // console.log(JSON.stringify(validityData, null, 2))
+        const identities = new Identities()
+        const validityData = await identities.inferIdentity_v2(demos, payload)
+        console.log(JSON.stringify(validityData, null, 2))
 
-        // const res = await demos.broadcast(validityData)
-        // console.log(JSON.stringify(res, null, 2))
+        const res = await demos.broadcast(validityData)
+        console.log(JSON.stringify(res, null, 2))
 
-        // const res2 = await identities.getIdentities(
-        //     demos,
-        //     "d7bbfb740dea556d92a1832fa34e6b8ede1143b6c213077cd931e8dbf0e61194",
-        // )
-        // console.log(JSON.stringify(res2, null, 2))
+        const res2 = await identities.getIdentities(
+            demos,
+            "d7bbfb740dea556d92a1832fa34e6b8ede1143b6c213077cd931e8dbf0e61194",
+        )
+        console.log(JSON.stringify(res2, null, 2))
 
-        // const res3 = await identities.removeXmIdentity(demos, {
-        //     chain: "evm",
-        //     subchain: "sepolia",
-        //     targetAddress: instance.getAddress(),
-        // })
-        // console.log(res3)
+        const res3 = await identities.removeXmIdentity_v2(demos, {
+            chain: "evm",
+            subchain: "sepolia",
+            targetAddress: instance.getAddress(),
+        })
+        const response = await demos.broadcast(res3)
+        expect(response["result"]).toBe(200)
     })
 
     test("SOLANA", async () => {

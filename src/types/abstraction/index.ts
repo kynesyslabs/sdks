@@ -74,4 +74,5 @@ export interface IdentityPayload {
         | InferFromGithubPayload
         | InferFromSignaturePayload
         | InferFromWritePayload
+        | XMCoreTargetIdentityPayload
 }
