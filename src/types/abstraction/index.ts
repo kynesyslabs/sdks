@@ -52,19 +52,39 @@ export interface InferFromSignaturePayload {
 
 // SECTION Web2 Identities
 
+/**
+ * NOTE: The payload for the inferIdentityFromWeb2 method contains a context (e.g. "github", "twitter", "telegram", etc.) 
+ *  and a proof (e.g. a link to the actual proof of the identity).
+ * 
+ *  The context is used to identify the type of identity being provided, and the proof is the actual proof of the identity.
+ * 
+ *  The proof is a string that contains the proof of the identity usually in the form of a link to the proof.
+ * 
+ * 
+ */
 export interface Web2CoreTargetIdentityPayload {
     context: string
     proof: string
 }
 
-// ANCHOR Proof types
+// ANCHOR Github Identities
 
 export type GithubProof = `https://github.com/${string}/${string}` // TODO Better scope for gists
 
 // Add more as needed following the above pattern
 
-// ANCHOR Payloads
 
 export interface InferFromGithubPayload extends Web2CoreTargetIdentityPayload {
     proof: GithubProof
 }
+
+// ANCHOR X Identities (aka Twitter Identities)
+
+export type XProof = `https://x.com/${string}/${string}` // TODO Better scope for X posts
+export type TwitterProof = XProof
+
+export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
+    proof: XProof
+}
+
+export interface InferFromTwitterPayload extends InferFromXPayload {}

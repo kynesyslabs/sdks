@@ -5,7 +5,11 @@ import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
     GithubProof,
+    XProof,
+    TwitterProof,
     InferFromGithubPayload,
+    InferFromXPayload,
+    InferFromTwitterPayload,
     InferFromSignaturePayload,
     InferFromWritePayload,
 } from "@/types/abstraction"
@@ -84,6 +88,32 @@ export default class Identities {
         return await demos.rpcCall(request, true)
     }
 
+
+    /**
+     * Add a twitter identity to the GCR.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to add the identity to.
+     * @returns The response from the RPC call.
+     */
+    async addTwitterIdentity(demos: Demos, payload: TwitterProof) {
+        let twitterPayload: InferFromXPayload = {
+            context: "twitter",
+            proof: payload
+        }
+
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "add_twitter_identity",
+                    params: [twitterPayload],
+                },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
     /**
      * Get the identities associated with an address.
      *
