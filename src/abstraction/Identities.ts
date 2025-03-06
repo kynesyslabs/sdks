@@ -55,11 +55,14 @@ export default class Identities {
             from: address,
             to: address,
             amount: 0,
-            data: ["identity", {
-                context: "xm",
-                method: "identity_assign",
-                payload: payload,
-            }],
+            data: [
+                "identity",
+                {
+                    context: "xm",
+                    method: "identity_assign",
+                    payload: payload,
+                },
+            ],
             nonce: nonce + 1,
             timestamp: Date.now(),
         }
@@ -81,12 +84,12 @@ export default class Identities {
 
     async removeXmIdentity_v2(
         demos: Demos,
-        payload: XMCoreTargetIdentityPayload,
+        payload: InferFromWritePayload | InferFromSignaturePayload,
     ): Promise<RPCResponseWithValidityData> {
-        const tx = DemosTransactions.empty();
-        const address = demos.getAddress();
+        const tx = DemosTransactions.empty()
+        const address = payload.target_identity.targetAddress
 
-        const nonce = await demos.getAddressNonce(address);
+        const nonce = await demos.getAddressNonce(address)
 
         tx.content = {
             ...tx.content,
@@ -94,18 +97,21 @@ export default class Identities {
             from: address,
             to: address,
             amount: 0,
-            data: ["identity", {
-                context: "xm",
-                method: "identity_remove",
-                payload: payload,
-            }],
+            data: [
+                "identity",
+                {
+                    context: "xm",
+                    method: "identity_remove",
+                    payload: payload,
+                },
+            ],
             nonce: nonce + 1,
             timestamp: Date.now(),
-        };
+        }
 
-        const signedTx = await demos.sign(tx);
+        const signedTx = await demos.sign(tx)
 
-        return await demos.confirm(signedTx);
+        return await demos.confirm(signedTx)
     }
 
     /**
