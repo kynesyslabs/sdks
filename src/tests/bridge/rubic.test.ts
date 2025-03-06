@@ -4,30 +4,50 @@ import {
     CROSS_CHAIN_TRADE_TYPE,
     CrossChainTrade,
 } from "rubic-sdk"
-import { RubicService } from "@/services/RubicService"
+import { RubicService } from "@/bridge/services/rubic"
 
 describe("RubicService", () => {
     let rubicService: RubicService
+    const privateKey = "" // Add Wallet PK for testing
 
     beforeEach(() => {
-        const privateKey = "" // Add PK
-        rubicService = new RubicService(privateKey, "AXELAR")
+        rubicService = new RubicService(privateKey, "ALL")
     })
 
     test("should get trade", async () => {
-        const trade = await rubicService.getTrade("USDT", "USDT", "10", 137, 1)
-        const wrappedTrade = trade.trade
+        try {
+            await rubicService.waitForInitialization()
 
-        expect(wrappedTrade).not.toBeNull()
+            const tradeResult = await rubicService.getTrade(
+                "USDT",
+                "USDT",
+                "10",
+                137,
+                1,
+            )
 
-        if (wrappedTrade !== null) {
-            expect(wrappedTrade).toBeDefined()
-            expect(wrappedTrade.from).toBeDefined()
-            expect(wrappedTrade.to).toBeDefined()
-            expect(typeof wrappedTrade.swap).toBe("function")
-            expect(trade.error).not.toBeDefined()
+            if (tradeResult instanceof Error) {
+                console.error("Trade error:", tradeResult)
+                fail(`Trade failed with error: ${tradeResult.message}`)
+            } else {
+                expect(tradeResult).not.toBeUndefined()
+                expect(tradeResult.trade).not.toBeNull()
+
+                const wrappedTrade = tradeResult.trade
+
+                if (wrappedTrade !== null) {
+                    expect(wrappedTrade).toBeDefined()
+                    expect(wrappedTrade.from).toBeDefined()
+                    expect(wrappedTrade.to).toBeDefined()
+                    expect(typeof wrappedTrade.swap).toBe("function")
+                    expect(tradeResult.error).not.toBeDefined()
+                }
+            }
+        } catch (error) {
+            console.error("Test error:", error)
+            fail(`Unexpected error occurred: ${error}`)
         }
-    }, 30000)
+    }, 60000)
 
     test("should execute trade with mock", async () => {
         const mockTrade = {
@@ -84,7 +104,34 @@ describe("RubicService", () => {
         expect(txHash).toBe("0x1234567890abcdef")
     })
 
-    afterEach(() => {
-        jest.clearAllMocks()
+    test.skip("should execute real trade", async () => {
+        // Integrate test to do real trade/swap execution
+        // Using skip() because it will take real funds
+
+        try {
+            await rubicService.waitForInitialization()
+
+            const tradeResult = await rubicService.getTrade(
+                "NATIVE",
+                "USDT",
+                "0.1",
+                137,
+                1,
+            )
+
+            if (tradeResult instanceof Error) {
+                console.error("Trade error:", tradeResult)
+                fail(`Trade failed with error: ${tradeResult.message}`)
+            } else {
+                const executedTrade = await rubicService.executeTrade(
+                    tradeResult,
+                )
+
+                // Continue ...
+            }
+        } catch (error: any) {
+            console.error("Test error:", error)
+            fail(`Unexpected error occurred: ${error}`)
+        }
     })
 })
