@@ -79,12 +79,13 @@ export class DemosWebAuth {
     // NOTE We just have to accept valid private keys and derive the public key from them
     async login(
         privKey: string | boolean | Uint8Array,
-        processSeed: boolean = false,
     ): Promise<[boolean, string]> {
         if (typeof privKey === "string") {
+            // REVIEW: Should we do this?
             if (!privKey.startsWith("0x")) {
                 privKey = "0x" + privKey
             }
+
             privKey = forge_converter.stringToForge(privKey)
             if (!privKey) {
                 return [false, "Cannot convert private key from that string!"]
@@ -93,50 +94,34 @@ export class DemosWebAuth {
         if (!required(privKey, false)) {
             return [false, "You need to provide a private key!"]
         }
+        // Serializing the private key as a string
 
+        // console.log("[LOGIN WALLET] Serializing private key...")
+        // this.keypair.privateKey = forge_converter.stringToForge(this.stringified_keypair.privateKey)
+        // console.log(this.keypair.privateKey)
+
+        this.keypair = {
+            privateKey: privKey as Uint8Array,
+            publicKey: forge.pki.ed25519.publicKeyFromPrivateKey({
+                privateKey: privKey as Uint8Array,
+            }),
+        }
+
+        // Logging in avoiding crashes on wrong private keys
         try {
-            let keypair: { privateKey: Uint8Array; publicKey: Uint8Array }
-
-            if (processSeed) {
-                let privKeyBytes = privKey as Uint8Array
-                if (
-                    privKeyBytes.length === 64 &&
-                    privKeyBytes.slice(32).every(b => b === 0)
-                ) {
-                    privKeyBytes = privKeyBytes.slice(0, 32)
-                }
-                if (privKeyBytes.length === 32) {
-                    keypair = forge.pki.ed25519.generateKeyPair({
-                        seed: privKeyBytes,
-                    })
-                } else if (privKeyBytes.length === 64) {
-                    keypair = {
-                        privateKey: privKeyBytes,
-                        publicKey: forge.pki.ed25519.publicKeyFromPrivateKey({
-                            privateKey: privKeyBytes,
-                        }),
-                    }
-                } else {
-                    return [
-                        false,
-                        `Unsupported private key length: ${privKeyBytes.length}`,
-                    ]
-                }
-            } else {
-                keypair = {
-                    privateKey: privKey as Uint8Array,
-                    publicKey: forge.pki.ed25519.publicKeyFromPrivateKey({
-                        privateKey: privKey as Uint8Array,
-                    }),
-                }
-            }
-
-            this.keypair = keypair
+            this.keypair.publicKey = forge.pki.ed25519.publicKeyFromPrivateKey({
+                privateKey: privKey as Uint8Array,
+            })
             this.stringified_keypair = {
-                privateKey: forge_converter.forgeToString(keypair.privateKey),
-                publicKey: forge_converter.forgeToString(keypair.publicKey),
+                privateKey: forge_converter.forgeToString(
+                    this.keypair.privateKey,
+                ),
+                publicKey: forge_converter.forgeToString(
+                    this.keypair.publicKey,
+                ),
             }
             this.loggedIn = true
+
             return [true, "Successfully logged in!"]
         } catch (e) {
             console.error(e)
