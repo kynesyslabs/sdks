@@ -48,6 +48,15 @@ export interface XmGCRData {
     identity: string
 }
 
+export interface XmGCRIdentityData {
+    chain: string
+    subchain: string
+    signature: string
+    signedData: string
+    targetAddress: string;
+    isEVM: boolean
+}
+
 export interface Web2GCRData {
     // TODO: Define this
 }
@@ -58,7 +67,7 @@ export interface GCREditIdentity {
     account: string
     context: "xm" | "web2"
     operation: "add" | "remove"
-    data: XmGCRData | Web2GCRData
+    data: XmGCRData | Web2GCRData | XmGCRIdentityData
     txhash: string
 }
 
