@@ -1,6 +1,7 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
+import { RPCResponseWithValidityData } from "@/types"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
@@ -13,6 +14,8 @@ import {
     InferFromSignaturePayload,
     InferFromWritePayload,
 } from "@/types/abstraction"
+import pprint from "@/utils/pprint"
+import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 
 export default class Identities {
@@ -39,6 +42,80 @@ export default class Identities {
         }
 
         return await demos.rpcCall(basePayload, true)
+    }
+
+    async inferIdentity_v2(
+        demos: Demos,
+        payload: InferFromWritePayload | InferFromSignaturePayload,
+    ): Promise<RPCResponseWithValidityData> {
+        const tx = DemosTransactions.empty()
+        const address = payload.target_identity.targetAddress
+
+        const nonce = await demos.getAddressNonce(address)
+
+        tx.content = {
+            ...tx.content,
+            type: "identity",
+            from: address,
+            to: address,
+            amount: 0,
+            data: [
+                "identity",
+                {
+                    context: "xm",
+                    method: "identity_assign",
+                    payload: payload,
+                },
+            ],
+            nonce: nonce + 1,
+            timestamp: Date.now(),
+        }
+
+        const signedTx = await demos.sign(tx)
+        return await demos.confirm(signedTx)
+        // const basePayload = {
+        //     method: "gcr_routine",
+        //     params: [
+        //         {
+        //             method: payload.method,
+        //             params: [payload],
+        //         },
+        //     ],
+        // }
+
+        // return await demos.rpcCall(basePayload, true)
+    }
+
+    async removeXmIdentity_v2(
+        demos: Demos,
+        payload: InferFromWritePayload | InferFromSignaturePayload,
+    ): Promise<RPCResponseWithValidityData> {
+        const tx = DemosTransactions.empty()
+        const address = payload.target_identity.targetAddress
+
+        const nonce = await demos.getAddressNonce(address)
+
+        tx.content = {
+            ...tx.content,
+            type: "identity",
+            from: address,
+            to: address,
+            amount: 0,
+            data: [
+                "identity",
+                {
+                    context: "xm",
+                    method: "identity_remove",
+                    payload: payload,
+                },
+            ],
+            nonce: nonce + 1,
+            timestamp: Date.now(),
+        }
+
+        const signedTx = await demos.sign(tx)
+
+        return await demos.confirm(signedTx)
     }
 
     /**
@@ -72,14 +149,14 @@ export default class Identities {
     async addGithubIdentity(demos: Demos, payload: GithubProof) {
         let githubPayload: InferFromGithubPayload = {
             context: "github",
-            proof: payload
+            proof: payload,
         }
 
         const request = {
             method: "gcr_routine",
             params: [
                 {
-                    method: "add_github_identity", 
+                    method: "add_github_identity",
                     params: [githubPayload], // REVIEW Is this correct?
                 },
             ],

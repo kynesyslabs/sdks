@@ -1,6 +1,7 @@
-import { GCREdit } from "@/types/blockchain/GCREdit"
+import { GCREdit, GCREditIdentity } from "@/types/blockchain/GCREdit"
 import { Transaction } from "@/types/blockchain/Transaction"
 import { INativePayload } from "@/types/native"
+import { IdentityPayload, InferFromSignaturePayload } from "@/types/abstraction"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -34,12 +35,21 @@ export class GCRGeneration {
             case "genesis":
                 // TODO Implement this
                 break
+            case "identity":
+                var identityEdits = await HandleIdentityOperations.handle(tx)
+                gcrEdits.push(...identityEdits)
+                break
         }
 
         // SECTION Operations valid for all tx types
 
         // Add gas operation edit with check for availability of gas amount in the sender's balance
-        try {
+        nonceEdits: try {
+            // INFO: Skip gas for identity operations
+            if (content.type === "identity") {
+                break nonceEdits
+            }
+
             let gasEdit = await this.createGasEdit(
                 content.from as string,
                 tx.hash,
@@ -175,5 +185,51 @@ export class HandleNativeOperations {
                 break
         }
         return edits
+    }
+}
+
+export class HandleIdentityOperations {
+    static async handle(tx: Transaction): Promise<GCREditIdentity[]> {
+        const edits = [] as GCREditIdentity[]
+        const identityPayloadData: ["identity", IdentityPayload] = tx.content.data as [
+            "identity",
+            IdentityPayload,
+        ]
+        const identityPayload: IdentityPayload = identityPayloadData[1]
+        const targetIdentityPayload = identityPayload.payload as InferFromSignaturePayload
+
+        switch (identityPayload.method) {
+            case "identity_assign":
+                const subEdit: GCREditIdentity = {
+                    account: tx.content.from as string,
+                    type: "identity",
+                    operation: "add",
+                    txhash: tx.hash,
+                    isRollback: false,
+                    context: identityPayload.context,
+                    data: targetIdentityPayload.target_identity,
+                }
+                edits.push(subEdit)
+                break;
+            case "identity_remove":
+                const removeEdit: GCREditIdentity = {
+                    account: tx.content.from as string,
+                    type: "identity",
+                    operation: "remove",
+                    txhash: tx.hash,
+                    isRollback: false,
+                    context: identityPayload.context,
+                    data: targetIdentityPayload.target_identity,
+                }
+                edits.push(removeEdit)
+                break;
+            default:
+                console.log(
+                    "Unknown native operation: ",
+                    identityPayload.method
+                )
+                break
+        }
+        return edits;
     }
 }

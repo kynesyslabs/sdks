@@ -1,4 +1,3 @@
-
 // SECTION Blockchain Identities
 
 export interface XMCoreTargetIdentityPayload {
@@ -73,7 +72,7 @@ export type GithubProof = `https://github.com/${string}/${string}` // TODO Bette
 
 // Add more as needed following the above pattern
 
-
+// ANCHOR Payloads
 export interface InferFromGithubPayload extends Web2CoreTargetIdentityPayload {
     proof: GithubProof
 }
@@ -88,3 +87,13 @@ export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
 }
 
 export interface InferFromTwitterPayload extends InferFromXPayload {}
+
+export interface IdentityPayload {
+    context: "xm" | "web2"
+    method: "identity_assign" | "identity_remove"
+    payload:
+        | InferFromGithubPayload
+        | InferFromSignaturePayload
+        | InferFromWritePayload
+        | XMCoreTargetIdentityPayload
+}
