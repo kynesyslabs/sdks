@@ -15,6 +15,8 @@ import {
     Web2CoreTargetIdentityPayload,
     InferFromGithubPayload,
     GithubProof,
+    IdentityPayload,
+    InferFromSignatureTargetIdentityPayload
 } from "@/types/abstraction"
 
 export {
@@ -27,4 +29,6 @@ export {
     Web2CoreTargetIdentityPayload,
     InferFromGithubPayload,
     GithubProof,
+    IdentityPayload,
+    InferFromSignatureTargetIdentityPayload
 }
