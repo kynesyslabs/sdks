@@ -11,7 +11,7 @@ describe("RubicService", () => {
     const privateKey = "" // Add Wallet PK for testing
 
     beforeEach(() => {
-        rubicService = new RubicService(privateKey, "ALL")
+        rubicService = new RubicService(privateKey, "POLYGON")
     })
 
     test("should get trade", async () => {
@@ -21,7 +21,7 @@ describe("RubicService", () => {
             const tradeResult = await rubicService.getTrade(
                 "USDT",
                 "USDT",
-                "10",
+                10,
                 137,
                 1,
             )
@@ -104,7 +104,7 @@ describe("RubicService", () => {
         expect(txHash).toBe("0x1234567890abcdef")
     })
 
-    test.skip("should execute real trade", async () => {
+    test("should execute real trade", async () => {
         // Integrate test to do real trade/swap execution
         // Using skip() because it will take real funds
 
@@ -112,9 +112,9 @@ describe("RubicService", () => {
             await rubicService.waitForInitialization()
 
             const tradeResult = await rubicService.getTrade(
-                "NATIVE",
                 "USDT",
-                "0.1",
+                "USDT",
+                0.5,
                 137,
                 1,
             )
@@ -133,5 +133,5 @@ describe("RubicService", () => {
             console.error("Test error:", error)
             fail(`Unexpected error occurred: ${error}`)
         }
-    })
+    }, 60000)
 })

@@ -6,7 +6,7 @@ export const SUPPORTED_TOKENS = {
     },
     POLYGON: {
         NATIVE: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-        USDC: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+        USDC: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
         USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
     },
     BSC: {

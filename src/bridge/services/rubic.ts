@@ -74,8 +74,19 @@ class CustomEVMProvider {
                 (error, response) => {
                     if (error) {
                         reject(error)
+                    } else if (
+                        !response ||
+                        typeof response.result === "undefined"
+                    ) {
+                        reject(
+                            new Error(
+                                `Invalid response for ${
+                                    args.method
+                                }: ${JSON.stringify(response)}`,
+                            ),
+                        )
                     } else {
-                        resolve(response?.result)
+                        resolve(response.result)
                     }
                 },
             )
@@ -107,12 +118,9 @@ export class RubicService {
     private customEVMProvider: CustomEVMProvider
     private signer: any
     private initPromise: Promise<void> | null = null
-    private selectedProtocol: BridgeProtocol = "ALL"
 
-    constructor(privateKey: string, selectedProtocol: BridgeProtocol = "ALL") {
-        this.selectedProtocol = selectedProtocol
-
-        const web3Instance = new Web3(chainProviders.ETH.mainnet)
+    constructor(privateKey: string, chain: string) {
+        const web3Instance = new Web3(chainProviders[`${chain}`].mainnet)
 
         const httpProvider =
             web3Instance.currentProvider as unknown as HttpProvider
@@ -200,7 +208,7 @@ export class RubicService {
     async getTrade(
         fromToken: "NATIVE" | "USDC" | "USDT",
         toToken: "NATIVE" | "USDC" | "USDT",
-        amount: string,
+        amount: number,
         fromChainId: number,
         toChainId: number,
     ): Promise<WrappedCrossChainTrade | RubicSdkError> {
@@ -231,12 +239,10 @@ export class RubicService {
                 },
                 {
                     fromAddress: this.signer.address,
-                    bridgeTypes:
-                        this.selectedProtocol === "ALL"
-                            ? Object.values(BRIDGE_PROTOCOLS)
-                                  .filter(p => p !== "all")
-                                  .map(p => p.toLowerCase())
-                            : [this.selectedProtocol.toLowerCase()],
+                    bridgeTypes: Object.values(BRIDGE_PROTOCOLS)
+                        .filter(p => p !== "all")
+                        .map(p => p.toLowerCase()),
+                    gasCalculation: "enabled",
                 } as ExtendedCrossChainManagerCalculationOptions,
             )
 
@@ -272,10 +278,9 @@ export class RubicService {
             throw wrappedTrade.error
         }
 
-        if (!wrappedTrade.trade)
-            throw new Error("Invalid trade object: trade is null")
-
         const trade: CrossChainTrade = wrappedTrade.trade
+
+        if (!trade) throw new Error("Invalid trade object: trade is null")
 
         try {
             const signerAddress = this.signer.address
