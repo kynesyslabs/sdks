@@ -104,7 +104,7 @@ describe("RubicService", () => {
         expect(txHash).toBe("0x1234567890abcdef")
     })
 
-    test("should execute real trade", async () => {
+    test.skip("should execute real trade", async () => {
         // Integrate test to do real trade/swap execution
         // Using skip() because it will take real funds
 
