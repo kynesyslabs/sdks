@@ -10,6 +10,7 @@ import {
     CrossChainTrade,
     SwapTransactionOptions,
     RubicSdkError,
+    BasicTransactionOptions,
 } from "rubic-sdk"
 import { chainProviders } from "../chainProviders"
 import { SUPPORTED_TOKENS } from "../supportedTokens"
@@ -17,19 +18,50 @@ import { SUPPORTED_TOKENS } from "../supportedTokens"
 class CustomEVMProvider {
     private httpProvider: HttpProvider
     private eventHandlers: Record<string, Function[]> = {}
+    private signer: any
 
-    constructor(httpProvider: HttpProvider) {
+    constructor(httpProvider: HttpProvider, signer: any) {
         this.httpProvider = httpProvider
+        this.signer = signer
     }
 
     send(
         payload: any,
         callback: (error: Error | null, result?: any) => void,
     ): void {
-        if (typeof this.httpProvider.send === "function") {
-            this.httpProvider.send(payload, callback)
+        if (payload.method === "eth_sendTransaction") {
+            const txParams = payload.params[0]
+
+            const minPriorityFee = Web3.utils.toWei("25", "gwei")
+            if (
+                !txParams.maxPriorityFeePerGas ||
+                BigInt(txParams.maxPriorityFeePerGas) < BigInt(minPriorityFee)
+            ) {
+                txParams.maxPriorityFeePerGas = minPriorityFee
+            }
+
+            if (
+                !txParams.maxFeePerGas ||
+                BigInt(txParams.maxFeePerGas) <
+                    BigInt(txParams.maxPriorityFeePerGas)
+            ) {
+                txParams.maxFeePerGas = Web3.utils.toWei("100", "gwei")
+            }
+
+            this.signer
+                .signTransaction(txParams)
+                .then((signedTx: any) => {
+                    const newPayload = {
+                        jsonrpc: payload.jsonrpc,
+                        id: payload.id,
+                        method: "eth_sendRawTransaction",
+                        params: [signedTx.rawTransaction],
+                    }
+                    this.httpProvider.send(newPayload, callback)
+                })
+                .catch(callback)
         } else {
-            callback(new Error("Send method not available on provider"))
+            this.httpProvider.send(payload, callback)
         }
     }
 
@@ -124,7 +156,6 @@ export class RubicService {
 
         const httpProvider =
             web3Instance.currentProvider as unknown as HttpProvider
-        this.customEVMProvider = new CustomEVMProvider(httpProvider)
 
         const formattedKey = privateKey.startsWith("0x")
             ? privateKey
@@ -133,6 +164,10 @@ export class RubicService {
         this.signer =
             web3Instance.eth.accounts.privateKeyToAccount(formattedKey)
         web3Instance.eth.accounts.wallet.add(this.signer)
+        this.customEVMProvider = new CustomEVMProvider(
+            httpProvider,
+            this.signer,
+        )
 
         this.initPromise = this.initializeSDK()
     }
@@ -255,7 +290,7 @@ export class RubicService {
             }
 
             const filteredTrades = trades.filter(
-                trade => trade !== undefined && trade !== null,
+                trade => trade !== undefined && trade !== null && !trade.error,
             )
 
             const bestTrade = filteredTrades[0]
@@ -299,6 +334,26 @@ export class RubicService {
                 testMode: false,
                 useEip155: true,
                 refundAddress: signerAddress,
+            }
+
+            const basicTransactionOptions: BasicTransactionOptions = {
+                onTransactionHash: (hash: string) => {
+                    console.log("Transaction hash:", hash)
+                },
+            }
+
+            const needsApproval = await trade.needApprove()
+
+            if (needsApproval) {
+                console.log("Approving...")
+                const approve = await trade.approve(
+                    basicTransactionOptions,
+                    true,
+                    "infinity",
+                )
+                console.log("approve", approve)
+            } else {
+                console.log("Skipping approval, allowance is sufficient.")
             }
 
             const receipt = await trade.swap(swapOptions)

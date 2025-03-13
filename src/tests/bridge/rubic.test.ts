@@ -114,7 +114,7 @@ describe("RubicService", () => {
             const tradeResult = await rubicService.getTrade(
                 "USDT",
                 "USDT",
-                0.5,
+                1,
                 137,
                 1,
             )
@@ -123,13 +123,24 @@ describe("RubicService", () => {
                 console.error("Trade error:", tradeResult)
                 fail(`Trade failed with error: ${tradeResult.message}`)
             } else {
-                const executedTrade = await rubicService.executeTrade(
-                    tradeResult,
-                )
+                expect(tradeResult).not.toBeUndefined()
+                expect(tradeResult.trade).not.toBeNull()
 
-                // Continue ...
+                const wrappedTrade = tradeResult.trade
+
+                if (wrappedTrade !== null) {
+                    expect(wrappedTrade).toBeDefined()
+                    expect(wrappedTrade.from).toBeDefined()
+                    expect(wrappedTrade.to).toBeDefined()
+                    expect(typeof wrappedTrade.swap).toBe("function")
+                }
             }
-        } catch (error: any) {
+
+            const txHash = await rubicService.executeTrade(tradeResult)
+            
+            expect(txHash).toBeDefined()
+            expect(typeof txHash).toBe("string")
+        } catch (error) {
             console.error("Test error:", error)
             fail(`Unexpected error occurred: ${error}`)
         }
