@@ -14,12 +14,13 @@ import {
     InferFromSignaturePayload,
     InferFromWritePayload,
 } from "@/types/abstraction"
-import pprint from "@/utils/pprint"
+
 import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 
 export default class Identities {
     // Infer identity from either a write transaction or a signature
+
     /**
      * Infer an identity from either a write transaction or a signature.
      *
@@ -28,23 +29,6 @@ export default class Identities {
      * @returns The identity inferred from the payload.
      */
     async inferIdentity(
-        demos: Demos,
-        payload: InferFromWritePayload | InferFromSignaturePayload,
-    ): Promise<string | false> {
-        const basePayload = {
-            method: "gcr_routine",
-            params: [
-                {
-                    method: payload.method,
-                    params: [payload],
-                },
-            ],
-        }
-
-        return await demos.rpcCall(basePayload, true)
-    }
-
-    async inferIdentity_v2(
         demos: Demos,
         payload: InferFromWritePayload | InferFromSignaturePayload,
     ): Promise<RPCResponseWithValidityData> {
@@ -73,27 +57,21 @@ export default class Identities {
 
         const signedTx = await demos.sign(tx)
         return await demos.confirm(signedTx)
-        // const basePayload = {
-        //     method: "gcr_routine",
-        //     params: [
-        //         {
-        //             method: payload.method,
-        //             params: [payload],
-        //         },
-        //     ],
-        // }
-
-        // return await demos.rpcCall(basePayload, true)
     }
 
-    async removeXmIdentity_v2(
+    /**
+     * Remove a crosschain identity associated with an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to remove the identity from.
+     * @returns The response from the RPC call.
+     */
+    async removeXmIdentity(
         demos: Demos,
-        payload: InferFromWritePayload | InferFromSignaturePayload,
+        payload: XMCoreTargetIdentityPayload,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
-        const address = payload.target_identity.targetAddress
-
-        const nonce = await demos.getAddressNonce(address)
+        const address = demos.getAddress()
 
         tx.content = {
             ...tx.content,
@@ -109,34 +87,12 @@ export default class Identities {
                     payload: payload,
                 },
             ],
-            nonce: nonce + 1,
+            nonce: 1,
             timestamp: Date.now(),
         }
 
         const signedTx = await demos.sign(tx)
-
         return await demos.confirm(signedTx)
-    }
-
-    /**
-     * Remove a crosschain identity associated with an address.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param payload The payload to remove the identity from.
-     * @returns The response from the RPC call.
-     */
-    async removeXmIdentity(demos: Demos, payload: XMCoreTargetIdentityPayload) {
-        const request = {
-            method: "gcr_routine",
-            params: [
-                {
-                    method: "remove_identity",
-                    params: [payload],
-                },
-            ],
-        }
-
-        return await demos.rpcCall(request, true)
     }
 
     /**
@@ -165,7 +121,6 @@ export default class Identities {
         return await demos.rpcCall(request, true)
     }
 
-
     /**
      * Add a twitter identity to the GCR.
      *
@@ -176,7 +131,7 @@ export default class Identities {
     async addTwitterIdentity(demos: Demos, payload: TwitterProof) {
         let twitterPayload: InferFromXPayload = {
             context: "twitter",
-            proof: payload
+            proof: payload,
         }
 
         const request = {

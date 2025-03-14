@@ -191,15 +191,14 @@ export class HandleNativeOperations {
 export class HandleIdentityOperations {
     static async handle(tx: Transaction): Promise<GCREditIdentity[]> {
         const edits = [] as GCREditIdentity[]
-        const identityPayloadData: ["identity", IdentityPayload] = tx.content.data as [
-            "identity",
-            IdentityPayload,
-        ]
+        const identityPayloadData: ["identity", IdentityPayload] = tx.content
+            .data as ["identity", IdentityPayload]
         const identityPayload: IdentityPayload = identityPayloadData[1]
-        const targetIdentityPayload = identityPayload.payload as InferFromSignaturePayload
 
         switch (identityPayload.method) {
             case "identity_assign":
+                const targetIdentityPayload =
+                    identityPayload.payload as InferFromSignaturePayload
                 const subEdit: GCREditIdentity = {
                     account: tx.content.from as string,
                     type: "identity",
@@ -210,7 +209,7 @@ export class HandleIdentityOperations {
                     data: targetIdentityPayload.target_identity,
                 }
                 edits.push(subEdit)
-                break;
+                break
             case "identity_remove":
                 const removeEdit: GCREditIdentity = {
                     account: tx.content.from as string,
@@ -219,17 +218,17 @@ export class HandleIdentityOperations {
                     txhash: tx.hash,
                     isRollback: false,
                     context: identityPayload.context,
-                    data: targetIdentityPayload.target_identity,
+                    data: identityPayload.payload,
                 }
                 edits.push(removeEdit)
-                break;
+                break
             default:
                 console.log(
                     "Unknown native operation: ",
-                    identityPayload.method
+                    identityPayload.method,
                 )
                 break
         }
-        return edits;
+        return edits
     }
 }
