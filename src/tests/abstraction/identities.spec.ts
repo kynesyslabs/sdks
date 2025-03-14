@@ -42,7 +42,6 @@ describe.skip("IDENTITIES V2", () => {
                 chain: instance.name,
                 chainId: instance.chainId,
                 subchain: "sepolia",
-                isEVM: true,
                 signature: signature,
                 signedData: message,
                 targetAddress: instance.getAddress(),
@@ -151,7 +150,7 @@ const chains = [
     },
 ]
 
-describe.skip.each(chains)(
+describe.only.each(chains)(
     "Identities › $name",
     ({ name, sdk, wallet, subchain, password, rpc }: any) => {
         let instance: any
@@ -168,7 +167,7 @@ describe.skip.each(chains)(
             )
         })
 
-        test.skip("Associate an identity using a signature", async () => {
+        test.only("Associate an identity using a signature", async () => {
             instance = await sdk.create(null)
             let ibcBase64PublicKey = ""
 
@@ -225,7 +224,6 @@ describe.skip.each(chains)(
                 signature: _signature,
                 signedData: instance.getAddress(),
                 targetAddress: instance.getAddress(),
-                isEVM: name === "EVM",
                 chainId: instance.chainId,
                 publicKey:
                     name === "IBC"
@@ -341,7 +339,6 @@ describe.skip.each(chains)(
                 targetAddress: instance.getAddress(),
                 // signature: _signature,
                 // signedData: instance.getAddress(),
-                // isEVM: name === "EVM",
                 // chainId: instance.chainId,
                 // publicKey:
                 //     name === "IBC"
@@ -412,7 +409,6 @@ describe.skip("Individual Sign & Verify", () => {
                 chain: instance.name,
                 chainId: instance.chainId,
                 subchain: "sepolia",
-                isEVM: true,
                 signature: signature,
                 signedData: message,
                 targetAddress: instance.getAddress(),
