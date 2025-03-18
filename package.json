@@ -31,6 +31,7 @@
         "test:tx": "rm -rf build && jest --testMatch '**/tests/multichain**/fulltx*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:demoswork": "rm -rf build && jest --testMatch '**/tests/**/demoswork*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:identities": "rm -rf build && jest --testMatch '**/tests/**/identities*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:identities:web2": "rm -rf build && jest --testMatch '**/tests/**/identities.web2*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose --setupFiles dotenv/config",
         "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",
         "test:native": "rm -rf build && jest --testMatch '**/tests/native*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:web2": "rm -rf build && jest --testMatch '**/tests/web2*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
@@ -58,6 +59,7 @@
         "bignumber.js": "^9.1.2",
         "bs58": "^5.0.0",
         "buffer": "^6.0.3",
+        "dotenv": "^16.4.7",
         "ethers": "^6.11.1",
         "libsodium-wrappers-sumo": "^0.7.15",
         "lodash": "^4.17.21",
@@ -72,6 +74,7 @@
         "superdilithium": "^2.0.6",
         "tweetnacl": "^1.0.3",
         "tweetnacl-util": "^0.15.1",
+        "twitter-api-sdk": "^1.2.1",
         "web3": "^4.9.0",
         "xrpl": "^3.1.0"
     },

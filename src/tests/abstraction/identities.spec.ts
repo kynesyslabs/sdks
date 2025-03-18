@@ -19,7 +19,7 @@ import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
 
-describe.skip("IDENTITIES V2", () => {
+describe.only("IDENTITIES V2", () => {
     test.only("EVM ADD IDENTITY v2", async () => {
         const instance = await EVM.create()
 
@@ -64,6 +64,7 @@ describe.skip("IDENTITIES V2", () => {
         const validityData = await identities.inferIdentity(demos, payload)
 
         const res = await demos.broadcast(validityData)
+        console.log(res)
         expect(res).toBeDefined()
         expect(res.result).toBe(200)
     })
@@ -95,6 +96,7 @@ describe.skip("IDENTITIES V2", () => {
         )
 
         const res = await demos.broadcast(validityData)
+        console.log(res)
         expect(res["result"]).toBe(200)
     })
 })
@@ -150,7 +152,7 @@ const chains = [
     },
 ]
 
-describe.only.each(chains)(
+describe.skip.each(chains)(
     "Identities › $name",
     ({ name, sdk, wallet, subchain, password, rpc }: any) => {
         let instance: any

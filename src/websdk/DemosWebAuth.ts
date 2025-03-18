@@ -82,11 +82,13 @@ export class DemosWebAuth {
     ): Promise<[boolean, string]> {
         if (typeof privKey === "string") {
             // REVIEW: Should we do this?
-            if (!privKey.startsWith("0x")) {
-                privKey = "0x" + privKey
-            }
+            // if (!privKey.startsWith("0x")) {
+            //     privKey = "0x" + privKey
+            // }
 
-            privKey = forge_converter.stringToForge(privKey)
+            // privKey = forge_converter.stringToForge(privKey)
+            privKey = forge.util.binary.hex.decode(privKey)
+            console.log("privKey", privKey)
             if (!privKey) {
                 return [false, "Cannot convert private key from that string!"]
             }

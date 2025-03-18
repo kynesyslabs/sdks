@@ -195,40 +195,41 @@ export class HandleIdentityOperations {
             .data as ["identity", IdentityPayload]
         const identityPayload: IdentityPayload = identityPayloadData[1]
 
+        // INFO: Create the GCR edit skeleton
+        const edit: GCREditIdentity = {
+            account: tx.content.from as string,
+            type: "identity",
+            operation: identityPayload.method.endsWith("assign")
+                ? "add"
+                : "remove",
+            txhash: tx.hash,
+            isRollback: false,
+            context: identityPayload.context,
+            data: null,
+        }
+
+        // INFO: Fill the GCR edit with the correct data
         switch (identityPayload.method) {
-            case "identity_assign":
-                const targetIdentityPayload =
+            case "xm_identity_assign":
+                edit.data = (
                     identityPayload.payload as InferFromSignaturePayload
-                const subEdit: GCREditIdentity = {
-                    account: tx.content.from as string,
-                    type: "identity",
-                    operation: "add",
-                    txhash: tx.hash,
-                    isRollback: false,
-                    context: identityPayload.context,
-                    data: targetIdentityPayload.target_identity,
-                }
-                edits.push(subEdit)
+                ).target_identity
                 break
-            case "identity_remove":
-                const removeEdit: GCREditIdentity = {
-                    account: tx.content.from as string,
-                    type: "identity",
-                    operation: "remove",
-                    txhash: tx.hash,
-                    isRollback: false,
-                    context: identityPayload.context,
-                    data: identityPayload.payload,
-                }
-                edits.push(removeEdit)
+            case "web2_identity_assign":
+            case "xm_identity_remove":
+            case "web2_identity_remove":
+                edit.data = identityPayload.payload
                 break
             default:
                 console.log(
-                    "Unknown native operation: ",
+                    "Unknown identity operation: ",
+                    // @ts-ignore
                     identityPayload.method,
                 )
                 break
         }
+
+        edits.push(edit)
         return edits
     }
 }

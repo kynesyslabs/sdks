@@ -22,53 +22,18 @@ export default class Identities {
     // Infer identity from either a write transaction or a signature
 
     /**
-     * Infer an identity from either a write transaction or a signature.
+     * Infer an identity from either a crosschain payload or a web2 proof.
      *
      * @param demos A Demos instance to communicate with the RPC.
+     * @param context The context of the identity to infer.
      * @param payload The payload to infer the identity from.
-     * @returns The identity inferred from the payload.
+     *
+     * @returns The validity data of the identity transaction.
      */
     async inferIdentity(
         demos: Demos,
-        payload: InferFromWritePayload | InferFromSignaturePayload,
-    ): Promise<RPCResponseWithValidityData> {
-        const tx = DemosTransactions.empty()
-        const address = payload.target_identity.targetAddress
-
-        const nonce = await demos.getAddressNonce(address)
-
-        tx.content = {
-            ...tx.content,
-            type: "identity",
-            from: address,
-            to: address,
-            amount: 0,
-            data: [
-                "identity",
-                {
-                    context: "xm",
-                    method: "identity_assign",
-                    payload: payload,
-                },
-            ],
-            nonce: nonce + 1,
-            timestamp: Date.now(),
-        }
-
-        const signedTx = await demos.sign(tx)
-        return await demos.confirm(signedTx)
-    }
-
-    /**
-     * Remove a crosschain identity associated with an address.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param payload The payload to remove the identity from.
-     * @returns The response from the RPC call.
-     */
-    async removeXmIdentity(
-        demos: Demos,
-        payload: XMCoreTargetIdentityPayload,
+        context: "xm" | "web2",
+        payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
         const address = demos.getAddress()
@@ -82,8 +47,8 @@ export default class Identities {
             data: [
                 "identity",
                 {
-                    context: "xm",
-                    method: "identity_remove",
+                    context: context,
+                    method: (context + "_identity_assign") as any,
                     payload: payload,
                 },
             ],
@@ -93,6 +58,77 @@ export default class Identities {
 
         const signedTx = await demos.sign(tx)
         return await demos.confirm(signedTx)
+    }
+
+    /**
+     * Infer a crosschain identity from a signature.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to infer the identity from.
+     * @returns The validity data of the identity transaction.
+     */
+    async inferXmIdentity(demos: Demos, payload: InferFromSignaturePayload) {
+        return await this.inferIdentity(demos, "xm", payload)
+    }
+
+    /**
+     * Infer a web2 identity from a proof payload.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to infer the identity from.
+     *
+     * @returns The validity data of the identity transaction.
+     */
+    async inferWeb2Identity(
+        demos: Demos,
+        payload: Web2CoreTargetIdentityPayload,
+    ) {
+        return await this.inferIdentity(demos, "web2", payload)
+    }
+
+    /**
+     * Remove a crosschain identity associated with an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to remove the identity from.
+     * @returns The response from the RPC call.
+     */
+    async removeIdentity(
+        demos: Demos,
+        context: "xm" | "web2",
+        payload: any,
+    ): Promise<RPCResponseWithValidityData> {
+        const tx = DemosTransactions.empty()
+        const address = demos.getAddress()
+
+        tx.content = {
+            ...tx.content,
+            type: "identity",
+            from: address,
+            to: address,
+            amount: 0,
+            data: [
+                "identity",
+                {
+                    context: context,
+                    method: (context + "_identity_remove") as any,
+                    payload: payload,
+                },
+            ],
+            nonce: 1,
+            timestamp: Date.now(),
+        }
+
+        const signedTx = await demos.sign(tx)
+        return await demos.confirm(signedTx)
+    }
+
+    async removeXmIdentity(demos: Demos, payload: XMCoreTargetIdentityPayload) {
+        return await this.removeIdentity(demos, "xm", payload)
+    }
+
+    async removeWeb2Identity(demos: Demos, payload: unknown) {
+        return await this.removeIdentity(demos, "web2", payload)
     }
 
     /**
