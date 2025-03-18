@@ -53,4 +53,8 @@ export default {
         mainnet: "https://rpc.near.org",
         testnet: "https://rpc.testnet.near.org",
     },
+    btc: {
+        mainnet: "https://blockstream.info/api",
+        testnet: "https://blockstream.info/testnet/api",
+    },
 }

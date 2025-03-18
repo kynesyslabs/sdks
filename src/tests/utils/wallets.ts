@@ -60,12 +60,17 @@ export const wallets: {
     },
     near: {
         // INFO: Testnet accountId: "kynesys.testnet"
-        privateKey: "drift uniform trend awkward will hope cheap sell matter month release prison"
-    }
+        privateKey:
+            "drift uniform trend awkward will hope cheap sell matter month release prison",
+    },
+    btc: {
+        privateKey: "cSbM47QmBZwjCGypJhsqKHP82heTZXsxKbC25rQabiXA2Gxc3WxW",
+    },
 }
 
 export const addresses = {
     // Alt account
     // INFO: XRPL doesn't accept transfers to own account
     xrpl: "rHYu6zpqEPqVZ1K5tvmeM3mm5D7VsVrH2h",
+    btc: "mptjhkdKDTA2HrvNPdKqpxNcFCP6ynijv4",
 }
