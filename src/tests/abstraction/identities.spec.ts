@@ -22,7 +22,6 @@ import { wallets } from "../utils/wallets"
 describe.only("IDENTITIES V2", () => {
     test.only("EVM ADD IDENTITY v2", async () => {
         const instance = await EVM.create()
-
         await instance.connectWallet(wallets.evm.privateKey)
 
         const message = "Hello, world!"
@@ -39,10 +38,11 @@ describe.only("IDENTITIES V2", () => {
         const payload: InferFromSignaturePayload = {
             method: "identity_assign_from_signature",
             target_identity: {
-                chain: instance.name,
+                chain: "evm",
                 chainId: instance.chainId,
                 subchain: "sepolia",
                 signature: signature,
+                isEVM: true,
                 signedData: message,
                 targetAddress: instance.getAddress(),
             },
@@ -52,7 +52,7 @@ describe.only("IDENTITIES V2", () => {
         const rpc = "http://localhost:53550"
         const identity = DemosWebAuth.getInstance()
         await identity.login(
-            "0x2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
+            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
         )
 
         const demos = new Demos()
@@ -61,10 +61,10 @@ describe.only("IDENTITIES V2", () => {
         await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
 
         const identities = new Identities()
-        const validityData = await identities.inferIdentity(demos, payload)
+        // @ts-ignore
+        const validityData = await identities.inferXmIdentity(demos, payload)
 
         const res = await demos.broadcast(validityData)
-        console.log(res)
         expect(res).toBeDefined()
         expect(res.result).toBe(200)
     })
@@ -90,10 +90,7 @@ describe.only("IDENTITIES V2", () => {
             targetAddress: instance.getAddress(),
         }
 
-        const validityData = await identities.removeXmIdentity(
-            demos,
-            payload,
-        )
+        const validityData = await identities.removeXmIdentity(demos, payload)
 
         const res = await demos.broadcast(validityData)
         console.log(res)
@@ -227,6 +224,7 @@ describe.skip.each(chains)(
                 signedData: instance.getAddress(),
                 targetAddress: instance.getAddress(),
                 chainId: instance.chainId,
+                isEVM: name === "EVM",
                 publicKey:
                     name === "IBC"
                         ? ibcBase64PublicKey
@@ -265,10 +263,8 @@ describe.skip.each(chains)(
             }
 
             // INFO: Send the payload to the RPC
-            const validityData = await identities.inferIdentity(
-                demos,
-                payload,
-            )
+            // @ts-ignore
+            const validityData = await identities.inferIdentity(demos, payload)
 
             const res = await demos.broadcast(validityData)
 
@@ -410,6 +406,7 @@ describe.skip("Individual Sign & Verify", () => {
             target_identity: {
                 chain: instance.name,
                 chainId: instance.chainId,
+                isEVM: true,
                 subchain: "sepolia",
                 signature: signature,
                 signedData: message,
@@ -428,6 +425,7 @@ describe.skip("Individual Sign & Verify", () => {
         await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
 
         const identities = new Identities()
+        // @ts-ignore
         const validityData = await identities.inferIdentity(demos, payload)
 
         const res = await demos.broadcast(validityData)

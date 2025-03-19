@@ -12,7 +12,7 @@ export interface XMCoreTargetIdentityPayload {
 export interface InferFromSignatureTargetIdentityPayload
     extends XMCoreTargetIdentityPayload {
     chainId: number | string
-
+    isEVM: boolean
     signature: string
     signedData: string
     targetAddress: string

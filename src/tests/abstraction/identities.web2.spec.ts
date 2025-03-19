@@ -7,7 +7,7 @@ import axios from "axios"
 import { Identities, InferFromTwitterPayload } from "@/abstraction"
 
 describe("Web2 Identities", () => {
-    test("Create Twitter Identity", async () => {
+    test.only("Create Twitter Identity", async () => {
         const identity = new DemosWebAuth()
         await identity.login(
             "60b66ef65fab761a776e4e86d175ec3a39892ae9202e7eb5a0c4bcce99db0cb3be065600833f72f3ff4d2f0ed16cc663bbd31ba607ebca0a6748ae3f98665492",
@@ -74,7 +74,7 @@ describe("Web2 Identities", () => {
         const rpc = "http://localhost:53550"
         const payload: InferFromTwitterPayload = {
             context: "twitter",
-            proof: "https://x.com/demos_xyz/status/1901630063692365884",
+            proof: "https://x.com/wakimata/status/1901630063692365884",
         }
 
         const identity = new DemosWebAuth()
