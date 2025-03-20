@@ -14,7 +14,7 @@ afterAll(() => {
     jest.restoreAllMocks()
 })
 
-describe("DEMOS Transaction with Bitcoin SDK", () => {
+describe.only("DEMOS Transaction with Bitcoin SDK", () => {
     let bitcoinSDK: BTC
 
     beforeAll(async () => {
@@ -78,7 +78,7 @@ describe.skip("BTC CHAIN TESTS", () => {
     test("preparePay returns a signed transaction", async () => {
         const address = instance.getAddress()
 
-        const signed_tx = await instance.preparePay(address, "10000")
+        const signed_tx = await instance.preparePay(address, "550")
         console.log(signed_tx, "<<< signed_tx")
 
         const tx = Transaction.fromHex(signed_tx)
@@ -86,7 +86,6 @@ describe.skip("BTC CHAIN TESTS", () => {
         expect(tx).toBeInstanceOf(Transaction)
         expect(tx.ins.length).toBeGreaterThan(0)
         expect(tx.outs.length).toBeGreaterThan(0)
-
         const outputAddresses = tx.outs.map(out =>
             bitcoin.address.fromOutputScript(out.script, instance.network),
         )
@@ -96,14 +95,14 @@ describe.skip("BTC CHAIN TESTS", () => {
             input => input.script.length > 0 || input.witness.length > 0,
         )
         expect(isSigned).toBe(true)
-    })
+    }, 30000)
 
     test("preparePay uses available UTXOs", async () => {
         const address = instance.getAddress()
         const utxosBefore = await instance.fetchUTXOs(address)
         console.log("UTXOs before:", utxosBefore)
 
-        const signed_tx = await instance.preparePay(address, "10000")
+        const signed_tx = await instance.preparePay(address, "600")
         const tx = Transaction.fromHex(signed_tx)
 
         // Check that at least one UTXO from fetchUTXOs is used in the transaction

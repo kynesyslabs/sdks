@@ -8,16 +8,24 @@ import { IPayParams } from "@/multichain/core/types/interfaces"
 
 const ECPair: ECPairAPI = ECPairFactory(ecc)
 
+const BITCOIN_CONSTANTS = {
+    DUST_LIMIT_P2PKH: 546,
+    BASE_TX_SIZE: 10,
+    INPUT_SIZE: 148,
+    OUTPUT_SIZE: 34,
+    SAT_PER_VBYTE: 10,
+    DEFAULT_NETWORK: bitcoin.networks.testnet, // Default Bitcoin network
+}
+
 export class BTC extends DefaultChain {
     declare provider: string
     network: bitcoin.Network
     override wallet: ECPairInterface
     address?: string
-    private readonly DUST_LIMIT_P2PKH = 546
 
     constructor(
         rpc_url: string,
-        network: bitcoin.Network = bitcoin.networks.testnet,
+        network: bitcoin.Network = BITCOIN_CONSTANTS.DEFAULT_NETWORK,
     ) {
         super(rpc_url)
         this.name = "btc"
@@ -27,16 +35,10 @@ export class BTC extends DefaultChain {
 
     async connect(): Promise<boolean> {
         try {
-            console.log("Connecting to provider:", this.provider)
-            const url =
-                this.provider.includes("blockstream.info") &&
-                this.provider.endsWith("/api")
-                    ? `${this.provider.slice(0, -4)}/api/blocks/tip/height`
-                    : `${this.provider}/api/blocks/tip/height`
+            const url = this.getApiUrl("/blocks/tip/height")
             const response = await axios.get(url)
-            console.log("Block height response:", response.data)
-            this.connected = true
-            return true
+            this.connected = !!response.data
+            return this.connected
         } catch (error) {
             console.error("BTC connection error:", error)
             this.connected = false
@@ -47,16 +49,15 @@ export class BTC extends DefaultChain {
     async connectWallet(privateKeyWIF: string): Promise<ECPairInterface> {
         try {
             this.wallet = ECPair.fromWIF(privateKeyWIF, this.network)
-            const pubkeyBuffer = Buffer.from(this.wallet.publicKey)
             const { address } = bitcoin.payments.p2pkh({
-                pubkey: pubkeyBuffer,
+                pubkey: Buffer.from(this.wallet.publicKey),
                 network: this.network,
             })
             this.address = address
+            console.log("Wallet connected, address:", address)
             return this.wallet
         } catch (error) {
-            console.error("Error connecting wallet:", error)
-            throw error
+            throw new Error(`Failed to connect wallet: ${error}`)
         }
     }
 
@@ -65,71 +66,106 @@ export class BTC extends DefaultChain {
         return this.address!
     }
 
+    private getApiUrl(path: string): string {
+        const baseUrl = this.provider.replace(/\/api$/, "")
+        return `${baseUrl}/api${path}`
+    }
+
     async fetchUTXOs(address: string): Promise<any[]> {
         try {
-            const url =
-                this.provider.includes("blockstream.info") &&
-                this.provider.endsWith("/api")
-                    ? `${this.provider.slice(
-                          0,
-                          -4,
-                      )}/api/address/${address}/utxo`
-                    : `${this.provider}/address/${address}/utxo`
+            const url = this.getApiUrl(`/address/${address}/utxo`)
+            console.log("Fetching UTXOs from:", url)
             const response = await axios.get(url)
-            if (!response || !response.data) {
-                throw new Error("Failed to get UTXO: response is empty")
-            }
-            console.log("Received UTXOs:", response.data)
-            return response.data
+            const utxos = response.data || []
+            console.log("Fetched UTXOs:", utxos)
+            return utxos
         } catch (error) {
-            console.error("Error while receiving UTXO:", error)
-            return []
+            throw new Error(`Failed to fetch UTXOs: ${error}`)
         }
     }
 
     async getTxHex(txid: string): Promise<string> {
         try {
-            const url =
-                this.provider.includes("blockstream.info") &&
-                this.provider.endsWith("/api")
-                    ? `${this.provider.slice(0, -4)}/api/tx/${txid}/hex`
-                    : `${this.provider}/tx/${txid}/hex`
-            console.log("txHex query for txid:", url)
+            const url = this.getApiUrl(`/tx/${txid}/hex`)
+            console.log("Fetching tx hex for:", txid)
             const response = await axios.get(url)
-            if (!response.data) throw new Error("Empty response from API")
-            console.log("Received txHex:", response.data)
-            return response.data
+            const txHex = response.data
+            console.log("Fetched tx hex:", txHex)
+            return txHex
         } catch (error) {
-            console.error("Error in getTxHex:", error)
-            if (axios.isAxiosError(error)) {
-                console.error("Error status:", error.response?.status)
-                console.error("Error data:", error.response?.data)
-            }
-            throw new Error(`Failed to get txHex for txid: ${txid}`)
+            throw new Error(`Failed to get transaction hex: ${error}`)
         }
     }
 
     private toSigner(ecpair: ECPairInterface): bitcoin.Signer {
         return {
             publicKey: Buffer.from(ecpair.publicKey),
-            sign: (hash: Buffer, lowR?: boolean) =>
-                Buffer.from(ecpair.sign(hash)),
+            sign: (hash: Buffer, lowR?: boolean) => {
+                const signature = ecpair.sign(hash, lowR)
+                return Buffer.from(signature)
+            },
         }
     }
 
     async preparePay(address: string, amount: string): Promise<string> {
-        const amountNum = parseInt(amount, 10)
+        console.log("Preparing payment to:", address, "for amount:", amount)
+        const txs = await this.preparePays([{ address, amount }])
+        return txs[0]
+    }
+
+    async preparePays(payments: IPayParams[]): Promise<string[]> {
+        required(this.wallet, "Wallet not connected")
+        const sender = this.getAddress()
+        let availableUtxos = await this.fetchUTXOs(sender)
+        const psbts: bitcoin.Psbt[] = []
+
+        for (const payment of payments) {
+            console.log("Creating PSBT for payment:", payment)
+            const { psbt, usedUtxos } = await this.createUnsignedPSBT(
+                payment.address,
+                payment.amount as string,
+                availableUtxos,
+            )
+            psbts.push(psbt)
+            availableUtxos = availableUtxos.filter(
+                utxo =>
+                    !usedUtxos.some(
+                        used =>
+                            used.txid === utxo.txid && used.vout === utxo.vout,
+                    ),
+            )
+            console.log("Remaining UTXOs:", availableUtxos)
+        }
+
+        return this.signTransactions(psbts)
+    }
+
+    private async createUnsignedPSBT(
+        address: string,
+        amount: string,
+        availableUtxos: any[],
+    ): Promise<{
+        psbt: bitcoin.Psbt
+        usedUtxos: { txid: string; vout: number }[]
+    }> {
+        const amountNum = Number(amount)
         if (isNaN(amountNum) || amountNum <= 0)
             throw new Error("Incorrect amount")
 
         const sender = this.getAddress()
-        const utxos = await this.fetchUTXOs(sender)
+        if (availableUtxos.length === 0) throw new Error("No UTXOs available")
 
         const psbt = new bitcoin.Psbt({ network: this.network })
         let totalInput = 0
-        const feeRate = 10 // satoshi per byte
+        let inputCount = 0
+        const usedUtxos: { txid: string; vout: number }[] = []
 
-        for (const utxo of utxos) {
+        const sortedUtxos = [...availableUtxos].sort(
+            (a, b) => b.value - a.value,
+        )
+        console.log("Sorted UTXOs:", sortedUtxos)
+
+        for (const utxo of sortedUtxos) {
             const txHex = await this.getTxHex(utxo.txid)
             psbt.addInput({
                 hash: utxo.txid,
@@ -137,45 +173,68 @@ export class BTC extends DefaultChain {
                 nonWitnessUtxo: Buffer.from(txHex, "hex"),
             })
             totalInput += utxo.value
+            inputCount++
+            usedUtxos.push({ txid: utxo.txid, vout: utxo.vout })
+            const currentFee = this.calculateFee(inputCount, 2)
+            if (totalInput >= amountNum + currentFee) break
         }
 
-        if (totalInput < amountNum) throw new Error("Insufficient funds")
+        const finalFee = this.calculateFee(inputCount, 2)
+        if (totalInput < amountNum + finalFee) {
+            throw new Error(
+                `Insufficient funds: have ${totalInput}, need ${
+                    amountNum + finalFee
+                }`,
+            )
+        }
 
         psbt.addOutput({
             address,
             value: amountNum,
         })
 
-        const txSizeEstimate = 200 + utxos.length * 148
-        const estimatedFee = txSizeEstimate * feeRate
-
-        const change = totalInput - amountNum - estimatedFee
-        if (change > this.DUST_LIMIT_P2PKH) {
+        const change = totalInput - amountNum - finalFee
+        if (change >= BITCOIN_CONSTANTS.DUST_LIMIT_P2PKH) {
             psbt.addOutput({
                 address: sender,
                 value: change,
             })
         }
 
-        psbt.signAllInputs(this.toSigner(this.wallet!))
-        psbt.finalizeAllInputs()
-
-        const tx = psbt.extractTransaction()
-        return tx.toHex()
+        console.log("Created PSBT with inputs:", usedUtxos, "outputs:", {
+            payment: amountNum,
+            change,
+        })
+        return { psbt, usedUtxos }
     }
 
-    async preparePays(payments: IPayParams[]): Promise<string[]> {
-        return Promise.all(
-            payments.map(p => this.preparePay(p.address, p.amount as string)),
-        )
+    private calculateFee(inputsCount: number, outputsCount: number): number {
+        const txSize =
+            BITCOIN_CONSTANTS.BASE_TX_SIZE +
+            inputsCount * BITCOIN_CONSTANTS.INPUT_SIZE +
+            outputsCount * BITCOIN_CONSTANTS.OUTPUT_SIZE
+        return txSize * BITCOIN_CONSTANTS.SAT_PER_VBYTE
+    }
+
+    async signTransaction(psbt: bitcoin.Psbt): Promise<string> {
+        const [signed] = await this.signTransactions([psbt])
+        return signed
+    }
+
+    async signTransactions(psbts: bitcoin.Psbt[]): Promise<string[]> {
+        required(this.wallet, "Wallet not connected")
+
+        return psbts.map(psbt => {
+            psbt.signAllInputs(this.toSigner(this.wallet))
+            psbt.finalizeAllInputs()
+            const tx = psbt.extractTransaction()
+
+            return tx.toHex()
+        })
     }
 
     async getBalance(address: string): Promise<string> {
         const utxos = await this.fetchUTXOs(address)
-        if (!utxos || utxos.length === 0) {
-            console.log("UTXO not found for address:", address)
-            return "0"
-        }
         return utxos.reduce((sum, utxo) => sum + utxo.value, 0).toString()
     }
 
@@ -188,26 +247,11 @@ export class BTC extends DefaultChain {
         }
     }
 
-    async signMessage(
-        message: string,
-        options?: { privateKey?: string },
-    ): Promise<string> {
-        throw new Error("Not implemented")
+    async signMessage(): Promise<string> {
+        throw new Error("Method not implemented")
     }
 
-    async verifyMessage(
-        message: string,
-        signature: string,
-        publicKey: string,
-    ): Promise<boolean> {
-        throw new Error("Not implemented")
-    }
-
-    async signTransaction(): Promise<void> {
-        throw new Error("Not implemented")
-    }
-
-    async signTransactions(): Promise<any[]> {
-        throw new Error("Not implemented")
+    async verifyMessage(): Promise<boolean> {
+        throw new Error("Method not implemented")
     }
 }
