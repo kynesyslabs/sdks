@@ -1,4 +1,16 @@
-export const SUPPORTED_TOKENS = {
+export const SupportedChains = {
+    ETH: "ETH",
+    POLYGON: "POLYGON",
+    BSC: "BSC",
+    AVALANCHE: "AVALANCHE",
+    OPTIMISM: "OPTIMISM",
+    ARBITRUM: "ARBITRUM",
+    LINEA: "LINEA",
+    BASE: "BASE",
+    SOLANA: "SOLANA",
+}
+
+export const SupportedTokens = {
     ETH: {
         NATIVE: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -43,5 +55,35 @@ export const SUPPORTED_TOKENS = {
         NATIVE: "So11111111111111111111111111111111111111112",
         USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    },
+}
+
+export const ChainProviders = {
+    ETH: {
+        mainnet: "https://ethereum-rpc.publicnode.com",
+    },
+    POLYGON: {
+        mainnet: "https://polygon-bor-rpc.publicnode.com",
+    },
+    BSC: {
+        mainnet: "https://bsc-rpc.publicnode.com",
+    },
+    AVALANCHE: {
+        mainnet: "https://avalanche-c-chain-rpc.publicnode.com",
+    },
+    OPTIMISM: {
+        mainnet: "https://optimism-rpc.publicnode.com",
+    },
+    ARBITRUM: {
+        mainnet: "https://arbitrum-one-rpc.publicnode.com",
+    },
+    LINEA: {
+        mainnet: "https://arbitrum-one-rpc.publicnode.com",
+    },
+    BASE: {
+        mainnet: "https://base-rpc.publicnode.com",
+    },
+    SOLANA: {
+        mainnet: "https://base-rpc.publicnode.com",
     },
 }

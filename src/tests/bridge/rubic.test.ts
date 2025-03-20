@@ -1,30 +1,48 @@
-import BigNumber from "bignumber.js"
 import {
     BLOCKCHAIN_NAME,
     CROSS_CHAIN_TRADE_TYPE,
     CrossChainTrade,
+    RubicSdkError,
+    WrappedCrossChainTrade,
 } from "rubic-sdk"
-import { RubicService } from "@/bridge/services/rubic"
+import { Demos } from "@/websdk"
+import RubicBridge from "@/bridge/rubicBridge"
+import BigNumber from "bignumber.js"
+import { BridgeTradePayload, SupportedChains } from "@/bridge"
 
 describe("RubicService", () => {
-    let rubicService: RubicService
-    const privateKey = "" // Add Wallet PK for testing
+    const rubicBridge = new RubicBridge()
+    const demos: Demos = new Demos()
 
-    beforeEach(() => {
-        rubicService = new RubicService(privateKey, "POLYGON")
+    beforeAll(async () => {
+        await demos.connect("http://localhost:53550")
+        await demos.connectWallet(
+            "0x2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
+        )
     })
 
     test("should get trade", async () => {
         try {
-            await rubicService.waitForInitialization()
+            const payload: BridgeTradePayload = {
+                fromToken: "USDT",
+                toToken: "USDT",
+                amount: 10,
+                fromChainId: 137,
+                toChainId: 1,
+            }
 
-            const tradeResult = await rubicService.getTrade(
-                "USDT",
-                "USDT",
-                10,
-                137,
-                1,
+            const rpcResponse = await rubicBridge.getTrade(
+                demos,
+                SupportedChains.POLYGON,
+                payload,
             )
+
+            expect(rpcResponse).not.toBeNull()
+            expect(rpcResponse.result).toBe(200)
+
+            const tradeResult = rpcResponse.response as
+                | WrappedCrossChainTrade
+                | RubicSdkError
 
             if (tradeResult instanceof Error) {
                 console.error("Trade error:", tradeResult)
@@ -39,7 +57,6 @@ describe("RubicService", () => {
                     expect(wrappedTrade).toBeDefined()
                     expect(wrappedTrade.from).toBeDefined()
                     expect(wrappedTrade.to).toBeDefined()
-                    expect(typeof wrappedTrade.swap).toBe("function")
                     expect(tradeResult.error).not.toBeDefined()
                 }
             }
@@ -97,7 +114,16 @@ describe("RubicService", () => {
             tradeType: CROSS_CHAIN_TRADE_TYPE.LIFI,
         }
 
-        const txHash = await rubicService.executeTrade(mockTrade)
+        const rpcResponse = await rubicBridge.executeMockTrade(
+            demos,
+            SupportedChains.POLYGON,
+            mockTrade,
+        )
+
+        expect(rpcResponse).not.toBeNull()
+        expect(rpcResponse.result).toBe(200)
+
+        const txHash = rpcResponse.response
 
         expect(txHash).toBeDefined()
         expect(typeof txHash).toBe("string")
@@ -109,35 +135,24 @@ describe("RubicService", () => {
         // Using skip() because it will take real funds
 
         try {
-            await rubicService.waitForInitialization()
-
-            const tradeResult = await rubicService.getTrade(
-                "USDT",
-                "USDT",
-                1,
-                137,
-                1,
-            )
-
-            if (tradeResult instanceof Error) {
-                console.error("Trade error:", tradeResult)
-                fail(`Trade failed with error: ${tradeResult.message}`)
-            } else {
-                expect(tradeResult).not.toBeUndefined()
-                expect(tradeResult.trade).not.toBeNull()
-
-                const wrappedTrade = tradeResult.trade
-
-                if (wrappedTrade !== null) {
-                    expect(wrappedTrade).toBeDefined()
-                    expect(wrappedTrade.from).toBeDefined()
-                    expect(wrappedTrade.to).toBeDefined()
-                    expect(typeof wrappedTrade.swap).toBe("function")
-                }
+            const payload: BridgeTradePayload = {
+                fromToken: "USDT",
+                toToken: "USDT",
+                amount: 1,
+                fromChainId: 137,
+                toChainId: 1,
             }
 
-            const txHash = await rubicService.executeTrade(tradeResult)
-            
+            const rpcResponse = await rubicBridge.executeTrade(
+                demos,
+                SupportedChains.POLYGON,
+                payload,
+            )
+
+            expect(rpcResponse).not.toBeNull()
+            expect(rpcResponse.result).toBe(200)
+
+            const txHash = rpcResponse.response
             expect(txHash).toBeDefined()
             expect(typeof txHash).toBe("string")
         } catch (error) {
