@@ -7,7 +7,7 @@ import axios from "axios"
 import { Identities, InferFromTwitterPayload } from "@/abstraction"
 
 describe("Web2 Identities", () => {
-    test.only("Create Twitter Identity", async () => {
+    test.skip("Create Twitter Identity", async () => {
         const identity = new DemosWebAuth()
         await identity.login(
             "60b66ef65fab761a776e4e86d175ec3a39892ae9202e7eb5a0c4bcce99db0cb3be065600833f72f3ff4d2f0ed16cc663bbd31ba607ebca0a6748ae3f98665492",
@@ -38,47 +38,51 @@ describe("Web2 Identities", () => {
         )
         console.log("verified", verified)
     })
-    test.skip("Get tweets via Twitter API SDK", async () => {
-        const twitter = new Client(process.env.TWITTER_BEARER)
-        const res = await twitter.tweets.findTweetById("1901630063692365884", {
-            expansions: ["author_id"],
-            "user.fields": ["username"],
-        })
 
-        console.log(res)
-    })
+    test.skip("Create Web2 Proof Payload", async () => {
+        const rpc = "http://localhost:53550"
+        const demos = new Demos()
+        // await demos.connect(rpc)
 
-    test.skip("Get tweets via Axios", async () => {
-        const id = "1901630063692365884"
-        const params = {
-            ids: id,
-            "user.fields": "created_at",
+        const identity = new DemosWebAuth()
+        await identity.login(
+            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
+        )
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+        demos.keypair
+
+        const identities = new Identities()
+        const payload = await identities.createWeb2ProofPayload(demos.keypair)
+        console.log(payload)
+
+        // recover payload
+        const recovered = payload.split(":")
+        const recoveredPayload = {
+            message: recovered[1],
+            signature: recovered[2],
+            publicKey: recovered[3],
         }
-        const url =
-            `https://api.twitter.com/2/tweets` +
-            "?" +
-            new URLSearchParams(params).toString()
 
-        console.log(url)
-
-        const res = await axios.get(url, {
-            headers: {
-                Authorization: `Bearer ${process.env.TWITTER_BEARER}`,
-            },
-            params,
-        })
-        console.log(res.data)
+        const verified = Cryptography.verify(
+            recoveredPayload.message,
+            forge.util.binary.hex.decode(recoveredPayload.signature),
+            forge.util.binary.hex.decode(recoveredPayload.publicKey),
+        )
+        expect(verified).toBe(true)
     })
 
     test.only("Infer Twitter Identity", async () => {
         const rpc = "http://localhost:53550"
+        const proof = "https://x.com/cwilvxi/status/1904132443960926709"
         const payload: InferFromTwitterPayload = {
             context: "twitter",
-            proof: "https://x.com/wakimata/status/1901630063692365884",
+            proof,
         }
 
         const identity = new DemosWebAuth()
-        await identity.create()
+        await identity.login(
+            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
+        )
 
         const demos = new Demos()
         await demos.connect(rpc)
@@ -88,5 +92,29 @@ describe("Web2 Identities", () => {
         const validityData = await identities.inferWeb2Identity(demos, payload)
         const res = await demos.broadcast(validityData)
         console.log(res)
+    })
+
+    test.skip("Remove Twitter Identity", async () => {
+        const rpc = "http://localhost:53550"
+        const demos = new Demos()
+        await demos.connect(rpc)
+
+        const identity = new DemosWebAuth()
+        await identity.login(
+            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
+        )
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+
+        const identities = new Identities()
+        const payload = {
+            context: "twitter",
+            username: "cwilvxi",
+        }
+
+        const validityData = await identities.removeWeb2Identity(demos, payload)
+        console.log(validityData)
+
+        const res2 = await demos.broadcast(validityData)
+        console.log(res2)
     })
 })

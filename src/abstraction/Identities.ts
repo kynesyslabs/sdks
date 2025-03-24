@@ -1,6 +1,7 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
+import { Cryptography } from "@/encryption"
 import { RPCResponseWithValidityData } from "@/types"
 import {
     XMCoreTargetIdentityPayload,
@@ -14,12 +15,39 @@ import {
     InferFromSignaturePayload,
     InferFromWritePayload,
 } from "@/types/abstraction"
-
+import forge from "node-forge"
 import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
+import { IKeyPair } from "@/websdk/types/KeyPair"
 
 export default class Identities {
-    // Infer identity from either a write transaction or a signature
+    /**
+     * Create a web2 proof payload for use with web2 identity inference.
+     *
+     * @param keypair The keypair of the demos account.
+     * @returns The web2 proof payload string.
+     */
+    async createWeb2ProofPayload(keypair: IKeyPair) {
+        const message = "dw2p"
+        const signature = Cryptography.sign(message, keypair.privateKey)
+        const payload = {
+            message,
+            signature: signature.toString("hex"),
+            publicKey: keypair.publicKey.toString("hex"),
+        }
+
+        const verified = Cryptography.verify(
+            message,
+            forge.util.binary.hex.decode(payload.signature),
+            forge.util.binary.hex.decode(payload.publicKey),
+        )
+
+        if (!verified) {
+            throw new Error("Failed to verify web2 proof payload")
+        }
+
+        return `demos:${payload.message}:${payload.signature}:${payload.publicKey}`
+    }
 
     /**
      * Infer an identity from either a crosschain payload or a web2 proof.
