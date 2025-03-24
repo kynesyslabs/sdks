@@ -88,7 +88,6 @@ export class DemosWebAuth {
             }
 
             privKey = forge.util.binary.hex.decode(privKey)
-            console.log("privKey", privKey)
             if (!privKey) {
                 return [false, "Cannot convert private key from that string!"]
             }
