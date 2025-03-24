@@ -163,6 +163,7 @@ interface prepareXMScriptParams {
 
     is_evm?: boolean
     params?: any
+    rpc?: string
 }
 
 export function prepareXMScript({
@@ -172,6 +173,7 @@ export function prepareXMScript({
     signedPayloads,
     type,
     params,
+    rpc
 }: prepareXMScriptParams) {
     const id = getNewUID()
 
@@ -186,6 +188,7 @@ export function prepareXMScript({
                     signedPayloads: [...signedPayloads],
                     params: params || null,
                 },
+                rpc,
             },
         },
         operations_order: [id],
