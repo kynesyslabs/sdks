@@ -1,26 +1,15 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
-import { RPCResponseWithValidityData } from "@/types"
 import {
-    XMCoreTargetIdentityPayload,
-    Web2CoreTargetIdentityPayload,
-    GithubProof,
-    XProof,
-    TwitterProof,
-    InferFromGithubPayload,
-    InferFromXPayload,
-    InferFromTwitterPayload,
+    CoreTargetIdentityPayload,
     InferFromSignaturePayload,
     InferFromWritePayload,
 } from "@/types/abstraction"
-
-import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 
 export default class Identities {
     // Infer identity from either a write transaction or a signature
-
     /**
      * Infer an identity from either a write transaction or a signature.
      *
@@ -31,32 +20,18 @@ export default class Identities {
     async inferIdentity(
         demos: Demos,
         payload: InferFromWritePayload | InferFromSignaturePayload,
-    ): Promise<RPCResponseWithValidityData> {
-        const tx = DemosTransactions.empty()
-        const address = payload.target_identity.targetAddress
-
-        const nonce = await demos.getAddressNonce(address)
-
-        tx.content = {
-            ...tx.content,
-            type: "identity",
-            from: address,
-            to: address,
-            amount: 0,
-            data: [
-                "identity",
+    ): Promise<string | false> {
+        const basePayload = {
+            method: "gcr_routine",
+            params: [
                 {
-                    context: "xm",
-                    method: "identity_assign",
-                    payload: payload,
+                    method: payload.method,
+                    params: [payload],
                 },
             ],
-            nonce: nonce + 1,
-            timestamp: Date.now(),
         }
 
-        const signedTx = await demos.sign(tx)
-        return await demos.confirm(signedTx)
+        return await demos.rpcCall(basePayload, true)
     }
 
     /**
@@ -66,54 +41,13 @@ export default class Identities {
      * @param payload The payload to remove the identity from.
      * @returns The response from the RPC call.
      */
-    async removeXmIdentity(
-        demos: Demos,
-        payload: XMCoreTargetIdentityPayload,
-    ): Promise<RPCResponseWithValidityData> {
-        const tx = DemosTransactions.empty()
-        const address = demos.getAddress()
-
-        tx.content = {
-            ...tx.content,
-            type: "identity",
-            from: address,
-            to: address,
-            amount: 0,
-            data: [
-                "identity",
-                {
-                    context: "xm",
-                    method: "identity_remove",
-                    payload: payload,
-                },
-            ],
-            nonce: 1,
-            timestamp: Date.now(),
-        }
-
-        const signedTx = await demos.sign(tx)
-        return await demos.confirm(signedTx)
-    }
-
-    /**
-     * Add a github identity to the GCR.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param payload The payload to add the identity to.
-     * @returns The response from the RPC call.
-     */
-    async addGithubIdentity(demos: Demos, payload: GithubProof) {
-        let githubPayload: InferFromGithubPayload = {
-            context: "github",
-            proof: payload,
-        }
-
+    async removeXmIdentity(demos: Demos, payload: CoreTargetIdentityPayload) {
         const request = {
             method: "gcr_routine",
             params: [
                 {
-                    method: "add_github_identity",
-                    params: [githubPayload], // REVIEW Is this correct?
+                    method: "remove_identity",
+                    params: [payload],
                 },
             ],
         }
@@ -121,33 +55,9 @@ export default class Identities {
         return await demos.rpcCall(request, true)
     }
 
-    /**
-     * Add a twitter identity to the GCR.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param payload The payload to add the identity to.
-     * @returns The response from the RPC call.
-     */
-    async addTwitterIdentity(demos: Demos, payload: TwitterProof) {
-        let twitterPayload: InferFromXPayload = {
-            context: "twitter",
-            proof: payload,
-        }
-
-        const request = {
-            method: "gcr_routine",
-            params: [
-                {
-                    method: "add_twitter_identity",
-                    params: [twitterPayload],
-                },
-            ],
-        }
-
-        return await demos.rpcCall(request, true)
-    }
     /**
      * Get the identities associated with an address.
+     * If no address is provided, the address of the connected wallet will be used.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param address The address to get identities for.

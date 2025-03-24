@@ -11,14 +11,7 @@ import Identities from "./Identities"
 import {
     InferFromWritePayload,
     InferFromSignaturePayload,
-    XMCoreTargetIdentityPayload,
-    Web2CoreTargetIdentityPayload,
-    InferFromGithubPayload,
-    GithubProof,
-    InferFromTwitterPayload,
-    TwitterProof,
-    IdentityPayload,
-    InferFromSignatureTargetIdentityPayload
+    CoreTargetIdentityPayload,
 } from "@/types/abstraction"
 
 export {
@@ -27,12 +20,5 @@ export {
     Identities,
     InferFromWritePayload,
     InferFromSignaturePayload,
-    XMCoreTargetIdentityPayload,
-    Web2CoreTargetIdentityPayload,
-    InferFromGithubPayload,
-    GithubProof,
-    InferFromTwitterPayload,
-    TwitterProof,
-    IdentityPayload,
-    InferFromSignatureTargetIdentityPayload
+    CoreTargetIdentityPayload,
 }

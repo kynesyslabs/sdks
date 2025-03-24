@@ -39,42 +39,7 @@ export interface GCREditSubnetsTx {
     isRollback: boolean
     account: string
     txhash: string
-    // ! Compile this based on node/src/model/entities/GCR/GCRSubnetsTxs.ts
+    // ! Compile this based on node/src/model/entities/GCR/GCRSubnetsTxs.ts 
 }
 
-export interface XmGCRData {
-    chain: string
-    subchain: string
-    identity: string
-}
-
-export interface XmGCRIdentityData {
-    chain: string
-    subchain: string
-    signature: string
-    signedData: string
-    targetAddress: string;
-    isEVM: boolean
-}
-
-export interface Web2GCRData {
-    // TODO: Define this
-}
-
-export interface GCREditIdentity {
-    type: "identity"
-    isRollback: boolean
-    account: string
-    context: "xm" | "web2"
-    operation: "add" | "remove"
-    data: XmGCRData | Web2GCRData | XmGCRIdentityData
-    txhash: string
-}
-
-export type GCREdit =
-    | GCREditBalance
-    | GCREditNonce
-    | GCREditAssign
-    | GCREditAssignIdentity
-    | GCREditSubnetsTx
-    | GCREditIdentity
+export type GCREdit = GCREditBalance | GCREditNonce | GCREditAssign | GCREditAssignIdentity | GCREditSubnetsTx

@@ -10,94 +10,11 @@ import {
     TON,
     XRPL,
 } from "@/multichain/websdk"
-import {
-    InferFromSignatureTargetIdentityPayload,
-    XMCoreTargetIdentityPayload,
-} from "@/types/abstraction"
+import { InferFromSignatureTargetIdentityPayload } from "@/types/abstraction"
 import { Demos, DemosWebAuth } from "@/websdk"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
-
-describe.skip("IDENTITIES V2", () => {
-    test.only("EVM ADD IDENTITY v2", async () => {
-        const instance = await EVM.create()
-
-        await instance.connectWallet(wallets.evm.privateKey)
-
-        const message = "Hello, world!"
-        const signature = await instance.signMessage(message)
-
-        const verified = await instance.verifyMessage(
-            message,
-            signature,
-            instance.getAddress(),
-        )
-
-        expect(verified).toBe(true)
-
-        const payload: InferFromSignaturePayload = {
-            method: "identity_assign_from_signature",
-            target_identity: {
-                chain: instance.name,
-                chainId: instance.chainId,
-                subchain: "sepolia",
-                signature: signature,
-                signedData: message,
-                targetAddress: instance.getAddress(),
-            },
-        }
-
-        // const rpc = "https://demosnode.discus.sh"
-        const rpc = "http://localhost:53550"
-        const identity = DemosWebAuth.getInstance()
-        await identity.login(
-            "0x2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
-
-        const demos = new Demos()
-
-        await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
-
-        const identities = new Identities()
-        const validityData = await identities.inferIdentity(demos, payload)
-
-        const res = await demos.broadcast(validityData)
-        expect(res).toBeDefined()
-        expect(res.result).toBe(200)
-    })
-
-    test.skip("EVM REMOVE IDENTITY v2", async () => {
-        const instance = await EVM.create()
-        await instance.connectWallet(wallets.evm.privateKey)
-
-        const rpc = "http://localhost:53550"
-        const identity = DemosWebAuth.getInstance()
-        await identity.login(
-            "0x2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
-
-        const demos = new Demos()
-        await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
-
-        const identities = new Identities()
-        const payload: XMCoreTargetIdentityPayload = {
-            chain: "evm",
-            subchain: "sepolia",
-            targetAddress: instance.getAddress(),
-        }
-
-        const validityData = await identities.removeXmIdentity(
-            demos,
-            payload,
-        )
-
-        const res = await demos.broadcast(validityData)
-        expect(res["result"]).toBe(200)
-    })
-})
 
 const chains = [
     {
@@ -150,7 +67,7 @@ const chains = [
     },
 ]
 
-describe.only.each(chains)(
+describe.skip.each(chains)(
     "Identities › $name",
     ({ name, sdk, wallet, subchain, password, rpc }: any) => {
         let instance: any
@@ -167,7 +84,7 @@ describe.only.each(chains)(
             )
         })
 
-        test.only("Associate an identity using a signature", async () => {
+        test("Associate an identity using a signature", async () => {
             instance = await sdk.create(null)
             let ibcBase64PublicKey = ""
 
@@ -224,6 +141,7 @@ describe.only.each(chains)(
                 signature: _signature,
                 signedData: instance.getAddress(),
                 targetAddress: instance.getAddress(),
+                isEVM: name === "EVM",
                 chainId: instance.chainId,
                 publicKey:
                     name === "IBC"
@@ -263,17 +181,14 @@ describe.only.each(chains)(
             }
 
             // INFO: Send the payload to the RPC
-            const validityData = await identities.inferIdentity(
-                demos,
-                payload,
-            )
+            const res = await identities.inferIdentity(demos, payload)
+            console.log(res)
 
-            const res = await demos.broadcast(validityData)
-
-            expect(res.result).toBe(200)
+            expect([200, 304]).toContain(res["result"])
+            expect(res["response"]).toBe("Identity added")
         })
 
-        test.skip("Confirm identity is added", async () => {
+        test("Confirm identity is added", async () => {
             const res = await identities.getIdentities(demos)
             const chain = name.toLowerCase()
 
@@ -283,111 +198,27 @@ describe.only.each(chains)(
             expect(res["response"]["xm"][chain]).toBeDefined()
         })
 
-        test.skip("Remove associated identity", async () => {
-            instance = await sdk.create(null)
-            let ibcBase64PublicKey = ""
-
-            if (name === "EGLD") {
-                await instance.connectWallet(wallet, { password: password })
-            } else if (name === "IBC") {
-                const options: IBCConnectWalletOptions = {
-                    prefix: "cosmos",
-                    gasPrice: "0",
-                }
-
-                await instance.connectWallet(wallet, options, rpc)
-
-                const sep256k1HdWallet =
-                    await DirectSecp256k1HdWallet.fromMnemonic(wallet, {
-                        prefix: "cosmos",
-                    })
-
-                const walletAccounts = await sep256k1HdWallet.getAccounts()
-                const currentAccount = walletAccounts.find(account =>
-                    account.address.startsWith("cosmos"),
-                )
-
-                if (currentAccount) {
-                    const pubKey = currentAccount.pubkey
-                    ibcBase64PublicKey = Buffer.from(pubKey).toString("base64")
-                }
-            } else if (name === "NEAR") {
-                const options = {
-                    accountId: "kynesys.testnet",
-                    networkId: "testnet",
-                }
-
-                await instance.connectWallet(wallet, options)
-            } else {
-                await instance.connectWallet(wallet)
-            }
-
-            const _signature =
-                name === "IBC"
-                    ? await instance.signMessage(instance.getAddress(), {
-                          privateKey: wallet as string,
-                      })
-                    : await instance.signMessage(instance.getAddress())
-
-            if (_signature === "Not implemented") {
-                throw Error("signMessage not implemented")
-            }
-
-            const target_identity: XMCoreTargetIdentityPayload = {
+        test("Remove associated identity", async () => {
+            const target_identity = {
                 chain: instance.name,
                 subchain: subchain,
                 targetAddress: instance.getAddress(),
-                // signature: _signature,
-                // signedData: instance.getAddress(),
-                // chainId: instance.chainId,
-                // publicKey:
-                //     name === "IBC"
-                //         ? ibcBase64PublicKey
-                //         : instance.wallet.publicKey,
             }
 
-            let verified = false
-
-            if (name === "XRPL" || name === "TON" || name === "NEAR") {
-                verified = await instance.verifyMessage(
-                    instance.getAddress(),
-                    _signature,
-                    instance.wallet.publicKey,
-                )
-            } else if (name === "IBC") {
-                verified = await instance.verifyMessage(
-                    instance.getAddress(),
-                    _signature,
-                    ibcBase64PublicKey,
-                )
-            } else {
-                verified = await instance.verifyMessage(
-                    instance.getAddress(),
-                    _signature,
-                    instance.getAddress(),
-                )
-            }
-
-            expect(verified).toBe(true)
-            // INFO: We don't need the signature to remove the identity
-            // const payload: InferFromSignaturePayload = {
-            //     method: "identity_assign_from_signature",
-            //     target_identity: target_identity,
-            // }
-
-            const validityData = await identities.removeXmIdentity(
+            const res = await identities.removeXmIdentity(
                 demos,
-                // @ts-ignore
                 target_identity,
             )
-            const res = await demos.broadcast(validityData)
+            console.log(res)
+
             expect(res["result"]).toBe(200)
+            expect(res["response"]).toBe("Identity removed")
         })
     },
 )
 
-describe.skip("Individual Sign & Verify", () => {
-    test("EVM", async () => {
+describe.only("Individual Sign & Verify", () => {
+    test.only("EVM", async () => {
         const instance = await EVM.create()
 
         await instance.connectWallet(wallets.evm.privateKey)
@@ -409,14 +240,14 @@ describe.skip("Individual Sign & Verify", () => {
                 chain: instance.name,
                 chainId: instance.chainId,
                 subchain: "sepolia",
+                isEVM: true,
                 signature: signature,
                 signedData: message,
                 targetAddress: instance.getAddress(),
             },
         }
 
-        // const rpc = "https://demosnode.discus.sh"
-        const rpc = "http://localhost:53550"
+        const rpc = "https://demosnode.discus.sh"
         const identity = DemosWebAuth.getInstance()
         await identity.create()
 
@@ -426,19 +257,21 @@ describe.skip("Individual Sign & Verify", () => {
         await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
 
         const identities = new Identities()
-        const validityData = await identities.inferIdentity(demos, payload)
+        const res = await identities.inferIdentity(demos, payload)
+        console.log(res)
 
-        const res = await demos.broadcast(validityData)
-        // console.log(JSON.stringify(res, null, 2))
-        expect(res["result"]).toBe(200)
+        const res2 = await identities.getIdentities(
+            demos,
+            "d7bbfb740dea556d92a1832fa34e6b8ede1143b6c213077cd931e8dbf0e61194",
+        )
+        console.log(JSON.stringify(res2, null, 2))
 
-        // const res3 = await identities.removeXmIdentity(demos, {
-        //     chain: "evm",
-        //     subchain: "sepolia",
-        //     targetAddress: instance.getAddress(),
-        // })
-        // const response = await demos.broadcast(res3)
-        // expect(response["result"]).toBe(200)
+        const res3 = await identities.removeXmIdentity(demos, {
+            chain: "evm",
+            subchain: "sepolia",
+            targetAddress: instance.getAddress(),
+        })
+        console.log(res3)
     })
 
     test("SOLANA", async () => {

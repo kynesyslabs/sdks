@@ -1,7 +1,6 @@
-import { GCREdit, GCREditIdentity } from "@/types/blockchain/GCREdit"
+import { GCREdit } from "@/types/blockchain/GCREdit"
 import { Transaction } from "@/types/blockchain/Transaction"
 import { INativePayload } from "@/types/native"
-import { IdentityPayload, InferFromSignaturePayload } from "@/types/abstraction"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -35,21 +34,12 @@ export class GCRGeneration {
             case "genesis":
                 // TODO Implement this
                 break
-            case "identity":
-                var identityEdits = await HandleIdentityOperations.handle(tx)
-                gcrEdits.push(...identityEdits)
-                break
         }
 
         // SECTION Operations valid for all tx types
 
         // Add gas operation edit with check for availability of gas amount in the sender's balance
-        nonceEdits: try {
-            // INFO: Skip gas for identity operations
-            if (content.type === "identity") {
-                break nonceEdits
-            }
-
+        try {
             let gasEdit = await this.createGasEdit(
                 content.from as string,
                 tx.hash,
@@ -182,51 +172,6 @@ export class HandleNativeOperations {
                     nativePayload.nativeOperation,
                 ) // TODO Better error handling
                 // throw new Error("Unknown native operation: " + nativePayload.nativeOperation)
-                break
-        }
-        return edits
-    }
-}
-
-export class HandleIdentityOperations {
-    static async handle(tx: Transaction): Promise<GCREditIdentity[]> {
-        const edits = [] as GCREditIdentity[]
-        const identityPayloadData: ["identity", IdentityPayload] = tx.content
-            .data as ["identity", IdentityPayload]
-        const identityPayload: IdentityPayload = identityPayloadData[1]
-
-        switch (identityPayload.method) {
-            case "identity_assign":
-                const targetIdentityPayload =
-                    identityPayload.payload as InferFromSignaturePayload
-                const subEdit: GCREditIdentity = {
-                    account: tx.content.from as string,
-                    type: "identity",
-                    operation: "add",
-                    txhash: tx.hash,
-                    isRollback: false,
-                    context: identityPayload.context,
-                    data: targetIdentityPayload.target_identity,
-                }
-                edits.push(subEdit)
-                break
-            case "identity_remove":
-                const removeEdit: GCREditIdentity = {
-                    account: tx.content.from as string,
-                    type: "identity",
-                    operation: "remove",
-                    txhash: tx.hash,
-                    isRollback: false,
-                    context: identityPayload.context,
-                    data: identityPayload.payload,
-                }
-                edits.push(removeEdit)
-                break
-            default:
-                console.log(
-                    "Unknown native operation: ",
-                    identityPayload.method,
-                )
                 break
         }
         return edits

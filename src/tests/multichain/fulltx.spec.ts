@@ -92,9 +92,8 @@ describe("DEMOS Transaction", () => {
         // 5. Convert the XMScript to a DEMOS transaction
         const tx = await prepareXMPayload(xmscript, identity.keypair)
 
-        // const rpc = "https://demosnode.discus.sh"
-        const rpc = "http://localhost:53550"
-        // const rpc = "https://demos.mungaist.com"
+        const rpc = "https://demosnode.discus.sh"
+
         const demos = new Demos()
 
         // 6. Connect to the DEMOS node

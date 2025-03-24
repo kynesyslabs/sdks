@@ -248,16 +248,12 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     // REVIEW Should prepare methods be like:
     // prepare = { pay(), send(), ...}
 
-    async preparePay(
-        address: string,
-        amount: string,
-        options?: { gasLimit?: number },
-    ) {
-        const tx = await this.preparePays([{ address, amount }], options)
+    async preparePay(address: string, amount: string) {
+        const tx = await this.preparePays([{ address, amount }])
         return tx[0]
     }
 
-    async preparePays(payments: IPayParams[], options?: { gasLimit?: number }) {
+    async preparePays(payments: IPayParams[]) {
         required(this.wallet, "Wallet not connected")
 
         const baseTx = await this.prepareBaseTxWithType()
@@ -265,7 +261,6 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         const txs = payments.map(payment => {
             const tx = {
                 ...baseTx,
-                ...(options?.gasLimit && { gasLimit: options.gasLimit }),
                 to: payment.address,
                 value: parseEther(payment.amount as string),
             }
