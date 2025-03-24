@@ -4,6 +4,40 @@ Demos SDKs metapackage
 
 Check out the [multichain documentation](./documentation/multichain/README.md).
 
+### Using this package locally
+
+To use this package locally, you need to build it then install it in your project as shown:
+
+On the root of this repo, run:
+
+```sh
+yarn build
+```
+
+Then, in your project, run:
+
+```sh
+yarn add file:../path/to/sdks
+```
+
+Assuming both repos are in the same directory, that would be:
+
+```sh
+yarn add file:../sdks
+```
+
+Then you can import stuff from the package normally, as shown:
+
+```ts
+import { Demos } from "@kynesyslabs/demosdk/websdk"
+```
+
+> [!TIP]
+> Installing this package will replace the NPM version of the package.
+
+> [!IMPORTANT]
+> Changes to the sdks will not be reflected on your project until you rebuild the sdks and reinstall them in your project all over again.
+
 ### Adding stuff
 
 Create a new folder in the `src` directory and add your stuff. Export items on the `index.ts` file in your new folder. Then add an export entry in `package.json` as shown:
