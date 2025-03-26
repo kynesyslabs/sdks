@@ -1,7 +1,18 @@
-import { GCREdit, GCREditIdentity } from "@/types/blockchain/GCREdit"
+import {
+    GCREdit,
+    GCREditIdentity,
+    Web2GCRData,
+    XmGCRData,
+    XmGCRIdentityData,
+} from "@/types/blockchain/GCREdit"
 import { Transaction } from "@/types/blockchain/Transaction"
 import { INativePayload } from "@/types/native"
-import { IdentityPayload, InferFromSignaturePayload } from "@/types/abstraction"
+import {
+    IdentityPayload,
+    InferFromSignaturePayload,
+    Web2CoreTargetIdentityPayload,
+    XMCoreTargetIdentityPayload,
+} from "@/types/abstraction"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -188,6 +199,37 @@ export class HandleNativeOperations {
     }
 }
 
+class Web2IdentityParsers {
+    proof_url: string
+    context: string
+
+    constructor(proof_url: string, context: string) {
+        this.proof_url = proof_url
+        this.context = context
+    }
+
+    parseTwitterUsername(): string {
+        // https://x.com/demos_xyz/status/1901630063692365884
+        const username = this.proof_url.split("/")[3]
+        return username
+    }
+
+    parseGithubUsername(): string {
+        return ""
+    }
+
+    parse(): string {
+        switch (this.context) {
+            case "twitter":
+                return this.parseTwitterUsername()
+            case "github":
+                return this.parseGithubUsername()
+            default:
+                throw new Error("Unsupported context: " + this.context)
+        }
+    }
+}
+
 export class HandleIdentityOperations {
     static async handle(tx: Transaction): Promise<GCREditIdentity[]> {
         const edits = [] as GCREditIdentity[]
@@ -195,40 +237,68 @@ export class HandleIdentityOperations {
             .data as ["identity", IdentityPayload]
         const identityPayload: IdentityPayload = identityPayloadData[1]
 
+        // INFO: Create the GCR edit skeleton
+        const edit: GCREditIdentity = {
+            account: tx.content.from as string,
+            type: "identity",
+            operation: identityPayload.method.endsWith("assign")
+                ? "add"
+                : "remove",
+            txhash: tx.hash,
+            isRollback: false,
+            context: identityPayload.context,
+            data: null,
+        }
+
+        // INFO: Fill the GCR edit with the correct data
         switch (identityPayload.method) {
-            case "identity_assign":
-                const targetIdentityPayload =
+            case "xm_identity_assign": {
+                // INFO: Fill in the identity data
+                const payload = (
                     identityPayload.payload as InferFromSignaturePayload
-                const subEdit: GCREditIdentity = {
-                    account: tx.content.from as string,
-                    type: "identity",
-                    operation: "add",
-                    txhash: tx.hash,
-                    isRollback: false,
-                    context: identityPayload.context,
-                    data: targetIdentityPayload.target_identity,
-                }
-                edits.push(subEdit)
+                ).target_identity
+
+                edit.data = {
+                    chain: payload.chain,
+                    subchain: payload.subchain,
+                    targetAddress: payload.targetAddress,
+                    isEVM: payload.isEVM,
+                } as XmGCRIdentityData
                 break
-            case "identity_remove":
-                const removeEdit: GCREditIdentity = {
-                    account: tx.content.from as string,
-                    type: "identity",
-                    operation: "remove",
-                    txhash: tx.hash,
-                    isRollback: false,
-                    context: identityPayload.context,
-                    data: identityPayload.payload,
-                }
-                edits.push(removeEdit)
+            }
+
+            case "web2_identity_assign": {
+                // INFO: Parse the web2 username from the proof url
+                const payload =
+                    identityPayload.payload as Web2CoreTargetIdentityPayload
+                const parser = new Web2IdentityParsers(
+                    payload.proof,
+                    payload.context,
+                )
+
+                edit.data = {
+                    context: payload.context,
+                    username: parser.parse(),
+                } as Web2GCRData
                 break
+            }
+
+            case "xm_identity_remove":
+            case "web2_identity_remove": {
+                // INFO: Passthrough the payload
+                edit.data = identityPayload.payload as any
+                break
+            }
             default:
                 console.log(
-                    "Unknown native operation: ",
+                    "Unknown identity operation: ",
+                    // @ts-ignore
                     identityPayload.method,
                 )
                 break
         }
+
+        edits.push(edit)
         return edits
     }
 }

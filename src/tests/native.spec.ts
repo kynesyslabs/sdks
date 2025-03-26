@@ -23,7 +23,7 @@ describe("Native transactions", () => {
         )
     })
 
-    test.only("Pay", async () => {
+    test.skip("Pay", async () => {
         const tx = await demos.transfer(
             "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
             100,
@@ -40,15 +40,15 @@ describe("Native transactions", () => {
         }
     })
 
-    test.skip("Node transaction Spam test", async () => {
+    test.only("Node transaction Spam test", async () => {
         // NOTE: To increase the number of concurrent transactions, 
         // run multiple instances of this test at the same time.
 
         // INFO: Local testnet RPCs
         const rpcs = [
             "http://localhost:53550",
-            "http://localhost:53559",
-            "http://localhost:53560",
+            // "http://localhost:53559",
+            // "http://localhost:53560",
         ]
 
         // INFO: Private testnet RPCs
@@ -90,7 +90,7 @@ describe("Native transactions", () => {
             }
         }
 
-        const TXCOUNT = 100
+        const TXCOUNT = 3
 
         // 2. Create a transaction
         for (let i = 0; i < TXCOUNT; i++) {

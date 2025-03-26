@@ -13,3 +13,4 @@ docs
 __pycache__
 bun.lockb
 mise.toml
+.env*
