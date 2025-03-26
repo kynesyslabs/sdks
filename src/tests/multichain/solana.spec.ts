@@ -132,8 +132,9 @@ describe("SOLANA CHAIN TESTS", () => {
             },
         )
 
+        // @ts-ignore
         console.log("data: ", acc.data.toNumber())
-
+        // @ts-ignore
         expect(acc.data.toNumber()).toEqual(42)
     }, 25000)
 
@@ -146,7 +147,9 @@ describe("SOLANA CHAIN TESTS", () => {
                 name: "newAccount",
             },
         )
+        // @ts-ignore
         console.log("data: ", acc.data.toNumber())
+        // @ts-ignore
         expect(acc.data.toNumber()).toEqual(42)
     })
 
