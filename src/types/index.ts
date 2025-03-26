@@ -105,3 +105,5 @@ export {
 } from "./communication/rpc"
 
 export { GCREdit } from "./blockchain/GCREdit"
+export { BridgeTradePayload } from "./bridge/bridgeTradePayload"
+export { ChainProviders, SupportedChains, SupportedTokens } from "./bridge/constants"
