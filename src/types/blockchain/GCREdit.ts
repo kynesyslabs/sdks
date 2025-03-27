@@ -61,7 +61,11 @@ export interface XmGCRIdentityData {
 
 export interface Web2GCRData {
     context: string
-    username: string
+    data: {
+        username: string
+        proof: string
+        proofHash: string
+    }
 }
 
 export interface GCREditIdentity {

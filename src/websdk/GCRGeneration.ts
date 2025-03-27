@@ -13,6 +13,7 @@ import {
     Web2CoreTargetIdentityPayload,
     XMCoreTargetIdentityPayload,
 } from "@/types/abstraction"
+import { Hashing } from "@/encryption/Hashing"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -278,7 +279,11 @@ export class HandleIdentityOperations {
 
                 edit.data = {
                     context: payload.context,
-                    username: parser.parse(),
+                    data: {
+                        username: parser.parse(),
+                        proof: payload.proof,
+                        proofHash: Hashing.sha256(payload.proof),
+                    },
                 } as Web2GCRData
                 break
             }
