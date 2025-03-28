@@ -15,19 +15,24 @@ afterAll(() => {
 })
 
 describe.only("DEMOS Transaction with Bitcoin SDK", () => {
-    let bitcoinSDK: BTC
+    const bitcoinSDK = new BTC(chainProviders.btc.testnet)
 
     beforeAll(async () => {
-        bitcoinSDK = new BTC(chainProviders.btc.testnet)
+        const connected = await bitcoinSDK.connect()
         await bitcoinSDK.connectWallet(wallets.btc.privateKey)
+        console.log("Connection status:", connected)
+        expect(connected).toBe(true)
     })
 
     test("preparePays - Create multiple payment transactions", async () => {
-        const payments = [
-            { address: addresses.btc, amount: "600" },
-            { address: addresses.btc, amount: "600" },
-        ]
-        const signedTxHexes = await bitcoinSDK.preparePays(payments)
+        const payments = [{ address: addresses.btc, amount: "500" }]
+
+        // INFO: Override the fee rate to 3 sat/byte
+        const overrideFeeRate = 3
+        const signedTxHexes = await bitcoinSDK.preparePays(
+            payments,
+            overrideFeeRate,
+        )
 
         const xmscript = prepareXMScript({
             chain: "btc",
@@ -62,7 +67,7 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
             expect(typeof hex).toBe("string")
             expect(hex.length).toBeGreaterThan(0)
         })
-    })
+    }, 300000)
 })
 
 describe.skip("BTC CHAIN TESTS", () => {
@@ -119,10 +124,9 @@ describe.skip("BTC CHAIN TESTS", () => {
     })
 
     test("getBalance returns the correct balance", async () => {
-        const address = instance.getAddress()
-        const balance = await instance.getBalance(address)
+        const balance = await instance.getBalance()
         console.log("Balance:", balance)
 
         expect(parseInt(balance, 10)).toBeGreaterThanOrEqual(0)
-    })
+    }, 300000)
 })

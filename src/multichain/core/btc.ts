@@ -1,19 +1,21 @@
 import * as bitcoin from "bitcoinjs-lib"
+import { BIP32Factory } from "bip32"
+import * as ecc from "tiny-secp256k1"
 import { required } from "./utils"
 import axios from "axios"
 import { ECPairAPI, ECPairFactory, ECPairInterface } from "ecpair"
-import * as ecc from "tiny-secp256k1"
 import { DefaultChain } from "@/multichain/core/types/defaultChain"
 import { IPayParams } from "@/multichain/core/types/interfaces"
 
 const ECPair: ECPairAPI = ECPairFactory(ecc)
+const bip32 = BIP32Factory(ecc)
 
 const BITCOIN_CONSTANTS = {
-    DUST_LIMIT_P2PKH: 546,
+    DUST_LIMIT_P2WPKH: 294,
     BASE_TX_SIZE: 10,
-    INPUT_SIZE: 148,
-    OUTPUT_SIZE: 34,
-    SAT_PER_VBYTE: 10,
+    INPUT_SIZE: 68,
+    OUTPUT_SIZE: 31,
+    SAT_PER_VBYTE: 1,
     DEFAULT_NETWORK: bitcoin.networks.testnet, // Default Bitcoin network
 }
 
@@ -22,6 +24,8 @@ export class BTC extends DefaultChain {
     network: bitcoin.Network
     override wallet: ECPairInterface
     address?: string
+    private changeIndex: number = 0
+    private changeAddresses: string[] = []
 
     constructor(
         rpc_url: string,
@@ -46,10 +50,23 @@ export class BTC extends DefaultChain {
         }
     }
 
+    private generateChangeAddress(): string {
+        const seed = this.wallet.privateKey!
+        const root = bip32.fromSeed(seed, this.network)
+        const child = root.derivePath(`m/84'/1'/0'/1/${this.changeIndex++}`)
+        const { address } = bitcoin.payments.p2wpkh({
+            pubkey: Buffer.from(child.publicKey),
+            network: this.network,
+        })
+        this.changeAddresses.push(address!) // Save the change address
+        console.log("New change address generated:", address)
+        return address!
+    }
+
     async connectWallet(privateKeyWIF: string): Promise<ECPairInterface> {
         try {
             this.wallet = ECPair.fromWIF(privateKeyWIF, this.network)
-            const { address } = bitcoin.payments.p2pkh({
+            const { address } = bitcoin.payments.p2wpkh({
                 pubkey: Buffer.from(this.wallet.publicKey),
                 network: this.network,
             })
@@ -77,11 +94,28 @@ export class BTC extends DefaultChain {
             console.log("Fetching UTXOs from:", url)
             const response = await axios.get(url)
             const utxos = response.data || []
-            console.log("Fetched UTXOs:", utxos)
+            console.log(`Fetched UTXOs for ${address}:`, utxos)
             return utxos
         } catch (error) {
-            throw new Error(`Failed to fetch UTXOs: ${error}`)
+            throw new Error(`Error receiving UTXOs: ${error}`)
         }
+    }
+
+    async fetchAllUTXOs(): Promise<any[]> {
+        const mainAddressUTXOs = await this.fetchUTXOs(this.getAddress())
+        console.log("Main Address UTXOs:", mainAddressUTXOs)
+
+        console.log("Change Addresses:", this.changeAddresses)
+        const changeUTXOsPromises = this.changeAddresses.map(async address => {
+            const utxos = await this.fetchUTXOs(address)
+            console.log(`UTXOs for change address ${address}:`, utxos)
+            return utxos
+        })
+        const changeUTXOs = (await Promise.all(changeUTXOsPromises)).flat()
+
+        const allUTXOs = [...mainAddressUTXOs, ...changeUTXOs]
+        console.log("All available UTXOs:", allUTXOs)
+        return allUTXOs
     }
 
     async getTxHex(txid: string): Promise<string> {
@@ -107,16 +141,28 @@ export class BTC extends DefaultChain {
         }
     }
 
-    async preparePay(address: string, amount: string): Promise<string> {
-        console.log("Preparing payment to:", address, "for amount:", amount)
-        const txs = await this.preparePays([{ address, amount }])
+    async preparePay(
+        address: string,
+        amount: string,
+        overrideFeeRate?: number,
+        addNoise: boolean = false,
+    ): Promise<string> {
+        console.log("Preparing payment for:", address, "amount:", amount)
+        const txs = await this.preparePays(
+            [{ address, amount }],
+            overrideFeeRate,
+            addNoise,
+        )
         return txs[0]
     }
 
-    async preparePays(payments: IPayParams[]): Promise<string[]> {
+    async preparePays(
+        payments: IPayParams[],
+        overrideFeeRate?: number,
+        addNoise: boolean = false,
+    ): Promise<string[]> {
         required(this.wallet, "Wallet not connected")
-        const sender = this.getAddress()
-        let availableUtxos = await this.fetchUTXOs(sender)
+        let availableUtxos = await this.fetchAllUTXOs()
         const psbts: bitcoin.Psbt[] = []
 
         for (const payment of payments) {
@@ -125,6 +171,8 @@ export class BTC extends DefaultChain {
                 payment.address,
                 payment.amount as string,
                 availableUtxos,
+                overrideFeeRate,
+                addNoise,
             )
             psbts.push(psbt)
             availableUtxos = availableUtxos.filter(
@@ -144,6 +192,8 @@ export class BTC extends DefaultChain {
         address: string,
         amount: string,
         availableUtxos: any[],
+        overrideFeeRate?: number,
+        addNoise: boolean = false,
     ): Promise<{
         psbt: bitcoin.Psbt
         usedUtxos: { txid: string; vout: number }[]
@@ -162,27 +212,51 @@ export class BTC extends DefaultChain {
 
         const sortedUtxos = [...availableUtxos].sort(
             (a, b) => b.value - a.value,
-        )
-        console.log("Sorted UTXOs:", sortedUtxos)
+        ) // Sort in descending order
+        const p2wpkh = bitcoin.payments.p2wpkh({
+            pubkey: Buffer.from(this.wallet.publicKey),
+            network: this.network,
+        })
+
+        // Minimize the number of inputs
+        const outputCount = addNoise ? 3 : 2 // Estimated number of outputs
+        let estimatedFee = await this.calculateFee(
+            1,
+            outputCount,
+            overrideFeeRate,
+        ) // Rating for 1 entry
 
         for (const utxo of sortedUtxos) {
-            const txHex = await this.getTxHex(utxo.txid)
             psbt.addInput({
                 hash: utxo.txid,
                 index: utxo.vout,
-                nonWitnessUtxo: Buffer.from(txHex, "hex"),
+                witnessUtxo: {
+                    script: p2wpkh.output!,
+                    value: utxo.value,
+                },
             })
             totalInput += utxo.value
             inputCount++
             usedUtxos.push({ txid: utxo.txid, vout: utxo.vout })
-            const currentFee = this.calculateFee(inputCount, 2)
-            if (totalInput >= amountNum + currentFee) break
+
+            // Recalculate the commission taking into account the current number of inputs
+            estimatedFee = await this.calculateFee(
+                inputCount,
+                outputCount,
+                overrideFeeRate,
+            )
+            if (totalInput >= amountNum + estimatedFee) break // break as soon as have enough
         }
 
-        const finalFee = this.calculateFee(inputCount, 2)
+        // Finally calculate the commission
+        const finalFee = await this.calculateFee(
+            inputCount,
+            outputCount,
+            overrideFeeRate,
+        )
         if (totalInput < amountNum + finalFee) {
             throw new Error(
-                `Insufficient funds: have ${totalInput}, need ${
+                `Insufficient funds: There is ${totalInput}, need ${
                     amountNum + finalFee
                 }`,
             )
@@ -194,26 +268,77 @@ export class BTC extends DefaultChain {
         })
 
         const change = totalInput - amountNum - finalFee
-        if (change >= BITCOIN_CONSTANTS.DUST_LIMIT_P2PKH) {
-            psbt.addOutput({
-                address: sender,
-                value: change,
-            })
+        let remainingChange = change
+
+        if (
+            addNoise &&
+            remainingChange >= BITCOIN_CONSTANTS.DUST_LIMIT_P2WPKH * 2
+        ) {
+            const noiseAmount = Math.floor(remainingChange / 3)
+            if (noiseAmount >= BITCOIN_CONSTANTS.DUST_LIMIT_P2WPKH) {
+                const noiseAddress = this.generateChangeAddress()
+                psbt.addOutput({
+                    address: noiseAddress,
+                    value: noiseAmount,
+                })
+                remainingChange -= noiseAmount
+            }
         }
 
-        console.log("Created PSBT with inputs:", usedUtxos, "outputs:", {
-            payment: amountNum,
-            change,
-        })
+        if (remainingChange >= BITCOIN_CONSTANTS.DUST_LIMIT_P2WPKH) {
+            // Need to change to generated address for security
+            // const changeAddress = this.generateChangeAddress();
+            psbt.addOutput({
+                address: sender,
+                value: remainingChange,
+            })
+        } else if (remainingChange > 0) {
+            console.log(
+                `The remaining ${remainingChange} satoshi went to the commission`,
+            )
+        }
+
+        console.log(
+            `Inputs used: ${inputCount}, commission: ${finalFee}, change: ${remainingChange}`,
+        )
         return { psbt, usedUtxos }
     }
 
-    private calculateFee(inputsCount: number, outputsCount: number): number {
+    async getFeeRate(overrideRate?: number): Promise<number> {
+        if (overrideRate !== undefined) {
+            console.log("The overridden commission rate is used:", overrideRate)
+            return overrideRate
+        }
+        try {
+            const url = this.getApiUrl("/fee-estimates")
+            console.log("Request a commission rate:", url)
+            const response = await axios.get(url)
+            // "2" means evaluation for confirmation within 2 blocks
+            const feeRate =
+                Math.ceil(response.data["2"]) || BITCOIN_CONSTANTS.SAT_PER_VBYTE
+            console.log("Commission received (sat/vbyte):", feeRate)
+            return feeRate > 0 ? feeRate : BITCOIN_CONSTANTS.SAT_PER_VBYTE
+        } catch (error) {
+            console.error("Error receiving commission, using standard:", error)
+            return BITCOIN_CONSTANTS.SAT_PER_VBYTE
+        }
+    }
+
+    private async calculateFee(
+        inputsCount: number,
+        outputsCount: number,
+        overrideFeeRate?: number,
+    ): Promise<number> {
         const txSize =
             BITCOIN_CONSTANTS.BASE_TX_SIZE +
             inputsCount * BITCOIN_CONSTANTS.INPUT_SIZE +
             outputsCount * BITCOIN_CONSTANTS.OUTPUT_SIZE
-        return txSize * BITCOIN_CONSTANTS.SAT_PER_VBYTE
+        const feeRate = await this.getFeeRate(overrideFeeRate)
+        const fee = Math.ceil(txSize * feeRate)
+        console.log(
+            `Commission calculation: size=${txSize} vbyte, fee=${feeRate}, total=${fee}`,
+        )
+        return fee
     }
 
     async signTransaction(psbt: bitcoin.Psbt): Promise<string> {
@@ -228,14 +353,17 @@ export class BTC extends DefaultChain {
             psbt.signAllInputs(this.toSigner(this.wallet))
             psbt.finalizeAllInputs()
             const tx = psbt.extractTransaction()
-
             return tx.toHex()
         })
     }
 
-    async getBalance(address: string): Promise<string> {
-        const utxos = await this.fetchUTXOs(address)
-        return utxos.reduce((sum, utxo) => sum + utxo.value, 0).toString()
+    async getBalance(): Promise<string> {
+        const utxos = await this.fetchAllUTXOs()
+        const totalBalance = utxos.reduce((sum, utxo) => sum + utxo.value, 0)
+        console.log(
+            `Total balance (including change addresses): ${totalBalance} satoshi`,
+        )
+        return totalBalance.toString()
     }
 
     async getEmptyTransaction(): Promise<any> {

@@ -13,7 +13,7 @@ export function generateBitcoinTestnetKey(): {
     const keyPair = ECPair.makeRandom({ network })
     const privateKey = keyPair.toWIF()
 
-    const { address } = bitcoin.payments.p2pkh({
+    const { address } = bitcoin.payments.p2wpkh({
         pubkey: Buffer.from(keyPair.publicKey),
         network,
     })

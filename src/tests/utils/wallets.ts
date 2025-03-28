@@ -64,7 +64,7 @@ export const wallets: {
             "drift uniform trend awkward will hope cheap sell matter month release prison",
     },
     btc: {
-        privateKey: "cSbM47QmBZwjCGypJhsqKHP82heTZXsxKbC25rQabiXA2Gxc3WxW",
+        privateKey: "cTbm69QwwDfVj9Fm6CwLubU3otcd8XxqZ1yjNjE9nr5qt2jfgm3T",
     },
 }
 
@@ -72,5 +72,5 @@ export const addresses = {
     // Alt account
     // INFO: XRPL doesn't accept transfers to own account
     xrpl: "rHYu6zpqEPqVZ1K5tvmeM3mm5D7VsVrH2h",
-    btc: "mptjhkdKDTA2HrvNPdKqpxNcFCP6ynijv4",
+    btc: "tb1qprxnxxp2wzqkqzvrlklghwjxaa9z3ejfg9dkcr",
 }
