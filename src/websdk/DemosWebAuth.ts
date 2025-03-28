@@ -14,8 +14,8 @@ import { Cryptography } from "@/encryption/Cryptography"
 export class DemosWebAuth {
     static _instance = <DemosWebAuth | null>null
     loggedIn = false
-    keypair = <IKeyPair | null>null
-    stringified_keypair = <IStringifiedKeyPair | null>null
+    keypair = <IKeyPair>null
+    stringified_keypair = <IStringifiedKeyPair>null
 
     constructor() {
         this.loggedIn = false

@@ -1,7 +1,7 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
-import { Cryptography } from "@/encryption"
+import { Cryptography } from "@/encryption/Cryptography"
 import { RPCResponseWithValidityData } from "@/types"
 import {
     XMCoreTargetIdentityPayload,
@@ -89,32 +89,6 @@ export default class Identities {
     }
 
     /**
-     * Infer a crosschain identity from a signature.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param payload The payload to infer the identity from.
-     * @returns The validity data of the identity transaction.
-     */
-    async inferXmIdentity(demos: Demos, payload: InferFromSignaturePayload) {
-        return await this.inferIdentity(demos, "xm", payload)
-    }
-
-    /**
-     * Infer a web2 identity from a proof payload.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param payload The payload to infer the identity from.
-     *
-     * @returns The validity data of the identity transaction.
-     */
-    async inferWeb2Identity(
-        demos: Demos,
-        payload: Web2CoreTargetIdentityPayload,
-    ) {
-        return await this.inferIdentity(demos, "web2", payload)
-    }
-
-    /**
      * Remove a crosschain identity associated with an address.
      *
      * @param demos A Demos instance to communicate with the RPC.
@@ -151,11 +125,57 @@ export default class Identities {
         return await demos.confirm(signedTx)
     }
 
+    /**
+     * Infer a crosschain identity from a signature.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to infer the identity from.
+     * @returns The validity data of the identity transaction.
+     */
+    async inferXmIdentity(demos: Demos, payload: InferFromSignaturePayload) {
+        return await this.inferIdentity(demos, "xm", payload)
+    }
+
+    /**
+     * Infer a web2 identity from a proof payload.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to infer the identity from.
+     *
+     * @returns The validity data of the identity transaction.
+     */
+    async inferWeb2Identity(
+        demos: Demos,
+        payload: Web2CoreTargetIdentityPayload,
+    ) {
+        return await this.inferIdentity(demos, "web2", payload)
+    }
+
+    /**
+     * Remove a crosschain identity from the network.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to remove the identity.
+     * @returns The response from the RPC call.
+     */
     async removeXmIdentity(demos: Demos, payload: XMCoreTargetIdentityPayload) {
         return await this.removeIdentity(demos, "xm", payload)
     }
 
-    async removeWeb2Identity(demos: Demos, payload: unknown) {
+    /**
+     * Remove a web2 identity from the network.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to remove the identity.
+     * @returns The response from the RPC call.
+     */
+    async removeWeb2Identity(
+        demos: Demos,
+        payload: {
+            context: string
+            username: string
+        },
+    ) {
         return await this.removeIdentity(demos, "web2", payload)
     }
 
@@ -172,17 +192,7 @@ export default class Identities {
             proof: payload,
         }
 
-        const request = {
-            method: "gcr_routine",
-            params: [
-                {
-                    method: "add_github_identity",
-                    params: [githubPayload], // REVIEW Is this correct?
-                },
-            ],
-        }
-
-        return await demos.rpcCall(request, true)
+        return await this.inferIdentity(demos, "web2", githubPayload)
     }
 
     /**
@@ -198,18 +208,9 @@ export default class Identities {
             proof: payload,
         }
 
-        const request = {
-            method: "gcr_routine",
-            params: [
-                {
-                    method: "add_twitter_identity",
-                    params: [twitterPayload],
-                },
-            ],
-        }
-
-        return await demos.rpcCall(request, true)
+        return await this.inferIdentity(demos, "web2", twitterPayload)
     }
+
     /**
      * Get the identities associated with an address.
      *
@@ -217,17 +218,39 @@ export default class Identities {
      * @param address The address to get identities for.
      * @returns The identities associated with the address.
      */
-    async getIdentities(demos: Demos, address?: string) {
+    async getIdentities(demos: Demos, call = "getIdentities", address?: string) {
         const request = {
             method: "gcr_routine",
             params: [
                 {
-                    method: "getIdentities",
+                    method: call,
                     params: [address || demos.getAddress()],
                 },
             ],
         }
 
         return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Get the crosschain identities associated with an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param address The address to get identities for.
+     * @returns The identities associated with the address.
+     */
+    async getXmIdentities(demos: Demos, address?: string) {
+        return await this.getIdentities(demos, "getXmIdentities", address)
+    }
+
+    /**
+     * Get the web2 identities associated with an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param address The address to get identities for.
+     * @returns The identities associated with the address.
+     */
+    async getWeb2Identities(demos: Demos, address?: string) {
+        return await this.getIdentities(demos, "getWeb2Identities", address)
     }
 }

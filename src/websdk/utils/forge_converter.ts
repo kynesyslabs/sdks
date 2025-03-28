@@ -24,7 +24,7 @@ function rawStringToForge(forgeString: any[]) {
     // NOTE This works only if the string can be reduced to a proper hex private key
     let hexified = Buffer.from(forgeString).toString("hex")
     if (hexified.length != 128) {
-        return false
+        return null
     }
     const derived = HexToForge(hexified)
     return derived

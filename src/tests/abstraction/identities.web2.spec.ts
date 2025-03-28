@@ -1,4 +1,4 @@
-import { Cryptography } from "@/encryption"
+import { Cryptography } from "@/encryption/Cryptography"
 import { HexToForge } from "@/utils/dataManipulation"
 import { DemosWebAuth, Demos } from "@/websdk"
 import { Client, auth } from "twitter-api-sdk"
@@ -71,9 +71,9 @@ describe("Web2 Identities", () => {
         expect(verified).toBe(true)
     })
 
-    test.only("Infer Twitter Identity", async () => {
-        const rpc = "http://localhost:53550"
-        // const rpc = "https://demos.mungaist.com"
+    test.skip("Infer Twitter Identity", async () => {
+        // const rpc = "http://localhost:53550"
+        const rpc = "https://demos.mungaist.com"
         const proof = "https://x.com/cwilvxi/status/1904144804499304524"
         const payload: InferFromTwitterPayload = {
             context: "twitter",
@@ -95,9 +95,9 @@ describe("Web2 Identities", () => {
         console.log(res)
     })
 
-    test.skip("Remove Twitter Identity", async () => {
-        const rpc = "http://localhost:53550"
-        // const rpc = "https://demos.mungaist.com"
+    test.only("Remove Twitter Identity", async () => {
+        // const rpc = "http://localhost:53550"
+        const rpc = "https://demos.mungaist.com"
         const demos = new Demos()
         await demos.connect(rpc)
 
