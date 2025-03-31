@@ -20,7 +20,6 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
     beforeAll(async () => {
         const connected = await bitcoinSDK.connect()
         await bitcoinSDK.connectWallet(wallets.btc.privateKey)
-        console.log("Connection status:", connected)
         expect(connected).toBe(true)
     })
 
@@ -53,13 +52,8 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
         await demos.connectWallet(identity.keypair.privateKey as any)
 
         const validityData = await demos.confirm(tx)
-        console.log("validityData", validityData)
+        await demos.broadcast(validityData)
 
-        const res = await demos.broadcast(validityData)
-
-        console.log(res, "< Response")
-
-        console.log("Signed Transaction Hexes:", signedTxHexes)
         expect(signedTxHexes).toBeDefined()
         expect(Array.isArray(signedTxHexes)).toBe(true)
         expect(signedTxHexes.length).toBe(payments.length)
@@ -76,16 +70,12 @@ describe.skip("BTC CHAIN TESTS", () => {
     beforeAll(async () => {
         const connected = await instance.connect()
         await instance.connectWallet(wallets.btc.privateKey)
-        console.log("Connection status:", connected)
         expect(connected).toBe(true)
     })
 
     test("preparePay returns a signed transaction", async () => {
         const address = instance.getAddress()
-
         const signed_tx = await instance.preparePay(address, "550")
-        console.log(signed_tx, "<<< signed_tx")
-
         const tx = Transaction.fromHex(signed_tx)
 
         expect(tx).toBeInstanceOf(Transaction)
@@ -105,7 +95,6 @@ describe.skip("BTC CHAIN TESTS", () => {
     test("preparePay uses available UTXOs", async () => {
         const address = instance.getAddress()
         const utxosBefore = await instance.fetchUTXOs(address)
-        console.log("UTXOs before:", utxosBefore)
 
         const signed_tx = await instance.preparePay(address, "600")
         const tx = Transaction.fromHex(signed_tx)
@@ -125,7 +114,6 @@ describe.skip("BTC CHAIN TESTS", () => {
 
     test("getBalance returns the correct balance", async () => {
         const balance = await instance.getBalance()
-        console.log("Balance:", balance)
 
         expect(parseInt(balance, 10)).toBeGreaterThanOrEqual(0)
     }, 300000)

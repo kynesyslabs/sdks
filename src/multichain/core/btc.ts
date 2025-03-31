@@ -59,7 +59,6 @@ export class BTC extends DefaultChain {
             network: this.network,
         })
         this.changeAddresses.push(address!) // Save the change address
-        console.log("New change address generated:", address)
         return address!
     }
 
@@ -71,7 +70,6 @@ export class BTC extends DefaultChain {
                 network: this.network,
             })
             this.address = address
-            console.log("Wallet connected, address:", address)
             return this.wallet
         } catch (error) {
             throw new Error(`Failed to connect wallet: ${error}`)
@@ -91,10 +89,8 @@ export class BTC extends DefaultChain {
     async fetchUTXOs(address: string): Promise<any[]> {
         try {
             const url = this.getApiUrl(`/address/${address}/utxo`)
-            console.log("Fetching UTXOs from:", url)
             const response = await axios.get(url)
             const utxos = response.data || []
-            console.log(`Fetched UTXOs for ${address}:`, utxos)
             return utxos
         } catch (error) {
             throw new Error(`Error receiving UTXOs: ${error}`)
@@ -103,28 +99,22 @@ export class BTC extends DefaultChain {
 
     async fetchAllUTXOs(): Promise<any[]> {
         const mainAddressUTXOs = await this.fetchUTXOs(this.getAddress())
-        console.log("Main Address UTXOs:", mainAddressUTXOs)
 
-        console.log("Change Addresses:", this.changeAddresses)
         const changeUTXOsPromises = this.changeAddresses.map(async address => {
             const utxos = await this.fetchUTXOs(address)
-            console.log(`UTXOs for change address ${address}:`, utxos)
             return utxos
         })
         const changeUTXOs = (await Promise.all(changeUTXOsPromises)).flat()
 
         const allUTXOs = [...mainAddressUTXOs, ...changeUTXOs]
-        console.log("All available UTXOs:", allUTXOs)
         return allUTXOs
     }
 
     async getTxHex(txid: string): Promise<string> {
         try {
             const url = this.getApiUrl(`/tx/${txid}/hex`)
-            console.log("Fetching tx hex for:", txid)
             const response = await axios.get(url)
             const txHex = response.data
-            console.log("Fetched tx hex:", txHex)
             return txHex
         } catch (error) {
             throw new Error(`Failed to get transaction hex: ${error}`)
@@ -147,7 +137,6 @@ export class BTC extends DefaultChain {
         overrideFeeRate?: number,
         addNoise: boolean = false,
     ): Promise<string> {
-        console.log("Preparing payment for:", address, "amount:", amount)
         const txs = await this.preparePays(
             [{ address, amount }],
             overrideFeeRate,
@@ -166,7 +155,6 @@ export class BTC extends DefaultChain {
         const psbts: bitcoin.Psbt[] = []
 
         for (const payment of payments) {
-            console.log("Creating PSBT for payment:", payment)
             const { psbt, usedUtxos } = await this.createUnsignedPSBT(
                 payment.address,
                 payment.amount as string,
@@ -182,7 +170,6 @@ export class BTC extends DefaultChain {
                             used.txid === utxo.txid && used.vout === utxo.vout,
                     ),
             )
-            console.log("Remaining UTXOs:", availableUtxos)
         }
 
         return this.signTransactions(psbts)
@@ -298,25 +285,19 @@ export class BTC extends DefaultChain {
             )
         }
 
-        console.log(
-            `Inputs used: ${inputCount}, commission: ${finalFee}, change: ${remainingChange}`,
-        )
         return { psbt, usedUtxos }
     }
 
     async getFeeRate(overrideRate?: number): Promise<number> {
         if (overrideRate !== undefined) {
-            console.log("The overridden commission rate is used:", overrideRate)
             return overrideRate
         }
         try {
             const url = this.getApiUrl("/fee-estimates")
-            console.log("Request a commission rate:", url)
             const response = await axios.get(url)
             // "2" means evaluation for confirmation within 2 blocks
             const feeRate =
                 Math.ceil(response.data["2"]) || BITCOIN_CONSTANTS.SAT_PER_VBYTE
-            console.log("Commission received (sat/vbyte):", feeRate)
             return feeRate > 0 ? feeRate : BITCOIN_CONSTANTS.SAT_PER_VBYTE
         } catch (error) {
             console.error("Error receiving commission, using standard:", error)
@@ -335,9 +316,6 @@ export class BTC extends DefaultChain {
             outputsCount * BITCOIN_CONSTANTS.OUTPUT_SIZE
         const feeRate = await this.getFeeRate(overrideFeeRate)
         const fee = Math.ceil(txSize * feeRate)
-        console.log(
-            `Commission calculation: size=${txSize} vbyte, fee=${feeRate}, total=${fee}`,
-        )
         return fee
     }
 
@@ -360,9 +338,6 @@ export class BTC extends DefaultChain {
     async getBalance(): Promise<string> {
         const utxos = await this.fetchAllUTXOs()
         const totalBalance = utxos.reduce((sum, utxo) => sum + utxo.value, 0)
-        console.log(
-            `Total balance (including change addresses): ${totalBalance} satoshi`,
-        )
         return totalBalance.toString()
     }
 
