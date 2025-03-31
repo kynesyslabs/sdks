@@ -16,7 +16,10 @@ const BITCOIN_CONSTANTS = {
     INPUT_SIZE: 68,
     OUTPUT_SIZE: 31,
     SAT_PER_VBYTE: 1,
-    DEFAULT_NETWORK: bitcoin.networks.testnet, // Default Bitcoin network
+    MAX_ATTEMPTS: 100,
+    MAX_INDEX: 100,
+    DEFAULT_NETWORK: bitcoin.networks.testnet,
+    MAX_EMPTY: 5,
 }
 
 export class BTC extends DefaultChain {
@@ -25,7 +28,9 @@ export class BTC extends DefaultChain {
     override wallet: ECPairInterface
     address?: string
     private changeIndex: number = 0
-    private changeAddresses: string[] = []
+    private lastUsedUtxos: { txid: string; vout: number; derivedKey?: any }[] =
+        []
+    private usedChangeAddresses: Set<string> = new Set() // For storing used change addresses
 
     constructor(
         rpc_url: string,
@@ -50,16 +55,35 @@ export class BTC extends DefaultChain {
         }
     }
 
-    private generateChangeAddress(): string {
+    private async generateChangeAddress(): Promise<string> {
         const seed = this.wallet.privateKey!
         const root = bip32.fromSeed(seed, this.network)
-        const child = root.derivePath(`m/84'/1'/0'/1/${this.changeIndex++}`)
-        const { address } = bitcoin.payments.p2wpkh({
-            pubkey: Buffer.from(child.publicKey),
-            network: this.network,
-        })
-        this.changeAddresses.push(address!) // Save the change address
-        return address!
+        let address: string | undefined
+        let attempts = 0
+
+        // Check if the address has been used before
+        while (attempts < BITCOIN_CONSTANTS.MAX_ATTEMPTS) {
+            const child = root.derivePath(`m/84'/1'/0'/1/${this.changeIndex}`)
+            const payment = bitcoin.payments.p2wpkh({
+                pubkey: Buffer.from(child.publicKey),
+                network: this.network,
+            })
+            address = payment.address!
+
+            // Check if there is a UTXO at this address (i.e., if it was used)
+            const utxos = await this.fetchUTXOs(address)
+            if (utxos.length === 0 && !this.usedChangeAddresses.has(address)) {
+                this.usedChangeAddresses.add(address) // Add to the list of used addresses
+                this.changeIndex++
+                return address
+            }
+            this.changeIndex++
+            attempts++
+        }
+
+        throw new Error(
+            "Failed to generate a unique change address after maximum attempts",
+        )
     }
 
     async connectWallet(privateKeyWIF: string): Promise<ECPairInterface> {
@@ -99,15 +123,37 @@ export class BTC extends DefaultChain {
 
     async fetchAllUTXOs(): Promise<any[]> {
         const mainAddressUTXOs = await this.fetchUTXOs(this.getAddress())
+        const seed = this.wallet.privateKey!
+        const root = bip32.fromSeed(seed, this.network)
+        let changeUTXOs: any[] = []
+        let i = 0
+        let emptyCount = 0
 
-        const changeUTXOsPromises = this.changeAddresses.map(async address => {
-            const utxos = await this.fetchUTXOs(address)
-            return utxos
-        })
-        const changeUTXOs = (await Promise.all(changeUTXOsPromises)).flat()
+        while (
+            i < BITCOIN_CONSTANTS.MAX_INDEX &&
+            emptyCount < BITCOIN_CONSTANTS.MAX_EMPTY
+        ) {
+            const child = root.derivePath(`m/84'/1'/0'/1/${i}`)
+            const { address } = bitcoin.payments.p2wpkh({
+                pubkey: Buffer.from(child.publicKey),
+                network: this.network,
+            })
+            const utxos = await this.fetchUTXOs(address!)
+            if (utxos.length === 0) {
+                emptyCount++
+            } else {
+                emptyCount = 0
+            }
+            changeUTXOs = changeUTXOs.concat(
+                utxos.map(utxo => ({
+                    ...utxo,
+                    derivedKey: child,
+                })),
+            )
+            i++
+        }
 
-        const allUTXOs = [...mainAddressUTXOs, ...changeUTXOs]
-        return allUTXOs
+        return [...mainAddressUTXOs, ...changeUTXOs]
     }
 
     async getTxHex(txid: string): Promise<string> {
@@ -163,6 +209,12 @@ export class BTC extends DefaultChain {
                 addNoise,
             )
             psbts.push(psbt)
+            this.lastUsedUtxos = usedUtxos.map((u, i) => ({
+                ...u,
+                derivedKey: availableUtxos.find(
+                    utxo => utxo.txid === u.txid && utxo.vout === u.vout,
+                )?.derivedKey,
+            }))
             availableUtxos = availableUtxos.filter(
                 utxo =>
                     !usedUtxos.some(
@@ -189,31 +241,34 @@ export class BTC extends DefaultChain {
         if (isNaN(amountNum) || amountNum <= 0)
             throw new Error("Incorrect amount")
 
-        const sender = this.getAddress()
         if (availableUtxos.length === 0) throw new Error("No UTXOs available")
 
         const psbt = new bitcoin.Psbt({ network: this.network })
         let totalInput = 0
         let inputCount = 0
         const usedUtxos: { txid: string; vout: number }[] = []
+        const inputAddresses: Set<string> = new Set() // Store input addresses for verification
 
         const sortedUtxos = [...availableUtxos].sort(
             (a, b) => b.value - a.value,
-        ) // Sort in descending order
-        const p2wpkh = bitcoin.payments.p2wpkh({
-            pubkey: Buffer.from(this.wallet.publicKey),
-            network: this.network,
-        })
-
-        // Minimize the number of inputs
-        const outputCount = addNoise ? 3 : 2 // Estimated number of outputs
+        )
+        const outputCount = addNoise ? 3 : 2
         let estimatedFee = await this.calculateFee(
             1,
             outputCount,
             overrideFeeRate,
-        ) // Rating for 1 entry
+        )
 
         for (const utxo of sortedUtxos) {
+            const pubkey = utxo.derivedKey
+                ? utxo.derivedKey.publicKey
+                : this.wallet.publicKey
+            const p2wpkh = bitcoin.payments.p2wpkh({
+                pubkey: Buffer.from(pubkey),
+                network: this.network,
+            })
+            const utxoAddress = p2wpkh.address!
+            inputAddresses.add(utxoAddress) // Save input address
             psbt.addInput({
                 hash: utxo.txid,
                 index: utxo.vout,
@@ -221,21 +276,20 @@ export class BTC extends DefaultChain {
                     script: p2wpkh.output!,
                     value: utxo.value,
                 },
+                sequence: 0xfffffffe, // Enable RBF
             })
             totalInput += utxo.value
             inputCount++
             usedUtxos.push({ txid: utxo.txid, vout: utxo.vout })
 
-            // Recalculate the commission taking into account the current number of inputs
             estimatedFee = await this.calculateFee(
                 inputCount,
                 outputCount,
                 overrideFeeRate,
             )
-            if (totalInput >= amountNum + estimatedFee) break // break as soon as have enough
+            if (totalInput >= amountNum + estimatedFee) break
         }
 
-        // Finally calculate the commission
         const finalFee = await this.calculateFee(
             inputCount,
             outputCount,
@@ -263,7 +317,13 @@ export class BTC extends DefaultChain {
         ) {
             const noiseAmount = Math.floor(remainingChange / 3)
             if (noiseAmount >= BITCOIN_CONSTANTS.DUST_LIMIT_P2WPKH) {
-                const noiseAddress = this.generateChangeAddress()
+                const noiseAddress = await this.generateChangeAddress()
+                if (inputAddresses.has(noiseAddress)) {
+                    throw new Error(
+                        "Generated noise address matches an input address",
+                    )
+                }
+
                 psbt.addOutput({
                     address: noiseAddress,
                     value: noiseAmount,
@@ -273,10 +333,14 @@ export class BTC extends DefaultChain {
         }
 
         if (remainingChange >= BITCOIN_CONSTANTS.DUST_LIMIT_P2WPKH) {
-            // Need to change to generated address for security
-            // const changeAddress = this.generateChangeAddress();
+            const changeAddress = await this.generateChangeAddress()
+            if (inputAddresses.has(changeAddress)) {
+                throw new Error(
+                    "Generated change address matches an input address",
+                )
+            }
             psbt.addOutput({
-                address: sender,
+                address: changeAddress,
                 value: remainingChange,
             })
         } else if (remainingChange > 0) {
@@ -295,7 +359,6 @@ export class BTC extends DefaultChain {
         try {
             const url = this.getApiUrl("/fee-estimates")
             const response = await axios.get(url)
-            // "2" means evaluation for confirmation within 2 blocks
             const feeRate =
                 Math.ceil(response.data["2"]) || BITCOIN_CONSTANTS.SAT_PER_VBYTE
             return feeRate > 0 ? feeRate : BITCOIN_CONSTANTS.SAT_PER_VBYTE
@@ -328,10 +391,15 @@ export class BTC extends DefaultChain {
         required(this.wallet, "Wallet not connected")
 
         return psbts.map(psbt => {
-            psbt.signAllInputs(this.toSigner(this.wallet))
+            psbt.data.inputs.forEach((input, index) => {
+                const utxo = this.lastUsedUtxos[index]
+                const keyPair = utxo.derivedKey || this.wallet
+                psbt.signInput(index, this.toSigner(keyPair))
+            })
             psbt.finalizeAllInputs()
             const tx = psbt.extractTransaction()
-            return tx.toHex()
+            const txHex = tx.toHex()
+            return txHex
         })
     }
 
