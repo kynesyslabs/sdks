@@ -170,7 +170,16 @@ export const DemosTransactions = {
         // See prepare(data) for a possible solution
         //validationData.response.data.transaction = signedTx
 
-        return await demos.call("execute", "", validationData, "broadcastTx")
+        const res =  await demos.call("execute", "", validationData, "broadcastTx")
+
+        try {
+            return {
+                ...res,
+                response: JSON.parse(res.response),
+            }
+        } catch (error) {
+            return res
+        }
     },
     // NOTE Subnet transactions methods are imported and exposed in demos.ts from the l2ps.ts file.
 }
