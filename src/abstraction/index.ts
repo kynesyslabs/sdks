@@ -17,6 +17,8 @@ import {
     GithubProof,
     InferFromTwitterPayload,
     TwitterProof,
+    IdentityPayload,
+    InferFromSignatureTargetIdentityPayload
 } from "@/types/abstraction"
 
 export {
@@ -31,4 +33,6 @@ export {
     GithubProof,
     InferFromTwitterPayload,
     TwitterProof,
+    IdentityPayload,
+    InferFromSignatureTargetIdentityPayload
 }

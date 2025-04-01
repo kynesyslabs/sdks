@@ -40,7 +40,7 @@ export class Demos {
     private static _instance: Demos | null = null
 
     /** The RPC URL of the demos node */
-    rpc_url: string | null = null
+    rpc_url: string = null
 
     /** Connection status of the RPC URL */
     connected: boolean = false
@@ -51,7 +51,7 @@ export class Demos {
     }
 
     /** The keypair of the connected wallet */
-    keypair: IKeyPair | null = null
+    keypair: IKeyPair = null
 
     static get instance() {
         if (!Demos._instance) {

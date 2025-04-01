@@ -104,4 +104,22 @@ export {
     emptyResponse as RPCResponseSkeleton,
 } from "./communication/rpc"
 
-export { GCREdit } from "./blockchain/GCREdit"
+export {
+    GCREdit,
+    GCREditAssign,
+    GCREditAssignIdentity,
+    GCREditBalance,
+    GCREditIdentity,
+    GCREditNonce,
+    GCREditSubnetsTx,
+    Web2GCRData,
+    XmGCRData,
+    XmGCRIdentityData,
+} from "./blockchain/GCREdit"
+export { BridgeTradePayload } from "./bridge/bridgeTradePayload"
+export {
+    ChainProviders,
+    SupportedChains,
+    SupportedTokens,
+} from "./bridge/constants"
+

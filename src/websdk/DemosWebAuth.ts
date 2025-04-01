@@ -14,8 +14,8 @@ import { Cryptography } from "@/encryption/Cryptography"
 export class DemosWebAuth {
     static _instance = <DemosWebAuth | null>null
     loggedIn = false
-    keypair = <IKeyPair | null>null
-    stringified_keypair = <IStringifiedKeyPair | null>null
+    keypair = <IKeyPair>null
+    stringified_keypair = <IStringifiedKeyPair>null
 
     constructor() {
         this.loggedIn = false
@@ -82,11 +82,12 @@ export class DemosWebAuth {
     ): Promise<[boolean, string]> {
         if (typeof privKey === "string") {
             // REVIEW: Should we do this?
-            if (!privKey.startsWith("0x")) {
-                privKey = "0x" + privKey
+            if (privKey.startsWith("0x")) {
+                // Remove the 0x prefix
+                privKey = privKey.slice(2)
             }
 
-            privKey = forge_converter.stringToForge(privKey)
+            privKey = forge.util.binary.hex.decode(privKey)
             if (!privKey) {
                 return [false, "Cannot convert private key from that string!"]
             }

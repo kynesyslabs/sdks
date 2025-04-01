@@ -1,8 +1,10 @@
 import pprint from "@/utils/pprint"
-import Wallet from "@/wallet/Wallet"
-import { Demos, DemosTransactions, DemosWebAuth } from "@/websdk"
+import { Demos, DemosWebAuth } from "@/websdk"
+import axios from "axios"
 
 describe("Native transactions", () => {
+    const RPC = "https://demos.mungaist.com"
+
     let demos: Demos = new Demos()
     let senderWebAuth = new DemosWebAuth()
     let recepientWebAuth = new DemosWebAuth()
@@ -15,13 +17,13 @@ describe("Native transactions", () => {
         )
         await recepientWebAuth.create()
 
-        await demos.connect("https://demos.mungaist.com")
+        await demos.connect(RPC)
         await demos.connectWallet(
             senderWebAuth.keypair.privateKey as Uint8Array,
         )
     })
 
-    test("Pay", async () => {
+    test.skip("Pay", async () => {
         const tx = await demos.transfer(
             "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
             100,
@@ -38,32 +40,65 @@ describe("Native transactions", () => {
         }
     })
 
-    test.only("Full Native Transaction", async () => {
-        // 1. Initialize the demos instance
-        const rpc = "https://demosnode.discus.sh"
-        const demos = new Demos()
-        await demos.connect(rpc)
+    test.only("Node transaction Spam test", async () => {
+        // NOTE: To increase the number of concurrent transactions, 
+        // run multiple instances of this test at the same time.
 
-        const identity = DemosWebAuth.getInstance()
-        await identity.create()
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+        // INFO: Local testnet RPCs
+        const rpcs = [
+            "http://localhost:53550",
+            // "http://localhost:53559",
+            // "http://localhost:53560",
+        ]
+
+        // INFO: Private testnet RPCs
+        // const rpcs = [
+        //     "https://demos.mungaist.com",
+        //     "http://node2.demos.sh:53560",
+        //     "http://node3.demos.sh:53560",
+        // ]
+
+        const demoss = rpcs.map(async rpc => {
+            const demos = new Demos()
+            await demos.connect(rpc)
+            return demos
+        })
+
+        const mademos = await Promise.all(demoss)
+
+        async function sendTx(demos: Demos) {
+            const sender = DemosWebAuth.getInstance()
+
+            await sender.create()
+            await demos.connectWallet(sender.keypair.privateKey as Uint8Array)
+
+            const receiver = DemosWebAuth.getInstance()
+            await receiver.create()
+
+            const tx = await demos.transfer(
+                receiver.keypair.publicKey.toString("hex"),
+                100,
+            )
+
+            const validityData = await demos.confirm(tx)
+
+            if (validityData.result == 200) {
+                const broadcastRes = await demos.broadcast(validityData)
+                console.log("Broadcast result", broadcastRes)
+            } else {
+                console.log("Tx confirm failed", validityData)
+            }
+        }
+
+        const TXCOUNT = 3
 
         // 2. Create a transaction
-        const tx = await demos.transfer(
-            "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
-            100,
-        )
-
-        // 3. Confirm the transaction
-        const validityData = await demos.confirm(tx)
-        console.log("Validity data", validityData)
+        for (let i = 0; i < TXCOUNT; i++) {
+            for (const demos of mademos) {
+                await sendTx(demos)
+            }
+        }
 
         // 4. Broadcast the transaction
-        if (validityData.result == 200) {
-            const broadcastRes = await demos.broadcast(validityData)
-            console.log("Broadcast result", broadcastRes)
-        } else {
-            console.log("Tx confirm failed", validityData)
-        }
-    })
+    }, 10000000)
 })

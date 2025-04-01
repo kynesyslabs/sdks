@@ -1,6 +1,6 @@
 export interface IKeyPair {
-    privateKey: Buffer | Uint8Array | null | false
-    publicKey: Buffer | Uint8Array | null | false
+    privateKey: Buffer | Uint8Array
+    publicKey: Buffer | Uint8Array
 }
 
 export interface IStringifiedKeyPair {
