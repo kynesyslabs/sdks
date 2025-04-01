@@ -24,6 +24,12 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
     const network = bitcoin.networks.testnet
     const bitcoinSDK = new BTC(chainProviders.btc.testnet, network)
 
+    beforeAll(async () => {
+        const connected = await bitcoinSDK.connect()
+        await bitcoinSDK.connectWallet(wallets.btc.privateKey)
+        expect(connected).toBe(true)
+    })
+
     test.skip("generatePrivateKey", async () => {
         const senderHash = Hashing.sha256(receiverSeed)
         const seed = Buffer.from(senderHash)
@@ -49,11 +55,6 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
         expect(btc.getAddress()).toBe(receiverAddress)
     })
 
-    beforeAll(async () => {
-        const connected = await bitcoinSDK.connect()
-        await bitcoinSDK.connectWallet(wallets.btc.privateKey)
-        expect(connected).toBe(true)
-    })
 
     test.only("Get Bitcoin balance", async () => {
         const balance = await bitcoinSDK.getBalance()
