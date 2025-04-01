@@ -1,4 +1,5 @@
 import { BTC } from "@/multichain/core/btc"
+// import { BTC as LocalBTC } from "@/multichain/localsdk/btc"
 import { Transaction } from "bitcoinjs-lib"
 import { addresses, wallets } from "@/tests/utils/wallets"
 import chainProviders from "./chainProviders"
@@ -10,17 +11,53 @@ import {
     prepareXMScript,
 } from "@/websdk"
 
+import { Hashing } from "@/encryption/Hashing"
+
 afterAll(() => {
     jest.restoreAllMocks()
 })
 
 describe.only("DEMOS Transaction with Bitcoin SDK", () => {
-    const bitcoinSDK = new BTC(chainProviders.btc.testnet)
+    const senderSeed = "sender"
+    const receiverSeed = "receiver"
+
+    const network = bitcoin.networks.testnet
+    const bitcoinSDK = new BTC(chainProviders.btc.testnet, network)
+
+    test.skip("generatePrivateKey", async () => {
+        const senderHash = Hashing.sha256(receiverSeed)
+        const seed = Buffer.from(senderHash)
+
+        const privateKey = bitcoinSDK.generatePrivateKey(seed)
+        console.log("Receiver private key:", privateKey)
+    })
+
+    test.skip("Confirm Receiver address", async () => {
+        // INFO: Helpful for running tests on the mainnet
+        const receiverAddress = "bc1qm7n58dksusdawp2xtjcvlphml5jve6velpcn3k"
+
+        const btc = new BTC(chainProviders.btc.mainnet, network)
+        const connected = await btc.connect()
+        expect(connected).toBe(true)
+
+        const hash = Hashing.sha256(receiverSeed)
+        const seed = Buffer.from(hash)
+        const privateKey = btc.generatePrivateKey(seed)
+        await btc.connectWallet(privateKey)
+
+        console.log("Receiver address:", btc.getAddress())
+        expect(btc.getAddress()).toBe(receiverAddress)
+    })
 
     beforeAll(async () => {
         const connected = await bitcoinSDK.connect()
         await bitcoinSDK.connectWallet(wallets.btc.privateKey)
         expect(connected).toBe(true)
+    })
+
+    test.only("Get Bitcoin balance", async () => {
+        const balance = await bitcoinSDK.getBalance()
+        console.log("Bitcoin balance:", balance)
     })
 
     test("preparePays - Create multiple payment transactions", async () => {
@@ -32,6 +69,15 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
             payments,
             overrideFeeRate,
         )
+
+        // ======= SEND USING LOCAL SDK =======
+        // const localBTC = new LocalBTC(chainProviders.btc.mainnet, network)
+        // const res = await localBTC.sendTransaction(signedTxHexes[0])
+        // console.log("Local SDK TX:", res)
+        // console.log("JSON:", JSON.stringify(res, null, 2))
+        
+        // process.exit(0)
+        // ======= !SEND USING LOCAL SDK =======
 
         const xmscript = prepareXMScript({
             chain: "btc",
@@ -52,7 +98,8 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
         await demos.connectWallet(identity.keypair.privateKey as any)
 
         const validityData = await demos.confirm(tx)
-        await demos.broadcast(validityData)
+        const res = await demos.broadcast(validityData)
+        console.log(res)
 
         expect(signedTxHexes).toBeDefined()
         expect(Array.isArray(signedTxHexes)).toBe(true)

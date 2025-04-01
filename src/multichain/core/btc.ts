@@ -55,6 +55,28 @@ export class BTC extends DefaultChain {
         }
     }
 
+    /**
+     * Generate a private key for the BTC chain
+     * @param seed - The seed to generate the private key from (optional)
+     * @returns The private key as a WIF string
+     */
+    generatePrivateKey(seed?: Buffer): string {
+        if (seed) {
+            // Generate deterministic key from seed using BIP32
+            const root = bip32.fromSeed(seed, this.network)
+            const path =
+                this.network === bitcoin.networks.testnet
+                    ? "m/84'/1'/0'/0/0"
+                    : "m/84'/0'/0'/0/0"
+            const child = root.derivePath(path)
+            return child.toWIF()
+        } else {
+            // Generate random key if no seed provided
+            const keyPair = ECPair.makeRandom({ network: this.network })
+            return keyPair.toWIF()
+        }
+    }
+
     private async generateChangeAddress(): Promise<string> {
         const seed = this.wallet.privateKey!
         const root = bip32.fromSeed(seed, this.network)
