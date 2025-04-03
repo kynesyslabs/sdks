@@ -211,12 +211,12 @@ class Web2IdentityParsers {
 
     parseTwitterUsername(): string {
         // https://x.com/demos_xyz/status/1901630063692365884
-        const username = this.proof_url.split("/")[3]
-        return username
+        return this.proof_url.split("/")[3]
     }
 
     parseGithubUsername(): string {
-        return ""
+        // https://gist.github.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79
+        return this.proof_url.split("/")[3]
     }
 
     parse(): string {
