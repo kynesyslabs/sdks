@@ -1,4 +1,4 @@
-import { BTC } from "@/multichain/core/btc"
+import { BTC } from "@/multichain/websdk"
 // import { BTC as LocalBTC } from "@/multichain/localsdk/btc"
 import { Transaction } from "bitcoinjs-lib"
 import { addresses, wallets } from "@/tests/utils/wallets"
@@ -22,9 +22,14 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
     const receiverSeed = "receiver"
 
     const network = bitcoin.networks.testnet
-    const bitcoinSDK = new BTC(chainProviders.btc.testnet, network)
+    let bitcoinSDK: BTC | null = null
 
     beforeAll(async () => {
+        bitcoinSDK = await BTC.create(
+            chainProviders.btc.testnet,
+            BTC.networks.testnet,
+        )
+
         const connected = await bitcoinSDK.connect()
         await bitcoinSDK.connectWallet(wallets.btc.privateKey)
         expect(connected).toBe(true)
@@ -55,13 +60,12 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
         expect(btc.getAddress()).toBe(receiverAddress)
     })
 
-
-    test.only("Get Bitcoin balance", async () => {
+    test.skip("Get Bitcoin balance", async () => {
         const balance = await bitcoinSDK.getBalance()
         console.log("Bitcoin balance:", balance)
     })
 
-    test("preparePays - Create multiple payment transactions", async () => {
+    test.only("preparePays - Create multiple payment transactions", async () => {
         const payments = [{ address: addresses.btc, amount: "500" }]
 
         // INFO: Override the fee rate to 3 sat/byte
@@ -76,7 +80,7 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
         // const res = await localBTC.sendTransaction(signedTxHexes[0])
         // console.log("Local SDK TX:", res)
         // console.log("JSON:", JSON.stringify(res, null, 2))
-        
+
         // process.exit(0)
         // ======= !SEND USING LOCAL SDK =======
 
@@ -92,6 +96,7 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
 
         const tx = await prepareXMPayload(xmscript, identity.keypair)
         const rpc = "http://localhost:53550"
+        // const rpc = "https://demos.mungaist.com"
 
         const demos = new Demos()
 
@@ -113,7 +118,8 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
 })
 
 describe.skip("BTC CHAIN TESTS", () => {
-    const instance = new BTC(chainProviders.btc.testnet)
+    const network = bitcoin.networks.testnet
+    const instance = new BTC(chainProviders.btc.testnet, network)
 
     beforeAll(async () => {
         const connected = await instance.connect()

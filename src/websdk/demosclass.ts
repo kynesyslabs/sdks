@@ -202,7 +202,7 @@ export class Demos {
         retries = 0,
         sleepTime = 250,
         allowedErrorCodes: number[] = [],
-    ) {
+    ): Promise<RPCResponse> {
         let publicKey = ""
         let signature = ""
 

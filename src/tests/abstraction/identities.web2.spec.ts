@@ -7,6 +7,19 @@ import axios from "axios"
 import { Identities, InferFromTwitterPayload } from "@/abstraction"
 
 describe("Web2 Identities", () => {
+    // const rpc = "http://localhost:53550"
+    const rpc = "https://demos.mungaist.com"
+
+    const demos = new Demos()
+    const identities = new Identities()
+
+    beforeAll(async () => {
+        await demos.connect(rpc)
+        await demos.connectWallet(
+            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
+        )
+    })
+
     test.skip("Create Twitter Identity", async () => {
         const identity = new DemosWebAuth()
         await identity.login(
@@ -40,17 +53,6 @@ describe("Web2 Identities", () => {
     })
 
     test.skip("Create Web2 Proof Payload", async () => {
-        const rpc = "http://localhost:53550"
-        const demos = new Demos()
-        // await demos.connect(rpc)
-
-        const identity = new DemosWebAuth()
-        await identity.login(
-            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
-        demos.keypair
-
         const identities = new Identities()
         const payload = await identities.createWeb2ProofPayload(demos.keypair)
         console.log(payload)
@@ -72,42 +74,18 @@ describe("Web2 Identities", () => {
     })
 
     test.skip("Infer Twitter Identity", async () => {
-        // const rpc = "http://localhost:53550"
-        const rpc = "https://demos.mungaist.com"
         const proof = "https://x.com/cwilvxi/status/1904144804499304524"
         const payload: InferFromTwitterPayload = {
             context: "twitter",
             proof,
         }
 
-        const identity = new DemosWebAuth()
-        await identity.login(
-            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
-
-        const demos = new Demos()
-        await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
-
-        const identities = new Identities()
         const validityData = await identities.inferWeb2Identity(demos, payload)
         const res = await demos.broadcast(validityData)
         console.log(res)
     })
 
     test.skip("Remove Twitter Identity", async () => {
-        // const rpc = "http://localhost:53550"
-        const rpc = "https://demos.mungaist.com"
-        const demos = new Demos()
-        await demos.connect(rpc)
-
-        const identity = new DemosWebAuth()
-        await identity.login(
-            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
-
-        const identities = new Identities()
         const payload = {
             context: "twitter",
             username: "cwilvxi",
@@ -120,42 +98,35 @@ describe("Web2 Identities", () => {
         console.log(res2)
     })
 
-    test.skip("Add Github Identity", async () => {
+    test.only("Add Github Identity", async () => {
+        // INFO: All these proofs should work
         // const proof = "https://gist.github.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79"
         // const proof = "https://gist.githubusercontent.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79/raw/224478424c5e6e51f5eb60cb6aeea278d3418742/gistfile1.txt"
         const proof = "https://raw.githubusercontent.com/cwilvx/vonage-draft-images/refs/heads/master/proof.txt"
-        // const rpc = "https://demos.mungaist.com"
-        const rpc = "http://localhost:53550"
-        const demos = new Demos()
-        await demos.connect(rpc)
 
-        const identity = new DemosWebAuth()
-        await identity.login(
-            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
-
-        const identities = new Identities()
         const validityData = await identities.addGithubIdentity(demos, proof)
         console.log(validityData)
 
         if (validityData.result == 200) {
             const res = await demos.broadcast(validityData)
             console.log(res)
+
+            expect(res.result).toBe(200)
+            expect(res.response['message']).toContain("Transaction applied")
         }
     })
 
-    test.only("Remove Github Identity", async () => {
-        const rpc = "http://localhost:53550"
-        const demos = new Demos()
-        await demos.connect(rpc)
+    test.skip("Verify Github Identity", async () => {
+        const res = await identities.getWeb2Identities(demos)
+        console.log(JSON.stringify(res, null, 2))
 
-        const identity = new DemosWebAuth()
-        await identity.login(
-            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+        expect(res.result).toBe(200)
+        expect(Array.isArray(res.response["github"])).toBe(true)
+        expect(res.response["github"].length).toBeGreaterThan(0)
+        expect(res.response["github"][0].username).toBe("cwilvx")
+    })
 
+    test.skip("Remove Github Identity", async () => {
         const identities = new Identities()
         const payload = {
             context: "github",
@@ -167,6 +138,9 @@ describe("Web2 Identities", () => {
         if (validityData.result == 200) {
             const res = await demos.broadcast(validityData)
             console.log(res)
+
+            expect(res.result).toBe(200)
+            expect(res.response['message']).toContain("Transaction applied")
         }
     })
 })

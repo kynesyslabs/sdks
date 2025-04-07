@@ -22,7 +22,10 @@ const BITCOIN_CONSTANTS = {
     MAX_EMPTY: 5,
 }
 
+// @ts-expect-error
 export class BTC extends DefaultChain {
+    static networks = bitcoin.networks
+
     declare provider: string
     network: bitcoin.Network
     override wallet: ECPairInterface
@@ -40,6 +43,16 @@ export class BTC extends DefaultChain {
         this.name = "btc"
         this.provider = rpc_url
         this.network = network
+    }
+
+    static override async create<T extends BTC>(
+        this: new (rpc_url: string, network: bitcoin.Network) => T,
+        rpc_url: string,
+        network: bitcoin.Network = BITCOIN_CONSTANTS.DEFAULT_NETWORK,
+    ): Promise<T> {
+        const instance = new this(rpc_url, network)
+        await instance.connect()
+        return instance
     }
 
     async connect(): Promise<boolean> {
