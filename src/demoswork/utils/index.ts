@@ -1,3 +1,5 @@
+import crypto from "crypto"
+
 export function getNewUID() {
     return crypto.randomUUID().replaceAll("-", "")
 }

@@ -14,7 +14,7 @@ export default async function createTestWorkScript(): Promise<Transaction> {
     const work = new DemosWork()
 
     const uid = getNewUID()
-    const evm = await EVM.create(chainProviders.eth.sepolia)
+    const evm = await EVM.create("https://ethereum-sepolia-rpc.publicnode.com")
     await evm.connectWallet(
         "e0a00e307c21850cde41b18bae307a492c471b463b60ce5b631fdb80503b23f7",
     )

@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+
 /**
  * Hashes any string using crypto subtle
  */
