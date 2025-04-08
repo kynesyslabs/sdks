@@ -40,13 +40,10 @@
     - I can't find the ntru library developer unfortunately, feel free to contact me if its you
 
 */
-import argon2 from "argon2"
-// import { superSphincs } from "supersphincs" // Same as above, just replace the two strings
 import { McEliece } from "mceliece-nist"
 import Rijndael from "rijndael-js"
 import { superDilithium } from "superdilithium"
-
-// import {ntru} from "ntru" // Interchangeable with McEliece
+import { keccak_256 } from "js-sha3"
 
 // INFO Interface to happily work with almost any keypair
 export interface IKeypair {
@@ -218,13 +215,16 @@ export default class Enigma {
         return secret
     }
 
-    /* SECTION Hashing with Argon2 */
+    /* SECTION Hashing with SHA-3 */
 
     async hash(input: string | Buffer): Promise<string> {
         if (typeof input === "string") {
             input = Buffer.from(input, "utf8")
         }
-        let hash = await argon2.hash(input)
+        // Convert Buffer to string for js-sha3
+        const inputStr = input.toString('hex')
+        // Use keccak_256 (SHA-3) for hashing
+        const hash = keccak_256(inputStr)
         return hash
     }
 
@@ -232,11 +232,11 @@ export default class Enigma {
         if (typeof input === "string") {
             input = Buffer.from(input, "utf8")
         }
-        if (await argon2.verify(hash, input)) {
-            return true
-        } else {
-            return false
-        }
+        // Convert Buffer to string for js-sha3
+        const inputStr = input.toString('hex')
+        // Calculate hash and compare
+        const calculatedHash = keccak_256(inputStr)
+        return calculatedHash === hash
     }
 
     /* SECTION Symmetric encryption and decryption with Rijndael */
