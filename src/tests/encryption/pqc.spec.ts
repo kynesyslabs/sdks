@@ -259,4 +259,74 @@ describe('Enigma PQC Library', () => {
       console.log('Different input types handled successfully!');
     });
   });
+  
+  describe('NTRU Encryption', () => {
+    it('should encrypt and decrypt data with NTRU', async () => {
+      const message = 'This is a secret message that needs to be encrypted with NTRU.';
+      
+      // Encrypt the message using NTRU
+      const { encrypted, secret } = await enigma.ntruEncrypt(message, enigma.ntruKeyPair.publicKey);
+      expect(encrypted).toBeDefined();
+      expect(secret).toBeDefined();
+      expect(encrypted).toBeInstanceOf(Uint8Array);
+      expect(secret).toBeInstanceOf(Uint8Array);
+      
+      // Decrypt the message using NTRU
+      const decrypted = await enigma.ntruDecrypt(encrypted, enigma.ntruKeyPair.privateKey);
+      expect(decrypted).toBeDefined();
+      expect(decrypted).toBeInstanceOf(Uint8Array);
+      
+      // Convert decrypted data to string and compare
+      const decryptedString = new TextDecoder().decode(decrypted);
+      expect(decryptedString).toBe(message);
+    });
+    
+    it('should handle different input types for NTRU encryption', async () => {
+      const stringMessage = 'This is a string message for NTRU';
+      const bufferMessage = new TextEncoder().encode('This is a buffer message for NTRU');
+      
+      // Test with string input
+      const { encrypted: encryptedString, secret: secretString } = await enigma.ntruEncrypt(stringMessage, enigma.ntruKeyPair.publicKey);
+      const decryptedString = await enigma.ntruDecrypt(encryptedString, enigma.ntruKeyPair.privateKey);
+      expect(new TextDecoder().decode(decryptedString)).toBe(stringMessage);
+      
+      // Test with Uint8Array input
+      const { encrypted: encryptedBuffer, secret: secretBuffer } = await enigma.ntruEncrypt(bufferMessage, enigma.ntruKeyPair.publicKey);
+      const decryptedBuffer = await enigma.ntruDecrypt(encryptedBuffer, enigma.ntruKeyPair.privateKey);
+      expect(new TextDecoder().decode(decryptedBuffer)).toBe(new TextDecoder().decode(bufferMessage));
+    });
+    
+    it('should throw error for invalid key sizes in NTRU', async () => {
+      const message = 'Test message for NTRU';
+      const invalidPublicKey = new Uint8Array(10); // Invalid public key size
+      const invalidPrivateKey = new Uint8Array(10); // Invalid private key size
+      
+      // Create a valid encrypted message first
+      const { encrypted } = await enigma.ntruEncrypt(message, enigma.ntruKeyPair.publicKey);
+      
+      // Test encryption with invalid public key
+      await expect(enigma.ntruEncrypt(message, invalidPublicKey)).rejects.toThrow();
+      
+      // Test decryption with invalid private key
+      await expect(enigma.ntruDecrypt(encrypted, invalidPrivateKey)).rejects.toThrow();
+    });
+    
+    it('should export and import NTRU keys', async () => {
+      // Export NTRU keys
+      const exportedKeys = enigma.exportNtruKeys();
+      expect(exportedKeys).toBeDefined();
+      expect(exportedKeys.privateKey).toBeDefined();
+      expect(exportedKeys.publicKey).toBeDefined();
+      
+      // Create a new instance and import the keys
+      const newEnigma = new Enigma();
+      newEnigma.importNtruKeys(exportedKeys);
+      
+      // Verify that the keys work
+      const message = 'Test message for NTRU key import/export';
+      const { encrypted } = await newEnigma.ntruEncrypt(message, newEnigma.ntruKeyPair.publicKey);
+      const decrypted = await newEnigma.ntruDecrypt(encrypted, newEnigma.ntruKeyPair.privateKey);
+      expect(new TextDecoder().decode(decrypted)).toBe(message);
+    });
+  });
 }); 

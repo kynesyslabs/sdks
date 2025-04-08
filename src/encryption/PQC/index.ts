@@ -44,6 +44,7 @@ import { McEliece } from "mceliece-nist"
 import { superDilithium } from "superdilithium"
 import { keccak_256 } from "js-sha3"
 import * as crypto from "crypto"
+import { ntru } from "ntru"
 
 // INFO Interface to happily work with almost any keypair
 export interface IKeypair {
@@ -55,6 +56,7 @@ export interface IKeypair {
 export default class Enigma {
     signingKeyPair: IKeypair = null
     mcelieceKeypair: IKeypair = null
+    ntruKeyPair: IKeypair = null
 
     private kem: McEliece = new McEliece("mceliece8192128")
     
@@ -79,6 +81,7 @@ export default class Enigma {
     async init() {
         this.signingKeyPair = await superDilithium.keyPair()
         this.mcelieceKeypair = this.kem.keypair()
+        this.ntruKeyPair = await ntru.keyPair()
     }
 
     /* SECTION Signatures with superDilithium */
@@ -368,9 +371,9 @@ export default class Enigma {
         }
         
         // Extract the nonce, ciphertext, and auth tag
-        const nonce = input.slice(0, this.NONCE_SIZE);
-        const authTag = input.slice(input.length - 16); // 16 bytes for auth tag
-        const ciphertext = input.slice(this.NONCE_SIZE, input.length - 16);
+        const nonce = input.subarray(0, this.NONCE_SIZE);
+        const authTag = input.subarray(input.length - 16); // 16 bytes for auth tag
+        const ciphertext = input.subarray(this.NONCE_SIZE, input.length - 16);
         
         // Create decipher with the key and nonce
         const decipher = crypto.createDecipheriv('chacha20-poly1305', keyBuffer, nonce, {
@@ -387,5 +390,81 @@ export default class Enigma {
         ]);
         
         return decrypted;
+    }
+
+    /* SECTION NTRU Encryption and Decryption */
+
+    /**
+     * Encrypts data using NTRU
+     * @param input The data to encrypt
+     * @param publicKey The public key to use for encryption
+     * @returns A promise that resolves to an object containing the encrypted data and secret
+     */
+    async ntruEncrypt(input: string | Uint8Array, publicKey: Uint8Array): Promise<{encrypted: Uint8Array, secret: Uint8Array}> {
+        // Convert input to Uint8Array if it's a string
+        const inputData = typeof input === 'string' ? new TextEncoder().encode(input) : input;
+        
+        // Validate public key length
+        const publicKeyBytes = await ntru.publicKeyBytes;
+        if (publicKey.length !== publicKeyBytes) {
+            throw new Error(`Public key must be ${publicKeyBytes} bytes long for NTRU`);
+        }
+        
+        // Encrypt the data using NTRU
+        const { cyphertext, secret } = await ntru.encrypt(publicKey);
+        
+        // Combine the encrypted data with the input
+        const combined = new Uint8Array(cyphertext.length + inputData.length);
+        combined.set(cyphertext, 0);
+        combined.set(inputData, cyphertext.length);
+        
+        return {
+            encrypted: combined,
+            secret: secret
+        };
+    }
+
+    /**
+     * Decrypts data using NTRU
+     * @param encrypted The encrypted data
+     * @param privateKey The private key to use for decryption
+     * @returns A promise that resolves to the decrypted data
+     */
+    async ntruDecrypt(encrypted: Uint8Array, privateKey: Uint8Array): Promise<Uint8Array> {
+        // Validate private key length
+        const privateKeyBytes = await ntru.privateKeyBytes;
+        if (privateKey.length !== privateKeyBytes) {
+            throw new Error(`Private key must be ${privateKeyBytes} bytes long for NTRU`);
+        }
+        
+        // Extract the cyphertext from the combined data
+        const cyphertextBytes = await ntru.cyphertextBytes;
+        const cyphertext = encrypted.subarray(0, cyphertextBytes);
+        const data = encrypted.subarray(cyphertextBytes);
+        
+        // Decrypt the data using NTRU
+        const secret = await ntru.decrypt(cyphertext, privateKey);
+        
+        // Return the decrypted data
+        return data;
+    }
+
+    /**
+     * Exports the NTRU key pair
+     * @returns The NTRU key pair
+     */
+    exportNtruKeys(): IKeypair {
+        if (!this.ntruKeyPair) {
+            throw new Error("NTRU key pair not initialized. Call init() first.");
+        }
+        return this.ntruKeyPair;
+    }
+
+    /**
+     * Imports an NTRU key pair
+     * @param keyPair The key pair to import
+     */
+    importNtruKeys(keyPair: IKeypair): void {
+        this.ntruKeyPair = keyPair;
     }
 }
