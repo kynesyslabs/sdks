@@ -40,6 +40,7 @@
         "test:btc": "rm -rf build && jest --testMatch '**/tests/multichain**/bitcoin*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
     },
     "dependencies": {
+        "@bitcoinerlab/secp256k1": "^1.2.0",
         "@cosmjs/proto-signing": "^0.32.3",
         "@cosmjs/stargate": "^0.32.3",
         "@metaplex-foundation/js": "^0.20.1",
@@ -79,7 +80,6 @@
         "rubic-sdk": "^5.52.6",
         "socket.io-client": "^4.7.2",
         "superdilithium": "^2.0.6",
-        "tiny-secp256k1": "^2.2.3",
         "tweetnacl": "^1.0.3",
         "tweetnacl-util": "^0.15.1",
         "twitter-api-sdk": "^1.2.1",
