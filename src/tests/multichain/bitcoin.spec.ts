@@ -171,4 +171,55 @@ describe.skip("BTC CHAIN TESTS", () => {
 
         expect(parseInt(balance, 10)).toBeGreaterThanOrEqual(0)
     }, 300000)
+
+    test("signMessage creates a valid signature", async () => {
+        const message = "Test message for BTC"
+        const signature = await instance.signMessage(message)
+
+        expect(typeof signature).toBe("string")
+        expect(signature.length).toBeGreaterThan(0)
+        const signatureBuffer = Buffer.from(signature, "base64")
+        expect(signatureBuffer.length).toBe(65)
+    })
+
+    test("verifyMessage validates a correct signature", async () => {
+        const message = "Test message for BTC"
+        const address = instance.getAddress()
+        const signature = await instance.signMessage(message)
+
+        const isValid = await instance.verifyMessage(
+            message,
+            signature,
+            address,
+        )
+        expect(isValid).toBe(true)
+
+        const isInvalid = await instance.verifyMessage(
+            "Wrong message",
+            signature,
+            address,
+        )
+        expect(isInvalid).toBe(false)
+
+        const wrongAddress = "tb1q8w4x9y7zq5v6m2n3k4j5h6g7f8d9s0a1p2l3r4"
+        const isInvalidAddress = await instance.verifyMessage(
+            message,
+            signature,
+            wrongAddress,
+        )
+        expect(isInvalidAddress).toBe(false)
+    })
+
+    test("verifyMessage returns false for invalid signature", async () => {
+        const message = "Test message for BTC"
+        const address = instance.getAddress()
+        const invalidSignature = "InvalidBase64Signature=="
+
+        const isValid = await instance.verifyMessage(
+            message,
+            invalidSignature,
+            address,
+        )
+        expect(isValid).toBe(false)
+    })
 })

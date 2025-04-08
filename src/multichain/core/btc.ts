@@ -1,6 +1,7 @@
 import * as bitcoin from "bitcoinjs-lib"
 import { BIP32Factory } from "bip32"
-import ecc from '@bitcoinerlab/secp256k1';
+import ecc from "@bitcoinerlab/secp256k1"
+import * as bitcoinMessage from "bitcoinjs-message"
 import { required } from "./utils"
 import axios from "axios"
 import { ECPairAPI, ECPairFactory, ECPairInterface } from "ecpair"
@@ -453,11 +454,44 @@ export class BTC extends DefaultChain {
         }
     }
 
-    async signMessage(): Promise<string> {
-        throw new Error("Method not implemented")
+    async signMessage(
+        message: string,
+        options?: { privateKey?: string },
+    ): Promise<string> {
+        let keyPair: ECPairInterface
+        if (options?.privateKey) {
+            keyPair = ECPair.fromWIF(options.privateKey, this.network)
+        } else {
+            required(this.wallet, "Wallet not connected")
+            keyPair = this.wallet
+        }
+
+        const privateKey = Buffer.from(keyPair.privateKey!)
+        const signature = bitcoinMessage.sign(
+            message,
+            privateKey,
+            keyPair.compressed,
+            { segwitType: "p2wpkh" },
+        )
+
+        return signature.toString("base64")
     }
 
-    async verifyMessage(): Promise<boolean> {
-        throw new Error("Method not implemented")
+    async verifyMessage(
+        message: string,
+        signature: string,
+        address: string,
+    ): Promise<boolean> {
+        try {
+            return bitcoinMessage.verify(
+                message,
+                address,
+                Buffer.from(signature, "base64"),
+                this.network.messagePrefix,
+                true, // checkSegwitAlways to support SegWit
+            )
+        } catch (error) {
+            return false
+        }
     }
 }
