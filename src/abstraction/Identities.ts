@@ -21,6 +21,17 @@ import { Demos } from "@/websdk/demosclass"
 import { IKeyPair } from "@/websdk/types/KeyPair"
 
 export default class Identities {
+    formats = {
+        web2: {
+            github: [
+                "https://gist.github.com",
+                "https://raw.githubusercontent.com",
+                "https://gist.githubusercontent.com",
+            ],
+            twitter: ["https://x.com", "https://twitter.com"],
+        },
+    }
+
     /**
      * Create a web2 proof payload for use with web2 identity inference.
      *
@@ -63,6 +74,23 @@ export default class Identities {
         context: "xm" | "web2",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
+        if (context === "web2") {
+            console.log
+            if (
+                !this.formats.web2[payload.context].some((format: string) =>
+                    payload.proof.startsWith(format),
+                )
+            ) {
+                // construct informative error message
+                const errorMessage = `Invalid ${
+                    payload.context
+                } proof format. Supported formats are: ${this.formats.web2[
+                    payload.context
+                ].join(", ")}`
+                throw new Error(errorMessage)
+            }
+        }
+
         const tx = DemosTransactions.empty()
         const address = demos.getAddress()
 
@@ -218,7 +246,11 @@ export default class Identities {
      * @param address The address to get identities for.
      * @returns The identities associated with the address.
      */
-    async getIdentities(demos: Demos, call = "getIdentities", address?: string) {
+    async getIdentities(
+        demos: Demos,
+        call = "getIdentities",
+        address?: string,
+    ) {
         const request = {
             method: "gcr_routine",
             params: [
