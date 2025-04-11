@@ -45,6 +45,16 @@ import { superDilithium } from "superdilithium"
 import { keccak_256 } from "js-sha3"
 import * as crypto from "crypto"
 import { ntru } from "ntru"
+import { Falcon } from "./falconts" 
+/**
+ * TODO Add falcon support for signing and verification
+ *  -> add falconKeyPair with proper type
+ *  -> add sign and verify methods for falcon
+ *  -> add export and import methods for falcon
+ *  -> add mnemonics support for falcon
+ * 
+ * 
+ */
 
 // INFO Interface to happily work with almost any keypair
 export interface IKeypair {
@@ -57,7 +67,6 @@ export default class Enigma {
     signingKeyPair: IKeypair = null
     mcelieceKeypair: IKeypair = null
     ntruKeyPair: IKeypair = null
-
     private kem: McEliece = new McEliece("mceliece8192128")
     
     // Nonce size for ChaCha20-Poly1305 (12 bytes = 96 bits)
