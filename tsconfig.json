@@ -29,7 +29,7 @@
       "@/*": ["*"]
     }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "bun.d.ts"],
   "exclude": ["src/**/archive/**/*"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],

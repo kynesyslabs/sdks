@@ -55,12 +55,18 @@ export default class Falcon {
         }
     }
 
-    async verify(message: string, signature: Uint8Array): Promise<boolean> {
-        return this.kernel.verify(signature, message, this.keypair.pk);
+    async verify(message: string, signature: Uint8Array, publicKey: Uint8Array): Promise<boolean> {
+        return this.kernel.verify(signature, message, publicKey);
     }
 
     async publicKeyCreate(privateKey: Uint8Array): Promise<Uint8Array> {
         return this.kernel.publicKeyCreate(privateKey);
+    }
+
+    // SECTION: Setters
+
+    async setKeypair(keypair: FalconKeypair): Promise<void> {
+        this.keypair = keypair;
     }
 
     // SECTION: Getters
@@ -153,9 +159,10 @@ export default class Falcon {
      * @param signatureHex The signature as a hex string
      * @returns True if the signature is valid, false otherwise
      */
-    async verifyHex(message: string, signatureHex: string): Promise<boolean> {
+    async verifyHex(message: string, signatureHex: string, publicKeyHex: string): Promise<boolean> {
         const signature = Falcon.hexToUint8Array(signatureHex);
-        return this.verify(message, signature);
+        const publicKey = Falcon.hexToUint8Array(publicKeyHex);
+        return this.verify(message, signature, publicKey);
     }
 
     /**
@@ -240,9 +247,10 @@ export default class Falcon {
      * @param signatureBase64 The signature as a base64 string
      * @returns True if the signature is valid, false otherwise
      */
-    async verifyBase64(message: string, signatureBase64: string): Promise<boolean> {
+    async verifyBase64(message: string, signatureBase64: string, publicKeyBase64: string): Promise<boolean> {
         const signature = Falcon.base64ToUint8Array(signatureBase64);
-        return this.verify(message, signature);
+        const publicKey = Falcon.base64ToUint8Array(publicKeyBase64);
+        return this.verify(message, signature, publicKey);
     }
 
     /**

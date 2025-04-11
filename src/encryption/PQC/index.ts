@@ -1,51 +1,27 @@
 /* INFO Enigma - An experimental wrapper for Post Quantum Cryptography in Typescript designed with ease of use in mind
+  Currently suggested and tested schemas for each algorithm are:
+  - Signing: ml-dsa or falcon
+  - Encryption: NTRU
+  - Hashing: SHA-3
 
-    LICENSE
+  While implemented, the following algorithms are not included in the pqc test suite:
+  - Key Encapsulation: McEliece
 
-    © 2023 by KyneSys Labs, licensed under CC BY-NC-ND 4.0
+  While implemented, the following algorithms are not fully tested:
+  - ChaCha20-Poly1305
 
-    Full license text: https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode
-    Human readable license: https://creativecommons.org/licenses/by-nc-nd/4.0/
-
-    KyneSys Labs: https://www.kynesys.xyz/
-
-    This module incorporates two Post Quantum Cryptography methods:
-    - Rijndael: symmetric encryption algorithm considered the state of the art of its category
-    - SHA-3: quantum-safe hashing algorithm
-    - McEliece: post-quantum cryptography algorithm that uses a keypair to share secrets between two parties.
-    - Dilithium: post-quantum cryptography algorithm that uses a keypair to sign and verify messages.
-
-    The Rijdael algorithm is a symmetric encryption algorithm and as many of the most used symmetric encryption algorithms 
-    is considered to be quantum-safe. While even standard AES-256 is considered to be quantum-safe, the Rijndael algorithm
-    is considered to improve robustness, performance, and security when compared to standard AES-256 as AES specification
-    is a subset of Rijdael algorithm itself.
-
-    The SHA-3 algorithm is a quantum-safe hashing algorithm that is designed to protect against various dehashing attacks.
-    It is used to replace less secure hashing algorithms such as SHA-1, SHA-256, and so on.
-
-    The McEliece algorithm is used to encrypt and decrypt messages, much like a symmetric classic encryption algorithm.
-    Thanks to its post-quantum security, however, it is not possible to retrieve the secrets as easily as with a classic algorithm.
-    We use McEliece to exchange a long-term secret between two parties. This secret will be the base to generate one-time secrets
-    encrypted with McEliece itself that will be used to generate one-time symmetric keys.
-
-    The Dilithium algorithm is used to sign and verify messages, much like algorithms like ed25519.
-    Apart from providing post quantum security, the Dilithium algorithm is also capable of generating combined signed messages
-    that can be used to verify signatures without sharing the initial message, as proofs of authenticity.
-
-    Credits:
-    - https://github.com/Snack-X for https://github.com/Snack-X/rijndael-js
-    - https://github.com/ranisalt for https://github.com/ranisalt/node-argon2
-    - https://github.com/cyph for its https://github.com/cyph/pqcrypto.js library (superdilithium, supersphincs and a lot of knowledge)
-    - https://github.com/tniessen for its https://github.com/tniessen/node-mceliece-nist library (mceliece and a lot of knowledge too)
-    - I can't find the ntru library developer unfortunately, feel free to contact me if its you
-
+  To properly test the encryption and decryption of data, please see the pqc test suite.
 */
 import { McEliece } from "mceliece-nist"
-import { superDilithium } from "superdilithium"
 import { keccak_256 } from "js-sha3"
 import * as crypto from "crypto"
 import { ntru } from "ntru"
 import { Falcon } from "./falconts" 
+import { ml_dsa65 } from "@noble/post-quantum/ml-dsa"
+import { utf8ToBytes, bytesToUtf8 } from "./ml-dsa/utils"
+import { randomBytes } from '@noble/hashes/utils';
+import { FalconKeypair } from "falcon-sign"
+
 /**
  * TODO Add falcon support for signing and verification
  *  -> add falconKeyPair with proper type
@@ -65,6 +41,9 @@ export interface IKeypair {
 // INFO Main class
 export default class Enigma {
     signingKeyPair: IKeypair = null
+    signingSeed: Uint8Array = null
+    falconKeyPair: FalconKeypair = null 
+    chaCha20Keypair: IKeypair = null
     mcelieceKeypair: IKeypair = null
     ntruKeyPair: IKeypair = null
     private kem: McEliece = new McEliece("mceliece8192128")
@@ -83,181 +62,299 @@ export default class Enigma {
         return crypto.randomBytes(length)
     }
 
+    
     /**
-     * Initializes the cryptographic key pairs for signing and key encapsulation
-     * @returns A promise that resolves when initialization is complete
+     * Generates a key pair for encryption with NTRU
+     * @returns A promise that resolves when the key pair is generated
      */
-    async init() {
-        this.signingKeyPair = await superDilithium.keyPair()
-        this.mcelieceKeypair = this.kem.keypair()
+    async genNTRUKeyPair() {
         this.ntruKeyPair = await ntru.keyPair()
     }
 
-    /* SECTION Signatures with superDilithium */
-
     /**
-     * Signs a message and combines it with the original message
-     * @param message The message to sign
-     * @param additionalData Optional additional data to include in the signature
-     * @returns A promise that resolves to the combined signed message
+     * Generates a key pair for mcEliece
+     * @returns A promise that resolves when the key pair is generated
      */
-    async combinedSign(
-        message: string,
-        additionalData: string = null,
-    ): Promise<Uint8Array> {
-        let bufMessage = Buffer.from(message, "utf8")
-        let signed: Uint8Array
-        if (additionalData) {
-            let bufAdditionalData = Buffer.from(additionalData, "utf8")
-            signed = await superDilithium.sign(
-                bufMessage,
-                this.signingKeyPair.privateKey,
-                bufAdditionalData,
-            )
-        } else {
-            signed = await superDilithium.sign(
-                bufMessage,
-                this.signingKeyPair.privateKey,
-            )
-        }
-        return signed
+    async genMcElieceKeyPair() {
+        this.mcelieceKeypair = this.kem.keypair()
     }
 
-    /**
-     * Verifies a combined signed message
-     * @param signed The combined signed message
-     * @param publicKey The public key to use for verification
-     * @param additionalData Optional additional data that was included in the signature
-     * @returns A promise that resolves to the original message if verification succeeds
-     */
-    async combinedVerify(
-        signed: Uint8Array,
-        publicKey: Uint8Array,
-        additionalData: string = null,
-    ): Promise<Uint8Array> {
-        let verifyData: Uint8Array
-        if (additionalData) {
-            let bufAdditionalData = Buffer.from(additionalData, "utf8")
-            verifyData = await superDilithium.open(
-                signed,
-                publicKey,
-                bufAdditionalData,
-            )
-        } else {
-            verifyData = await superDilithium.open(signed, publicKey)
-        }
-        return verifyData
-    }
 
     /**
-     * Signs a message without combining it with the original message
+     * Generates a Falcon key pair
+     * @param seed The seed to use for key generation
+     * @returns A promise that resolves when the key pair is generated
+     */
+    async genFalconKeyPair(seed: Uint8Array = null) {
+        if (!seed) {
+            seed = randomBytes(48)
+        }
+        const falcon = new Falcon()
+        await falcon.init()
+        await falcon.genkey(seed)
+        this.falconKeyPair = await falcon.getKeypair()
+    }
+
+    
+
+    /**
+     * Generates a signing key pair
+     * @param seed The seed to use for key generation
+     * @returns A promise that resolves when the key pair is generated
+     */
+    async genSigningKeyPair(seed: Uint8Array = null) {
+        if (!seed) {
+            seed = randomBytes(32)
+        }
+        this.signingSeed = seed
+        const dlKeys = ml_dsa65.keygen(seed)
+        this.signingKeyPair = {
+            privateKey: dlKeys.secretKey,
+            publicKey: dlKeys.publicKey
+        }
+    }
+    /* SECTION Signatures with ml-dsa */
+
+    /**
+     * Signs a message using ml-dsa
      * @param message The message to sign
-     * @param additionalData Optional additional data to include in the signature
      * @returns A promise that resolves to the signature
      */
-    async sign(
-        message: string | Uint8Array,
-        additionalData: string | Uint8Array = null,
-    ) {
+    async sign(message: string | Uint8Array) {
         if (typeof message === "string") {
-            message = Buffer.from(message, "utf8")
+            message = utf8ToBytes(message)
         }
-        if (typeof additionalData === "string") {
-            additionalData = Buffer.from(additionalData, "utf8")
-        }
-        // Signing
-        let signed: Uint8Array
-        if (additionalData) {
-            signed = await superDilithium.signDetached(
-                message,
-                this.signingKeyPair.privateKey,
-                additionalData,
-            )
-        } else {
-            signed = await superDilithium.signDetached(
-                message,
-                this.signingKeyPair.privateKey,
-            )
-        }
-        return signed
+        const signature = ml_dsa65.sign(this.signingKeyPair.privateKey, message)
+        return signature
     }
-
+    
     /**
-     * Verifies a signature
+     * Verifies a signature using ml-dsa
+     * @param message The message to verify
      * @param signature The signature to verify
-     * @param message The original message
-     * @param publicKey The public key to use for verification
-     * @param additionalData Optional additional data that was included in the signature
-     * @returns A promise that resolves to true if verification succeeds
+     * @returns A promise that resolves to true if the signature is valid
      */
-    async verify(
-        signature: Uint8Array,
-        message: string | Uint8Array,
-        publicKey: Uint8Array,
-        additionalData: string | Uint8Array = null,
-    ) {
+    async verify(publicKey: string | Uint8Array, message: string | Uint8Array, signature: string | Uint8Array) {
+        if (typeof publicKey === "string") {
+            publicKey = utf8ToBytes(publicKey)
+        }
         if (typeof message === "string") {
-            message = Buffer.from(message, "utf8")
+            message = utf8ToBytes(message)
         }
-        if (typeof additionalData === "string") {
-            additionalData = Buffer.from(additionalData, "utf8")
+        if (typeof signature === "string") {
+            signature = utf8ToBytes(signature)
         }
-        // Verifying
-        let verified: boolean
-        if (additionalData) {
-            verified = await superDilithium.verifyDetached(
-                signature,
-                message,
-                publicKey,
-                additionalData,
-            )
-        } else {
-            verified = await superDilithium.verifyDetached(
-                signature,
-                message,
-                publicKey,
-            )
+        const isValid = ml_dsa65.verify(publicKey, message, signature)
+        return isValid
+    }
+
+
+    // ml-dsa utils
+    async getPublicKey(str: boolean = true) {
+        if (str) {
+            return bytesToUtf8(this.signingKeyPair.publicKey)
         }
-        return verified
+        return this.signingKeyPair.publicKey
+    }
+
+    async getPrivateKey(str: boolean = true) {
+        if (str) {
+            return bytesToUtf8(this.signingKeyPair.privateKey)
+        }
+        return this.signingKeyPair.privateKey
+    }
+
+    async getSeed(str: boolean = false) {
+        if (str) {
+            return bytesToUtf8(this.signingSeed)
+        }
+        return this.signingSeed
+    }
+
+    async setSeed(seed: string | Uint8Array) {
+        if (typeof seed === "string") {
+            seed = utf8ToBytes(seed)
+        }
+        await this.genSigningKeyPair(seed)
+    }
+
+    /* SECTION Signatures with Falcon */
+
+    /**
+     * Signs a message using Falcon
+     * @param message The message to sign
+     * @param salt Optional salt for signing
+     * @returns A promise that resolves to the signature
+     */
+    async signFalcon(message: string | Uint8Array, salt: string | Uint8Array = null) {
+        const falcon = new Falcon()
+        await falcon.init()
+        await falcon.setKeypair(this.falconKeyPair)
+        if (!(typeof message === "string")) {
+            message = bytesToUtf8(message)
+        }
+        if (salt) {
+            if (typeof salt === "string") {
+                salt = utf8ToBytes(salt)
+            }
+        }
+        const signature = await falcon.sign(message, salt as Uint8Array | null)
+        return signature
     }
 
     /**
-     * Exports the signing key pair
-     * @param passphrase Optional passphrase to encrypt the keys
-     * @returns A promise that resolves to the exported keys
+     * Signs a message using Falcon and returns the signature as a hex string
+     * @param message The message to sign
+     * @returns A promise that resolves to the signature as a hex string
      */
-    async exportSigningKeys(passphrase: string = null): Promise<any> {
-        let storage: any
-        if (passphrase) {
-            storage = await superDilithium.exportKeys(
-                this.signingKeyPair,
-                passphrase,
-            )
-        } else {
-            storage = await superDilithium.exportKeys(this.signingKeyPair)
-        }
-        return storage
+    async signFalconHex(message: string | Uint8Array) {
+        const signature = await this.signFalcon(message)
+        return Falcon.uint8ArrayToHex(signature)
     }
 
     /**
-     * Imports a signing key pair
-     * @param storage The exported keys to import
-     * @param passphrase Optional passphrase to decrypt the keys
-     * @returns A promise that resolves to the imported key pair
+     * Signs a message using Falcon and returns the signature as a base64 string
+     * @param message The message to sign
+     * @returns A promise that resolves to the signature as a base64 string
      */
-    async importSigningKeys(
-        storage: any,
-        passphrase: string = null,
-    ): Promise<any> {
-        if (passphrase) {
-            this.signingKeyPair = await superDilithium.importKeys(
-                storage,
-                passphrase,
-            )
-        } else {
-            this.signingKeyPair = await superDilithium.importKeys(storage)
+    async signFalconBase64(message: string | Uint8Array) {
+        const signature = await this.signFalcon(message)
+        return Falcon.uint8ArrayToBase64(signature)
+    }
+
+    /**
+     * Verifies a signature using Falcon
+     * @param message The message to verify
+     * @param signature The signature to verify
+     * @param publicKey The public key to use for verification
+     * @returns A promise that resolves to true if the signature is valid
+     */
+    async verifyFalcon(message: string | Uint8Array, signature: Uint8Array, publicKey: string | Uint8Array) {
+        const falcon = new Falcon()
+        await falcon.init()
+        if (!(typeof message === "string")) {
+            message = bytesToUtf8(message)
         }
-        return this.signingKeyPair
+        if (typeof publicKey === "string") {
+            publicKey = utf8ToBytes(publicKey)
+        }
+        const isValid = await falcon.verify(message, signature, publicKey)
+        return isValid
+    }
+
+    /**
+     * Verifies a signature using Falcon with hex format
+     * @param message The message to verify
+     * @param signatureHex The signature to verify as a hex string
+     * @param publicKeyHex The public key to use for verification as a hex string
+     * @returns A promise that resolves to true if the signature is valid
+     */
+    async verifyFalconHex(message: string | Uint8Array, signatureHex: string, publicKeyHex: string) {
+        const signature = Falcon.hexToUint8Array(signatureHex)
+        const publicKey = Falcon.hexToUint8Array(publicKeyHex)
+        return this.verifyFalcon(message, signature, publicKey)
+    }
+
+    /**
+     * Verifies a signature using Falcon with base64 format
+     * @param message The message to verify
+     * @param signatureBase64 The signature to verify as a base64 string
+     * @param publicKeyBase64 The public key to use for verification as a base64 string
+     * @returns A promise that resolves to true if the signature is valid
+     */
+    async verifyFalconBase64(message: string | Uint8Array, signatureBase64: string, publicKeyBase64: string) {
+        const signature = Falcon.base64ToUint8Array(signatureBase64)
+        const publicKey = Falcon.base64ToUint8Array(publicKeyBase64)
+        return this.verifyFalcon(message, signature, publicKey)
+    }
+    
+    // falcon utils
+    async getPublicKeyFalcon(str: boolean = true) {
+        if (str) {
+            return bytesToUtf8(this.falconKeyPair.pk)
+        }
+        return this.falconKeyPair.pk
+    }
+
+    async getPrivateKeyFalcon(str: boolean = true) {
+        if (str) {
+            return bytesToUtf8(this.falconKeyPair.sk)
+        }
+        return this.falconKeyPair.sk
+    }
+
+    /**
+     * Gets the Falcon public key as a hex string
+     * @returns A promise that resolves to the public key as a hex string
+     */
+    async getPublicKeyFalconHex() {
+        return Falcon.uint8ArrayToHex(this.falconKeyPair.pk)
+    }
+
+    /**
+     * Gets the Falcon private key as a hex string
+     * @returns A promise that resolves to the private key as a hex string
+     */
+    async getPrivateKeyFalconHex() {
+        return Falcon.uint8ArrayToHex(this.falconKeyPair.sk)
+    }
+
+    /**
+     * Gets the Falcon public key as a base64 string
+     * @returns A promise that resolves to the public key as a base64 string
+     */
+    async getPublicKeyFalconBase64() {
+        return Falcon.uint8ArrayToBase64(this.falconKeyPair.pk)
+    }
+
+    /**
+     * Gets the Falcon private key as a base64 string
+     * @returns A promise that resolves to the private key as a base64 string
+     */
+    async getPrivateKeyFalconBase64() {
+        return Falcon.uint8ArrayToBase64(this.falconKeyPair.sk)
+    }
+
+    /**
+     * Sets the Falcon private key from a hex string
+     * @param privateKeyHex The private key as a hex string
+     * @returns A promise that resolves to the public key as a hex string
+     */
+    async setPrivateKeyFalconHex(privateKeyHex: string) {
+        const falcon = new Falcon()
+        await falcon.init()
+        const privateKey = Falcon.hexToUint8Array(privateKeyHex)
+        const publicKey = await falcon.publicKeyCreate(privateKey)
+        
+        // Update the keypair
+        this.falconKeyPair = {
+            genkeySeed: new Uint8Array(0), // We don't have the seed
+            sk: privateKey,
+            pk: publicKey
+        }
+        
+        return Falcon.uint8ArrayToHex(publicKey)
+    }
+
+    /**
+     * Sets the Falcon private key from a base64 string
+     * @param privateKeyBase64 The private key as a base64 string
+     * @returns A promise that resolves to the public key as a base64 string
+     */
+    async setPrivateKeyFalconBase64(privateKeyBase64: string) {
+        const falcon = new Falcon()
+        await falcon.init()
+        const privateKey = Falcon.base64ToUint8Array(privateKeyBase64)
+        const publicKey = await falcon.publicKeyCreate(privateKey)
+        
+        // Update the keypair
+        this.falconKeyPair = {
+            genkeySeed: new Uint8Array(0), // We don't have the seed
+            sk: privateKey,
+            pk: publicKey
+        }
+        
+        return Falcon.uint8ArrayToBase64(publicKey)
     }
 
     /* SECTION Keys generation and incapsulation with McEliece */
