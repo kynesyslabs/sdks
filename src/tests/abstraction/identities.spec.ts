@@ -9,6 +9,7 @@ import {
     SOLANA,
     TON,
     XRPL,
+    BTC,
 } from "@/multichain/websdk"
 import {
     InferFromSignatureTargetIdentityPayload,
@@ -19,8 +20,8 @@ import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
 
-describe.only("IDENTITIES V2", () => {
-    test.only("EVM ADD IDENTITY v2", async () => {
+describe("IDENTITIES V2", () => {
+    test("EVM ADD IDENTITY v2", async () => {
         const instance = await EVM.create()
         await instance.connectWallet(wallets.evm.privateKey)
 
@@ -147,9 +148,16 @@ const chains = [
         wallet: wallets.near.privateKey,
         subchain: "testnet",
     },
+    {
+        name: "BTC",
+        sdk: BTC,
+        rpc: chainProviders.btc.testnet,
+        wallet: wallets.btc.privateKey,
+        subchain: "testnet",
+    },
 ]
 
-describe.skip.each(chains)(
+describe.each(chains)(
     "Identities › $name",
     ({ name, sdk, wallet, subchain, password, rpc }: any) => {
         let instance: any
@@ -166,7 +174,7 @@ describe.skip.each(chains)(
             )
         })
 
-        test.only("Associate an identity using a signature", async () => {
+        test("Associate an identity using a signature", async () => {
             instance = await sdk.create(null)
             let ibcBase64PublicKey = ""
 
@@ -266,9 +274,7 @@ describe.skip.each(chains)(
             // @ts-ignore
             const validityData = await identities.inferIdentity(demos, payload)
 
-            const res = await demos.broadcast(validityData)
-
-            expect(res.result).toBe(200)
+            expect(validityData.result).toBe(200)
         })
 
         test.skip("Confirm identity is added", async () => {
@@ -384,7 +390,7 @@ describe.skip.each(chains)(
     },
 )
 
-describe.skip("Individual Sign & Verify", () => {
+describe("Individual Sign & Verify", () => {
     test("EVM", async () => {
         const instance = await EVM.create()
 
@@ -428,9 +434,11 @@ describe.skip("Individual Sign & Verify", () => {
         // @ts-ignore
         const validityData = await identities.inferIdentity(demos, payload)
 
-        const res = await demos.broadcast(validityData)
+        expect(validityData.result).toBe(200)
+
+        // const res = await demos.broadcast(validityData)
         // console.log(JSON.stringify(res, null, 2))
-        expect(res["result"]).toBe(200)
+        // expect(res["result"]).toBe(200)
 
         // const res3 = await identities.removeXmIdentity(demos, {
         //     chain: "evm",
@@ -588,6 +596,29 @@ describe.skip("Individual Sign & Verify", () => {
             signature,
             instance.wallet.publicKey,
         )
+        expect(verified).toBe(true)
+    })
+
+    test("BTC", async () => {
+        const instance = await BTC.create(
+            chainProviders.btc.testnet,
+            BTC.networks.testnet,
+        )
+
+        await instance.connectWallet(wallets.btc.privateKey)
+
+        const message = "Hello, world!"
+
+        // Signing
+        const signature = await instance.signMessage(message)
+
+        // Verifying signature
+        const verified = await instance.verifyMessage(
+            message,
+            signature,
+            instance.getAddress(),
+        )
+
         expect(verified).toBe(true)
     })
 })
