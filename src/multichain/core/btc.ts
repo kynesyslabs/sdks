@@ -57,6 +57,10 @@ export class BTC extends DefaultChain {
     }
 
     async connect(): Promise<boolean> {
+        if (!this.rpc_url){
+            return false
+        }
+
         try {
             const url = this.getApiUrl("/blocks/tip/height")
             const response = await axios.get(url)

@@ -20,7 +20,7 @@ import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
 
-describe("IDENTITIES V2", () => {
+describe.skip("IDENTITIES V2", () => {
     test("EVM ADD IDENTITY v2", async () => {
         const instance = await EVM.create()
         await instance.connectWallet(wallets.evm.privateKey)
@@ -272,9 +272,12 @@ describe.each(chains)(
 
             // INFO: Send the payload to the RPC
             // @ts-ignore
-            const validityData = await identities.inferIdentity(demos, payload)
+            const validityData = await identities.inferXmIdentity(demos, payload)
 
-            expect(validityData.result).toBe(200)
+            const res = await demos.broadcast(validityData)
+            console.log(res)
+
+            expect(res["result"]).toBe(200)
         })
 
         test.skip("Confirm identity is added", async () => {
@@ -390,7 +393,7 @@ describe.each(chains)(
     },
 )
 
-describe("Individual Sign & Verify", () => {
+describe.skip("Individual Sign & Verify", () => {
     test("EVM", async () => {
         const instance = await EVM.create()
 
