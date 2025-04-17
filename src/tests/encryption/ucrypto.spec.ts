@@ -16,11 +16,41 @@ beforeEach(() => {
     })
 })
 
+describe("randomBytes generation performance", () => {
+    test("should generate random bytes quickly and derive a seed in a reasonable time (less than 1000ms)", async () => {
+        const startTime = performance.now()
+        const rndBytes = randomBytes(128)
+        const endTime = performance.now()
+        const randomBytesGenerationTime = endTime - startTime
+        // Generating a ed25519 seed from the random bytes
+        const startTime2 = performance.now()
+        const seed = await unifiedCrypto.deriveSeed("ed25519", rndBytes)
+        const endTime2 = performance.now()
+        const seedGenerationTime = endTime2 - startTime2
+        console.log(
+            `Time taken to generate random bytes: ${randomBytesGenerationTime}ms`,
+        )
+        console.log(`Time taken to generate seed: ${seedGenerationTime}ms`)
+        if (randomBytesGenerationTime > 1000) {
+            console.log(
+                "[WARNING] randomBytes generation is taking too long: ${randomBytesGenerationTime}ms",
+            )
+        }
+        if (seedGenerationTime > 1000) {
+            console.log(
+                "[WARNING] seed generation is taking too long: ${seedGenerationTime}ms",
+            )
+        }
+        expect(randomBytesGenerationTime).toBeLessThan(1000)
+        expect(seedGenerationTime).toBeLessThan(1000)
+    })
+})
+
 describe("UnifiedCrypto Multiton", () => {
     test("should maintain separate state for different instances", async () => {
         // Generate a random master seed
-        const masterSeed1 = randomBytes(32)
-        const masterSeed2 = randomBytes(32)
+        const masterSeed1 = randomBytes(128)
+        const masterSeed2 = randomBytes(128)
 
         // Create two different instances
         const instance1 = getUnifiedCryptoInstance("instance1", masterSeed1)
@@ -46,7 +76,7 @@ describe("UnifiedCrypto Multiton", () => {
 
     test("should maintain the default instance through the proxy", async () => {
         // Generate a random master seed
-        const masterSeed = randomBytes(32)
+        const masterSeed = randomBytes(128)
 
         // Use the proxy to access the default instance
         await unifiedCrypto.generateIdentity("ed25519", masterSeed)
@@ -78,7 +108,7 @@ describe("UnifiedCrypto Multiton", () => {
 
 describe("Seed Derivation", () => {
     test("should derive different seeds for different algorithms", async () => {
-        const masterSeed = randomBytes(32)
+        const masterSeed = randomBytes(128)
         const seed1 = await unifiedCrypto.deriveSeed("ed25519", masterSeed)
         const seed2 = await unifiedCrypto.deriveSeed("ml-dsa", masterSeed)
         expect(seed1).not.toEqual(seed2)
@@ -91,7 +121,7 @@ describe("Seed Derivation", () => {
     })
 
     test("should use the master seed if available", async () => {
-        const masterSeed = randomBytes(32)
+        const masterSeed = randomBytes(128)
         await unifiedCrypto.generateIdentity("ed25519", masterSeed)
         const seed = await unifiedCrypto.deriveSeed("ed25519")
         expect(seed).toBeDefined()
@@ -136,7 +166,7 @@ describe("Key Generation", () => {
     })
 
     test("should generate consistent keys with the same seed", async () => {
-        const masterSeed = randomBytes(32)
+        const masterSeed = randomBytes(128)
         await unifiedCrypto.generateIdentity("ed25519", masterSeed)
         const identity1 = await unifiedCrypto.getIdentity("ed25519")
 
@@ -303,7 +333,7 @@ describe("Proxy Export", () => {
     })
 
     test("should maintain singleton behavior for the default instance", async () => {
-        const masterSeed = randomBytes(32)
+        const masterSeed = randomBytes(128)
         await unifiedCrypto.generateIdentity("ed25519", masterSeed)
         const identity1 = await unifiedCrypto.getIdentity("ed25519")
 
