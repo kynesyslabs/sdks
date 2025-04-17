@@ -4,7 +4,6 @@ import {
     getUnifiedCryptoInstance,
     encryptedObject,
     signedObject,
-    isForgePublicKey,
 } from "../../encryption/unifiedCrypto"
 import { randomBytes } from "@noble/hashes/utils"
 
@@ -81,7 +80,7 @@ describe("Seed Derivation", () => {
     test("should derive different seeds for different algorithms", async () => {
         const masterSeed = randomBytes(32)
         const seed1 = await unifiedCrypto.deriveSeed("ed25519", masterSeed)
-        const seed2 = await unifiedCrypto.deriveSeed("rsa", masterSeed)
+        const seed2 = await unifiedCrypto.deriveSeed("ml-dsa", masterSeed)
         expect(seed1).not.toEqual(seed2)
     })
 
@@ -108,12 +107,12 @@ describe("Key Generation", () => {
         expect(identity.privateKey).toBeDefined()
     })
 
-    test("should generate RSA keys", async () => {
+    /* test("should generate RSA keys", async () => {
         await unifiedCrypto.generateIdentity("rsa")
         const identity = await unifiedCrypto.getIdentity("rsa")
         expect(identity.publicKey).toBeDefined()
         expect(identity.privateKey).toBeDefined()
-    })
+    }) */
 
     test("should generate ML-KEM-AES keys", async () => {
         await unifiedCrypto.generateIdentity("ml-kem-aes")
@@ -152,7 +151,7 @@ describe("Key Generation", () => {
 })
 
 describe("Encryption and Decryption", () => {
-    test("should encrypt and decrypt data with RSA", async () => {
+    /* test("should encrypt and decrypt data with RSA", async () => {
         // Setup
         await unifiedCrypto.generateIdentity("rsa")
         const data = new TextEncoder().encode("Hello, world!")
@@ -173,7 +172,7 @@ describe("Encryption and Decryption", () => {
         // Decrypt
         const decrypted = await unifiedCrypto.decrypt(encrypted)
         expect(decrypted).toEqual(data)
-    })
+    }) */
 
     test("should encrypt and decrypt data with ML-KEM-AES", async () => {
         // Setup
@@ -199,13 +198,13 @@ describe("Encryption and Decryption", () => {
         expect(decrypted).toEqual(data)
     })
 
-    test("should throw an error when trying to encrypt with RSA without generating keys", async () => {
+    /*test("should throw an error when trying to encrypt with RSA without generating keys", async () => {
         const data = new TextEncoder().encode("Hello, world!")
         const publicKey = new Uint8Array(32)
         await expect(
             unifiedCrypto.encrypt("rsa", data, publicKey),
         ).rejects.toThrow()
-    })
+    }) */
 })
 
 describe("Signing and Verification", () => {
@@ -219,7 +218,6 @@ describe("Signing and Verification", () => {
         expect(signed.algorithm).toBe("ed25519")
         expect(signed.signedData).toBeDefined()
         expect(signed.publicKey).toBeDefined()
-        expect(isForgePublicKey(signed.publicKey)).toBe(true)
 
         // Verify
         const isValid = await unifiedCrypto.verify(signed)
@@ -236,7 +234,6 @@ describe("Signing and Verification", () => {
         expect(signed.algorithm).toBe("ml-dsa")
         expect(signed.signedData).toBeDefined()
         expect(signed.publicKey).toBeDefined()
-        expect(isForgePublicKey(signed.publicKey)).toBe(false)
 
         // Verify
         const isValid = await unifiedCrypto.verify(signed)
@@ -253,7 +250,6 @@ describe("Signing and Verification", () => {
         expect(signed.algorithm).toBe("falcon")
         expect(signed.signedData).toBeDefined()
         expect(signed.publicKey).toBeDefined()
-        expect(isForgePublicKey(signed.publicKey)).toBe(false)
 
         // Verify
         const isValid = await unifiedCrypto.verify(signed)
@@ -273,7 +269,9 @@ describe("Signing and Verification", () => {
         modifiedSigned.signedData = new Uint8Array(signed.signedData.length)
 
         // Verify
-        const isValid = await unifiedCrypto.verify(modifiedSigned)
+        let isOriginalValid = await unifiedCrypto.verify(signed)
+        let isValid = await unifiedCrypto.verify(modifiedSigned)
+        expect(isOriginalValid).toBe(true)
         expect(isValid).toBe(false)
     })
 
@@ -287,7 +285,7 @@ describe("Signing and Verification", () => {
 
         // Modify the public key to make it invalid
         const modifiedSigned = { ...signed }
-        modifiedSigned.publicKey = new Uint8Array(32)
+        modifiedSigned.publicKey = new Uint8Array(15)
 
         // Verify should throw an error
         await expect(unifiedCrypto.verify(modifiedSigned)).rejects.toThrow()

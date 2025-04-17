@@ -173,12 +173,13 @@ export class UnifiedCrypto {
         // Creating a new seed if none is provided and the master seed is not set
         if (!seed && !this.masterSeed) {
             seed = randomBytes(32)
-        } 
-        // Setting the master seed if it is not already set or if it is different from the provided seed
-        if (!this.masterSeed || this.masterSeed !== seed) {
+            this.masterSeed = seed
+        } else if (!seed && this.masterSeed) {
+            seed = this.masterSeed
+        } else if (seed) {
             this.masterSeed = seed
         }
-
+ 
         // Deriving the seed for the given algorithms
 
         if (algorithm === "ed25519") {
@@ -193,7 +194,7 @@ export class UnifiedCrypto {
                 this.masterSeed,
                 "master seed",
                 "ml-kem-aes",
-                32,
+                64,
             )
         } else if (algorithm === "rsa") {
             return hkdf(sha256, this.masterSeed, "master seed", "rsa", 32)
@@ -332,12 +333,20 @@ export class UnifiedCrypto {
                 message: data,
                 publicKey: this.ed25519KeyPair.publicKey,
             } as Ed25519SignedObject
-        } else {
+        } else if (algorithm === "ml-dsa") {
             signedObject = {
                 algorithm: algorithm,
                 signedData: await this.enigma.sign_ml_dsa(data),
                 message: data,
                 publicKey: this.enigma.ml_dsa_signing_keypair.publicKey,
+            } as PqcSignedObject
+        } else if (algorithm === "falcon") {
+            let dataString = new TextDecoder().decode(data)
+            signedObject = {
+                algorithm: algorithm,
+                signedData: await this.enigma.sign_falcon(dataString),
+                message: data,
+                publicKey: this.enigma.falcon_signing_keypair.publicKey,
             } as PqcSignedObject
         }
         return signedObject
@@ -376,7 +385,7 @@ export class UnifiedCrypto {
      */
     async verify(signedObject: signedObject): Promise<boolean> {
         if (signedObject.algorithm === "ml-dsa") {
-            return Enigma.verify_ml_dsa(
+            return await Enigma.verify_ml_dsa(
                 signedObject.signedData,
                 signedObject.message,
                 signedObject.publicKey as Uint8Array,
@@ -384,7 +393,7 @@ export class UnifiedCrypto {
         } else if (signedObject.algorithm === "falcon") {
             // Convert the message to a string
             const messageString = new TextDecoder().decode(signedObject.message)
-            return Enigma.verify_falcon(
+            return await Enigma.verify_falcon(
                 signedObject.signedData,
                 messageString,
                 signedObject.publicKey as Uint8Array,

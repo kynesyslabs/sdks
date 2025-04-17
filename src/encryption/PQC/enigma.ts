@@ -116,7 +116,24 @@ export class Enigma {
             sk: this.falcon_signing_keypair.privateKey,
             pk: this.falcon_signing_keypair.publicKey,
         })
-        return falcon.sign(message, this.falcon_signing_keypair.privateKey)
+        return falcon.sign(message)
+    }
+
+    async encapsulate_ml_kem(peerPublicKey: Uint8Array): Promise<{
+        cipherText: Uint8Array;
+        sharedSecret: Uint8Array;
+    }> {
+        if (!this.ml_kem_encryption_keypair.privateKey) {
+            throw new Error("ml_kem_encryption_keypair.privateKey is not set")
+        }
+        return ml_kem768.encapsulate(peerPublicKey)
+    }
+
+    async decapsulate_ml_kem(cipherText: Uint8Array): Promise<Uint8Array> {
+        if (!this.ml_kem_encryption_keypair.privateKey) {
+            throw new Error("ml_kem_encryption_keypair.privateKey is not set")
+        }
+        return ml_kem768.decapsulate(cipherText, this.ml_kem_encryption_keypair.privateKey)
     }
 
     /** Encrypt data using ml_kem + aes
@@ -233,9 +250,11 @@ export class Enigma {
         await falcon.init()
         await falcon.genkey(seed)
         const falconKeyPair = await falcon.getKeypair()
-        this.falcon_signing_keypair.genKey = falconKeyPair.genkeySeed
-        this.falcon_signing_keypair.publicKey = falconKeyPair.pk
-        this.falcon_signing_keypair.privateKey = falconKeyPair.sk
+        this.falcon_signing_keypair = {
+            genKey: falconKeyPair.genkeySeed,
+            publicKey: falconKeyPair.pk,
+            privateKey: falconKeyPair.sk,
+        }
     }
 
     /**
