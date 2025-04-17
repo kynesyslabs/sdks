@@ -6,7 +6,7 @@ A unified cryptographic interface that provides a consistent API for multiple en
 
 UnifiedCrypto is a multiton class that provides a unified interface for different cryptographic algorithms:
 
-- **Encryption/Decryption**: ML-KEM-AES (post-quantum) and RSA (classical)
+- **Encryption/Decryption**: ML-KEM-AES (post-quantum); RSA is deactivated due to performances issue
 - **Signing/Verification**: ML-DSA, Falcon (post-quantum), and Ed25519 (classical)
 
 The class manages key generation, encryption, decryption, signing, and verification operations through a consistent API, abstracting away the differences between the underlying cryptographic libraries.
@@ -50,7 +50,7 @@ import { unifiedCrypto } from './unifiedCrypto';
 import { randomBytes } from '@noble/hashes/utils';
 
 // Generate a random master seed
-const masterSeed = randomBytes(32);
+const masterSeed = randomBytes(128);
 
 // Initialize with a master seed
 const crypto = unifiedCrypto; // The proxy automatically calls getInstance with the master seed
@@ -67,12 +67,12 @@ import { unifiedCrypto, getUnifiedCryptoInstance } from './unifiedCrypto';
 import { randomBytes } from '@noble/hashes/utils';
 
 // Create a named instance with a specific seed
-const masterSeed1 = randomBytes(32);
+const masterSeed1 = randomBytes(128);
 const instance1 = getUnifiedCryptoInstance('user1', masterSeed1);
 await instance1.generateIdentity('ed25519');
 
 // Create another instance with a different seed
-const masterSeed2 = randomBytes(32);
+const masterSeed2 = randomBytes(128);
 const instance2 = getUnifiedCryptoInstance('user2', masterSeed2);
 await instance2.generateIdentity('rsa');
 
@@ -251,14 +251,11 @@ The `unifiedCrypto` proxy provides access to both instance methods and static me
 ## Security Considerations
 
 - The master seed is a critical security parameter and should be kept secure
+- For a decent level of security, is advised to keep the master seed 128 bytes or longer
 - Private keys are stored in memory and should be cleared when no longer needed
 - The implementation is not designed to be resistant to timing attacks
 - For production use, consider adding additional security measures
 
-## Future Improvements
+## Misc
 
-- Add support for more post-quantum algorithms
-- Implement constant-time operations to resist timing attacks
-- Add a mechanism to securely clear sensitive data from memory
-- Build a comprehensive test suite
-- Add support for key rotation and management 
+- The master seed acts as an universal private key
