@@ -7,13 +7,10 @@ import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
     GithubProof,
-    XProof,
     TwitterProof,
     InferFromGithubPayload,
     InferFromXPayload,
-    InferFromTwitterPayload,
     InferFromSignaturePayload,
-    InferFromWritePayload,
 } from "@/types/abstraction"
 import forge from "node-forge"
 import { DemosTransactions } from "@/websdk"
