@@ -7,20 +7,17 @@ import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
     GithubProof,
-    XProof,
     TwitterProof,
     InferFromGithubPayload,
     InferFromXPayload,
-    InferFromTwitterPayload,
     InferFromSignaturePayload,
-    InferFromWritePayload,
 } from "@/types/abstraction"
 import forge from "node-forge"
 import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 import { IKeyPair } from "@/websdk/types/KeyPair"
 
-export default class Identities {
+export class Identities {
     /**
      * Create a web2 proof payload for use with web2 identity inference.
      *
@@ -58,7 +55,7 @@ export default class Identities {
      *
      * @returns The validity data of the identity transaction.
      */
-    async inferIdentity(
+    private async inferIdentity(
         demos: Demos,
         context: "xm" | "web2",
         payload: any,
@@ -95,7 +92,7 @@ export default class Identities {
      * @param payload The payload to remove the identity from.
      * @returns The response from the RPC call.
      */
-    async removeIdentity(
+    private async removeIdentity(
         demos: Demos,
         context: "xm" | "web2",
         payload: any,
@@ -218,7 +215,11 @@ export default class Identities {
      * @param address The address to get identities for.
      * @returns The identities associated with the address.
      */
-    async getIdentities(demos: Demos, call = "getIdentities", address?: string) {
+    async getIdentities(
+        demos: Demos,
+        call = "getIdentities",
+        address?: string,
+    ) {
         const request = {
             method: "gcr_routine",
             params: [

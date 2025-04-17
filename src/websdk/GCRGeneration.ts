@@ -1,8 +1,8 @@
 import {
     GCREdit,
     GCREditIdentity,
+    GCREditIncentive,
     Web2GCRData,
-    XmGCRData,
     XmGCRIdentityData,
 } from "@/types/blockchain/GCREdit"
 import { Transaction } from "@/types/blockchain/Transaction"
@@ -11,7 +11,6 @@ import {
     IdentityPayload,
     InferFromSignaturePayload,
     Web2CoreTargetIdentityPayload,
-    XMCoreTargetIdentityPayload,
 } from "@/types/abstraction"
 import { Hashing } from "@/encryption/Hashing"
 
@@ -51,14 +50,19 @@ export class GCRGeneration {
                 var identityEdits = await HandleIdentityOperations.handle(tx)
                 gcrEdits.push(...identityEdits)
                 break
+            case "incentive":
+                var incentiveEdits = await HandleIncentiveOperations.handle(tx)
+
+                gcrEdits.push(...incentiveEdits)
+                break
         }
 
         // SECTION Operations valid for all tx types
 
         // Add gas operation edit with check for availability of gas amount in the sender's balance
         nonceEdits: try {
-            // INFO: Skip gas for identity operations
-            if (content.type === "identity") {
+            // INFO: Skip gas for identity and incentive operations
+            if (content.type === "identity" || content.type === "incentive") {
                 break nonceEdits
             }
 
@@ -234,6 +238,7 @@ class Web2IdentityParsers {
 export class HandleIdentityOperations {
     static async handle(tx: Transaction): Promise<GCREditIdentity[]> {
         const edits = [] as GCREditIdentity[]
+
         const identityPayloadData: ["identity", IdentityPayload] = tx.content
             .data as ["identity", IdentityPayload]
         const identityPayload: IdentityPayload = identityPayloadData[1]
@@ -265,6 +270,7 @@ export class HandleIdentityOperations {
                     targetAddress: payload.targetAddress,
                     isEVM: payload.isEVM,
                 } as XmGCRIdentityData
+
                 break
             }
 
@@ -285,6 +291,7 @@ export class HandleIdentityOperations {
                         proofHash: Hashing.sha256(payload.proof),
                     },
                 } as Web2GCRData
+
                 break
             }
 
@@ -304,6 +311,30 @@ export class HandleIdentityOperations {
         }
 
         edits.push(edit)
+        return edits
+    }
+}
+
+/**
+ * This class is responsible for handling incentive operations when generating the GCREdit
+ * for a transaction.
+ */
+export class HandleIncentiveOperations {
+    static async handle(tx: Transaction): Promise<GCREdit[]> {
+        const edits = [] as GCREdit[]
+        // Extract the incentive payload data
+        const incentivePayloadData: ["incentive", GCREditIncentive] = tx.content
+            .data as ["incentive", GCREditIncentive]
+        const incentivePayload: GCREditIncentive = incentivePayloadData[1]
+
+        // Create the incentive edit with the transaction hash
+        const incentiveEdit: GCREditIncentive = {
+            ...incentivePayload,
+            txhash: tx.hash,
+        }
+
+        // Add the incentive edit to the list of edits
+        edits.push(incentiveEdit)
         return edits
     }
 }

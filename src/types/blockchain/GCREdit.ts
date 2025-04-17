@@ -81,6 +81,22 @@ export interface GCREditIdentity {
     txhash: string
 }
 
+export interface GCREditIncentive {
+    type: "incentive"
+    isRollback: boolean
+    account: string
+    operation: "award"
+    incentiveType: "wallet_linked" | "social_linked" | "get_points"
+    incentiveSubtype: string
+    data: {
+        walletAddress?: string
+        chain?: string
+        username?: string
+        platform?: string
+    }
+    txhash: string
+}
+
 export type GCREdit =
     | GCREditBalance
     | GCREditNonce
@@ -88,3 +104,4 @@ export type GCREdit =
     | GCREditAssignIdentity
     | GCREditSubnetsTx
     | GCREditIdentity
+    | GCREditIncentive

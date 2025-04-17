@@ -1,4 +1,3 @@
-import { INativePayload } from "./native/INativePayload"
 export {
     GenesisArtifact,
     GenesisImmutableProperties,
@@ -112,6 +111,7 @@ export {
     GCREditIdentity,
     GCREditNonce,
     GCREditSubnetsTx,
+    GCREditIncentive,
     Web2GCRData,
     XmGCRData,
     XmGCRIdentityData,
@@ -122,4 +122,3 @@ export {
     SupportedChains,
     SupportedTokens,
 } from "./bridge/constants"
-
