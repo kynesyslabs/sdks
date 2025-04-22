@@ -66,6 +66,9 @@ export const wallets: {
     btc: {
         privateKey: "cTbm69QwwDfVj9Fm6CwLubU3otcd8XxqZ1yjNjE9nr5qt2jfgm3T",
     },
+    sui: {
+        privateKey: "buddy size guide warrior either cinnamon spin decrease pen gym flush drift"
+    }
 }
 
 export const addresses = {

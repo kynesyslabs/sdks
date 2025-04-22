@@ -19,6 +19,7 @@ import { Demos, DemosWebAuth } from "@/websdk"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
+import { SUI } from "@/multichain/websdk/sui"
 
 describe.skip("IDENTITIES V2", () => {
     test("EVM ADD IDENTITY v2", async () => {
@@ -155,6 +156,13 @@ const chains = [
         wallet: wallets.btc.privateKey,
         subchain: "testnet",
     },
+    {
+        name: "SUI",
+        sdk: SUI,
+        rpc: chainProviders.sui.testnet,
+        wallet: wallets.sui.privateKey,
+        subchain: "testnet",
+    }
 ]
 
 describe.each(chains)(
@@ -254,7 +262,16 @@ describe.each(chains)(
                     _signature,
                     ibcBase64PublicKey,
                 )
-            } else {
+            } else if (name === "SUI") {
+                const suiPublicKey = instance.wallet.getPublicKey().toBase64();
+
+                verified = await instance.verifyMessage(
+                    instance.getAddress(),
+                    _signature,
+                    suiPublicKey,
+                )
+            }
+            else {
                 verified = await instance.verifyMessage(
                     instance.getAddress(),
                     _signature,

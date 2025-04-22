@@ -1,9 +1,9 @@
 import { SuiClient } from "@mysten/sui/client"
 import { DefaultChain } from "./types/defaultChain"
 import { required } from "./utils"
-import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519"
-import { fromB64 } from "@mysten/bcs"
-import * as ed from "@noble/ed25519"
+import { Ed25519Keypair, Ed25519PublicKey } from "@mysten/sui/keypairs/ed25519"
+import * as bip39 from "@scure/bip39"
+import { wordlist } from "@scure/bip39/wordlists/english"
 
 export class SUI extends DefaultChain {
     declare provider: SuiClient
@@ -34,22 +34,24 @@ export class SUI extends DefaultChain {
     }
 
     async createWallet() {
-        const keypair = new Ed25519Keypair()
-        const address = keypair.getPublicKey().toSuiAddress()
-        const secretKey = keypair.getSecretKey()
-
+        const mnemonic = bip39.generateMnemonic(wordlist)
+        const keypair = Ed25519Keypair.deriveKeypair(mnemonic);
+        const publicKey = keypair.getPublicKey()
+        const address = publicKey.toSuiAddress()
+        
         return {
             address,
-            secretKey,
+            publicKey,
             keypair,
         }
     }
 
     async connectWallet(privateKey: string) {
-        const keypair = Ed25519Keypair.fromSecretKey(
-            Buffer.from(privateKey, "base64"),
-        )
-
+        if (!privateKey || typeof privateKey !== "string") {
+            throw new TypeError("Invalid privateKey: must be a non-empty base64 string")
+        }
+        
+        const keypair = Ed25519Keypair.deriveKeypair(privateKey)
         this.wallet = keypair
         return this.wallet
     }
@@ -71,14 +73,13 @@ export class SUI extends DefaultChain {
 
         let signer = this.wallet
         if (options?.privateKey) {
-            const keypair = Ed25519Keypair.fromSecretKey(
-                Buffer.from(options.privateKey, "base64"),
-            )
+            const keypair = Ed25519Keypair.deriveKeypair(options.privateKey)
             signer = keypair
         }
-
-        const bytes = new TextEncoder().encode(message)
-        const signed = await signer.signPersonalMessage(bytes)
+        
+        const messageBytes = new TextEncoder().encode(message)
+        const signed = await signer.signPersonalMessage(messageBytes)
+        
         return signed.signature
     }
 
@@ -87,11 +88,10 @@ export class SUI extends DefaultChain {
         signature: string,
         publicKey: string,
     ): Promise<boolean> {
-        const msgBytes = new TextEncoder().encode(message)
-        const sigBytes = fromB64(signature)
-        const pubKeyBytes = fromB64(publicKey)
-        const isValid = await ed.verify(sigBytes, msgBytes, pubKeyBytes)
-
+        const messageBytes = new TextEncoder().encode(message)
+        const ed25519PublicKey = new Ed25519PublicKey(publicKey);
+        const isValid = await ed25519PublicKey.verifyPersonalMessage(messageBytes, signature);
+        
         return isValid
     }
 
