@@ -34,6 +34,7 @@ export enum BaseChain {
     XRP = "xrp",
     BITCOIN = "bitcoin",
     TON = "ton",
+    SUI = "sui",
 }
 
 /**
