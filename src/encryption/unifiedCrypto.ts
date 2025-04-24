@@ -217,6 +217,14 @@ export class UnifiedCrypto {
         }
     }
 
+    // helper for all identities at once
+    async generateAllIdentities(masterSeed?: Uint8Array) {
+        await this.generateIdentity("ed25519", masterSeed)
+        await this.generateIdentity("falcon", masterSeed)
+        await this.generateIdentity("ml-dsa", masterSeed)
+        await this.generateIdentity("ml-kem-aes", masterSeed)
+    }
+
     async generateIdentity(
         algorithm: "ed25519" | "falcon" | "ml-dsa" | "ml-kem-aes" | "rsa",
         masterSeed?: Uint8Array,
