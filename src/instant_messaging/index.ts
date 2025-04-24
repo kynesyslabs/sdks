@@ -133,6 +133,7 @@
  */
 
 import { unifiedCrypto, encryptedObject } from "@/encryption/unifiedCrypto"
+import { serializeUint8Array, deserializeUint8Array } from "@/utils/uint8Serialize"
 export interface MessagingPeerConfig {
     serverUrl: string
     clientId: string
@@ -437,10 +438,10 @@ export class MessagingPeer {
             targetPublicKey,
         )
 
-        const serializedCipherText = this.serializeUint8Array(
+        const serializedCipherText = serializeUint8Array(
             encryptedMessage.cipherText,
         )
-        const serializedEncryptedData = this.serializeUint8Array(
+        const serializedEncryptedData = serializeUint8Array(
             encryptedMessage.encryptedData,
         )
         const serializedEncryptedObject: SerializedEncryptedObject = {
@@ -662,10 +663,10 @@ export class MessagingPeer {
                 const serializedEncryptedMessage = message.payload // REVIEW Safeguard this?
                     .message as SerializedEncryptedObject // REVIEW Safeguard this?
 
-                const cipherText = this.deserializeUint8Array(
+                const cipherText = deserializeUint8Array(
                     serializedEncryptedMessage.serializedCipherText,
                 )
-                const encryptedData = this.deserializeUint8Array(
+                const encryptedData = deserializeUint8Array(
                     serializedEncryptedMessage.serializedEncryptedData,
                 )
                 const encryptedMessage: encryptedObject = {
@@ -796,24 +797,4 @@ export class MessagingPeer {
         }
     }
 
-    private serializeUint8Array(u8: Uint8Array): string {
-        // TODO Implement this
-        // Convert to binary string
-        const binary = String.fromCharCode(...u8)
-        // Convert binary string to Base64
-        return btoa(binary)
-    }
-
-    private deserializeUint8Array(base64: string): Uint8Array {
-        // TODO Implement this
-        // Decode Base64 to binary string
-        const binary = atob(base64)
-        // Convert binary string to Uint8Array
-        const len = binary.length
-        const u8 = new Uint8Array(len)
-        for (let i = 0; i < len; i++) {
-            u8[i] = binary.charCodeAt(i)
-        }
-        return u8
-    }
 }
