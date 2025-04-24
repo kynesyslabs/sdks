@@ -24,6 +24,35 @@
  * - For request-response patterns (like getting a peer's public key), use the Promise-based methods
  *   that handle the response matching automatically
  *
+ * Request-Response Pattern:
+ * - The class provides a robust request-response pattern through the sendToServerAndWait method
+ * - This method sends a message to the server and waits for a specific response type
+ * - It supports custom error handling, retry logic, and filtering by additional criteria
+ * - Example usage:
+ *   ```typescript
+ *   // Basic usage
+ *   const response = await peer.sendToServerAndWait(
+ *     {
+ *       type: "custom_action",
+ *       payload: { someData: "value" }
+ *     },
+ *     "custom_action_success"
+ *   );
+ *
+ *   // With retry logic
+ *   const response = await peer.sendToServerAndWait(
+ *     {
+ *       type: "custom_action",
+ *       payload: { someData: "value" }
+ *     },
+ *     "custom_action_success",
+ *     {
+ *       retryCount: 3,
+ *       timeout: 5000
+ *     }
+ *   );
+ *   ```
+ *
  * Message Types:
  * - "message": Encrypted peer-to-peer messages
  *   ```typescript
@@ -104,13 +133,19 @@
  */
 
 import { unifiedCrypto, encryptedObject } from "@/encryption/unifiedCrypto"
-interface MessagingPeerConfig {
+export interface MessagingPeerConfig {
     serverUrl: string
     clientId: string
     publicKey: Uint8Array
 }
 
-interface Message {
+export interface SerializedEncryptedObject {
+    algorithm: "ml-kem-aes" | "rsa"
+    serializedEncryptedData: string
+    serializedCipherText?: string
+}
+
+export interface Message {
     type:
         | "register"
         | "discover"
@@ -130,7 +165,7 @@ type ConnectionStateHandler = (
 ) => void
 
 export class MessagingPeer {
-    private ws: WebSocket | null = null
+    public ws: WebSocket | null = null
     private config: MessagingPeerConfig
     private messageHandlers: Set<MessageHandler> = new Set()
     private errorHandlers: Set<ErrorHandler> = new Set()
@@ -138,7 +173,7 @@ export class MessagingPeer {
     private connectionStateHandlers: Set<ConnectionStateHandler> = new Set()
     private connectedPeers: Set<string> = new Set()
     private messageQueue: Message[] = []
-    private isConnected = false
+    public isConnected = false
     private reconnectAttempts = 0
     private maxReconnectAttempts = 10
     private baseReconnectDelay = 1000 // 1 second
@@ -154,12 +189,55 @@ export class MessagingPeer {
      * @returns Promise that resolves when connected and registered
      */
     public async connect(): Promise<void> {
+        console.log(
+            "[IM @ " + this.config.clientId + "] Connecting to the server",
+            this.config.serverUrl,
+        )
         return new Promise((resolve, reject) => {
             try {
                 this.connectWebSocket()
                 this.reconnectAttempts = 0
-                resolve()
+
+                // Wait for the WebSocket to connect and register
+                const checkConnection = setInterval(() => {
+                    if (this.isConnected) {
+                        clearInterval(checkConnection)
+                        // Now wait for registration confirmation
+                        this.registerAndWait()
+                            .then(() => {
+                                console.log(
+                                    "[IM @ " +
+                                        this.config.clientId +
+                                        "] Connection and registration complete",
+                                )
+                                resolve()
+                            })
+                            .catch(error => {
+                                console.error(
+                                    "[IM @ " +
+                                        this.config.clientId +
+                                        "] Registration failed",
+                                    error,
+                                )
+                                reject(error)
+                            })
+                    }
+                }, 100)
+
+                // Set a timeout for the connection
+                setTimeout(() => {
+                    clearInterval(checkConnection)
+                    if (!this.isConnected) {
+                        reject(new Error("Connection timeout"))
+                    }
+                }, 10000)
             } catch (error) {
+                console.error(
+                    "[IM @ " +
+                        this.config.clientId +
+                        "] Error connecting to the server",
+                    error,
+                )
                 reject(error)
             }
         })
@@ -178,15 +256,22 @@ export class MessagingPeer {
         this.notifyConnectionState("reconnecting")
 
         this.ws.onopen = () => {
+            console.log(
+                "[IM @ " + this.config.clientId + "] Connected to the server",
+            )
             this.isConnected = true
             this.isReconnecting = false
             this.reconnectAttempts = 0
-            this.register()
             this.processMessageQueue()
             this.notifyConnectionState("connected")
         }
 
         this.ws.onclose = () => {
+            console.log(
+                "[IM @ " +
+                    this.config.clientId +
+                    "] Disconnected from the server",
+            )
             this.isConnected = false
             this.connectedPeers.clear()
             this.notifyConnectionState("disconnected")
@@ -194,6 +279,10 @@ export class MessagingPeer {
         }
 
         this.ws.onerror = error => {
+            console.error(
+                "[IM @ " + this.config.clientId + "] Error on the websocket",
+                error,
+            )
             this.handleError({
                 type: "CONNECTION_ERROR",
                 details:
@@ -231,9 +320,57 @@ export class MessagingPeer {
     }
 
     /**
+     * Awaits a response for a specific message type
+     * @param messageType - The type of message to wait for
+     * @param filterFn - Optional function to filter messages by additional criteria
+     * @param timeout - Optional timeout in milliseconds (default: 10000)
+     * @returns Promise that resolves with the message payload or rejects with an error
+     */
+    public async awaitResponse<T = any>(
+        messageType: Message["type"],
+        filterFn?: (message: Message) => boolean,
+        timeout: number = 10000,
+    ): Promise<T> {
+        return new Promise((resolve, reject) => {
+            // Set a timeout to reject the promise if no response is received
+            const timeoutId = setTimeout(() => {
+                reject(
+                    new Error(
+                        `Timeout waiting for response of type: ${messageType}`,
+                    ),
+                )
+            }, timeout)
+
+            const handler = (message: any, fromId: string) => {
+                // Convert to Message object if needed
+                const msg =
+                    message && typeof message === "object" && "type" in message
+                        ? (message as Message)
+                        : ({ type: "message", payload: message } as Message)
+
+                if (msg.type === messageType && (!filterFn || filterFn(msg))) {
+                    clearTimeout(timeoutId)
+                    resolve(msg.payload as T)
+                } else if (msg.type === "error") {
+                    console.error(
+                        "[IM @ " +
+                            this.config.clientId +
+                            "] Received an error message: ",
+                        msg,
+                    )
+                    clearTimeout(timeoutId)
+                    reject(new Error(msg.payload.details))
+                }
+            }
+
+            this.addTemporaryMessageHandler(handler)
+        })
+    }
+
+    /**
      * Registers the peer with the signaling server
      */
-    private register() {
+    public register(): void {
         this.sendToServer({
             type: "register",
             payload: {
@@ -241,6 +378,27 @@ export class MessagingPeer {
                 publicKey: Array.from(this.config.publicKey),
             },
         })
+        console.log("[IM @ " + this.config.clientId + "] Register payload sent")
+    }
+
+    /**
+     * Registers the peer with the signaling server and waits for confirmation
+     * @returns Promise that resolves when registration is confirmed
+     */
+    public async registerAndWait(): Promise<void> {
+        await this.sendToServerAndWait(
+            {
+                type: "register",
+                payload: {
+                    clientId: this.config.clientId,
+                    publicKey: Array.from(this.config.publicKey),
+                },
+            },
+            "register",
+        )
+        console.log(
+            "[IM @ " + this.config.clientId + "] Registration confirmed",
+        )
     }
 
     /**
@@ -248,23 +406,16 @@ export class MessagingPeer {
      * @returns Promise that resolves with an array of peer IDs
      */
     public async discoverPeers(): Promise<string[]> {
-        return new Promise((resolve, reject) => {
-            const messageId = Date.now().toString()
-            const handler = (message: Message) => {
-                if (message.type === "discover") {
-                    this.connectedPeers = new Set(message.payload.peers)
-                    resolve(message.payload.peers)
-                } else if (message.type === "error") {
-                    reject(new Error(message.payload.details))
-                }
-            }
-
-            this.addTemporaryMessageHandler(handler)
-            this.sendToServer({
+        const response = await this.sendToServerAndWait<{ peers: string[] }>(
+            {
                 type: "discover",
                 payload: {},
-            })
-        })
+            },
+            "discover",
+        )
+
+        this.connectedPeers = new Set(response.peers)
+        return response.peers
     }
 
     /**
@@ -279,7 +430,6 @@ export class MessagingPeer {
 
         // Encrypt the message using ml-kem-aes
         // NOTE This assumes that we have already exchanged public keys with the target peer
-        // REVIEW Is the Ucrypto system in place for this? Aka we have a valid id? We are in the sdk so we should ensure this
         const bytesMessage = new TextEncoder().encode(message)
         const encryptedMessage: encryptedObject = await unifiedCrypto.encrypt(
             "ml-kem-aes",
@@ -287,12 +437,23 @@ export class MessagingPeer {
             targetPublicKey,
         )
 
+        const serializedCipherText = this.serializeUint8Array(
+            encryptedMessage.cipherText,
+        )
+        const serializedEncryptedData = this.serializeUint8Array(
+            encryptedMessage.encryptedData,
+        )
+        const serializedEncryptedObject: SerializedEncryptedObject = {
+            algorithm: "ml-kem-aes",
+            serializedCipherText,
+            serializedEncryptedData,
+        }
         // Send the encrypted message to the target peer
         this.sendToServer({
             type: "message",
             payload: {
                 targetId: targetId,
-                message: encryptedMessage,
+                message: serializedEncryptedObject,
             },
         })
     }
@@ -303,26 +464,23 @@ export class MessagingPeer {
      * @returns Promise that resolves with the peer's public key
      */
     public async requestPublicKey(peerId: string): Promise<Uint8Array> {
-        return new Promise((resolve, reject) => {
-            const handler = (message: Message) => {
-                if (
-                    message.type === "public_key_response" &&
-                    message.payload.peerId === peerId
-                ) {
-                    resolve(new Uint8Array(message.payload.publicKey))
-                } else if (message.type === "error") {
-                    reject(new Error(message.payload.details))
-                }
-            }
-
-            this.addTemporaryMessageHandler(handler)
-            this.sendToServer({
+        const response = await this.sendToServerAndWait<{
+            peerId: string
+            publicKey: number[]
+        }>(
+            {
                 type: "request_public_key",
                 payload: {
                     targetId: peerId,
                 },
-            })
-        })
+            },
+            "public_key_response",
+            {
+                filterFn: message => message.payload.peerId === peerId,
+            },
+        )
+
+        return new Uint8Array(response.publicKey)
     }
 
     /**
@@ -433,14 +591,57 @@ export class MessagingPeer {
     }
 
     /**
-     * Processes queued messages
+     * Sends a message to the server and waits for a specific response type
+     * @param message - The message to send
+     * @param expectedResponseType - The type of response to wait for
+     * @param options - Additional options for handling the response
+     * @returns Promise that resolves with the response payload or rejects with an error
      */
-    private processMessageQueue(): void {
-        while (this.messageQueue.length > 0) {
-            const message = this.messageQueue.shift()
-            if (message) {
-                this.sendToServer(message)
+    public async sendToServerAndWait<T = any>(
+        message: Message,
+        expectedResponseType: Message["type"],
+        options: {
+            timeout?: number
+            errorHandler?: (error: any) => void
+            retryCount?: number
+            filterFn?: (message: Message) => boolean
+        } = {},
+    ): Promise<T> {
+        const {
+            timeout = 10000,
+            errorHandler,
+            retryCount = 0,
+            filterFn,
+        } = options
+
+        try {
+            // Send the message
+            this.sendToServer(message)
+
+            // Wait for the response
+            return await this.awaitResponse<T>(
+                expectedResponseType,
+                filterFn,
+                timeout,
+            )
+        } catch (error) {
+            // Custom error handling
+            if (errorHandler) {
+                errorHandler(error)
             }
+
+            // Retry logic if needed
+            if (retryCount > 0) {
+                console.log(
+                    `[IM] Retrying message (${retryCount} attempts remaining)...`,
+                )
+                return this.sendToServerAndWait(message, expectedResponseType, {
+                    ...options,
+                    retryCount: retryCount - 1,
+                })
+            }
+
+            throw error
         }
     }
 
@@ -451,18 +652,43 @@ export class MessagingPeer {
     private handleMessage(message: Message): void {
         switch (message.type) {
             case "message":
-                // TODO: Decrypt the message using ml-kem-aes before passing to handlers
-                // REVIEW The message's payload should be {
-                //     message: payload.message as encryptedObject,
-                //     fromId: senderId,
-                // },
-                const encryptedMessage = message.payload
-                    .message as encryptedObject // REVIEW Safeguard this?
+                console.log(
+                    "[IM @ " +
+                        this.config.clientId +
+                        "] Received an encrypted message",
+                )
+                //console.log(message)
+                // Decrypt the message using ml-kem-aes before passing to handlers
+                const serializedEncryptedMessage = message.payload // REVIEW Safeguard this?
+                    .message as SerializedEncryptedObject // REVIEW Safeguard this?
+
+                const cipherText = this.deserializeUint8Array(
+                    serializedEncryptedMessage.serializedCipherText,
+                )
+                const encryptedData = this.deserializeUint8Array(
+                    serializedEncryptedMessage.serializedEncryptedData,
+                )
+                const encryptedMessage: encryptedObject = {
+                    algorithm: serializedEncryptedMessage.algorithm,
+                    cipherText,
+                    encryptedData,
+                }
+
                 // NOTE When we receive a message, we need to decrypt it before passing it to the message handlers
                 // This is an async operation, so we need to handle it properly
+                console.log(
+                    "[IM @ " + this.config.clientId + "] Decrypting message:",
+                )
+
                 const decryptedMessage = unifiedCrypto
                     .decrypt(encryptedMessage)
                     .then(decryptedMessage => {
+                        console.log(
+                            "[IM @ " +
+                                this.config.clientId +
+                                "] Decrypted message: ",
+                            decryptedMessage,
+                        )
                         // NOTE If something is added here, it will be executed for every message
                         // Below are the user-defined message handlers (through peer.onMessage)
                         this.messageHandlers.forEach(handler => {
@@ -471,16 +697,40 @@ export class MessagingPeer {
                     })
 
                 break
+            case "register":
+                // Handle registration response
+                console.log(
+                    "[IM @ " +
+                        this.config.clientId +
+                        "] Received registration response:",
+                    message.payload,
+                )
+                // Pass the message to any temporary handlers waiting for this response
+                this.messageHandlers.forEach(handler => {
+                    handler(message, "")
+                })
+                break
             case "peer_disconnected":
                 this.connectedPeers.delete(message.payload.peerId)
                 this.peerDisconnectedHandlers.forEach(handler => {
                     handler(message.payload.peerId)
                 })
                 break
-            case "error":
+            /*case "error":
+                console.error("[IM @ " + this.config.clientId + "] Received an error message: ", message)
                 this.handleError({
                     type: message.payload.errorType,
                     details: message.payload.details,
+                })
+                break*/
+            default:
+                console.info(
+                    "[IM @ " + this.config.clientId + "] Received a message: ",
+                )
+                console.log(message.type)
+                // Pass the message to any temporary handlers waiting for this response
+                this.messageHandlers.forEach(handler => {
+                    handler(message, "")
                 })
                 break
         }
@@ -513,12 +763,57 @@ export class MessagingPeer {
      * @param handler - The temporary handler to add
      */
     private addTemporaryMessageHandler(
-        handler: (message: Message) => void,
+        handler: (message: any, fromId: string) => void,
     ): void {
-        const tempHandler = (message: Message) => {
-            handler(message)
+        const tempHandler = (message: any, fromId: string) => {
+            // If the message is a Message object, pass it directly
+            if (message && typeof message === "object" && "type" in message) {
+                handler(message as Message, fromId)
+            } else {
+                // Otherwise, create a Message object from the data
+                handler(
+                    {
+                        type: "message",
+                        payload: message,
+                    } as Message,
+                    fromId,
+                )
+            }
             this.removeMessageHandler(tempHandler)
         }
         this.messageHandlers.add(tempHandler)
+    }
+
+    /**
+     * Process queued messages
+     */
+    private processMessageQueue(): void {
+        while (this.messageQueue.length > 0) {
+            const message = this.messageQueue.shift()
+            if (message) {
+                this.sendToServer(message)
+            }
+        }
+    }
+
+    private serializeUint8Array(u8: Uint8Array): string {
+        // TODO Implement this
+        // Convert to binary string
+        const binary = String.fromCharCode(...u8)
+        // Convert binary string to Base64
+        return btoa(binary)
+    }
+
+    private deserializeUint8Array(base64: string): Uint8Array {
+        // TODO Implement this
+        // Decode Base64 to binary string
+        const binary = atob(base64)
+        // Convert binary string to Uint8Array
+        const len = binary.length
+        const u8 = new Uint8Array(len)
+        for (let i = 0; i < len; i++) {
+            u8[i] = binary.charCodeAt(i)
+        }
+        return u8
     }
 }
