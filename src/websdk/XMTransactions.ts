@@ -5,6 +5,7 @@ import { getNewUID } from "@/demoswork/utils"
 import type { Transaction, XMScript } from "@/types"
 import { DemosTransactions } from "./DemosTransactions"
 import { IKeyPair } from "./types/KeyPair"
+import { Demos } from "./demosclass"
 
 // INFO Using the methods below to create, manage and send chainscript-like scripts
 const XMTransactions = {
@@ -196,11 +197,11 @@ export function prepareXMScript({
 
 async function prepareXMPayload(
     xm_payload: XMScript,
-    keypair: IKeyPair,
+    demos: Demos,
 ): Promise<Transaction> {
     var xm_transaction: Transaction = DemosTransactions.empty()
     // From and To are the same in XM transactions
-    xm_transaction.content.from = keypair.publicKey as Uint8Array
+    xm_transaction.content.from = demos.keypair.publicKey as Uint8Array
     xm_transaction.content.to = xm_transaction.content.from
     // Setting the type and data
     xm_transaction.content.type = "crosschainOperation"
@@ -208,7 +209,7 @@ async function prepareXMPayload(
     // Producing a timestamp
     xm_transaction.content.timestamp = Date.now()
     // Signing the transaction
-    return await DemosTransactions.sign(xm_transaction, keypair)
+    return await demos.sign(xm_transaction)
 }
 
 export { prepareXMPayload, XMTransactions }

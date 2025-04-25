@@ -26,6 +26,9 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
+import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
+import { GCRGeneration } from "./GCRGeneration"
+import { Hashing } from "@/encryption/Hashing"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -37,6 +40,8 @@ async function sleep(ms: number) {
  * This class provides methods to interact with the DEMOS blockchain.
  */
 export class Demos {
+    algorithm: "ed25519" | "falcon" = "ed25519"
+    crypto: UnifiedCrypto = null
     private static _instance: Demos | null = null
 
     /** The RPC URL of the demos node */
@@ -47,11 +52,29 @@ export class Demos {
 
     /** Connection status of the wallet */
     get walletConnected(): boolean {
-        return this.keypair !== null && this.keypair.privateKey !== null
+        // return this.keypair !== null && this.keypair.privateKey !== null
+        return this.crypto != null
     }
 
     /** The keypair of the connected wallet */
-    keypair: IKeyPair = null
+    get keypair() {
+        if (!this.walletConnected) {
+            return null
+        }
+
+        switch (this.algorithm) {
+            case "ed25519":
+                return this.crypto.ed25519KeyPair
+            case "falcon":
+                return this.crypto.enigma.falcon_signing_keypair
+            default:
+                throw new Error("Invalid algorithm " + this.algorithm)
+        }
+    }
+
+    constructor() {
+        this.crypto = UnifiedCrypto.getInstance()
+    }
 
     static get instance() {
         if (!Demos._instance) {
@@ -79,35 +102,46 @@ export class Demos {
     }
 
     /**
-     * Connects to a Demos wallet using the provided private key.
+     * Connects to a Demos wallet using the provided master seed.
      *
-     * @param privateKey - The private key of the wallet
+     * @param masterSeed - The master seed of the wallet
+     * @param algorithm - The algorithm to use for the wallet
      * @param options - The options for the wallet connection
      * @returns The public key of the wallet
      */
     async connectWallet(
-        privateKey: string | Buffer | Uint8Array,
+        masterSeed: string | Uint8Array,
         options?: {
             /**
              * Whether the private key is a seed.
              * If true, the seed will be converted to an ed25519 keypair.
              */
             isSeed?: boolean
+            algorithm?: "ed25519" | "falcon"
         },
     ) {
-        if (options?.isSeed) {
-            privateKey = Cryptography.newFromSeed(privateKey).privateKey
+        this.algorithm = options?.algorithm || "ed25519"
+        // TODO: Convert masterSeed to 128 bytes
+
+        if (typeof masterSeed === "string") {
+            masterSeed = Buffer.from(masterSeed, "hex")
         }
 
-        const webAuthInstance = new DemosWebAuth()
-        const [loggedIn, helptext] = await webAuthInstance.login(privateKey)
+        // const seedBuffer = new TextEncoder().encode(masterSeed)
+        await this.crypto.generateIdentity(this.algorithm, masterSeed)
+        // if (options?.isSeed) {
+        //     privateKey = Cryptography.newFromSeed(privateKey).privateKey
+        // }
 
-        if (loggedIn) {
-            this.keypair = webAuthInstance.keypair
-            return this.keypair.publicKey.toString("hex")
-        }
+        // const webAuthInstance = new DemosWebAuth()
+        // const [loggedIn, helptext] = await webAuthInstance.login(privateKey)
 
-        throw new Error(helptext)
+        // if (loggedIn) {
+        //     this.keypair = webAuthInstance.keypair
+        //     return this.keypair.publicKey.toString("hex")
+        // }
+
+        // throw new Error(helptext)
     }
 
     /**
@@ -117,7 +151,7 @@ export class Demos {
      */
     getAddress() {
         required(this.walletConnected, "Wallet not connected")
-        return this.keypair.publicKey.toString("hex")
+        return uint8ArrayToHex(this.keypair.publicKey)
     }
 
     // !SECTION Connection and listeners
@@ -190,8 +224,27 @@ export class Demos {
      * @param raw_tx - The transaction to sign
      * @returns The signed transaction
      */
-    sign(raw_tx: Transaction) {
-        return DemosTransactions.sign(raw_tx, this.keypair)
+    async sign(raw_tx: Transaction) {
+        required(this.keypair, "Wallet not connected")
+        if (!raw_tx.content.timestamp || raw_tx.content.timestamp === 0) {
+            raw_tx.content.timestamp = Date.now()
+        }
+
+        raw_tx.content.from = this.keypair.publicKey
+        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
+        raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
+
+        const signature = await this.crypto.sign(
+            this.algorithm,
+            new TextEncoder().encode(raw_tx.hash),
+        )
+
+        raw_tx.signature = {
+            type: this.algorithm,
+            data: uint8ArrayToHex(signature.signedData),
+        }
+
+        return raw_tx
     }
 
     // L2PS calls are defined here
@@ -207,11 +260,12 @@ export class Demos {
         let signature = ""
 
         if (isAuthenticated) {
-            publicKey = this.keypair.publicKey.toString("hex")
-            signature = Cryptography.sign(
-                publicKey,
-                this.keypair.privateKey,
-            ).toString("hex")
+            publicKey = uint8ArrayToHex(this.keypair.publicKey)
+            const _signature = await this.crypto.sign(
+                this.algorithm,
+                new TextEncoder().encode(publicKey),
+            )
+            signature = uint8ArrayToHex(_signature.signedData)
         }
 
         try {
@@ -221,7 +275,7 @@ export class Demos {
                 {
                     headers: {
                         "Content-Type": "application/json",
-                        identity: publicKey,
+                        identity: this.algorithm + ":" + publicKey,
                         signature: signature,
                     },
                 },
@@ -300,11 +354,14 @@ export class Demos {
                 )
             }
 
-            pubkey_string = this.keypair.publicKey.toString("hex")
-            pubkey_signature = Cryptography.sign(
-                pubkey_string,
-                this.keypair.privateKey,
-            ).toString("hex")
+            const publicKey = uint8ArrayToHex(this.keypair.publicKey)
+            const signature = await this.crypto.sign(
+                this.algorithm,
+                new TextEncoder().encode(publicKey),
+            )
+
+            pubkey_string = this.algorithm + ":" + publicKey
+            pubkey_signature = uint8ArrayToHex(signature.signedData)
         }
 
         try {
@@ -497,7 +554,7 @@ export class Demos {
     disconnect() {
         // remove rpc_url and wallet connection
         this.rpc_url = null
-        this.keypair = null
+        // this.keypair = null
 
         this.connected = false
     }
@@ -517,7 +574,7 @@ export class Demos {
             if (!usedKeypair) {
                 throw new Error("No keypair provided and no wallet connected")
             }
-            return prepareXMPayload(xm_payload, usedKeypair)
+            return prepareXMPayload(xm_payload, this)
         },
     }
 
@@ -530,12 +587,20 @@ export class Demos {
          * @param keypair - The keypair to use for signing. If not provided, the keypair connected to the wallet will be used.
          * @returns A Promise that resolves to the signed transaction.
          */
-        sign: (raw_tx: Transaction, keypair?: IKeyPair) => {
+        sign: (
+            raw_tx: Transaction,
+            keypair?: IKeyPair,
+            options?: {
+                algorithm: "ed25519" | "falcon"
+            },
+        ) => {
             const usedKeypair = keypair || this.keypair
             if (!usedKeypair) {
                 throw new Error("No keypair provided and no wallet connected")
             }
-            return DemosTransactions.sign(raw_tx, usedKeypair)
+            return DemosTransactions.sign(raw_tx, usedKeypair, {
+                algorithm: options?.algorithm || this.algorithm,
+            })
         },
     }
 

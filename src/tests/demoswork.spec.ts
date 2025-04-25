@@ -169,14 +169,14 @@ describe("Demos Workflow", () => {
         const identity = DemosWebAuth.getInstance()
         await identity.create()
 
-        const tx = await prepareDemosWorkPayload(work, identity.keypair)
-        pprint(tx)
-
         const demos = new Demos()
 
         const rpc_url = "https://mungaist.com"
         await demos.connect(rpc_url)
         await demos.connectWallet(identity.keypair.privateKey as any)
+
+        const tx = await prepareDemosWorkPayload(work, demos)
+        pprint(tx)
 
         const validityData = await demos.confirm(tx)
         pprint(validityData)
@@ -271,8 +271,8 @@ describe("Demos Workflow", () => {
         const identity = DemosWebAuth.getInstance()
         await identity.create()
 
-        const tx = await prepareDemosWorkPayload(work, identity.keypair)
-        pprint(tx)
+        // const tx = await prepareDemosWorkPayload(work, demos)
+        // pprint(tx)
     })
 
     test("it works", async () => {

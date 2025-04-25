@@ -4,11 +4,14 @@ import { Demos } from "./demosclass"
 import { sha256 } from "./utils/sha256"
 import * as skeletons from "./utils/skeletons"
 
-import type { Transaction } from "@/types"
+import type { SigningAlgorithm, Transaction } from "@/types"
 import { IKeyPair } from "./types/KeyPair"
 import { GCRGeneration } from "./GCRGeneration"
 import { _required as required } from "./utils/required"
 import { RPCResponseWithValidityData } from "@/types/communication/rpc"
+import { Cryptography } from "@/encryption"
+import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
+import { Enigma } from "@/encryption/PQC/enigma"
 
 export const DemosTransactions = {
     // REVIEW All this part
@@ -79,6 +82,9 @@ export const DemosTransactions = {
     sign: async function (
         raw_tx: Transaction,
         keypair: IKeyPair,
+        options: {
+            algorithm: "ed25519" | "falcon"
+        },
     ): Promise<Transaction> {
         required(keypair, "Private key not provided")
 
@@ -96,33 +102,65 @@ export const DemosTransactions = {
 
         // Hash the content of the transaction
         raw_tx.hash = await sha256(JSON.stringify(raw_tx.content))
-
-        // Sign the hash of the content
-        let signatureData = forge.pki.ed25519.sign({
-            message: raw_tx.hash,
-            encoding: "utf8",
-            privateKey: keypair.privateKey as Uint8Array,
-        })
-
-        // Set the signature in the transaction
-        raw_tx.signature = {
-            type: "ed25519",
-            data: signatureData,
-        }
-
-        // Verify the signature (for debugging purposes)
-        let verified = forge.pki.ed25519.verify({
-            message: raw_tx.hash,
-            encoding: "utf8",
-            signature: signatureData,
-            publicKey: keypair.publicKey as Uint8Array,
-        })
-
-        if (!verified) {
-            throw new Error("Signature verification failed")
-        }
+        raw_tx.signature = await DemosTransactions.signWithAlgorithm(
+            raw_tx.hash,
+            keypair,
+            { algorithm: options.algorithm },
+        )
 
         return raw_tx // Return the hashed and signed transaction
+    },
+
+    /**
+     * Signs a message with a given algorithm.
+     *
+     * @param data - The message to sign.
+     * @param keypair - The keypair to use for signing.
+     * @param options.algorithm - The algorithm related to the keypair.
+     * @returns A Promise that resolves to the signed message.
+     */
+    signWithAlgorithm: async function (
+        data: string,
+        keypair: IKeyPair,
+        options: { algorithm: SigningAlgorithm },
+    ): Promise<{
+        type: SigningAlgorithm
+        data: string
+    }> {
+        required(keypair, "Private key not provided")
+        required(options && options.algorithm, "Algorithm not provided")
+
+        if (options.algorithm === "ed25519") {
+            const signature = Cryptography.sign(data, keypair.privateKey)
+
+            return {
+                type: "ed25519",
+                data: uint8ArrayToHex(signature),
+            }
+        }
+
+        const enigma = new Enigma()
+
+        if (options.algorithm === "falcon") {
+            const signature = await enigma.sign_falcon(data, keypair as any)
+
+            return {
+                type: "falcon",
+                data: uint8ArrayToHex(signature),
+            }
+        }
+
+        if (options.algorithm === "ml-dsa") {
+            const buff = new TextEncoder().encode(data)
+            const signature = await enigma.sign_ml_dsa(buff, keypair)
+
+            return {
+                type: "ml-dsa",
+                data: uint8ArrayToHex(signature),
+            }
+        }
+
+        throw new Error("Unsupported algorithm: " + options.algorithm)
     },
     // NOTE Sending a transaction after signing it
     /**
@@ -133,6 +171,7 @@ export const DemosTransactions = {
      */
     confirm: async function (transaction: Transaction, demos: Demos) {
         let response = await demos.call("execute", "", transaction, "confirmTx")
+        console.log("response:", response)
         // If the tx is not valid, we notify the user
         if (!response.response.data.valid) {
             throw new Error(
@@ -170,7 +209,12 @@ export const DemosTransactions = {
         // See prepare(data) for a possible solution
         //validationData.response.data.transaction = signedTx
 
-        const res =  await demos.call("execute", "", validationData, "broadcastTx")
+        const res = await demos.call(
+            "execute",
+            "",
+            validationData,
+            "broadcastTx",
+        )
 
         try {
             return {

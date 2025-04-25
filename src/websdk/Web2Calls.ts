@@ -121,12 +121,9 @@ export const web2Calls = {
         web2Tx.content.timestamp = Date.now()
 
         // Signing and broadcasting the transaction
-        const signedWeb2Tx = await DemosTransactions.sign(web2Tx, usedKeyPair)
-        const validityData = await DemosTransactions.confirm(
-            signedWeb2Tx,
-            demos,
-        )
-        await DemosTransactions.broadcast(validityData, demos)
+        const signedWeb2Tx = await demos.sign(web2Tx)
+        const validityData = await demos.confirm(signedWeb2Tx)
+        await demos.broadcast(validityData)
         return new Web2Proxy(sessionId, demos)
     },
 }

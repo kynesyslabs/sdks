@@ -11,15 +11,14 @@
   - ChaCha20-Poly1305
   To properly test the encryption and decryption of data, please see the pqc test suite.
 */
-import { ml_kem768 } from "@noble/post-quantum/ml-kem"
-import { ml_dsa65 } from "@noble/post-quantum/ml-dsa"
-import { sha3_256 } from "@noble/hashes/sha3"
+// import { ml_kem768 } from "@noble/post-quantum/ml-kem"
+// import { ml_dsa65 } from "@noble/post-quantum/ml-dsa"
+// import { sha3_256 } from "@noble/hashes/sha3"
 import * as crypto from "crypto"
 import { Falcon } from "./falconts"
 import { randomBytes } from "crypto"
 
 export class Enigma {
-
     // ml-dsa signing keypair
     ml_dsa_signing_keypair: {
         publicKey: Uint8Array
@@ -51,9 +50,13 @@ export class Enigma {
      * @param data The data to hash
      * @returns The hash of the data
      */
-    static async hash(data: string, algorithm: string = "sha3-256"): Promise<Uint8Array> {
+    static async hash(
+        data: string,
+        algorithm: string = "sha3-256",
+    ): Promise<Uint8Array> {
         // NOTE: algorithm is not used yet, but will be used in the future
-        return sha3_256.create().update(data).digest()
+        // return sha3_256.create().update(data).digest()
+        return "" as any
     }
 
     /**
@@ -68,7 +71,9 @@ export class Enigma {
         message: Uint8Array,
         publicKey: Uint8Array,
     ): Promise<boolean> {
-        return ml_dsa65.verify(publicKey, message, signature)
+        // return ml_dsa65.verify(publicKey, message, signature)
+        return "" as any
+
     }
 
     /**
@@ -94,21 +99,43 @@ export class Enigma {
      * @param message The message to sign
      * @returns The signature of the message
      */
-    async sign_ml_dsa(message: Uint8Array): Promise<Uint8Array> {
-        if (!this.ml_dsa_signing_keypair.privateKey) {
+    async sign_ml_dsa(
+        message: Uint8Array,
+        keypair?: typeof this.ml_dsa_signing_keypair,
+    ): Promise<Uint8Array> {
+        if (!keypair) {
+            keypair = this.ml_dsa_signing_keypair
+        }
+        if (!keypair.privateKey) {
             throw new Error("ml_dsa_signing_keypair.privateKey is not set")
         }
-        return ml_dsa65.sign(this.ml_dsa_signing_keypair.privateKey, message)
+        // const signature = ml_dsa65.sign(keypair.privateKey, message)
+        // const verified = ml_dsa65.verify(keypair.publicKey, message, signature)
+        // if (!verified) {
+        //     throw new Error("Signature verification failed")
+        // }
+
+        // return signature
+        return "" as any
+
     }
 
     /** Sign data using falcon
      * @param message The message to sign
      * @returns The signature of the message
      */
-    async sign_falcon(message: string): Promise<Uint8Array> {
-        if (!this.falcon_signing_keypair.privateKey) {
+    async sign_falcon(
+        message: string,
+        keypair?: typeof this.falcon_signing_keypair,
+    ): Promise<Uint8Array> {
+        if (!keypair) {
+            keypair = this.falcon_signing_keypair
+        }
+
+        if (!keypair.privateKey) {
             throw new Error("falcon_signing_keypair.privateKey is not set")
         }
+
         const falcon = new Falcon()
         await falcon.init()
         await falcon.setKeypair({
@@ -120,20 +147,25 @@ export class Enigma {
     }
 
     async encapsulate_ml_kem(peerPublicKey: Uint8Array): Promise<{
-        cipherText: Uint8Array;
-        sharedSecret: Uint8Array;
+        cipherText: Uint8Array
+        sharedSecret: Uint8Array
     }> {
         if (!this.ml_kem_encryption_keypair.privateKey) {
             throw new Error("ml_kem_encryption_keypair.privateKey is not set")
         }
-        return ml_kem768.encapsulate(peerPublicKey)
+        // return ml_kem768.encapsulate(peerPublicKey)
+        return "" as any
     }
 
     async decapsulate_ml_kem(cipherText: Uint8Array): Promise<Uint8Array> {
         if (!this.ml_kem_encryption_keypair.privateKey) {
             throw new Error("ml_kem_encryption_keypair.privateKey is not set")
         }
-        return ml_kem768.decapsulate(cipherText, this.ml_kem_encryption_keypair.privateKey)
+        // return ml_kem768.decapsulate(
+        //     cipherText,
+        //     this.ml_kem_encryption_keypair.privateKey,
+        // )
+        return "" as any
     }
 
     /** Encrypt data using ml_kem + aes
@@ -151,36 +183,37 @@ export class Enigma {
             throw new Error("ml_kem_encryption_keypair.privateKey is not set")
         }
         // Generate shared secret and encapsulate it in a cipher text using ml_kem and the peer's public key
-        const encapsulatedSecret = ml_kem768.encapsulate(peerPublicKey)
+        // const encapsulatedSecret = ml_kem768.encapsulate(peerPublicKey)
 
         // Encrypt the message using AES-256-GCM with the shared secret
-        const iv = crypto.randomBytes(12) // 96-bit IV for GCM mode
-        const cipher = crypto.createCipheriv(
-            "aes-256-gcm",
-            encapsulatedSecret.sharedSecret,
-            iv,
-        )
+        // const iv = crypto.randomBytes(12) // 96-bit IV for GCM mode
+        // const cipher = crypto.createCipheriv(
+        //     "aes-256-gcm",
+        //     encapsulatedSecret.sharedSecret,
+        //     iv,
+        // )
 
-        // Encrypt the message
-        const encryptedMessage = Buffer.concat([
-            cipher.update(message),
-            cipher.final(),
-        ])
+        // // Encrypt the message
+        // const encryptedMessage = Buffer.concat([
+        //     cipher.update(message),
+        //     cipher.final(),
+        // ])
 
-        // Get the authentication tag
-        const authTag = cipher.getAuthTag()
+        // // Get the authentication tag
+        // const authTag = cipher.getAuthTag()
 
-        // Combine IV, encrypted message, and auth tag for transmission
-        const combinedEncryptedData = Buffer.concat([
-            iv,
-            encryptedMessage,
-            authTag,
-        ])
+        // // Combine IV, encrypted message, and auth tag for transmission
+        // const combinedEncryptedData = Buffer.concat([
+        //     iv,
+        //     encryptedMessage,
+        //     authTag,
+        // ])
 
-        return {
-            cipherText: encapsulatedSecret.cipherText,
-            encryptedMessage: combinedEncryptedData,
-        }
+        // return {
+        //     cipherText: encapsulatedSecret.cipherText,
+        //     encryptedMessage: combinedEncryptedData,
+        // }
+        return "" as any
     }
 
     /** Decrypt data using ml_kem + aes
@@ -196,25 +229,30 @@ export class Enigma {
             throw new Error("ml_kem_encryption_keypair.privateKey is not set")
         }
         // Get the shared secret from the cipher text
-        const sharedSecret = ml_kem768.decapsulate(cipherText, this.ml_kem_encryption_keypair.privateKey)
+        // const sharedSecret = ml_kem768.decapsulate(
+        //     cipherText,
+        //     this.ml_kem_encryption_keypair.privateKey,
+        // )
 
         // Decrypt the message using AES-256-GCM with the shared secret
-        const iv = encryptedMessage.slice(0, 12)
-        const message = encryptedMessage.slice(12, -16)
-        const authTag = encryptedMessage.slice(-16)
+        // const iv = encryptedMessage.slice(0, 12)
+        // const message = encryptedMessage.slice(12, -16)
+        // const authTag = encryptedMessage.slice(-16)
 
-        // Decrypt the message
-        const decipher = crypto.createDecipheriv(
-            "aes-256-gcm",
-            sharedSecret,
-            iv,
-        )
-        decipher.setAuthTag(authTag)
-        const decryptedMessage = Buffer.concat([
-            decipher.update(message),
-            decipher.final(),
-        ])
-        return decryptedMessage
+        // // Decrypt the message
+        // const decipher = crypto.createDecipheriv(
+        //     "aes-256-gcm",
+        //     sharedSecret,
+        //     iv,
+        // )
+        // decipher.setAuthTag(authTag)
+        // const decryptedMessage = Buffer.concat([
+        //     decipher.update(message),
+        //     decipher.final(),
+        // ])
+        // return decryptedMessage
+        return "" as any
+
     }
 
     // Keypair generation methods
@@ -229,11 +267,12 @@ export class Enigma {
         if (!seed) {
             seed = randomBytes(32)
         }
-        const keypair = ml_dsa65.keygen(seed)
-        this.ml_dsa_signing_keypair = {
-            publicKey: keypair.publicKey,
-            privateKey: keypair.secretKey,
-        }
+        // const keypair = ml_dsa65.keygen(seed)
+        // this.ml_dsa_signing_keypair = {
+        //     publicKey: keypair.publicKey,
+        //     privateKey: keypair.secretKey,
+        // }
+        return "" as any
     }
 
     /**
@@ -267,10 +306,10 @@ export class Enigma {
         if (!seed) {
             seed = randomBytes(64)
         }
-        let keys = ml_kem768.keygen(seed)
-        this.ml_kem_encryption_keypair = {
-            privateKey: keys.secretKey,
-            publicKey: keys.publicKey,
-        }
+        // let keys = ml_kem768.keygen(seed)
+        // this.ml_kem_encryption_keypair = {
+        //     privateKey: keys.secretKey,
+        //     publicKey: keys.publicKey,
+        // }
     }
 }

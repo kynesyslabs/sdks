@@ -44,17 +44,17 @@ describe("DEMOS Transaction", () => {
         const identity = DemosWebAuth.getInstance()
         await identity.create()
 
-        const tx = await prepareXMPayload(xmscript, identity.keypair)
-
-        console.log(xmscript)
-        console.log(tx)
-
         const rpc = "http://localhost:53550"
 
         const demos = new Demos()
 
         await demos.connect(rpc)
         await demos.connectWallet(identity.keypair.privateKey as any)
+
+        const tx = await prepareXMPayload(xmscript, demos)
+
+        console.log(xmscript)
+        console.log(tx)
 
         console.log("address", demos.getAddress())
         console.log("private key:", identity.keypair.privateKey.toString("hex"))
@@ -89,17 +89,18 @@ describe("DEMOS Transaction", () => {
         const identity = DemosWebAuth.getInstance()
         await identity.create()
 
-        // 5. Convert the XMScript to a DEMOS transaction
-        const tx = await prepareXMPayload(xmscript, identity.keypair)
-
         // const rpc = "https://demosnode.discus.sh"
         const rpc = "http://localhost:53550"
         // const rpc = "https://demos.mungaist.com"
         const demos = new Demos()
 
-        // 6. Connect to the DEMOS node
+        // 5. Connect to the DEMOS node
         await demos.connect(rpc)
         await demos.connectWallet(identity.keypair.privateKey as any)
+
+        // 6. Convert the XMScript to a DEMOS transaction
+        const tx = await prepareXMPayload(xmscript, demos)
+
 
         // 7. Broadcast the transaction
         const validityData = await demos.confirm(tx)
