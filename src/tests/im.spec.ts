@@ -41,7 +41,7 @@ beforeAll(async () => {
 describe("IM setup", () => {
     it("should be able to create a new IM instance", async () => {
         const im = new MessagingPeer({
-            serverUrl: "http://localhost:3005",
+            serverUrl: "ws://localhost:3005",
             clientId: "test-client-id",
             publicKey: mlKemAes.publicKey,
         })
@@ -49,7 +49,7 @@ describe("IM setup", () => {
     })
     it("should be able to connect to the server and register the client", async () => {
         const im = new MessagingPeer({
-            serverUrl: "http://localhost:3005",
+            serverUrl: "ws://localhost:3005",
             clientId: "test-client-id",
             publicKey: mlKemAes.publicKey,
         })
@@ -59,7 +59,7 @@ describe("IM setup", () => {
     })
     it("should fail to register a new client as the client id is already taken", async () => {
         const im = new MessagingPeer({
-            serverUrl: "http://localhost:3005",
+            serverUrl: "ws://localhost:3005",
             clientId: "test-client-id",
             publicKey: mlKemAes.publicKey,
         })
@@ -75,7 +75,7 @@ describe("IM setup", () => {
     })
     it("should be able to retrieve the list of available peers", async () => {
         const im = new MessagingPeer({
-            serverUrl: "http://localhost:3005",
+            serverUrl: "ws://localhost:3005",
             clientId: "second-client-id",
             publicKey: mlKemAes.publicKey,
         })
@@ -89,12 +89,12 @@ describe("IM setup", () => {
     })
     it("should be able to send a message to a peer", async () => {
         const alice = new MessagingPeer({
-            serverUrl: "http://localhost:3005",
+            serverUrl: "ws://localhost:3005",
             clientId: "alice",
             publicKey: mlKemAes.publicKey,
         })
         const bob = new MessagingPeer({
-            serverUrl: "http://localhost:3005",
+            serverUrl: "ws://localhost:3005",
             clientId: "bob",
             publicKey: mlKemAes.publicKey,
         })
@@ -139,7 +139,7 @@ describe("IM setup", () => {
     it("should be able to have a multi-round conversation with the server", async () => {
         // Create a peer
         const peer = new MessagingPeer({
-            serverUrl: "http://localhost:3005",
+            serverUrl: "ws://localhost:3005",
             clientId: "multi-round-peer",
             publicKey: mlKemAes.publicKey,
         })
