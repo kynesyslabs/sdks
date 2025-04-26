@@ -134,17 +134,14 @@
 
 import { unifiedCrypto, encryptedObject } from "@/encryption/unifiedCrypto"
 import { serializeUint8Array, deserializeUint8Array } from "@/utils/uint8Serialize"
+import { SerializedEncryptedObject, SerializedSignedObject } from "@/encryption/unifiedCrypto"
+
 export interface MessagingPeerConfig {
     serverUrl: string
     clientId: string
     publicKey: Uint8Array
 }
 
-export interface SerializedEncryptedObject {
-    algorithm: "ml-kem-aes" | "rsa"
-    serializedEncryptedData: string
-    serializedCipherText?: string
-}
 
 export interface Message {
     type:
@@ -387,12 +384,22 @@ export class MessagingPeer {
      * @returns Promise that resolves when registration is confirmed
      */
     public async registerAndWait(): Promise<void> {
+        // Creating a proof that shows our signing key
+        const proofSignature = await unifiedCrypto.sign("ml-dsa", this.config.publicKey)
+        const serializedProofSignature: SerializedSignedObject = {
+            algorithm: "ml-dsa",
+            serializedSignedData: serializeUint8Array(proofSignature.signedData),
+            serializedPublicKey: serializeUint8Array(proofSignature.publicKey),
+            serializedMessage: serializeUint8Array(proofSignature.message),
+        }
+        // Sending the registration request and signing key proof
         await this.sendToServerAndWait(
             {
                 type: "register",
                 payload: {
                     clientId: this.config.clientId,
                     publicKey: Array.from(this.config.publicKey),
+                    verification: serializedProofSignature,
                 },
             },
             "register",

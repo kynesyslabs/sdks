@@ -12,6 +12,18 @@ export interface encryptedObject {
     cipherText?: Uint8Array
 }
 
+export interface SerializedEncryptedObject {
+    algorithm: "ml-kem-aes" | "rsa"
+    serializedEncryptedData: string
+    serializedCipherText?: string
+}
+
+export interface SerializedSignedObject {
+    algorithm: "ml-dsa" | "falcon" | "ed25519"
+    serializedSignedData: string
+    serializedPublicKey: string
+    serializedMessage: string
+}
 interface Ed25519SignedObject {
     algorithm: "ed25519"
     signedData: Uint8Array
