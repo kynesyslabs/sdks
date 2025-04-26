@@ -6,7 +6,8 @@ import {
 import { unifiedCrypto } from "@/encryption/unifiedCrypto"
 import { randomBytes } from "crypto"
 import * as forge from "node-forge"
-import * as socket from 'socket.io-client';
+import * as socket from "socket.io-client"
+
 interface keyType {
     publicKey: any | forge.pki.PublicKey | forge.pki.ed25519.NativeBuffer
     privateKey: any | forge.pki.PrivateKey | forge.pki.ed25519.NativeBuffer
@@ -33,58 +34,35 @@ beforeAll(async () => {
     mlKemAes = await unifiedCrypto.getIdentity("ml-kem-aes")
     if (!ed25519 || !falcon || !mlDsa || !mlKemAes) {
         throw new Error("Failed to generate identities:")
-        if (!ed25519) {
-            console.error("Ed25519 identity not generated")
-        }
-        if (!falcon) {
-            console.error("Falcon identity not generated")
-        }
-        if (!mlDsa) {
-            console.error("ML-DSA identity not generated")
-        }
-        if (!mlKemAes) {
-            console.error("ML-KEM-AES identity not generated")
-        }
-        throw new Error("Failed to generate identities")
     }
-
-    console.log(
-        "[Preflight] Identities generated for: ed25519, falcon, ml-dsa, ml-kem-aes",
-    )
 })
 
 // IM setup
 describe("IM setup", () => {
     it("should be able to create a new IM instance", async () => {
-        const im = new MessagingPeer(
-            {
-                serverUrl: "http://localhost:3005",
-                clientId: "test-client-id",
-                publicKey: mlKemAes.publicKey,
-            }
-        )
+        const im = new MessagingPeer({
+            serverUrl: "http://localhost:3005",
+            clientId: "test-client-id",
+            publicKey: mlKemAes.publicKey,
+        })
         expect(im).toBeDefined()
     })
     it("should be able to connect to the server and register the client", async () => {
-        const im = new MessagingPeer(
-            {
-                serverUrl: "http://localhost:3005",
-                clientId: "test-client-id",
-                publicKey: mlKemAes.publicKey,
-            }
-        )
+        const im = new MessagingPeer({
+            serverUrl: "http://localhost:3005",
+            clientId: "test-client-id",
+            publicKey: mlKemAes.publicKey,
+        })
         await im.connect()
         await new Promise(resolve => setTimeout(resolve, 1000))
         expect(im.ws.readyState).toBe(WebSocket.OPEN)
     })
     it("should fail to register a new client as the client id is already taken", async () => {
-        const im = new MessagingPeer(
-            {
-                serverUrl: "http://localhost:3005",
-                clientId: "test-client-id",
-                publicKey: mlKemAes.publicKey,
-            }
-        )
+        const im = new MessagingPeer({
+            serverUrl: "http://localhost:3005",
+            clientId: "test-client-id",
+            publicKey: mlKemAes.publicKey,
+        })
         let success = false
         try {
             await im.connect()
@@ -96,13 +74,11 @@ describe("IM setup", () => {
         expect(success).toBe(true)
     })
     it("should be able to retrieve the list of available peers", async () => {
-        const im = new MessagingPeer(
-            {
-                serverUrl: "http://localhost:3005",
-                clientId: "second-client-id",
-                publicKey: mlKemAes.publicKey,
-            }
-        )
+        const im = new MessagingPeer({
+            serverUrl: "http://localhost:3005",
+            clientId: "second-client-id",
+            publicKey: mlKemAes.publicKey,
+        })
         await im.connect()
         await new Promise(resolve => setTimeout(resolve, 1000))
         expect(im.ws.readyState).toBe(WebSocket.OPEN)
@@ -112,20 +88,16 @@ describe("IM setup", () => {
         expect(peers.length).toBeGreaterThan(0)
     })
     it("should be able to send a message to a peer", async () => {
-        const alice = new MessagingPeer(
-            {
-                serverUrl: "http://localhost:3005",
-                clientId: "alice",
-                publicKey: mlKemAes.publicKey,
-            }
-        )
-        const bob = new MessagingPeer(
-            {
-                serverUrl: "http://localhost:3005",
-                clientId: "bob",
-                publicKey: mlKemAes.publicKey,
-            }
-        )
+        const alice = new MessagingPeer({
+            serverUrl: "http://localhost:3005",
+            clientId: "alice",
+            publicKey: mlKemAes.publicKey,
+        })
+        const bob = new MessagingPeer({
+            serverUrl: "http://localhost:3005",
+            clientId: "bob",
+            publicKey: mlKemAes.publicKey,
+        })
         await alice.connect()
         await new Promise(resolve => setTimeout(resolve, 1000))
         expect(alice.ws.readyState).toBe(WebSocket.OPEN)
@@ -142,7 +114,10 @@ describe("IM setup", () => {
         const messages = await messagesPromise
         expect(messages).toBeDefined()
         const stringifiedMessages = messages.toString("utf-8")
-        console.log("[IM-TEST] [BOB] Decrypted message from alice: ", stringifiedMessages)
+        console.log(
+            "[IM-TEST] [BOB] Decrypted message from alice: ",
+            stringifiedMessages,
+        )
         expect(stringifiedMessages).toBe(message)
         // Bob sends a message to alice and alice receives it
         const messagesPromiseAlice = alice.awaitResponse<Buffer>("message") // NOTE Setting up a promise to receive the message as we don't know when it will arrive
@@ -154,7 +129,60 @@ describe("IM setup", () => {
         const messagesAlice = await messagesPromiseAlice
         expect(messagesAlice).toBeDefined()
         const stringifiedMessagesAlice = messagesAlice.toString("utf-8")
-        console.log("[IM-TEST] [ALICE] Decrypted message from bob: ", stringifiedMessagesAlice)
+        console.log(
+            "[IM-TEST] [ALICE] Decrypted message from bob: ",
+            stringifiedMessagesAlice,
+        )
         expect(stringifiedMessagesAlice).toBe(messageAlice)
+    })
+
+    it("should be able to have a multi-round conversation with the server", async () => {
+        // Create a peer
+        const peer = new MessagingPeer({
+            serverUrl: "http://localhost:3005",
+            clientId: "multi-round-peer",
+            publicKey: mlKemAes.publicKey,
+        })
+        await peer.connect()
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        expect(peer.ws.readyState).toBe(WebSocket.OPEN)
+
+        // Set up a handler for server questions
+        const questionPromise = new Promise<{
+            question: any
+            questionId: string
+        }>(resolve => {
+            peer.onServerQuestion((question, questionId) => {
+                resolve({ question, questionId })
+            })
+        })
+
+        // Send a debug_question message to trigger the server to send a question
+        console.log("[IM-TEST] Sending debug_question message to server")
+        // Use the WebSocket directly to send the debug_question message
+        peer.ws.send(
+            JSON.stringify({
+                type: "debug_question",
+                payload: {},
+            }),
+        )
+
+        // Wait for the question to be received by the peer
+        const receivedQuestion = await questionPromise
+        console.log(
+            "[IM-TEST] Peer received question with ID:",
+            receivedQuestion.questionId,
+        )
+        console.log("[IM-TEST] Question content:", receivedQuestion.question)
+
+        // Respond to the server's question
+        const response = {
+            answer: "My favorite programming language is TypeScript",
+        }
+        console.log("[IM-TEST] Peer sending response to server:", response)
+        peer.respondToServer(receivedQuestion.questionId, response)
+
+        // Wait for the server to process the response
+        await new Promise(resolve => setTimeout(resolve, 1000))
     })
 })
