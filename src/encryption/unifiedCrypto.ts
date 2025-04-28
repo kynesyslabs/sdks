@@ -1,6 +1,8 @@
 import { Enigma } from "./PQC/enigma"
 import { hkdf } from "@noble/hashes/hkdf"
-import { sha256 } from "@noble/hashes/sha2"
+// @ts-expect-error sha2 module is not resolved properly when sdk is installed on the node
+// error: Cannot find module '@noble/hashes/sha2' from '/Users/cwilvx/demos/node/node_modules/@kynesyslabs/demosdk/build/encryption/unifiedCrypto.js'
+import { sha256 } from "node_modules/@noble/hashes/sha2"
 import { randomBytes } from "@noble/hashes/utils"
 import * as forge from "node-forge"
 import { Cryptography } from "./Cryptography"
