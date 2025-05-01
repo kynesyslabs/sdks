@@ -102,4 +102,34 @@ export interface Web2IdentityPayload {
     payload: InferFromGithubPayload | InferFromTwitterPayload
 }
 
-export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload
+export interface PointsQueryPayload {
+    context: "points"
+    method: "query_points"
+    payload?: Record<string, any>
+}
+
+export interface TurnstileVerificationPayload {
+    context: "security"
+    method: "verify_turnstile"
+    payload: {
+        token: string
+    }
+}
+
+export type IdentityPayload =
+    | XmIdentityPayload
+    | Web2IdentityPayload
+    | PointsQueryPayload
+    | TurnstileVerificationPayload
+
+export interface UserPoints {
+    userId: string
+    totalPoints: number
+    breakdown: {
+        web3Wallets: number
+        socialAccounts: number
+    }
+    linkedWallets: string[]
+    linkedSocials: { twitter?: string }
+    lastUpdated: Date
+}

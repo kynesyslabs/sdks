@@ -1,7 +1,9 @@
 import {
     GCREdit,
     GCREditIdentity,
-    GCREditIncentive,
+    GCREditBalance,
+    GCREditNonce,
+    GCREditAssign,
     Web2GCRData,
     XmGCRIdentityData,
 } from "@/types/blockchain/GCREdit"
@@ -28,41 +30,40 @@ export class GCRGeneration {
         const { content } = tx
 
         // Handle main transaction edits
-        switch (content.type) {
-            case "demoswork":
-                // TODO Implement this
-                break
-            case "native":
-                var nativeEdits = await HandleNativeOperations.handle(
-                    tx,
-                    isRollback,
-                )
-                gcrEdits.push(...nativeEdits)
-                break
-            case "web2Request":
-            case "crosschainOperation":
-                gcrEdits.push(this.createAssignEdit(content, tx.hash))
-                break
-            case "genesis":
-                // TODO Implement this
-                break
-            case "identity":
-                var identityEdits = await HandleIdentityOperations.handle(tx)
-                gcrEdits.push(...identityEdits)
-                break
-            case "incentive":
-                var incentiveEdits = await HandleIncentiveOperations.handle(tx)
-
-                gcrEdits.push(...incentiveEdits)
-                break
+        if (content.type) {
+            switch (content.type) {
+                case "demoswork":
+                    // TODO Implement this
+                    break
+                case "native":
+                    var nativeEdits = await HandleNativeOperations.handle(
+                        tx,
+                        isRollback,
+                    )
+                    gcrEdits.push(...nativeEdits)
+                    break
+                case "web2Request":
+                case "crosschainOperation":
+                    gcrEdits.push(this.createAssignEdit(content, tx.hash))
+                    break
+                case "genesis":
+                    // TODO Implement this
+                    break
+                case "identity":
+                    var identityEdits = await HandleIdentityOperations.handle(
+                        tx,
+                    )
+                    gcrEdits.push(...identityEdits)
+                    break
+            }
         }
 
         // SECTION Operations valid for all tx types
 
         // Add gas operation edit with check for availability of gas amount in the sender's balance
         nonceEdits: try {
-            // INFO: Skip gas for identity and incentive operations
-            if (content.type === "identity" || content.type === "incentive") {
+            // INFO: Skip gas for identity
+            if (content.type === "identity") {
                 break nonceEdits
             }
 
@@ -247,7 +248,9 @@ export class HandleIdentityOperations {
         const edit: GCREditIdentity = {
             account: tx.content.from as string,
             type: "identity",
-            operation: identityPayload.method.endsWith("assign")
+            operation: identityPayload.method.startsWith("query_")
+                ? "query"
+                : identityPayload.method.endsWith("assign")
                 ? "add"
                 : "remove",
             txhash: tx.hash,
@@ -301,6 +304,11 @@ export class HandleIdentityOperations {
                 edit.data = identityPayload.payload as any
                 break
             }
+            case "query_points": {
+                // INFO: For points query, we just need to set the operation to query
+                edit.operation = "query"
+                break
+            }
             default:
                 console.log(
                     "Unknown identity operation: ",
@@ -311,30 +319,7 @@ export class HandleIdentityOperations {
         }
 
         edits.push(edit)
-        return edits
-    }
-}
 
-/**
- * This class is responsible for handling incentive operations when generating the GCREdit
- * for a transaction.
- */
-export class HandleIncentiveOperations {
-    static async handle(tx: Transaction): Promise<GCREdit[]> {
-        const edits = [] as GCREdit[]
-        // Extract the incentive payload data
-        const incentivePayloadData: ["incentive", GCREditIncentive] = tx.content
-            .data as ["incentive", GCREditIncentive]
-        const incentivePayload: GCREditIncentive = incentivePayloadData[1]
-
-        // Create the incentive edit with the transaction hash
-        const incentiveEdit: GCREditIncentive = {
-            ...incentivePayload,
-            txhash: tx.hash,
-        }
-
-        // Add the incentive edit to the list of edits
-        edits.push(incentiveEdit)
         return edits
     }
 }

@@ -4,7 +4,7 @@ import { TxFee } from "./TxFee"
 import { DemoScript } from "../demoswork"
 import { IWeb2Payload } from "../web2"
 import { XMScript } from "../xm"
-import { GCREdit, GCREditIncentive } from "./GCREdit"
+import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
 import { SubnetPayload } from "../../l2ps"
 import { IdentityPayload } from "../abstraction"
@@ -17,12 +17,12 @@ export type TransactionContentData =
     | ["demoswork", DemoScript]
     | ["subnet", SubnetPayload]
     | ["identity", IdentityPayload]
-    | ["incentive", GCREditIncentive]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
 export interface TransactionContent {
     type:
+        | "identity"
         | "web2Request"
         | "crosschainOperation"
         | "subnet"
@@ -30,8 +30,6 @@ export interface TransactionContent {
         | "demoswork"
         | "genesis"
         | "NODE_ONLINE"
-        | "identity"
-        | "incentive"
     from: forge.pki.ed25519.BinaryBuffer | forge.pki.PublicKey | ISignature
     to: forge.pki.ed25519.BinaryBuffer | forge.pki.PrivateKey | ISignature
     amount: number
@@ -47,7 +45,6 @@ export interface TransactionContent {
 export interface Transaction {
     content: TransactionContent
     signature: ISignature | null
-
     hash: string
     status: string
     blockNumber: number | null

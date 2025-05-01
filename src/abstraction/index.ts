@@ -19,6 +19,7 @@ import {
     TwitterProof,
     IdentityPayload,
     InferFromSignatureTargetIdentityPayload,
+    UserPoints,
 } from "@/types/abstraction"
 
 export {
@@ -35,4 +36,5 @@ export {
     TwitterProof,
     IdentityPayload,
     InferFromSignatureTargetIdentityPayload,
+    UserPoints,
 }

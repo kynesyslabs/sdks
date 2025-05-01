@@ -12,8 +12,6 @@ export {
     prepareXMScript,
 } from "./XMTransactions"
 
-export { Incentive } from "./Incentive"
-
 export { GCRGeneration, HandleNativeOperations } from "./GCRGeneration"
 // Utils
 export { sha256 } from "./utils/sha256"

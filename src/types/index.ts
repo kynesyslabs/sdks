@@ -111,7 +111,6 @@ export {
     GCREditIdentity,
     GCREditNonce,
     GCREditSubnetsTx,
-    GCREditIncentive,
     Web2GCRData,
     XmGCRData,
     XmGCRIdentityData,

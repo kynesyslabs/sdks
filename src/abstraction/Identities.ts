@@ -11,6 +11,7 @@ import {
     InferFromGithubPayload,
     InferFromXPayload,
     InferFromSignaturePayload,
+    PointsQueryPayload,
 } from "@/types/abstraction"
 import forge from "node-forge"
 import { DemosTransactions } from "@/websdk"
@@ -77,12 +78,14 @@ export class Identities {
                     payload: payload,
                 },
             ],
-            nonce: 1,
+            nonce: (await demos.getAddressNonce(address)) + 1,
             timestamp: Date.now(),
         }
 
         const signedTx = await demos.sign(tx)
-        return await demos.confirm(signedTx)
+        const validityData = await demos.confirm(signedTx)
+
+        return await demos.broadcast(validityData)
     }
 
     /**
@@ -114,12 +117,14 @@ export class Identities {
                     payload: payload,
                 },
             ],
-            nonce: 1,
+            nonce: (await demos.getAddressNonce(address)) + 1,
             timestamp: Date.now(),
         }
 
         const signedTx = await demos.sign(tx)
-        return await demos.confirm(signedTx)
+        const validityData = await demos.confirm(signedTx)
+
+        return await demos.broadcast(validityData)
     }
 
     /**
@@ -253,5 +258,53 @@ export class Identities {
      */
     async getWeb2Identities(demos: Demos, address?: string) {
         return await this.getIdentities(demos, "getWeb2Identities", address)
+    }
+
+    /**
+     * Get the points associated with an identity
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @returns The points data for the identity
+     */
+    async getUserPoints(demos: Demos): Promise<RPCResponseWithValidityData> {
+        try {
+            const tx = DemosTransactions.empty()
+            const address = demos.getAddress()
+            const pointsPayload: PointsQueryPayload = {
+                context: "points" as const,
+                method: "query_points" as const,
+            }
+
+            tx.content = {
+                type: "identity",
+                from: address,
+                to: address,
+                amount: 0,
+                data: ["identity", pointsPayload],
+                gcr_edits: [],
+                nonce: (await demos.getAddressNonce(address)) + 1,
+                timestamp: Date.now(),
+                transaction_fee: {
+                    network_fee: 0,
+                    rpc_fee: 0,
+                    additional_fee: 0,
+                },
+            }
+
+            const signedTx = await demos.sign(tx)
+            const validityData = await demos.confirm(signedTx)
+
+            return await demos.broadcast(validityData)
+        } catch (error) {
+            return {
+                result: 400,
+                response: null,
+                require_reply: false,
+                extra: {
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                },
+            }
+        }
     }
 }
