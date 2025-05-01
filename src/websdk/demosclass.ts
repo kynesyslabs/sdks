@@ -202,7 +202,7 @@ export class Demos {
         retries = 0,
         sleepTime = 250,
         allowedErrorCodes: number[] = [],
-    ) {
+    ): Promise<RPCResponse> {
         let publicKey = ""
         let signature = ""
 
@@ -465,9 +465,13 @@ export class Demos {
         })
 
         if (info) {
+            // REVIEW Fix for when the balance is 0 (see FIXME below)
+            if (!info.balance) {
+                info.balance = 0
+            }
             return {
                 ...info,
-                balance: BigInt(info.balance),
+                balance: BigInt(info.balance), // FIXME This fails when the balance is 0
             } as AddressInfo
         }
 

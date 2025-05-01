@@ -65,8 +65,11 @@ export interface Web2CoreTargetIdentityPayload {
 }
 
 // ANCHOR Github Identities
+type GistProofUrl = `https://gist.github.com/${string}/${string}`
+type RawGistProofUrl = `https://gist.githubusercontent.com/${string}/${string}`
+type RawGithubProofUrl = `https://raw.githubusercontent.com/${string}/${string}`
 
-export type GithubProof = `https://github.com/${string}/${string}` // TODO Better scope for gists
+export type GithubProof = RawGistProofUrl | GistProofUrl | RawGithubProofUrl
 
 // Add more as needed following the above pattern
 

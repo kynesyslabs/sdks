@@ -18,7 +18,18 @@ import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 import { IKeyPair } from "@/websdk/types/KeyPair"
 
-export class Identities {
+export default class Identities {
+    formats = {
+        web2: {
+            github: [
+                "https://gist.github.com",
+                "https://raw.githubusercontent.com",
+                "https://gist.githubusercontent.com",
+            ],
+            twitter: ["https://x.com", "https://twitter.com"],
+        },
+    }
+
     /**
      * Create a web2 proof payload for use with web2 identity inference.
      *
@@ -61,6 +72,22 @@ export class Identities {
         context: "xm" | "web2",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
+        if (context === "web2") {
+            if (
+                !this.formats.web2[payload.context].some((format: string) =>
+                    payload.proof.startsWith(format),
+                )
+            ) {
+                // construct informative error message
+                const errorMessage = `Invalid ${
+                    payload.context
+                } proof format. Supported formats are: ${this.formats.web2[
+                    payload.context
+                ].join(", ")}`
+                throw new Error(errorMessage)
+            }
+        }
+
         const tx = DemosTransactions.empty()
         const address = demos.getAddress()
 

@@ -18,6 +18,7 @@ export {
 
 // SECTION Payload types
 export { INativePayload } from "./native/INativePayload"
+export { InstantMessagingPayload } from "./instantMessaging"
 
 export { TxFee } from "./blockchain/TxFee"
 export { CValidityData, ValidityData } from "./blockchain/ValidityData"

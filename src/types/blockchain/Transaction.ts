@@ -8,6 +8,7 @@ import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
 import { SubnetPayload } from "../../l2ps"
 import { IdentityPayload } from "../abstraction"
+import { InstantMessagingPayload } from "../instantMessaging"
 // export type StringifiedPayload = [string, string]
 
 export type TransactionContentData =
@@ -17,12 +18,12 @@ export type TransactionContentData =
     | ["demoswork", DemoScript]
     | ["subnet", SubnetPayload]
     | ["identity", IdentityPayload]
+    | ["instantMessaging", InstantMessagingPayload]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
 export interface TransactionContent {
     type:
-        | "identity"
         | "web2Request"
         | "crosschainOperation"
         | "subnet"
@@ -30,6 +31,8 @@ export interface TransactionContent {
         | "demoswork"
         | "genesis"
         | "NODE_ONLINE"
+        | "identity"
+        | "instantMessaging"
     from: forge.pki.ed25519.BinaryBuffer | forge.pki.PublicKey | ISignature
     to: forge.pki.ed25519.BinaryBuffer | forge.pki.PrivateKey | ISignature
     amount: number

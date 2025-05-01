@@ -45,11 +45,11 @@ describe("Native transactions", () => {
         // run multiple instances of this test at the same time.
 
         // INFO: Local testnet RPCs
-        const rpcs = [
-            "http://localhost:53550",
-            // "http://localhost:53559",
-            // "http://localhost:53560",
-        ]
+        // const rpcs = [
+        //     "http://localhost:53550",
+        //     "http://localhost:53559",
+        //     "http://localhost:53560",
+        // ]
 
         // INFO: Private testnet RPCs
         // const rpcs = [
@@ -57,6 +57,12 @@ describe("Native transactions", () => {
         //     "http://node2.demos.sh:53560",
         //     "http://node3.demos.sh:53560",
         // ]
+
+        // INFO: Public testnet RPCs
+        const rpcs = [
+            "https://demosnode.discus.sh",
+            "http://mungaist.com:53550",
+        ]
 
         const demoss = rpcs.map(async rpc => {
             const demos = new Demos()
