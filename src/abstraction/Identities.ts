@@ -18,7 +18,7 @@ import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 import { IKeyPair } from "@/websdk/types/KeyPair"
 
-export default class Identities {
+export class Identities {
     formats = {
         web2: {
             github: [
