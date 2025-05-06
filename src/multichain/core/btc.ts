@@ -1,7 +1,6 @@
 import * as bitcoin from "bitcoinjs-lib"
 import { BIP32Factory } from "bip32"
-import ecc from "@bitcoinerlab/secp256k1"
-// import * as bitcoinMessage from "bitcoinjs-message"
+import * as ecc from "tiny-secp256k1"
 import { required } from "./utils"
 import axios from "axios"
 import { ECPairAPI, ECPairFactory, ECPairInterface } from "ecpair"
@@ -57,7 +56,7 @@ export class BTC extends DefaultChain {
     }
 
     async connect(): Promise<boolean> {
-        if (!this.rpc_url){
+        if (!this.rpc_url) {
             return false
         }
 
@@ -462,8 +461,6 @@ export class BTC extends DefaultChain {
         message: string,
         options?: { privateKey?: string },
     ): Promise<string> {
-        return "";
-
         let keyPair: ECPairInterface
         if (options?.privateKey) {
             keyPair = ECPair.fromWIF(options.privateKey, this.network)
@@ -472,16 +469,12 @@ export class BTC extends DefaultChain {
             keyPair = this.wallet
         }
 
-        const privateKey = Buffer.from(keyPair.privateKey!)
-        // @ts-expect-error
-        const signature = bitcoinMessage.sign(
-            message,
-            privateKey,
-            keyPair.compressed,
-            { segwitType: "p2wpkh" },
-        )
+        const messageBuffer = Buffer.from(message, "utf-8")
+        const hash = bitcoin.crypto.sha256(messageBuffer)
+        const signature = keyPair.sign(hash)
+        const signatureBase64 = Buffer.from(signature).toString("base64")
 
-        return signature.toString("base64")
+        return signatureBase64
     }
 
     async verifyMessage(
@@ -489,18 +482,20 @@ export class BTC extends DefaultChain {
         signature: string,
         address: string,
     ): Promise<boolean> {
-        return false;
-
         try {
-            // @ts-expect-error
-            return bitcoinMessage.verify(
-                message,
-                address,
-                Buffer.from(signature, "base64"),
-                this.network.messagePrefix,
-                true, // checkSegwitAlways to support SegWit
-            )
+            const keyPair = ECPair.fromPublicKey(Buffer.from(address, "base64"), {
+                network: this.network,
+            })
+            
+            const messageBuffer = Buffer.from(message, "utf-8")
+            const hash = bitcoin.crypto.sha256(messageBuffer)
+            const signatureBuffer = Buffer.from(signature, "base64")
+            const isValid = keyPair.verify(hash, signatureBuffer)
+
+            return isValid
         } catch (error) {
+            console.log("Error verifying message:", error)
+
             return false
         }
     }

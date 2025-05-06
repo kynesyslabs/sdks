@@ -186,11 +186,16 @@ describe.skip("BTC CHAIN TESTS", () => {
         const message = "Test message for BTC"
         const address = instance.getAddress()
         const signature = await instance.signMessage(message)
+        
+        const connectedWallet = await instance.connectWallet(wallets.btc.privateKey)
+        const bitcoinPublicKey = Buffer.from(connectedWallet.publicKey).toString(
+            "base64",
+        )
 
         const isValid = await instance.verifyMessage(
             message,
             signature,
-            address,
+            bitcoinPublicKey
         )
         expect(isValid).toBe(true)
 

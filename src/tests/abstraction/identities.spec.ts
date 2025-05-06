@@ -177,6 +177,7 @@ describe.each(chains)(
         test("Associate an identity using a signature", async () => {
             instance = await sdk.create(null)
             let ibcBase64PublicKey = ""
+            let bitcoinPublicKey = ""
 
             if (name === "EGLD") {
                 await instance.connectWallet(wallet, { password: password })
@@ -209,6 +210,12 @@ describe.each(chains)(
                 }
 
                 await instance.connectWallet(wallet, options)
+            } else if (name === "BTC") {
+                const connectedWallet = await instance.connectWallet(wallet)
+
+                bitcoinPublicKey = Buffer.from(
+                    connectedWallet.publicKey,
+                ).toString("base64")
             } else {
                 await instance.connectWallet(wallet)
             }
@@ -236,6 +243,8 @@ describe.each(chains)(
                 publicKey:
                     name === "IBC"
                         ? ibcBase64PublicKey
+                        : name === "BTC"
+                        ? bitcoinPublicKey
                         : instance.wallet.publicKey,
             }
 
@@ -253,6 +262,12 @@ describe.each(chains)(
                     instance.getAddress(),
                     _signature,
                     ibcBase64PublicKey,
+                )
+            } else if (name === "BTC") {
+                verified = await instance.verifyMessage(
+                    instance.getAddress(),
+                    _signature,
+                    bitcoinPublicKey,
                 )
             } else {
                 verified = await instance.verifyMessage(
@@ -272,7 +287,10 @@ describe.each(chains)(
 
             // INFO: Send the payload to the RPC
             // @ts-ignore
-            const validityData = await identities.inferXmIdentity(demos, payload)
+            const validityData = await identities.inferXmIdentity(
+                demos,
+                payload,
+            )
 
             const res = await demos.broadcast(validityData)
             console.log(res)
