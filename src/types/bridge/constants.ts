@@ -84,6 +84,6 @@ export const ChainProviders = {
         mainnet: "https://base-rpc.publicnode.com",
     },
     SOLANA: {
-        mainnet: "https://base-rpc.publicnode.com",
+        mainnet: "https://api.mainnet-beta.solana.com",
     },
 }
