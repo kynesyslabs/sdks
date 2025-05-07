@@ -12,6 +12,7 @@ MessagingPeer provides a robust implementation for peer-to-peer communication wi
 -   **Event-Based Architecture**: Uses handlers for different message types and events
 -   **Promise-Based API**: For request-response patterns like peer discovery and public key exchange
 -   **Robust Request-Response Pattern**: Built-in support for waiting for specific responses with retry logic
+-   **Multi-Round Conversations**: Support for back-and-forth conversations between peers and the server
 
 ### Architecture
 
@@ -31,6 +32,10 @@ The system consists of:
     - Message is sent through signaling server
     - Recipient decrypts message using their private key
     - Decrypted message is passed to registered handlers
+5. **Multi-Round Conversations**:
+    - Server can ask questions to peers
+    - Peers can respond to server questions
+    - Conversations can continue for multiple rounds
 
 ## Usage
 
@@ -80,6 +85,23 @@ await peer.sendMessage("target-peer-id", "Hello from me!")
 // Discover all connected peers
 const peers = await peer.discoverPeers()
 console.log("Available peers:", peers)
+```
+
+### Multi-Round Conversations with Server
+
+MessagingPeer supports multi-round conversations with the server:
+
+```typescript
+// Register a handler for server questions
+peer.onServerQuestion((question, questionId) => {
+    console.log("Server asked:", question)
+
+    // Process the question and prepare a response
+    const response = { answer: "This is my answer" }
+
+    // Send the response back to the server
+    peer.respondToServer(questionId, response)
+})
 ```
 
 ### Request-Response Pattern
@@ -163,6 +185,17 @@ peer.onMessage((message, fromId) => {
     document.getElementById("messages-container").appendChild(messageElement)
 })
 
+// Register a handler for server questions
+peer.onServerQuestion((question, questionId) => {
+    console.log("Server asked:", question)
+
+    // Process the question and prepare a response
+    const response = { answer: "This is my answer" }
+
+    // Send the response back to the server
+    peer.respondToServer(questionId, response)
+})
+
 // Discover other peers
 const peers = await peer.discoverPeers()
 console.log("Available peers:", peers)
@@ -201,6 +234,9 @@ The system supports various message types:
 -   **"peer_disconnected"**: Notification when a peer disconnects
 -   **"request_public_key"**: Request a peer's public key
 -   **"public_key_response"**: Response containing a peer's public key
+-   **"server_question"**: Question from the server to a peer
+-   **"peer_response"**: Response from a peer to a server question
+-   **"debug_question"**: Debug message to trigger a server question
 -   **"error"**: Error notification with details
 
 ## Event Handlers
@@ -211,6 +247,7 @@ MessagingPeer provides several handler registration methods:
 -   **onError**: Handle errors
 -   **onPeerDisconnected**: Handle peer disconnection events
 -   **onConnectionStateChange**: Handle connection state changes
+-   **onServerQuestion**: Handle questions from the server
 
 ## Reconnection Logic
 
@@ -235,6 +272,7 @@ MessagingPeer provides several methods for request-response patterns:
 -   **registerAndWait**: Register with the server and wait for confirmation
 -   **discoverPeers**: Discover all connected peers
 -   **requestPublicKey**: Request a peer's public key
+-   **respondToServer**: Respond to a server question
 
 ## TODO: Future Documentation
 

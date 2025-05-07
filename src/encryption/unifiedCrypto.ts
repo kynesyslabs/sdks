@@ -1,6 +1,6 @@
+import { sha256 } from '@noble/hashes/sha2';
 import { Enigma } from "./PQC/enigma"
 import { hkdf } from "@noble/hashes/hkdf"
-import { sha256 } from "@noble/hashes/sha2"
 import { randomBytes } from "@noble/hashes/utils"
 import * as forge from "node-forge"
 import { Cryptography } from "./Cryptography"
@@ -12,6 +12,18 @@ export interface encryptedObject {
     cipherText?: Uint8Array
 }
 
+export interface SerializedEncryptedObject {
+    algorithm: "ml-kem-aes" | "rsa"
+    serializedEncryptedData: string
+    serializedCipherText?: string
+}
+
+export interface SerializedSignedObject {
+    algorithm: "ml-dsa" | "falcon" | "ed25519"
+    serializedSignedData: string
+    serializedPublicKey: string
+    serializedMessage: string
+}
 export interface Ed25519SignedObject {
     algorithm: "ed25519"
     signature: Uint8Array

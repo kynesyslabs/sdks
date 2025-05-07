@@ -133,17 +133,19 @@
  */
 
 import { unifiedCrypto, encryptedObject } from "@/encryption/unifiedCrypto"
-import { serializeUint8Array, deserializeUint8Array } from "@/utils/uint8Serialize"
+import {
+    serializeUint8Array,
+    deserializeUint8Array,
+} from "@/utils/uint8Serialize"
+import {
+    SerializedEncryptedObject,
+    SerializedSignedObject,
+} from "@/encryption/unifiedCrypto"
+
 export interface MessagingPeerConfig {
     serverUrl: string
     clientId: string
     publicKey: Uint8Array
-}
-
-export interface SerializedEncryptedObject {
-    algorithm: "ml-kem-aes" | "rsa"
-    serializedEncryptedData: string
-    serializedCipherText?: string
 }
 
 export interface Message {
@@ -154,6 +156,9 @@ export interface Message {
         | "peer_disconnected"
         | "request_public_key"
         | "public_key_response"
+        | "server_question"
+        | "peer_response"
+        | "debug_question"
         | "error"
     payload: any
 }
@@ -387,12 +392,27 @@ export class MessagingPeer {
      * @returns Promise that resolves when registration is confirmed
      */
     public async registerAndWait(): Promise<void> {
+        // Creating a proof that shows our signing key
+        const proofSignature = await unifiedCrypto.sign(
+            "ml-dsa",
+            this.config.publicKey,
+        )
+        const serializedProofSignature: SerializedSignedObject = {
+            algorithm: "ml-dsa",
+            serializedSignedData: serializeUint8Array(
+                proofSignature.signedData,
+            ),
+            serializedPublicKey: serializeUint8Array(proofSignature.publicKey),
+            serializedMessage: serializeUint8Array(proofSignature.message),
+        }
+        // Sending the registration request and signing key proof
         await this.sendToServerAndWait(
             {
                 type: "register",
                 payload: {
                     clientId: this.config.clientId,
                     publicKey: Array.from(this.config.publicKey),
+                    verification: serializedProofSignature,
                 },
             },
             "register",
@@ -482,6 +502,36 @@ export class MessagingPeer {
         )
 
         return new Uint8Array(response.publicKey)
+    }
+
+    /**
+     * Responds to a server question
+     * @param questionId - The ID of the question to respond to
+     * @param response - The response to send back to the server
+     */
+    public respondToServer(questionId: string, response: any): void {
+        this.sendToServer({
+            type: "peer_response",
+            payload: {
+                questionId,
+                response,
+            },
+        })
+    }
+
+    /**
+     * Registers a handler for server questions
+     * @param handler - Function to call when a server question is received
+     */
+    public onServerQuestion(
+        handler: (question: any, questionId: string) => void,
+    ): void {
+        const messageHandler = (message: any, fromId: string) => {
+            if (message.type === "server_question") {
+                handler(message.payload.question, message.payload.questionId)
+            }
+        }
+        this.messageHandlers.add(messageHandler)
     }
 
     /**
@@ -717,6 +767,30 @@ export class MessagingPeer {
                     handler(message.payload.peerId)
                 })
                 break
+            case "server_question":
+                console.log(
+                    "[IM @ " +
+                        this.config.clientId +
+                        "] Received a server question:",
+                    message.payload,
+                )
+                // Pass the message to any temporary handlers waiting for this response
+                this.messageHandlers.forEach(handler => {
+                    handler(message, "")
+                })
+                break
+            case "peer_response":
+                console.log(
+                    "[IM @ " +
+                        this.config.clientId +
+                        "] Received a peer response:",
+                    message.payload,
+                )
+                // Pass the message to any temporary handlers waiting for this response
+                this.messageHandlers.forEach(handler => {
+                    handler(message, "")
+                })
+                break
             /*case "error":
                 console.error("[IM @ " + this.config.clientId + "] Received an error message: ", message)
                 this.handleError({
@@ -796,5 +870,4 @@ export class MessagingPeer {
             }
         }
     }
-
 }
