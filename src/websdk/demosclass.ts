@@ -241,7 +241,7 @@ export class Demos {
 
         raw_tx.signature = {
             type: this.algorithm,
-            data: uint8ArrayToHex(signature.signedData),
+            data: uint8ArrayToHex(signature.signature),
         }
 
         return raw_tx
@@ -265,7 +265,7 @@ export class Demos {
                 this.algorithm,
                 new TextEncoder().encode(publicKey),
             )
-            signature = uint8ArrayToHex(_signature.signedData)
+            signature = uint8ArrayToHex(_signature.signature)
         }
 
         try {
@@ -361,7 +361,7 @@ export class Demos {
             )
 
             pubkey_string = this.algorithm + ":" + publicKey
-            pubkey_signature = uint8ArrayToHex(signature.signedData)
+            pubkey_signature = uint8ArrayToHex(signature.signature)
         }
 
         try {

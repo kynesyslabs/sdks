@@ -36,7 +36,7 @@
         "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",
         "test:native": "rm -rf build && jest --testMatch '**/tests/native*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:web2": "rm -rf build && jest --testMatch '**/tests/web2*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
-        "test:demos": "rm -rf build && jest --testMatch '**/tests/communication/demos.spec.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:demos": "rm -rf build && jest --testMatch '**/newdemos.spec.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:rubic-service": "rm -rf build && jest --testMatch '**/tests/**/rubic*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template* --verbose",
         "test:btc": "rm -rf build && jest --testMatch '**/tests/multichain**/bitcoin*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:pqc": "rm -rf build && jest --testMatch '**/tests/encryption/new*.ts' --verbose",

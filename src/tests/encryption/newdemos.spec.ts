@@ -17,7 +17,7 @@ describe("New Demos", () => {
 
         const verified2 = await unifiedCrypto.verify({
             algorithm: "ed25519",
-            signedData: forge.util.binary.hex.decode(
+            signature: forge.util.binary.hex.decode(
                 "1158ed37d9f3510819aa3e424316cd4760c34a94c815d9491eba5e6e601c7c72d81e1cfa8032eeeee2c29d8b13b16f2b6f9f1642946a48cc775adb20fc92780e",
             ),
             publicKey: forge.util.binary.hex.decode(
@@ -34,6 +34,8 @@ describe("New Demos", () => {
     })
 
     test.only("Stuff", async () => {
+        const rpc = "http://localhost:53550"
+
         const identity = DemosWebAuth.getInstance()
         await identity.create()
 
@@ -42,7 +44,17 @@ describe("New Demos", () => {
             identity.keypair.privateKey.length,
         )
 
-        // const demos = new Demos()
-        // await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+        const demos = new Demos()
+        await demos.connect(rpc)
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+
+        const tx = await demos.pay(
+            identity.keypair.publicKey.toString("hex"),
+            100,
+        )
+        console.log("tx:", tx)
+
+        const validityData = await demos.confirm(tx)
+        console.log("validityData:", validityData)
     })
 })

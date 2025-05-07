@@ -282,7 +282,7 @@ describe("Signing and Verification", () => {
         // Sign
         const signed = await unifiedCrypto.sign("ed25519", data)
         expect(signed.algorithm).toBe("ed25519")
-        expect(signed.signedData).toBeDefined()
+        expect(signed.signature).toBeDefined()
         expect(signed.publicKey).toBeDefined()
 
         // Verify
@@ -298,7 +298,7 @@ describe("Signing and Verification", () => {
         // Sign
         const signed = await unifiedCrypto.sign("ml-dsa", data)
         expect(signed.algorithm).toBe("ml-dsa")
-        expect(signed.signedData).toBeDefined()
+        expect(signed.signature).toBeDefined()
         expect(signed.publicKey).toBeDefined()
 
         // Verify
@@ -314,7 +314,7 @@ describe("Signing and Verification", () => {
         // Sign
         const signed = await unifiedCrypto.sign("falcon", data)
         expect(signed.algorithm).toBe("falcon")
-        expect(signed.signedData).toBeDefined()
+        expect(signed.signature).toBeDefined()
         expect(signed.publicKey).toBeDefined()
 
         // Verify
@@ -332,7 +332,7 @@ describe("Signing and Verification", () => {
 
         // Modify the signature to make it invalid
         const modifiedSigned = { ...signed }
-        modifiedSigned.signedData = new Uint8Array(signed.signedData.length)
+        modifiedSigned.signature = new Uint8Array(signed.signature.length)
 
         // Verify
         let isOriginalValid = await unifiedCrypto.verify(signed)
