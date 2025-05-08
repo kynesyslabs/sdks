@@ -304,8 +304,12 @@ export class HandleIdentityOperations {
                 edit.data = identityPayload.payload as any
                 break
             }
-            case "query_points": {
-                // INFO: For points query, we just need to set the operation to query
+            /**
+             * INFO: For points query and turnstile verification, we just need to set the operation to query
+             * since they are handled separately in handleIdentityRequest
+             */
+            case "query_points":
+            case "verify_turnstile": {
                 edit.operation = "query"
                 break
             }
