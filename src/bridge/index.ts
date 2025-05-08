@@ -11,3 +11,6 @@ export {
     SupportedChains,
     SupportedTokens
 }
+
+// Native bridge exports
+export * as NativeBridge from "./nativeBridge"
