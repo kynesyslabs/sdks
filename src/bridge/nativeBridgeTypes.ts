@@ -4,6 +4,20 @@
 export const supportedChains = ["EVM", "SOLANA"] as const
 export const supportedStablecoins = ["USDC"] as const
 
+export type BridgeOperation = {
+    demoAddress: string
+    originChain: SupportedChain
+    destinationChain: SupportedChain
+    originAddress: string
+    destinationAddress: string
+    amount: string
+    token: SupportedStablecoin
+    txHash: string
+    status: "empty" | "pending" | "completed" | "failed"
+}
+
+
+
 export type NativeBridgePayload = {
     operation: BridgeOperation
 }
@@ -41,16 +55,4 @@ export const usdcAbi = [
 export type SupportedChain = typeof supportedChains[number]
 export type SupportedStablecoin = typeof supportedStablecoins[number]
 export type SupportedEVMChain = typeof supportedEVMChains[number]
-
-export interface BridgeOperation {
-    demoAddress: string
-    originChain: SupportedChain
-    destinationChain: SupportedChain
-    originAddress: string
-    destinationAddress: string
-    amount: string
-    token: SupportedStablecoin
-    txHash: string
-    status: "empty" | "pending" | "completed" | "failed"
-}
 

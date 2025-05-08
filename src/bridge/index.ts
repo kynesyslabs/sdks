@@ -7,14 +7,19 @@ import {
 
 export { BridgeTradePayload, ChainProviders, SupportedChains, SupportedTokens }
 
-// Native bridge exports
-import * as NativeBridgeTypes from "./nativeBridgeTypes"
 import { methods as NativeBridgeMethods } from "./nativeBridge"
+export { NativeBridgeMethods }
 
-const NativeBridge = {
-    types: NativeBridgeTypes,
-    methods: NativeBridgeMethods,
-}
-
-export { NativeBridge }
-
+// Export types from nativeBridgeTypes
+export {
+    BridgeOperation as NativeBridgeOperation,
+    NativeBridgePayload,
+    SupportedChain as NativeBridgeSupportedChain,
+    SupportedStablecoin as NativeBridgeSupportedStablecoin,
+    SupportedEVMChain as NativeBridgeSupportedEVMChain,
+    supportedChains as NativeBridgeSupportedChains,
+    supportedStablecoins as NativeBridgeSupportedStablecoins,
+    supportedEVMChains as NativeBridgeSupportedEVMChains,
+    usdcContracts as NativeBridgeUSDCContracts,
+    usdcAbi as NativeBridgeUSDCAbi,
+} from "./nativeBridgeTypes"
