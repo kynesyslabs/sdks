@@ -19,8 +19,11 @@ export class SUI extends SUICore implements IDefaultChainLocal {
         required(this.provider, "Provider not connected")
 
         try {
+            const transactionBlockBytes = Uint8Array.from(
+                Buffer.from(signed_tx.bytes, "base64"),
+            )
             const res = await this.provider.executeTransactionBlock({
-                transactionBlock: signed_tx.bytes,
+                transactionBlock: transactionBlockBytes,
                 signature: signed_tx.signature,
                 options: {
                     showEffects: true,

@@ -134,11 +134,13 @@ export class SUI extends DefaultChain {
         }
 
         const sender = keypair.getPublicKey().toSuiAddress()
+        const referenceGasPrice = await this.provider.getReferenceGasPrice()
+
         for (const { address, amount } of payments) {
             const tx = new Transaction()
             tx.setSender(sender)
-            tx.setGasPrice(1)
-            tx.setGasBudget(1_000_000)
+            tx.setGasPrice(referenceGasPrice)
+            tx.setGasBudget(10_000_000)
 
             const coinToSend = tx.splitCoins(tx.gas, [BigInt(amount)])
             tx.transferObjects([coinToSend], address)
@@ -146,9 +148,7 @@ export class SUI extends DefaultChain {
             const bytes: Uint8Array = await tx.build({ client: this.provider })
             const signatureData = await keypair.signTransaction(bytes)
             const txBytesBase64 = Buffer.from(bytes).toString("base64")
-            const signatureBase64 = Buffer.from(
-                signatureData.signature,
-            ).toString("base64")
+            const signatureBase64 = signatureData.signature
 
             results.push({
                 bytes: txBytesBase64,

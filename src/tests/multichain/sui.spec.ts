@@ -1,6 +1,12 @@
 import { SUI } from "@/multichain/websdk/sui"
 import chainProviders from "@/tests/multichain/chainProviders"
 import { wallets } from "@/tests/utils/wallets"
+import {
+    Demos,
+    DemosWebAuth,
+    prepareXMPayload,
+    prepareXMScript,
+} from "@/websdk"
 
 describe("SUI CHAIN TESTS", () => {
     let sui: SUI
@@ -83,4 +89,72 @@ describe("SUI CHAIN TESTS", () => {
             expect(typeof result.signature).toBe("string")
         })
     })
+})
+
+describe.skip("DEMOS Transaction with Sui SDK", () => {
+    const senderMnemonic = wallets.sui.privateKey
+    let receiverAddress: string
+    let suiSDK: SUI | null = null
+    let operationId: string
+
+    beforeAll(async () => {
+        suiSDK = new SUI(chainProviders.sui.testnet)
+        const connected = await suiSDK.connect()
+        expect(connected).toBe(true)
+
+        await suiSDK.connectWallet(senderMnemonic)
+
+        receiverAddress =
+            "0x18ed053d809847b3ce9b4a81f3c2467134bb0f0a16869fa38cd57225076899ca"
+
+        const balance = await suiSDK.getBalance(suiSDK.getAddress())
+        expect(parseInt(balance, 10)).toBeGreaterThan(0)
+    })
+
+    it("preparePays - Create multiple payment transactions", async () => {
+        const payments = [{ address: receiverAddress, amount: "1000" }]
+
+        const signedTxs = await suiSDK.preparePays(payments)
+
+        expect(signedTxs).toBeDefined()
+        expect(Array.isArray(signedTxs)).toBe(true)
+        expect(signedTxs.length).toBe(payments.length)
+        signedTxs.forEach(tx => {
+            expect(tx).toHaveProperty("bytes")
+            expect(tx).toHaveProperty("signature")
+            expect(typeof tx.bytes).toBe("string")
+            expect(typeof tx.signature).toBe("string")
+            expect(
+                Buffer.from(tx.signature, "base64").length,
+            ).toBeGreaterThanOrEqual(65)
+        })
+
+        const xmscript = prepareXMScript({
+            chain: "sui",
+            subchain: "testnet",
+            signedPayloads: [signedTxs[0]],
+            type: "pay",
+        })
+
+        operationId = Object.keys(xmscript.operations)[0]
+        const identity = DemosWebAuth.getInstance()
+        await identity.create()
+
+        const tx = await prepareXMPayload(xmscript, identity.keypair)
+
+        const rpc = "http://localhost:53550"
+        const demos = new Demos()
+
+        await demos.connect(rpc)
+        await demos.connectWallet(identity.keypair.privateKey as any)
+
+        const validityData = await demos.confirm(tx)
+
+        const res = await demos.broadcast(validityData)
+
+        expect(res).toBeDefined()
+        expect(res.result).toBe(200)
+        expect(res.response[operationId].result).toBe("success")
+        expect(res.response[operationId].hash).toBeDefined()
+    }, 300000)
 })
