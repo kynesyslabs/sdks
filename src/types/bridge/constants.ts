@@ -52,7 +52,7 @@ export const SupportedTokens = {
         USDT: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
     },
     SOLANA: {
-        NATIVE: "So11111111111111111111111111111111111111112",
+        NATIVE: "11111111111111111111111111111111",
         USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
     },
@@ -84,6 +84,6 @@ export const ChainProviders = {
         mainnet: "https://base-rpc.publicnode.com",
     },
     SOLANA: {
-        mainnet: "https://base-rpc.publicnode.com",
+        mainnet: "https://api.mainnet-beta.solana.com",
     },
 }
