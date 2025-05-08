@@ -20,8 +20,8 @@ import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
 
-describe.skip("IDENTITIES V2", () => {
-    test("EVM ADD IDENTITY v2", async () => {
+describe.only("IDENTITIES V2", () => {
+    test.only("EVM ADD IDENTITY v2", async () => {
         const instance = await EVM.create()
         await instance.connectWallet(wallets.evm.privateKey)
 
@@ -49,8 +49,8 @@ describe.skip("IDENTITIES V2", () => {
             },
         }
 
-        // const rpc = "https://demosnode.discus.sh"
-        const rpc = "http://localhost:53550"
+        const rpc = "https://demosnode.discus.sh"
+        // const rpc = "http://localhost:53550"
         const identity = DemosWebAuth.getInstance()
         await identity.login(
             "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
@@ -64,8 +64,10 @@ describe.skip("IDENTITIES V2", () => {
         const identities = new Identities()
         // @ts-ignore
         const validityData = await identities.inferXmIdentity(demos, payload)
+        console.log(validityData)
 
         const res = await demos.broadcast(validityData)
+        console.log(res)
         expect(res).toBeDefined()
         expect(res.result).toBe(200)
     })
