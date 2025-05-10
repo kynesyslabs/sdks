@@ -159,6 +159,7 @@ export class DemosWebAuth {
                 ),
             }
         }
+        
         let result = [true, {}]
         try {
             const sign_result = forge.pki.ed25519.sign({
