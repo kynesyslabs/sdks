@@ -51,7 +51,7 @@ function HexToForge(forgeString: string) {
     const finalArray = new Uint8Array(64)
     // Parsing the hex string into a Uint8Array by splitting it into 2-char chunks and parsing them into decimal values
     for (let i = 0; i < forgeString.length; i += 2) {
-        const hexValue = forgeString.substr(i, 2)
+        const hexValue = forgeString.substring(i, i + 2)
         const decimalValue = parseInt(hexValue, 16)
         finalArray[i / 2] = decimalValue
     }

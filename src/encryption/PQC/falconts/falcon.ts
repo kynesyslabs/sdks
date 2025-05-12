@@ -15,7 +15,7 @@ interface FalconKernel {
     signNonceByte: number;
 }
 
-interface FalconKeypair {
+export interface FalconKeypair {
     genkeySeed: Uint8Array;
     sk: Uint8Array;
     pk: Uint8Array;

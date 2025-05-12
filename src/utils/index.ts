@@ -3,3 +3,4 @@ export async function sleep(time: number) {
 }
 
 export * as dataManipulation from "./dataManipulation"
+export { deserializeUint8Array, serializeUint8Array } from "./uint8Serialize"

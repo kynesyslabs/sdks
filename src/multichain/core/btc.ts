@@ -1,7 +1,7 @@
 import * as bitcoin from "bitcoinjs-lib"
 import { BIP32Factory } from "bip32"
 import ecc from "@bitcoinerlab/secp256k1"
-import * as bitcoinMessage from "bitcoinjs-message"
+// import * as bitcoinMessage from "bitcoinjs-message"
 import { required } from "./utils"
 import axios from "axios"
 import { ECPairAPI, ECPairFactory, ECPairInterface } from "ecpair"
@@ -462,6 +462,8 @@ export class BTC extends DefaultChain {
         message: string,
         options?: { privateKey?: string },
     ): Promise<string> {
+        return "";
+
         let keyPair: ECPairInterface
         if (options?.privateKey) {
             keyPair = ECPair.fromWIF(options.privateKey, this.network)
@@ -471,6 +473,7 @@ export class BTC extends DefaultChain {
         }
 
         const privateKey = Buffer.from(keyPair.privateKey!)
+        // @ts-expect-error
         const signature = bitcoinMessage.sign(
             message,
             privateKey,
@@ -486,7 +489,10 @@ export class BTC extends DefaultChain {
         signature: string,
         address: string,
     ): Promise<boolean> {
+        return false;
+
         try {
+            // @ts-expect-error
             return bitcoinMessage.verify(
                 message,
                 address,

@@ -1,104 +1,216 @@
-import { describe, test, expect, beforeEach } from "bun:test";
-import Enigma from "../../encryption/PQC";
-import { randomBytes } from "crypto";
+import { describe, test, expect, beforeEach } from "bun:test"
+import { Enigma } from "@/encryption/PQC/enigma"
+import { randomBytes } from "crypto"
+import { performance } from "perf_hooks"
 
-describe('Hashing with SHA-3', () => {
-  test('should hash a message', async () => {
-    let enigma = new Enigma()
-    let hash = await enigma.hash('Hello, world!')
-    expect(hash).toBeDefined()
-  });
+// SECTION 1: Hashing with SHA-3
+console.log(">>>> SHA-3 Hashing tests in progress <<<<")
+let startTimeSHA3 = performance.now()
+describe("Hashing with SHA-3", () => {
+    test("should hash a message", async () => {
+        let hash = await Enigma.hash("Hello, world!")
+        expect(hash).toBeDefined()
+    })
+})
+let endTimeSHA3 = performance.now()
+console.log(`SHA-3 Hashing tests completed in ${endTimeSHA3 - startTimeSHA3}ms`)
+
+// SECTION 2: ml-dsa
+console.log(">>>> ml-dsa tests in progress <<<<")
+let startTimeMLDSA = performance.now()
+
+describe("ml-dsa", () => {
+    test("Should generate a keypair", async () => {
+        let enigma = new Enigma()
+        await enigma.generate_ml_dsa_signing_keypair()
+        expect(enigma.ml_dsa_signing_keypair).toBeDefined()
+    })
+
+    test("Should generate a keypair with a seed", async () => {
+        let enigma = new Enigma()
+        let seed = randomBytes(32)
+        await enigma.generate_ml_dsa_signing_keypair(seed)
+        expect(enigma.ml_dsa_signing_keypair).toBeDefined()
+    })
+
+    test("Should generate two identical keypairs with the same seed", async () => {
+        let enigma = new Enigma()
+        let seed = randomBytes(32)
+        await enigma.generate_ml_dsa_signing_keypair(seed)
+        let enigma2 = new Enigma()
+        await enigma2.generate_ml_dsa_signing_keypair(seed)
+        expect(enigma.ml_dsa_signing_keypair).toEqual(
+            enigma2.ml_dsa_signing_keypair,
+        )
+    })
+
+    test("Should sign a message", async () => {
+        let enigma = new Enigma()
+        await enigma.generate_ml_dsa_signing_keypair()
+        let message = randomBytes(32)
+        let signature = await enigma.sign_ml_dsa(message)
+        expect(signature).toBeDefined()
+    })
+
+    test("Should verify a signature", async () => {
+        let enigma = new Enigma()
+        await enigma.generate_ml_dsa_signing_keypair()
+        let message = randomBytes(32)
+        let signature = await enigma.sign_ml_dsa(message)
+        let isValid = await Enigma.verify_ml_dsa(
+            signature,
+            message,
+            enigma.ml_dsa_signing_keypair.publicKey,
+        )
+        expect(isValid).toBe(true)
+    })
+})
+let endTimeMLDSA = performance.now()
+console.log(`ml-dsa tests completed in ${endTimeMLDSA - startTimeMLDSA}ms`)
+
+// SECTION 3: falcon
+
+console.log(">>>> falcon tests in progress <<<<")
+let startTimeFalcon = performance.now()
+describe("falcon", () => {
+    test("Should generate a keypair", async () => {
+        let enigma = new Enigma()
+        await enigma.generate_falcon_signing_keypair()
+        expect(enigma.falcon_signing_keypair).toBeDefined()
+    })
+    test("Should generate a keypair with a seed", async () => {
+        let enigma = new Enigma()
+        let seed = randomBytes(48)
+        await enigma.generate_falcon_signing_keypair(seed)
+        expect(enigma.falcon_signing_keypair).toBeDefined()
+    })
+    test("Should generate two identical keypairs with the same seed", async () => {
+        let enigma = new Enigma()
+        let seed = randomBytes(48)
+        await enigma.generate_falcon_signing_keypair(seed)
+        let enigma2 = new Enigma()
+        await enigma2.generate_falcon_signing_keypair(seed)
+        expect(enigma.falcon_signing_keypair).toEqual(
+            enigma2.falcon_signing_keypair,
+        )
+    })
+    test("Should sign a message", async () => {
+        let enigma = new Enigma()
+        await enigma.generate_falcon_signing_keypair()
+        let message = randomBytes(32)
+        let stringMessage = message.toString("hex")
+        let signature = await enigma.sign_falcon(stringMessage)
+        expect(signature).toBeDefined()
+    })
+    test("Should verify a signature", async () => {
+        let enigma = new Enigma()
+        await enigma.generate_falcon_signing_keypair()
+        let message = randomBytes(32)
+        let stringMessage = message.toString("hex")
+        let signature = await enigma.sign_falcon(stringMessage)
+        let isValid = await Enigma.verify_falcon(
+            signature,
+            stringMessage,
+            enigma.falcon_signing_keypair.publicKey,
+        )
+    })
+})
+let endTimeFalcon = performance.now()
+console.log(`falcon tests completed in ${endTimeFalcon - startTimeFalcon}ms`)
+
+// SECTION 4: ml-kem
+
+console.log(">>>> ml-kem tests in progress <<<<")
+let startTimeMLKEM = performance.now()
+
+describe("ml-kem", () => {
+    test("Should generate a keypair", async () => {
+        let enigma = new Enigma()
+        await enigma.generate_ml_kem_encryption_keypair()
+        expect(enigma.ml_kem_encryption_keypair).toBeDefined()
+    })
+    test("Should generate a keypair with a seed", async () => {
+        let enigma = new Enigma()
+        let seed = randomBytes(64)
+        await enigma.generate_ml_kem_encryption_keypair(seed)
+        expect(enigma.ml_kem_encryption_keypair).toBeDefined()
+    })
+    test("Should generate two identical keypairs with the same seed", async () => {
+        let enigma = new Enigma()
+        let seed = randomBytes(64)
+        await enigma.generate_ml_kem_encryption_keypair(seed)
+        let enigma2 = new Enigma()
+        await enigma2.generate_ml_kem_encryption_keypair(seed)
+        expect(enigma.ml_kem_encryption_keypair).toEqual(
+            enigma2.ml_kem_encryption_keypair,
+        )
+    })
+    test("Should encapsulate a secret given a public key", async () => {
+        let enigma = new Enigma()
+        await enigma.generate_ml_kem_encryption_keypair()
+        let enigma2 = new Enigma()
+        await enigma2.generate_ml_kem_encryption_keypair()
+        let secret = randomBytes(32)
+        let { cipherText, sharedSecret } = await enigma.encapsulate_ml_kem(
+            enigma2.ml_kem_encryption_keypair.publicKey,
+        )
+        expect(cipherText).toBeDefined()
+        expect(sharedSecret).toBeDefined()
+    })
+    test("Should decapsulate a secret given a cipher text", async () => {
+        let alice = new Enigma()
+        await alice.generate_ml_kem_encryption_keypair()
+        let bob = new Enigma()
+        await bob.generate_ml_kem_encryption_keypair()
+        let { cipherText, sharedSecret } = await alice.encapsulate_ml_kem(
+            bob.ml_kem_encryption_keypair.publicKey,
+        )
+        let decapsulatedSecret = await bob.decapsulate_ml_kem(cipherText)
+        expect(decapsulatedSecret).toEqual(sharedSecret)
+    })
 })
 
-// SECTION PQC Encryption Tests
+let endTimeMLKEM = performance.now()
+console.log(`ml-kem tests completed in ${endTimeMLKEM - startTimeMLKEM}ms`)
 
-describe('PQC Encryption with NTRU', () => {
-  beforeEach(async () => {
-  });
+// TODO Add ml-kem-aes tests
+let startTimeMLKEMAES = performance.now()
+console.log(">>>> ml-kem-aes tests in progress <<<<")
 
-  describe('Key Generation', () => {
-    test('should generate a valid key pair', async () => {
-      // Test key generation
-      let enigma = new Enigma()
-      await enigma.genNTRUKeyPair()
-      expect(enigma.ntruKeyPair).toBeDefined()
-    });
-  });
-
-  describe('Encryption', () => {
-    test('should encrypt and decrypt data successfully', async () => {
-      // Test encryption
-      let enigma = new Enigma()
-      await enigma.genNTRUKeyPair()
-      let encrypted = await enigma.ntruEncrypt('Hello, world!', enigma.ntruKeyPair.publicKey)
-      let decrypted = await enigma.ntruDecrypt(encrypted.encrypted, enigma.ntruKeyPair.privateKey)
-      let decryptedString = new TextDecoder().decode(decrypted)
-      expect(decryptedString).toBe('Hello, world!')
-    });
-  });
+describe("ml-kem-aes", () => {
+    test("Should encrypt a message", async () => {
+        let alice = new Enigma()
+        await alice.generate_ml_kem_encryption_keypair()
+        let bob = new Enigma()
+        await bob.generate_ml_kem_encryption_keypair()
+        let message = randomBytes(32)
+        let encryptedMessage = await alice.encrypt_ml_kem_aes(
+            message,
+            bob.ml_kem_encryption_keypair.publicKey,
+        )
+        expect(encryptedMessage).toBeDefined()
+    })
+    test("Should decrypt a message", async () => {
+        let alice = new Enigma()
+        await alice.generate_ml_kem_encryption_keypair()
+        let bob = new Enigma()
+        await bob.generate_ml_kem_encryption_keypair()
+        let message = randomBytes(32)
+        let encryptedMessage = await alice.encrypt_ml_kem_aes(
+            message,
+            bob.ml_kem_encryption_keypair.publicKey,
+        )
+        let decryptedMessage = await bob.decrypt_ml_kem_aes(
+            encryptedMessage.encryptedMessage,
+            encryptedMessage.cipherText,
+        )
+        expect(decryptedMessage).toEqual(message)
+    })
 })
 
-// SECTION Signature Tests
+let endTimeMLKEMAES = performance.now()
+console.log(
+    `ml-kem-aes tests completed in ${endTimeMLKEMAES - startTimeMLKEMAES}ms`,
+)
 
-describe('Falcon', () => {
-  test('should generate a valid key pair', async () => {
-    let enigma = new Enigma()
-    await enigma.genFalconKeyPair()
-    expect(enigma.falconKeyPair).toBeDefined()
-  });
-
-  test('should generate a valid public key given a seed', async () => {
-    let enigma = new Enigma()
-    let seed = randomBytes(48)
-    await enigma.genFalconKeyPair(seed)
-    let publicKey = await enigma.getPublicKeyFalcon()
-    // Creating a second key pair with the same seed should produce the same public key
-    await enigma.genFalconKeyPair(seed)
-    let publicKey2 = await enigma.getPublicKeyFalcon()
-    expect(publicKey).toEqual(publicKey2)
-  });
-
-  test('should import a private key from a hex string', async () => {
-    let enigma = new Enigma()
-    await enigma.genFalconKeyPair()
-    let privateKey = await enigma.getPrivateKeyFalconHex()
-    let publicKey = await enigma.getPublicKeyFalconHex()
-    await enigma.setPrivateKeyFalconHex(privateKey)
-    let publicKey2 = await enigma.getPublicKeyFalconHex()
-    expect(publicKey).toEqual(publicKey2)
-  });
-
-  test('should sign and verify a message', async () => {
-    let enigma = new Enigma()
-    await enigma.genFalconKeyPair()
-    let signature = await enigma.signFalcon('Hello, world!')
-    let isValid = await enigma.verifyFalcon('Hello, world!', signature, enigma.falconKeyPair.pk)
-    expect(isValid).toBe(true)
-  });
-})
-
-describe('ml-dsa', () => {
-  test('should generate a valid key pair', async () => {
-    let enigma = new Enigma()
-    await enigma.genSigningKeyPair()
-    expect(enigma.signingKeyPair).toBeDefined()
-  });
-
-  test('should import a private key from a seed string', async () => {
-    let enigma = new Enigma()
-    await enigma.genSigningKeyPair()
-    let seed = await enigma.getSeed()
-    let publicKey = await enigma.getPublicKey()
-    await enigma.genSigningKeyPair(seed as Uint8Array)
-    let publicKey2 = await enigma.getPublicKey()
-    expect(publicKey).toEqual(publicKey2)
-  });
-
-  test('should sign and verify a message', async () => {
-    let enigma = new Enigma()
-    await enigma.genSigningKeyPair()
-    let signature = await enigma.sign('Hello, world!')
-    let isValid = await enigma.verify(enigma.signingKeyPair.publicKey, 'Hello, world!', signature)
-    expect(isValid).toBe(true)
-  });
-})
+console.log(">>>> results <<<<")

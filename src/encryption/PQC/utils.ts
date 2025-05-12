@@ -1,4 +1,4 @@
-import { utf8ToBytes } from '@noble/hashes/utils';
+import { utf8ToBytes, randomBytes } from '@noble/hashes/utils';
 /**
  * Converts a Uint8Array to a hex string
  * @param bytes The Uint8Array to convert
@@ -8,4 +8,4 @@ function bytesToUtf8(bytes: Uint8Array): string {
     return new TextDecoder().decode(bytes);
   }
 
-export { utf8ToBytes, bytesToUtf8 }
+export { utf8ToBytes, bytesToUtf8, randomBytes }
