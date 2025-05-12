@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.2.25",
+    "version": "2.2.36",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -21,7 +21,8 @@
         "./abstraction": "./build/abstraction/index.js",
         "./l2ps": "./build/l2ps/index.js",
         "./utils": "./build/utils/index.js",
-        "./encryption": "./build/encryption/index.js"
+        "./encryption": "./build/encryption/index.js",
+        "./bridge": "./build/bridge/index.js"
     },
     "scripts": {
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
