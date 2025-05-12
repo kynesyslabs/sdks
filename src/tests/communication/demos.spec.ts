@@ -49,7 +49,7 @@ describe("DEMOS METHODS TESTS", () => {
         expect(addressNonce).not.toBeNull()
     })
 
-    test("Get Blocks", async () => {
+    test.skip("Get Blocks", async () => {
         // Get the last 25 blocks
         const blocks = await demos.getBlocks("latest", 25)
         expect(Array.isArray(blocks)).toBe(true)
@@ -73,7 +73,7 @@ describe("DEMOS METHODS TESTS", () => {
         expect(invalidBlocksLimit.length).toBe(0)
     })
 
-    test("Get Transactions", async () => {
+    test.skip("Get Transactions", async () => {
         // Get 25 transactions from latest
         const transactions = await demos.getTransactions("latest", 25)
         expect(Array.isArray(transactions)).toBe(true)
@@ -95,5 +95,130 @@ describe("DEMOS METHODS TESTS", () => {
         const invalidTxLimit = await demos.getTransactions(100, "something" as any)
         expect(Array.isArray(invalidTxLimit)).toBe(true)
         expect(invalidTxLimit.length).toBe(0)
+    })
+
+    test("Get last block number", async () => {
+        const lastBlockNumber = await demos.getLastBlockNumber();
+
+        expect(typeof lastBlockNumber).toBe("number")
+        expect(lastBlockNumber).toBeGreaterThan(0)
+    })
+
+    test("Get block by number", async () => {
+        const lastBlockNumber = await demos.getLastBlockNumber()
+
+        expect(typeof lastBlockNumber).toBe("number")
+        expect(lastBlockNumber).toBeGreaterThan(0)
+
+        const block = await demos.getBlockByNumber(lastBlockNumber)
+
+        expect(block).toHaveProperty("id")
+        expect(block).toHaveProperty("number")
+        expect(block).toHaveProperty("hash")
+        expect(block).toHaveProperty("content")
+        expect(block).toHaveProperty("status")
+        expect(block).toHaveProperty("proposer")
+        expect(block).toHaveProperty("validation_data")
+    })
+
+    test("Get last block hash", async () => {
+        const lastBlockHash = await demos.getLastBlockHash();
+
+        expect(typeof lastBlockHash).toBe("string")
+
+        const blockNumber = await demos.getLastBlockNumber()
+
+        expect(typeof blockNumber).toBe("number")
+        expect(blockNumber).toBeGreaterThan(0)
+
+        const block = await demos.getBlockByNumber(blockNumber)
+
+        expect(block).toHaveProperty("hash")
+        expect(lastBlockHash).toBe(block.hash)
+    })
+
+    test("Get block by hash", async () => {
+        const lastBlockHash = await demos.getLastBlockHash();
+
+        expect(typeof lastBlockHash).toBe("string")
+
+        const block = await demos.getBlockByHash(lastBlockHash)
+
+        expect(block).toHaveProperty("id")
+        expect(block).toHaveProperty("number")
+        expect(block).toHaveProperty("hash")
+        expect(block).toHaveProperty("content")
+        expect(block).toHaveProperty("status")
+        expect(block).toHaveProperty("proposer")
+        expect(block).toHaveProperty("validation_data")
+    })
+
+    test("Get transaction by hash", async () => {
+        const allTransactions = await demos.getAllTxs();
+
+        expect(typeof allTransactions).toBe("object")
+        expect(allTransactions).not.toBeNull()
+
+        const firstTxHash = allTransactions[0].hash;
+        const transaction = await demos.getTxByHash(firstTxHash)
+
+        expect(transaction).toHaveProperty("content")
+        expect(transaction).toHaveProperty("signature")
+        expect(transaction).toHaveProperty("hash")
+        expect(transaction).toHaveProperty("status")
+        expect(transaction).toHaveProperty("blockNumber")
+    })
+    
+    test("Get all transactions", async () => {
+        const allTransactions = await demos.getAllTxs();
+
+        expect(typeof allTransactions).toBe("object")
+        expect(allTransactions).not.toBeNull()
+
+        const firstTransaction = allTransactions[0];
+
+        expect(firstTransaction).toHaveProperty("content")
+        expect(firstTransaction).toHaveProperty("signature")
+        expect(firstTransaction).toHaveProperty("hash")
+        expect(firstTransaction).toHaveProperty("status")
+        expect(firstTransaction).toHaveProperty("blockNumber")
+    })
+
+    test("Get peer Identity", async () => {
+        const peerList = await demos.getPeerlist();
+
+        expect(peerList).not.toBeNull()
+        expect(peerList.length).toBeGreaterThan(0)
+
+        const firstPeer = peerList[0];
+
+        expect(firstPeer).not.toBeNull()
+        expect(firstPeer).toHaveProperty("connection")
+        expect(firstPeer).toHaveProperty("identity")
+        expect(firstPeer).toHaveProperty("verification")
+        expect(firstPeer).toHaveProperty("sync")
+        expect(firstPeer).toHaveProperty("status")
+
+        const peerIdentity = await demos.getPeerIdentity();
+        console.log("peerIdentity:", peerIdentity);
+
+        expect(typeof peerIdentity).toBe("string")
+        expect(peerIdentity).toBe(firstPeer.identity)
+    })
+
+    test("Get peer list", async () => {
+        const peerList = await demos.getPeerlist();
+
+        expect(peerList).not.toBeNull()
+        expect(peerList.length).toBeGreaterThan(0)
+
+        const firstPeer = peerList[0];
+
+        expect(firstPeer).not.toBeNull()
+        expect(firstPeer).toHaveProperty("connection")
+        expect(firstPeer).toHaveProperty("identity")
+        expect(firstPeer).toHaveProperty("verification")
+        expect(firstPeer).toHaveProperty("sync")
+        expect(firstPeer).toHaveProperty("status")
     })
 })

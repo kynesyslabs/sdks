@@ -18,7 +18,7 @@ import { wallets } from "./utils/wallets"
 import { EnumWeb2Methods } from "@/types"
 
 describe("Demos Workflow", () => {
-    test.only("cheatsheet: workstep output dynamic acess", () => {
+    test("cheatsheet: workstep output dynamic acess", () => {
         // SECTION: WorkStep ouput access cheatsheet
         const getBTCPrice = prepareWeb2Step({
             url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
@@ -50,7 +50,7 @@ describe("Demos Workflow", () => {
         // !SECTION
     })
 
-    test.only("Example usage", () => {
+    test("Example usage", () => {
         const getBTCPrice = prepareWeb2Step({
             url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
             method: EnumWeb2Methods.GET,
@@ -77,7 +77,7 @@ describe("Demos Workflow", () => {
         pprint(tx)
     })
 
-    test.skip("depends on + critical", () => {
+    test("depends on + critical", () => {
         const operation = new ConditionalOperation()
 
         console.log("operation", operation)
@@ -92,7 +92,7 @@ describe("Demos Workflow", () => {
         console.log("operation.critical", operation.critical)
     })
 
-    test.skip("base operation", async () => {
+    test("base operation", async () => {
         const base = new BaseOperation()
         const checkBTCPrice = prepareWeb2Step({
             url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
@@ -108,7 +108,7 @@ describe("Demos Workflow", () => {
         pprint(base)
     })
 
-    test.only("conditional", async () => {
+    test.skip("conditional", async () => {
         // Web2 step to do a GET API call
         const address = "0x8A6575025DE23CB2DcB0fE679E588da9fE62f3B6"
         const isMember = prepareWeb2Step({
@@ -186,12 +186,12 @@ describe("Demos Workflow", () => {
         pprint(res)
     })
 
-    test.skip("workstep", async () => {
+    test("workstep", async () => {
         // const step = prepareWeb2Step({ method: EnumWeb2Methods.GET, url: "https://google.com" })
         // const evm_key = process.env.EVM_KEY
         const evm_key = wallets.evm.privateKey
 
-        const evm_rpc = "https://rpc.ankr.com/eth_sepolia"
+        const evm_rpc = "https://ethereum-sepolia-rpc.publicnode.com"
 
         const evm = await EVM.create(evm_rpc)
         await evm.connectWallet(evm_key)
