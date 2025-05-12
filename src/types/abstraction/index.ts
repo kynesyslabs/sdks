@@ -130,7 +130,11 @@ export interface UserPoints {
     totalPoints: number
     breakdown: {
         web3Wallets: number
-        socialAccounts: number
+        socialAccounts: {
+            twitter: number
+            github: number
+            discord: number
+        }
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
