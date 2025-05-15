@@ -19,7 +19,7 @@ export { NativeBridgeMethods }
 // Export types from nativeBridgeTypes
 export {
     BridgeOperation as NativeBridgeOperation,
-    NativeBridgePayload,
+    BridgeOperationCompiled as NativeBridgeOperationCompiled,
     SupportedChain as NativeBridgeSupportedChain,
     SupportedStablecoin as NativeBridgeSupportedStablecoin,
     SupportedEVMChain as NativeBridgeSupportedEVMChain,

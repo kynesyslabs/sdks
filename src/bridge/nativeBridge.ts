@@ -1,14 +1,17 @@
-import { BridgeOperation } from "./nativeBridgeTypes"
+import { Cryptography, Hashing } from "@/encryption"
+import { BridgeOperation, BridgeOperationCompiled } from "./nativeBridgeTypes"
 import { Transaction } from "@/types/blockchain/Transaction"
 import { demos } from "@/websdk"
+import { sha256 } from '@noble/hashes/sha2';
 
 export const methods = {
 
     /**
-     * Generates a new operation, its corresponding Transaction and returns it
+     * Generates a new operation, ready to be sent to the node as a nodeCall
      * TODO Implement the params 
+     * REVIEW Should we use the identity somehow or we keep using the private key?
     */
-    generateOperation(): Transaction {
+    generateOperation(privateKey: string): BridgeOperationCompiled {
         // Defining the operation
         const operation: BridgeOperation = {
             demoAddress: "",
@@ -21,16 +24,26 @@ export const methods = {
             txHash: "",
             status: "empty",
         }
-        // Defining the transaction
-        var transaction: Transaction = demos.transactions.empty()
-        transaction.content.type = "nativeBridge"
+        // TODO Generate the operation based on parameters
+        // REVIEW Sign the operation
+        let opHash = Hashing.sha256(JSON.stringify(operation))
+        let signature = Cryptography.sign(opHash, privateKey)
+        // TODO Call the node to send the operation
+        // TODO Await the response
+        // TODO Return the response
+        return null
+    },
 
-        // TODO Implement the operation 
-        // TODO Implement the transaction
-        transaction.content.data = ["nativeBridge", operation]
-        
-
-        return transaction
-    }   
+    /**
+     * 
+     * @param compiled operation 
+     * @param signature 
+     * @param rpc 
+     * @returns 
+     */
+    generateOperationTx(compiled: BridgeOperationCompiled): Transaction {
+        // TODO Implement the transaction once we have the compiled operation
+        return null
+    }
 }
 
