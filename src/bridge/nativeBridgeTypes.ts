@@ -24,6 +24,7 @@ export type BridgeOperationCompiled = {
     content: {
         operation: BridgeOperation
         amountExpected: number // Amount of tokens expected to be received
+        validUntil: number // Block number until which the operation is valid
     } & (
         | {
               originChain: "EVM"
