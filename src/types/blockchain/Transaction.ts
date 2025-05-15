@@ -9,7 +9,7 @@ import { INativePayload } from "../native"
 import { SubnetPayload } from "../../l2ps"
 import { IdentityPayload } from "../abstraction"
 import { InstantMessagingPayload } from "../instantMessaging"
-import { NativeBridgePayload } from "@/bridge/nativeBridgeTypes"
+import { BridgeOperation } from "@/bridge/nativeBridgeTypes"
 
 // export type StringifiedPayload = [string, string]
 
@@ -21,7 +21,7 @@ export type TransactionContentData =
     | ["subnet", SubnetPayload]
     | ["identity", IdentityPayload]
     | ["instantMessaging", InstantMessagingPayload]
-    | ["nativeBridge", NativeBridgePayload]
+    | ["nativeBridge", BridgeOperation]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications

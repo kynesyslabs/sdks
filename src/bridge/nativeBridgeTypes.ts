@@ -16,12 +16,6 @@ export type BridgeOperation = {
     status: "empty" | "pending" | "completed" | "failed"
 }
 
-
-
-export type NativeBridgePayload = {
-    operation: BridgeOperation
-}
-
 // Supported chains for EVM
 export const supportedEVMChains = [
     "eth",
@@ -51,8 +45,6 @@ export const usdcAbi = [
     "function decimals() view returns (uint8)",
 ]
 
-
-export type SupportedChain = typeof supportedChains[number]
-export type SupportedStablecoin = typeof supportedStablecoins[number]
-export type SupportedEVMChain = typeof supportedEVMChains[number]
-
+export type SupportedChain = (typeof supportedChains)[number]
+export type SupportedStablecoin = (typeof supportedStablecoins)[number]
+export type SupportedEVMChain = (typeof supportedEVMChains)[number]

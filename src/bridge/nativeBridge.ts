@@ -8,7 +8,7 @@ export const methods = {
      * Generates a new operation, its corresponding Transaction and returns it
      * TODO Implement the params 
     */
-    generateOperation(): {operation: BridgeOperation, transaction: Transaction} {
+    generateOperation(): Transaction {
         // Defining the operation
         const operation: BridgeOperation = {
             demoAddress: "",
@@ -21,14 +21,16 @@ export const methods = {
             txHash: "",
             status: "empty",
         }
-
         // Defining the transaction
         var transaction: Transaction = demos.transactions.empty()
-        
+        transaction.content.type = "nativeBridge"
+
         // TODO Implement the operation 
         // TODO Implement the transaction
+        transaction.content.data = ["nativeBridge", operation]
+        
 
-        return {operation, transaction}
+        return transaction
     }   
 }
 
