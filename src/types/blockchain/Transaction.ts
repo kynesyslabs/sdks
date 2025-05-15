@@ -11,6 +11,8 @@ import { IdentityPayload } from "../abstraction"
 import { InstantMessagingPayload } from "../instantMessaging"
 import { BridgeOperation } from "@/bridge/nativeBridgeTypes"
 
+// TODO Implement multisignature transactions
+
 // export type StringifiedPayload = [string, string]
 
 export type TransactionContentData =

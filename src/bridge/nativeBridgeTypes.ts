@@ -4,6 +4,8 @@
 export const supportedChains = ["EVM", "SOLANA"] as const
 export const supportedStablecoins = ["USDC"] as const
 
+// Types for the operation
+// NOTE: This will be sent from the client to the node
 export type BridgeOperation = {
     demoAddress: string
     originChain: SupportedChain
@@ -14,6 +16,27 @@ export type BridgeOperation = {
     token: SupportedStablecoin
     txHash: string
     status: "empty" | "pending" | "completed" | "failed"
+}
+
+// Types compiled from the node
+// NOTE: This will be sent back from the node to the client
+export type BridgeOperationCompiled = {
+    content: {
+        operation: BridgeOperation
+        amountExpected: number // Amount of tokens expected to be received
+    } & (
+        | {
+              originChain: "EVM"
+              contractAddress: string // Address of the tank contract
+              contractABI: string[]
+          }
+        | {
+              originChain: "SOLANA"
+              solanaAddress: string // Address of the tank account
+          }
+    )
+    signature: string // Signed hash of the content
+    rpc: string // public key of the node that sent us back the operation
 }
 
 // Supported chains for EVM
