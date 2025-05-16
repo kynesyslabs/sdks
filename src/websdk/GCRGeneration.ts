@@ -248,9 +248,7 @@ export class HandleIdentityOperations {
         const edit: GCREditIdentity = {
             account: tx.content.from as string,
             type: "identity",
-            operation: identityPayload.method.startsWith("query_")
-                ? "query"
-                : identityPayload.method.endsWith("assign")
+            operation: identityPayload.method.endsWith("assign")
                 ? "add"
                 : "remove",
             txhash: tx.hash,
@@ -304,15 +302,7 @@ export class HandleIdentityOperations {
                 edit.data = identityPayload.payload as any
                 break
             }
-            /**
-             * INFO: For points query and turnstile verification, we just need to set the operation to query
-             * since they are handled separately in handleIdentityRequest
-             */
-            case "query_points":
-            case "verify_turnstile": {
-                edit.operation = "query"
-                break
-            }
+
             default:
                 console.log(
                     "Unknown identity operation: ",

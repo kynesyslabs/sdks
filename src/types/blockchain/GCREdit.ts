@@ -1,11 +1,7 @@
 // TODO See handleGCR.ts for the execution of the GCREdit
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
-import {
-    TurnstileVerificationPayload,
-    PointsQueryPayload,
-    XMCoreTargetIdentityPayload,
-} from "../abstraction"
+import { XMCoreTargetIdentityPayload } from "../abstraction"
 
 export interface GCREditBalance {
     type: "balance"
@@ -76,14 +72,12 @@ export interface GCREditIdentity {
     type: "identity"
     isRollback: boolean
     account: string
-    context: "xm" | "web2" | "points" | "security"
-    operation: "add" | "remove" | "query"
+    context: "xm" | "web2"
+    operation: "add" | "remove"
     data:
         | Web2GCRData // web2 add or remove identity
         | XmGCRIdentityData // xm add identity
         | XMCoreTargetIdentityPayload // xm remove identity
-        | PointsQueryPayload // points query
-        | TurnstileVerificationPayload // security verify turnstile
     txhash: string
 }
 
