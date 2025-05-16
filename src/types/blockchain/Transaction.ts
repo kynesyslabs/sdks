@@ -9,7 +9,9 @@ import { INativePayload } from "../native"
 import { SubnetPayload } from "../../l2ps"
 import { IdentityPayload } from "../abstraction"
 import { InstantMessagingPayload } from "../instantMessaging"
-import { NativeBridgePayload } from "@/bridge/nativeBridgeTypes"
+import { BridgeOperationCompiled } from "@/bridge/nativeBridgeTypes"
+
+// TODO Implement multisignature transactions
 
 // export type StringifiedPayload = [string, string]
 
@@ -21,7 +23,7 @@ export type TransactionContentData =
     | ["subnet", SubnetPayload]
     | ["identity", IdentityPayload]
     | ["instantMessaging", InstantMessagingPayload]
-    | ["nativeBridge", NativeBridgePayload]
+    | ["nativeBridge", BridgeOperationCompiled]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications

@@ -4,10 +4,14 @@
 export const supportedChains = ["EVM", "SOLANA"] as const
 export const supportedStablecoins = ["USDC"] as const
 
+// Types for the operation
+// NOTE: This will be sent from the client to the node
 export type BridgeOperation = {
     demoAddress: string
-    originChain: SupportedChain
-    destinationChain: SupportedChain
+    originChainType: SupportedChain
+    originChain: SupportedEVMChain | SupportedNonEVMChain
+    destinationChainType: SupportedChain
+    destinationChain: SupportedEVMChain | SupportedNonEVMChain
     originAddress: string
     destinationAddress: string
     amount: string
@@ -16,10 +20,26 @@ export type BridgeOperation = {
     status: "empty" | "pending" | "completed" | "failed"
 }
 
-
-
-export type NativeBridgePayload = {
-    operation: BridgeOperation
+// Types compiled from the node
+// NOTE: This will be sent back from the node to the client
+export type BridgeOperationCompiled = {
+    content: {
+        operation: BridgeOperation
+        amountExpected: number // Amount of tokens expected to be received
+        validUntil: number // Block number until which the operation is valid
+    } & (
+        | {
+              originChain: "EVM"
+              contractAddress: string // Address of the tank contract
+              contractABI: string[]
+          }
+        | {
+              originChain: "SOLANA"
+              solanaAddress: string // Address of the tank account
+          }
+    )
+    signature: string // Signed hash of the content
+    rpc: string // public key of the node that sent us back the operation
 }
 
 // Supported chains for EVM
@@ -32,6 +52,8 @@ export const supportedEVMChains = [
     "avalanche",
     "base",
 ] as const
+
+export const supportedNonEVMChains = ["SOLANA"] as const
 
 // USDC contract addresses for different chains (testnet addresses)
 export const usdcContracts = {
@@ -51,8 +73,7 @@ export const usdcAbi = [
     "function decimals() view returns (uint8)",
 ]
 
-
-export type SupportedChain = typeof supportedChains[number]
-export type SupportedStablecoin = typeof supportedStablecoins[number]
-export type SupportedEVMChain = typeof supportedEVMChains[number]
-
+export type SupportedChain = (typeof supportedChains)[number]
+export type SupportedStablecoin = (typeof supportedStablecoins)[number]
+export type SupportedEVMChain = (typeof supportedEVMChains)[number]
+export type SupportedNonEVMChain = (typeof supportedNonEVMChains)[number]
