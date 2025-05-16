@@ -8,8 +8,10 @@ export const supportedStablecoins = ["USDC"] as const
 // NOTE: This will be sent from the client to the node
 export type BridgeOperation = {
     demoAddress: string
-    originChain: SupportedChain
-    destinationChain: SupportedChain
+    originChainType: SupportedChain
+    originChain: SupportedEVMChain | SupportedNonEVMChain
+    destinationChainType: SupportedChain
+    destinationChain: SupportedEVMChain | SupportedNonEVMChain
     originAddress: string
     destinationAddress: string
     amount: string
@@ -51,6 +53,8 @@ export const supportedEVMChains = [
     "base",
 ] as const
 
+export const supportedNonEVMChains = ["SOLANA"] as const
+
 // USDC contract addresses for different chains (testnet addresses)
 export const usdcContracts = {
     ETHEREUM: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // Sepolia USDC
@@ -72,3 +76,4 @@ export const usdcAbi = [
 export type SupportedChain = (typeof supportedChains)[number]
 export type SupportedStablecoin = (typeof supportedStablecoins)[number]
 export type SupportedEVMChain = (typeof supportedEVMChains)[number]
+export type SupportedNonEVMChain = (typeof supportedNonEVMChains)[number]
