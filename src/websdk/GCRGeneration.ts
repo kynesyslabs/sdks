@@ -1,8 +1,10 @@
 import {
     GCREdit,
     GCREditIdentity,
+    GCREditBalance,
+    GCREditNonce,
+    GCREditAssign,
     Web2GCRData,
-    XmGCRData,
     XmGCRIdentityData,
 } from "@/types/blockchain/GCREdit"
 import { Transaction } from "@/types/blockchain/Transaction"
@@ -11,7 +13,6 @@ import {
     IdentityPayload,
     InferFromSignaturePayload,
     Web2CoreTargetIdentityPayload,
-    XMCoreTargetIdentityPayload,
 } from "@/types/abstraction"
 import { Hashing } from "@/encryption/Hashing"
 
@@ -29,35 +30,39 @@ export class GCRGeneration {
         const { content } = tx
 
         // Handle main transaction edits
-        switch (content.type) {
-            case "demoswork":
-                // TODO Implement this
-                break
-            case "native":
-                var nativeEdits = await HandleNativeOperations.handle(
-                    tx,
-                    isRollback,
-                )
-                gcrEdits.push(...nativeEdits)
-                break
-            case "web2Request":
-            case "crosschainOperation":
-                gcrEdits.push(this.createAssignEdit(content, tx.hash))
-                break
-            case "genesis":
-                // TODO Implement this
-                break
-            case "identity":
-                var identityEdits = await HandleIdentityOperations.handle(tx)
-                gcrEdits.push(...identityEdits)
-                break
+        if (content.type) {
+            switch (content.type) {
+                case "demoswork":
+                    // TODO Implement this
+                    break
+                case "native":
+                    var nativeEdits = await HandleNativeOperations.handle(
+                        tx,
+                        isRollback,
+                    )
+                    gcrEdits.push(...nativeEdits)
+                    break
+                case "web2Request":
+                case "crosschainOperation":
+                    gcrEdits.push(this.createAssignEdit(content, tx.hash))
+                    break
+                case "genesis":
+                    // TODO Implement this
+                    break
+                case "identity":
+                    var identityEdits = await HandleIdentityOperations.handle(
+                        tx,
+                    )
+                    gcrEdits.push(...identityEdits)
+                    break
+            }
         }
 
         // SECTION Operations valid for all tx types
 
         // Add gas operation edit with check for availability of gas amount in the sender's balance
         nonceEdits: try {
-            // INFO: Skip gas for identity operations
+            // INFO: Skip gas for identity
             if (content.type === "identity") {
                 break nonceEdits
             }
@@ -234,6 +239,7 @@ class Web2IdentityParsers {
 export class HandleIdentityOperations {
     static async handle(tx: Transaction): Promise<GCREditIdentity[]> {
         const edits = [] as GCREditIdentity[]
+
         const identityPayloadData: ["identity", IdentityPayload] = tx.content
             .data as ["identity", IdentityPayload]
         const identityPayload: IdentityPayload = identityPayloadData[1]
@@ -265,6 +271,7 @@ export class HandleIdentityOperations {
                     targetAddress: payload.targetAddress,
                     isEVM: payload.isEVM,
                 } as XmGCRIdentityData
+
                 break
             }
 
@@ -285,6 +292,7 @@ export class HandleIdentityOperations {
                         proofHash: Hashing.sha256(payload.proof),
                     },
                 } as Web2GCRData
+
                 break
             }
 
@@ -294,6 +302,7 @@ export class HandleIdentityOperations {
                 edit.data = identityPayload.payload as any
                 break
             }
+
             default:
                 console.log(
                     "Unknown identity operation: ",
@@ -304,6 +313,7 @@ export class HandleIdentityOperations {
         }
 
         edits.push(edit)
+
         return edits
     }
 }

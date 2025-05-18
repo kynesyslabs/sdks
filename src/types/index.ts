@@ -1,4 +1,3 @@
-import { INativePayload } from "./native/INativePayload"
 export {
     GenesisArtifact,
     GenesisImmutableProperties,
@@ -123,4 +122,3 @@ export {
     SupportedChains,
     SupportedTokens,
 } from "./bridge/constants"
-

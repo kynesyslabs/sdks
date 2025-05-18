@@ -106,3 +106,19 @@ export interface Web2IdentityPayload {
 }
 
 export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload
+
+export interface UserPoints {
+    userId: string
+    totalPoints: number
+    breakdown: {
+        web3Wallets: number
+        socialAccounts: {
+            twitter: number
+            github: number
+            discord: number
+        }
+    }
+    linkedWallets: string[]
+    linkedSocials: { twitter?: string }
+    lastUpdated: Date
+}

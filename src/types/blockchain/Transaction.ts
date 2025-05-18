@@ -54,7 +54,6 @@ export interface TransactionContent {
 export interface Transaction {
     content: TransactionContent
     signature: ISignature | null
-
     hash: string
     status: string
     blockNumber: number | null

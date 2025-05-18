@@ -17,7 +17,7 @@ import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 import { IKeyPair } from "@/websdk/types/KeyPair"
 
-export default class Identities {
+export class Identities {
     formats = {
         web2: {
             github: [
@@ -66,13 +66,12 @@ export default class Identities {
      *
      * @returns The validity data of the identity transaction.
      */
-    async inferIdentity(
+    private async inferIdentity(
         demos: Demos,
         context: "xm" | "web2",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
-            console.log
             if (
                 !this.formats.web2[payload.context].some((format: string) =>
                     payload.proof.startsWith(format),
@@ -120,7 +119,7 @@ export default class Identities {
      * @param payload The payload to remove the identity from.
      * @returns The response from the RPC call.
      */
-    async removeIdentity(
+    private async removeIdentity(
         demos: Demos,
         context: "xm" | "web2",
         payload: any,
@@ -281,5 +280,25 @@ export default class Identities {
      */
     async getWeb2Identities(demos: Demos, address?: string) {
         return await this.getIdentities(demos, "getWeb2Identities", address)
+    }
+
+    /**
+     * Get the points associated with an identity
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @returns The points data for the identity
+     */
+    async getUserPoints(demos: Demos): Promise<RPCResponseWithValidityData> {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getPoints",
+                    params: [demos.getAddress()],
+                },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
     }
 }
