@@ -12,10 +12,9 @@ import {
     InferFromXPayload,
     InferFromSignaturePayload,
 } from "@/types/abstraction"
-import forge from "node-forge"
 import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
-import { IKeyPair } from "@/websdk/types/KeyPair"
+import { uint8ArrayToHex } from "@/encryption"
 
 export default class Identities {
     formats = {
@@ -35,26 +34,14 @@ export default class Identities {
      * @param keypair The keypair of the demos account.
      * @returns The web2 proof payload string.
      */
-    async createWeb2ProofPayload(keypair: IKeyPair) {
+    async createWeb2ProofPayload(demos: Demos) {
         const message = "dw2p"
-        const signature = Cryptography.sign(message, keypair.privateKey)
-        const payload = {
-            message,
-            signature: signature.toString("hex"),
-            publicKey: keypair.publicKey.toString("hex"),
-        }
-
-        const verified = Cryptography.verify(
-            message,
-            forge.util.binary.hex.decode(payload.signature),
-            forge.util.binary.hex.decode(payload.publicKey),
+        const signature = await demos.crypto.sign(
+            demos.algorithm,
+            new TextEncoder().encode(message),
         )
 
-        if (!verified) {
-            throw new Error("Failed to verify web2 proof payload")
-        }
-
-        return `demos:${payload.message}:${payload.signature}:${payload.publicKey}`
+        return `demos:${message}:${demos.algorithm}:${uint8ArrayToHex(signature.signature)}`
     }
 
     /**
@@ -95,7 +82,7 @@ export default class Identities {
             ...tx.content,
             type: "identity",
             from: address,
-            to: address,
+            to: "0x9fdab6eaa302929de6c72a4dac2bad3b6d71a373b6cf81729a5e3c7979ef82a6",
             amount: 0,
             data: [
                 "identity",

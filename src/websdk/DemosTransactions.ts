@@ -94,7 +94,7 @@ export const DemosTransactions = {
         }
 
         // Set the public key in the transaction
-        raw_tx.content.from = keypair.publicKey as Uint8Array
+        raw_tx.content.from = uint8ArrayToHex(keypair.publicKey as Uint8Array)
 
         // REVIEW Generate the GCREdit in the client (will be compared on the node)
         // NOTE They are created without the tx hash, which is added in the node

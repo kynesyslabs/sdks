@@ -7,8 +7,8 @@ import axios from "axios"
 import { Identities, InferFromTwitterPayload } from "@/abstraction"
 
 describe("Web2 Identities", () => {
-    // const rpc = "http://localhost:53550"
-    const rpc = "https://demos.mungaist.com"
+    const rpc = "http://localhost:53550"
+    // const rpc = "https://demos.mungaist.com"
 
     const demos = new Demos()
     const identities = new Identities()
@@ -21,40 +21,13 @@ describe("Web2 Identities", () => {
     })
 
     test.skip("Create Twitter Identity", async () => {
-        const identity = new DemosWebAuth()
-        await identity.login(
-            "60b66ef65fab761a776e4e86d175ec3a39892ae9202e7eb5a0c4bcce99db0cb3be065600833f72f3ff4d2f0ed16cc663bbd31ba607ebca0a6748ae3f98665492",
-        )
-
-        console.log("privateKey", identity.keypair.privateKey.toString("hex"))
-        console.log("publicKey", identity.keypair.publicKey.toString("hex"))
-
-        const message = "hi"
-        const signature = Cryptography.sign(
-            message,
-            identity.keypair.privateKey,
-        )
-        console.log("signature", signature)
-
-        const payload = {
-            message,
-            signature: signature.toString("hex"),
-            publicKey: identity.keypair.publicKey.toString("hex"),
-        }
-
-        console.log("payload", payload)
-
-        const verified = Cryptography.verify(
-            message,
-            forge.util.binary.hex.decode(payload.signature),
-            forge.util.binary.hex.decode(payload.publicKey),
-        )
-        console.log("verified", verified)
+        const payload = await identities.createWeb2ProofPayload(demos)
+        console.log(payload)
     })
 
     test.skip("Create Web2 Proof Payload", async () => {
         const identities = new Identities()
-        const payload = await identities.createWeb2ProofPayload(demos.keypair)
+        const payload = await identities.createWeb2ProofPayload(demos)
         console.log(payload)
 
         // recover payload
@@ -74,7 +47,7 @@ describe("Web2 Identities", () => {
     })
 
     test.skip("Infer Twitter Identity", async () => {
-        const proof = "https://x.com/cwilvxi/status/1904144804499304524"
+        const proof = "https://x.com/cwilvxi/status/1921817774764032186"
         const payload: InferFromTwitterPayload = {
             context: "twitter",
             proof,
@@ -100,9 +73,10 @@ describe("Web2 Identities", () => {
 
     test.only("Add Github Identity", async () => {
         // INFO: All these proofs should work
-        // const proof = "https://gist.github.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79"
+        const proof = "https://gist.github.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79"
         // const proof = "https://gist.githubusercontent.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79/raw/224478424c5e6e51f5eb60cb6aeea278d3418742/gistfile1.txt"
-        const proof = "https://raw.githubusercontent.com/cwilvx/vonage-draft-images/refs/heads/master/proof.txt"
+        // const proof =
+        //     "https://raw.githubusercontent.com/cwilvx/vonage-draft-images/refs/heads/master/proof.txt"
 
         const validityData = await identities.addGithubIdentity(demos, proof)
         console.log(validityData)
@@ -112,7 +86,7 @@ describe("Web2 Identities", () => {
             console.log(res)
 
             expect(res.result).toBe(200)
-            expect(res.response['message']).toContain("Transaction applied")
+            expect(res.response["message"]).toContain("Transaction applied")
         }
     })
 
@@ -140,7 +114,7 @@ describe("Web2 Identities", () => {
             console.log(res)
 
             expect(res.result).toBe(200)
-            expect(res.response['message']).toContain("Transaction applied")
+            expect(res.response["message"]).toContain("Transaction applied")
         }
     })
 })

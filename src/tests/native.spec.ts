@@ -1,9 +1,9 @@
 import pprint from "@/utils/pprint"
 import { Demos, DemosWebAuth } from "@/websdk"
-import axios from "axios"
 
 describe("Native transactions", () => {
-    const RPC = "https://demos.mungaist.com"
+    // const RPC = "https://demos.mungaist.com"
+    const RPC = "http://localhost:53550"
 
     let demos: Demos = new Demos()
     let senderWebAuth = new DemosWebAuth()
@@ -20,11 +20,14 @@ describe("Native transactions", () => {
         await demos.connect(RPC)
         await demos.connectWallet(
             senderWebAuth.keypair.privateKey as Uint8Array,
+            {
+                algorithm: "falcon"
+            }
         )
     })
 
-    test.skip("Pay", async () => {
-        const tx = await demos.transfer(
+    test.only("Pay", async () => {
+        const tx = await demos.pay(
             "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
             100,
         )
@@ -40,7 +43,7 @@ describe("Native transactions", () => {
         }
     })
 
-    test.only("Node transaction Spam test", async () => {
+    test.skip("Node transaction Spam test", async () => {
         // NOTE: To increase the number of concurrent transactions, 
         // run multiple instances of this test at the same time.
 

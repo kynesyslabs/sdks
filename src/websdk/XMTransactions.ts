@@ -202,7 +202,7 @@ async function prepareXMPayload(
     var xm_transaction: Transaction = DemosTransactions.empty()
     // From and To are the same in XM transactions
     xm_transaction.content.from = demos.keypair.publicKey as Uint8Array
-    xm_transaction.content.to = xm_transaction.content.from
+    xm_transaction.content.to = "0x9fdab6eaa302929de6c72a4dac2bad3b6d71a373b6cf81729a5e3c7979ef82a6"
     // Setting the type and data
     xm_transaction.content.type = "crosschainOperation"
     xm_transaction.content.data = ["crosschainOperation", xm_payload]

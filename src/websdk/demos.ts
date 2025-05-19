@@ -374,4 +374,4 @@ import { Demos } from "./demosclass"
  *
  * @see Demos class
  */
-export const demos = Demos.instance
+// export const demos = Demos.instance

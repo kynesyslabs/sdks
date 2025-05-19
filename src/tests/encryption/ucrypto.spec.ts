@@ -3,15 +3,13 @@ import { Hashing } from "@/encryption"
 import {
     unifiedCrypto,
     getUnifiedCryptoInstance,
-    encryptedObject,
-    signedObject,
     uint8ArrayToHex,
     hexToUint8Array,
 } from "../../encryption/unifiedCrypto"
 import { randomBytes } from "@noble/hashes/utils"
 import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
-import { sha3_256, sha3_512 } from "@noble/hashes/sha3"
+import { sha3_512 } from "@noble/hashes/sha3"
 import { Demos } from "@/websdk/demosclass"
 
 // Reset the instances before each test
@@ -179,7 +177,7 @@ describe("Key Generation", () => {
         expect(identity.privateKey).toBeDefined()
     })
 
-    test.only("should generate Falcon keys", async () => {
+    test("should generate Falcon keys", async () => {
         const seed = "entire vocal party hold witness glimpse damp cat small type whale cry";
         const mnemonic = bip39.generateMnemonic(wordlist, 128)
 
@@ -274,7 +272,7 @@ describe("Encryption and Decryption", () => {
 })
 
 describe("Signing and Verification", () => {
-    test("should sign and verify data with Ed25519", async () => {
+    test.only("should sign and verify data with Ed25519", async () => {
         // Setup
         await unifiedCrypto.generateIdentity("ed25519")
         const data = new TextEncoder().encode("Hello, world!")

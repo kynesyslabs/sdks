@@ -5,7 +5,6 @@ import type {
     Transaction,
     IWeb2Payload,
 } from "@/types"
-import { demos } from "./demos"
 import { web2_request } from "./utils/skeletons"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"

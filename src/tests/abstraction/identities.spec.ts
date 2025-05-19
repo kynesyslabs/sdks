@@ -20,8 +20,8 @@ import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
 
-describe.skip("IDENTITIES V2", () => {
-    test("EVM ADD IDENTITY v2", async () => {
+describe.only("IDENTITIES V2", () => {
+    test.only("EVM ADD IDENTITY v2", async () => {
         const instance = await EVM.create()
         await instance.connectWallet(wallets.evm.privateKey)
 
@@ -59,13 +59,22 @@ describe.skip("IDENTITIES V2", () => {
         const demos = new Demos()
 
         await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array,
+            {
+                algorithm: "falcon"
+            }
+        )
 
         const identities = new Identities()
-        // @ts-ignore
         const validityData = await identities.inferXmIdentity(demos, payload)
+        // validityData (RPCResponseWithValidityData)
+        console.log("validityData: ", validityData)
+        console.log("transaction hash: ", validityData.response.data.transaction.hash)
 
         const res = await demos.broadcast(validityData)
+        // Broadcast response (RPCResponse)
+        console.log("res: ", res)
+
         expect(res).toBeDefined()
         expect(res.result).toBe(200)
     })
@@ -217,8 +226,8 @@ describe.each(chains)(
             const _signature =
                 name === "IBC"
                     ? await instance.signMessage(instance.getAddress(), {
-                          privateKey: wallet as string,
-                      })
+                        privateKey: wallet as string,
+                    })
                     : await instance.signMessage(instance.getAddress())
 
             if (_signature === "Not implemented") {
@@ -332,8 +341,8 @@ describe.each(chains)(
             const _signature =
                 name === "IBC"
                     ? await instance.signMessage(instance.getAddress(), {
-                          privateKey: wallet as string,
-                      })
+                        privateKey: wallet as string,
+                    })
                     : await instance.signMessage(instance.getAddress())
 
             if (_signature === "Not implemented") {

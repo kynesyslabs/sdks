@@ -230,7 +230,7 @@ export class Demos {
             raw_tx.content.timestamp = Date.now()
         }
 
-        raw_tx.content.from = this.keypair.publicKey
+        raw_tx.content.from = uint8ArrayToHex(this.keypair.publicKey)
         raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
         raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
 

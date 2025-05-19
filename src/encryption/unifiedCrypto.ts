@@ -24,6 +24,7 @@ export interface SerializedSignedObject {
     serializedPublicKey: string
     serializedMessage: string
 }
+
 export interface Ed25519SignedObject {
     algorithm: "ed25519"
     signature: Uint8Array
