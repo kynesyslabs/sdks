@@ -2,7 +2,7 @@
 // This should be able to query and set the GCR identities for a Demos address
 
 import { Cryptography } from "@/encryption/Cryptography"
-import { RPCResponseWithValidityData } from "@/types"
+import { RPCResponseWithValidityData, SigningAlgorithm } from "@/types"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
@@ -11,6 +11,8 @@ import {
     InferFromGithubPayload,
     InferFromXPayload,
     InferFromSignaturePayload,
+    PqcIdentityAssignPayload,
+    PqcIdentityRemovePayload,
 } from "@/types/abstraction"
 import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
@@ -55,7 +57,7 @@ export default class Identities {
      */
     async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2",
+        context: "xm" | "web2" | "pqc",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -66,11 +68,10 @@ export default class Identities {
                 )
             ) {
                 // construct informative error message
-                const errorMessage = `Invalid ${
-                    payload.context
-                } proof format. Supported formats are: ${this.formats.web2[
-                    payload.context
-                ].join(", ")}`
+                const errorMessage = `Invalid ${payload.context
+                    } proof format. Supported formats are: ${this.formats.web2[
+                        payload.context
+                    ].join(", ")}`
                 throw new Error(errorMessage)
             }
         }
@@ -109,7 +110,7 @@ export default class Identities {
      */
     async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2",
+        context: "xm" | "web2" | "pqc",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -221,6 +222,71 @@ export default class Identities {
         }
 
         return await this.inferIdentity(demos, "web2", twitterPayload)
+    }
+
+    // SECTION: PQC Identities
+    async bindPqcIdentity(demos: Demos, algorithms: "all" | SigningAlgorithm[] = "all") {
+        let ed25519Address: string = null
+        let addressTypes: SigningAlgorithm[] = []
+
+        // Get the ed25519 address (paylaod to be signed)
+        const ed25519 = await demos.crypto.getIdentity("ed25519")
+        ed25519Address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+
+        // Create the address types to bind
+        if (algorithms === "all") {
+            await demos.crypto.generateAllIdentities()
+            addressTypes = ["falcon", "ml-dsa"]
+        } else {
+            for (const algorithm of algorithms) {
+                await demos.crypto.generateIdentity(algorithm)
+                addressTypes.push(algorithm)
+            }
+        }
+
+        // Create the payloads
+        const payloads: PqcIdentityAssignPayload["payload"] = []
+
+        for (const addressType of addressTypes) {
+            const address = await demos.crypto.getIdentity(addressType)
+            const signature = await demos.crypto.sign(addressType, new TextEncoder().encode(ed25519Address))
+
+            payloads.push({
+                algorithm: addressType,
+                address: uint8ArrayToHex(address.publicKey as Uint8Array),
+                signature: uint8ArrayToHex(signature.signature),
+            })
+        }
+
+        return await this.inferIdentity(demos, "pqc", payloads)
+    }
+
+    async removePqcIdentity(demos: Demos, algorithms: "all" | SigningAlgorithm[] = "all") {
+        let addressTypes: SigningAlgorithm[] = []
+
+        // Create the address types to remove
+        if (algorithms === "all") {
+            await demos.crypto.generateAllIdentities()
+            addressTypes = ["falcon", "ml-dsa"]
+        } else {
+            for (const algorithm of algorithms) {
+                await demos.crypto.generateIdentity(algorithm)
+                addressTypes.push(algorithm)
+            }
+        }
+
+        // Create the payloads
+        const payloads: PqcIdentityRemovePayload["payload"] = []
+
+        for (const addressType of addressTypes) {
+            const address = await demos.crypto.getIdentity(addressType)
+            payloads.push({
+                algorithm: addressType,
+                address: uint8ArrayToHex(address.publicKey as Uint8Array),
+            })
+        }
+
+        return await this.removeIdentity(demos, "pqc", payloads)
     }
 
     /**

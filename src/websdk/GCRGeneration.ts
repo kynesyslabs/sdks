@@ -10,8 +10,8 @@ import { INativePayload } from "@/types/native"
 import {
     IdentityPayload,
     InferFromSignaturePayload,
+    PqcIdentityAssignPayload,
     Web2CoreTargetIdentityPayload,
-    XMCoreTargetIdentityPayload,
 } from "@/types/abstraction"
 import { Hashing } from "@/encryption/Hashing"
 
@@ -268,6 +268,17 @@ export class HandleIdentityOperations {
                 break
             }
 
+            case "pqc_identity_assign": {
+                // INFO: Passthrough the payload
+                edit.data = identityPayload.payload.map((payload) => ({
+                    algorithm: payload.algorithm,
+                    address: payload.address,
+                    // signature: payload.signature,
+                    // REVIEW: Do we need to store the signature in the gcr?
+                })) as PqcIdentityAssignPayload["payload"]
+                break
+            }
+
             case "web2_identity_assign": {
                 // INFO: Parse the web2 username from the proof url
                 const payload =
@@ -289,11 +300,13 @@ export class HandleIdentityOperations {
             }
 
             case "xm_identity_remove":
-            case "web2_identity_remove": {
+            case "web2_identity_remove":
+            case "pqc_identity_remove": {
                 // INFO: Passthrough the payload
                 edit.data = identityPayload.payload as any
                 break
             }
+
             default:
                 console.log(
                     "Unknown identity operation: ",

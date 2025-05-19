@@ -1,5 +1,7 @@
 // SECTION Blockchain Identities
 
+import { SigningAlgorithm } from "../cryptography"
+
 export interface XMCoreTargetIdentityPayload {
     chain: string
     subchain: string
@@ -47,8 +49,24 @@ export interface InferFromSignaturePayload {
     target_identity: InferFromSignatureTargetIdentityPayload
 }
 
-// SECTION Web2 Identities
 
+export interface BaseXmIdentityPayload {
+    context: "xm"
+}
+
+export interface XmIdentityAssignPayload extends BaseXmIdentityPayload {
+    method: "xm_identity_assign"
+    payload: InferFromSignaturePayload | InferFromWritePayload
+}
+
+export interface XmIdentityRemovePayload extends BaseXmIdentityPayload {
+    method: "xm_identity_remove"
+    payload: XMCoreTargetIdentityPayload
+}
+
+export type XmIdentityPayload = XmIdentityAssignPayload | XmIdentityRemovePayload
+
+// SECTION Web2 Identities
 /**
  * NOTE: The payload for the inferIdentityFromWeb2 method contains a context (e.g. "github", "twitter", "telegram", etc.)
  *  and a proof (e.g. a link to the actual proof of the identity).
@@ -88,21 +106,53 @@ export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
     proof: XProof
 }
 
-export interface InferFromTwitterPayload extends InferFromXPayload {}
+export interface InferFromTwitterPayload extends InferFromXPayload { }
 
-export interface XmIdentityPayload {
-    context: "xm"
-    method: "xm_identity_assign" | "xm_identity_remove"
-    payload:
-        | InferFromSignaturePayload
-        | InferFromWritePayload
-        | XMCoreTargetIdentityPayload
+// SECTION Web2 Identities
+export interface BaseWeb2IdentityPayload {
+    context: "web2"
+    // method: "web2_identity_assign" | "web2_identity_remove"
+    // payload: InferFromGithubPayload | InferFromTwitterPayload
 }
 
-export interface Web2IdentityPayload {
-    context: "web2"
-    method: "web2_identity_assign" | "web2_identity_remove"
+export interface Web2IdentityAssignPayload extends BaseWeb2IdentityPayload {
+    method: "web2_identity_assign"
     payload: InferFromGithubPayload | InferFromTwitterPayload
 }
 
-export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload
+export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
+    method: "web2_identity_remove"
+    payload: {
+        context: string
+        username: string
+    }
+}
+
+export type Web2IdentityPayload = Web2IdentityAssignPayload | Web2IdentityRemovePayload
+
+// SECTION PQC Identities
+export interface BasePqcIdentityPayload {
+    context: "pqc"
+}
+
+export interface PqcIdentityAssignPayload extends BasePqcIdentityPayload {
+    method: "pqc_identity_assign"
+    payload: {
+        algorithm: SigningAlgorithm
+        address: string
+        signature: string
+    }[]
+}
+
+export interface PqcIdentityRemovePayload extends BasePqcIdentityPayload {
+    method: "pqc_identity_remove"
+    payload: {
+        algorithm: SigningAlgorithm
+        address: string
+    }[]
+}
+
+export type PqcIdentityPayload = PqcIdentityAssignPayload | PqcIdentityRemovePayload
+
+// SECTION Final payload type
+export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload | PqcIdentityPayload

@@ -1,7 +1,7 @@
 // TODO See handleGCR.ts for the execution of the GCREdit
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
-import { XMCoreTargetIdentityPayload } from "../abstraction"
+import { PqcIdentityAssignPayload, PqcIdentityRemovePayload, XMCoreTargetIdentityPayload } from "../abstraction"
 
 export interface GCREditBalance {
     type: "balance"
@@ -72,12 +72,14 @@ export interface GCREditIdentity {
     type: "identity"
     isRollback: boolean
     account: string
-    context: "xm" | "web2"
+    context: "xm" | "web2" | "pqc"
     operation: "add" | "remove"
     data:
         | Web2GCRData // web2 add or remove identity
         | XmGCRIdentityData // xm add identity
         | XMCoreTargetIdentityPayload // xm remove identity
+        | PqcIdentityAssignPayload["payload"] // pqc add identity
+        | PqcIdentityRemovePayload["payload"] // pqc remove identity
     txhash: string
 }
 
