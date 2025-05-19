@@ -1,5 +1,5 @@
 import { Demos } from "../demosclass"
-import { RPCResponseWithValidityData } from "@/types"
+import { RPCResponse } from "@/types"
 
 /**
  * Verify a Cloudflare Turnstile token to protect against bots
@@ -11,7 +11,7 @@ import { RPCResponseWithValidityData } from "@/types"
 export async function verifyTurnstileToken(
     demos: Demos,
     token: string,
-): Promise<RPCResponseWithValidityData> {
+): Promise<RPCResponse> {
     const request = {
         method: "gcr_routine",
         params: [
