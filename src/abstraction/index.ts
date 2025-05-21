@@ -18,7 +18,9 @@ import {
     InferFromTwitterPayload,
     TwitterProof,
     IdentityPayload,
-    InferFromSignatureTargetIdentityPayload
+    InferFromSignatureTargetIdentityPayload,
+    PqcIdentityAssignPayload,
+    PqcIdentityRemovePayload
 } from "@/types/abstraction"
 
 export {
@@ -34,5 +36,7 @@ export {
     InferFromTwitterPayload,
     TwitterProof,
     IdentityPayload,
-    InferFromSignatureTargetIdentityPayload
+    InferFromSignatureTargetIdentityPayload,
+    PqcIdentityAssignPayload,
+    PqcIdentityRemovePayload
 }
