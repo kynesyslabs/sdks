@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.2.42",
+    "version": "2.2.43",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
