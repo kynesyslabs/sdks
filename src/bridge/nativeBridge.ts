@@ -97,6 +97,32 @@ export const methods = {
      */
     generateOperationTx(compiled: BridgeOperationCompiled): Transaction {
         // TODO Implement the transaction once we have the compiled operation
-        return null
+        // Preparing the known values for the transaction
+        const tx: Transaction = {
+            content: {
+                type: "nativeBridge",
+                data: ["nativeBridge", compiled],
+                from: "", // TODO Implement from using the identity
+                to: "", // TODO Same as from
+                amount: 0,
+                gcr_edits: [],
+                nonce: 0,
+                timestamp: Date.now(),
+                transaction_fee: { // TODO Compile with the BridgeOperationCompiled object content
+                    network_fee: 0,
+                    rpc_fee: 0,
+                    additional_fee: 0,
+                },
+            },
+            signature: {
+                type: "ed25519",
+                data: "",
+            },
+            hash: "",
+            status: "empty",
+            blockNumber: 0,
+        }
+        // TODO Hash and sign the transaction
+        return tx
     },
 }
