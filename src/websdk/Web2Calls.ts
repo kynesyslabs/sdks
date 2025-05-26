@@ -113,7 +113,7 @@ export const web2Calls = {
 
         const web2Tx: Transaction = DemosTransactions.empty()
         // From and To are the same in Web2 transactions
-        web2Tx.content.from = usedKeyPair.publicKey as Uint8Array
+        // web2Tx.content.from = usedKeyPair.publicKey as Uint8Array
         web2Tx.content.to = web2Tx.content.from
         web2Tx.content.type = "web2Request"
         web2Tx.content.data = ["web2Request", web2Payload]

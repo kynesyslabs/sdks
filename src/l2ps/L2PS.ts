@@ -203,7 +203,7 @@ export class l2psCalls {
         // Creating the subnet transaction
         let subnetTx: Transaction = DemosTransactions.empty()
         // ? From and To are the same in Subnet transactions (or should we use the subnet's uid somehow?)
-        subnetTx.content.from = keypair.publicKey as Uint8Array
+        // subnetTx.content.from = keypair.publicKey as Uint8Array
         subnetTx.content.to = subnetTx.content.from
         subnetTx.content.type = "subnet"
         subnetTx.content.data = ["subnet", payload]

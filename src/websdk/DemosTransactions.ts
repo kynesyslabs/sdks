@@ -45,6 +45,9 @@ export const DemosTransactions = {
         const from = demos.keypair.publicKey.toString("hex")
         const nonce = await demos.getAddressNonce(from)
 
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        tx.content.ed25519_address = uint8ArrayToHex(publicKey as Uint8Array)
+
         // REVIEW Get the address nonce
         tx.content.from = from
         tx.content.to = to
@@ -57,7 +60,7 @@ export const DemosTransactions = {
             { nativeOperation: "send", args: [to, amount] },
         ]
 
-        return await demos.sign(tx)
+        return await demos.sign(tx, { dual_sign: false })
     },
     /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
@@ -176,7 +179,7 @@ export const DemosTransactions = {
         if (!response.response.data.valid) {
             throw new Error(
                 "[Confirm] Transaction is not valid: " +
-                    response.response.data.message,
+                response.response.data.message,
             )
         }
 
@@ -198,7 +201,7 @@ export const DemosTransactions = {
         if (!validationData.response.data.valid) {
             throw new Error(
                 "[Broadcast] Transaction is not valid: " +
-                    validationData.response.data.message,
+                validationData.response.data.message,
             )
         }
         // REVIEW Resign the Transaction hash as it has been recalculated in the node

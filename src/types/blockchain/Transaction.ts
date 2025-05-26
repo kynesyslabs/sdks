@@ -24,17 +24,18 @@ export type TransactionContentData =
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
 export interface TransactionContent {
     type:
-        | "web2Request"
-        | "crosschainOperation"
-        | "subnet"
-        | "native"
-        | "demoswork"
-        | "genesis"
-        | "NODE_ONLINE"
-        | "identity"
-        | "instantMessaging"
-    from: forge.pki.ed25519.BinaryBuffer | forge.pki.PublicKey | ISignature
-    to: forge.pki.ed25519.BinaryBuffer | forge.pki.PrivateKey | ISignature
+    | "web2Request"
+    | "crosschainOperation"
+    | "subnet"
+    | "native"
+    | "demoswork"
+    | "genesis"
+    | "NODE_ONLINE"
+    | "identity"
+    | "instantMessaging"
+    from: string
+    ed25519_address: string
+    to: string
     amount: number
     // TODO Replace below with data: XMPayload | Web2Payload | NativePayload when ready
     data: TransactionContentData
@@ -47,6 +48,11 @@ export interface TransactionContent {
 
 export interface Transaction {
     content: TransactionContent
+
+    // INFO: explicit ed25519 signature for dual-signing
+    ed25519_signature: string
+
+    // INFO: Main signature (can be PQC or ed25519)
     signature: ISignature | null
 
     hash: string

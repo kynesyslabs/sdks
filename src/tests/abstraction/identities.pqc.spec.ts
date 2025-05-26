@@ -8,7 +8,7 @@ describe("IDENTITIES PQC", () => {
 
     beforeAll(async () => {
         const identity = new DemosWebAuth()
-        await identity.login("2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928")
+        await identity.login("0x8ef606ad922ae1ce88fa8b245b8dbcff5b5a5ca1b21c594be0c505af6f5317471060ab12b16a7385351fd6ebf0029cc9bcf4dcb2bdb49093368ce4b511f4f1ad")
         demos = new Demos()
         await demos.connect(rpc)
         await demos.connectWallet(identity.keypair.privateKey, {

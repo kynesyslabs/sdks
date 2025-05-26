@@ -78,7 +78,7 @@ export interface GCREditIdentity {
         | Web2GCRData // web2 add or remove identity
         | XmGCRIdentityData // xm add identity
         | XMCoreTargetIdentityPayload // xm remove identity
-        | PqcIdentityAssignPayload["payload"] // pqc add identity
+        | PqcIdentityAssignPayload // pqc add identity
         | PqcIdentityRemovePayload["payload"] // pqc remove identity
     txhash: string
 }

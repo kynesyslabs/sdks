@@ -1,6 +1,6 @@
-import { pki } from "node-forge"
+import { SigningAlgorithm } from "../cryptography"
 
 export interface ISignature {
-    type: string
+    type: SigningAlgorithm
     data: string
 }

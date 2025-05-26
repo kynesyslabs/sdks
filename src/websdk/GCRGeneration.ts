@@ -269,13 +269,7 @@ export class HandleIdentityOperations {
             }
 
             case "pqc_identity_assign": {
-                // INFO: Passthrough the payload
-                edit.data = identityPayload.payload.map((payload) => ({
-                    algorithm: payload.algorithm,
-                    address: payload.address,
-                    // signature: payload.signature,
-                    // REVIEW: Do we need to store the signature in the gcr?
-                })) as PqcIdentityAssignPayload["payload"]
+                edit.data = identityPayload.payload
                 break
             }
 

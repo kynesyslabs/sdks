@@ -14,7 +14,7 @@ import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 
 import { Cryptography } from "@/encryption/Cryptography"
-import { Block, IPeer, RawTransaction, Transaction, XMScript } from "@/types"
+import { Block, IPeer, RawTransaction, SigningAlgorithm, Transaction, TransactionContent, XMScript } from "@/types"
 import { AddressInfo } from "@/types/blockchain/address"
 import {
     RPCRequest,
@@ -26,7 +26,7 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
-import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
+import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 
@@ -128,6 +128,11 @@ export class Demos {
         }
 
         // const seedBuffer = new TextEncoder().encode(masterSeed)
+        // Always generate an ed25519 identity
+        if (this.algorithm !== "ed25519") {
+            await this.crypto.generateIdentity("ed25519", masterSeed)
+        }
+
         await this.crypto.generateIdentity(this.algorithm, masterSeed)
         // if (options?.isSeed) {
         //     privateKey = Cryptography.newFromSeed(privateKey).privateKey
@@ -221,16 +226,40 @@ export class Demos {
     /**
      * Signs a transaction.
      *
-     * @param raw_tx - The transaction to sign
+     * @param raw_tx - The transaction to sign  
+     * @param options - The dual-signing options
      * @returns The signed transaction
      */
-    async sign(raw_tx: Transaction) {
+    async sign(raw_tx: Transaction, options?: {
+        /**
+         * Whether to include the ed25519 signature along with the PQC signature.
+         * This is required when signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
+         */
+        dual_sign?: boolean
+    }) {
         required(this.keypair, "Wallet not connected")
         if (!raw_tx.content.timestamp || raw_tx.content.timestamp === 0) {
             raw_tx.content.timestamp = Date.now()
         }
 
-        raw_tx.content.from = uint8ArrayToHex(this.keypair.publicKey)
+        // INFO: Use the ed25519 public key as the sender
+        raw_tx.content.from = uint8ArrayToHex(this.keypair.publicKey as Uint8Array)
+
+        // INFO: Client-side enforcement of reflexive transactions
+        const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request"]
+
+        if (reflexive.includes(raw_tx.content.type)) {
+            if (raw_tx.content.from !== raw_tx.content.to) {
+                throw new Error("Transaction of type: " + raw_tx.content.type + " must have the same from and to addresses")
+            }
+        }
+
+        // INFO: If no ed25519 address is provided, use the connected master seed's ed25519 address
+        if (!raw_tx.content.ed25519_address) {
+            const { publicKey } = await this.crypto.getIdentity("ed25519")
+            raw_tx.content.ed25519_address = uint8ArrayToHex(publicKey as Uint8Array)
+        }
+
         raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
         raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
 
@@ -239,6 +268,17 @@ export class Demos {
             new TextEncoder().encode(raw_tx.hash),
         )
 
+        // INFO: We only dual-sign when signing with PQC keypairs
+        let dual_sign = options?.dual_sign && this.algorithm !== "ed25519"
+
+        if (dual_sign) {
+            const ed25519_signature = await this.crypto.sign(
+                "ed25519",
+                new TextEncoder().encode(raw_tx.hash),
+            )
+            raw_tx.ed25519_signature = uint8ArrayToHex(ed25519_signature.signature)
+        }
+
         raw_tx.signature = {
             type: this.algorithm,
             data: uint8ArrayToHex(signature.signature),
@@ -246,7 +286,6 @@ export class Demos {
 
         return raw_tx
     }
-
     // L2PS calls are defined here
 
     async rpcCall(
