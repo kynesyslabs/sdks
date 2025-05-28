@@ -65,6 +65,8 @@ export interface Web2GCRData {
         username: string
         proof: string
         proofHash: string
+        userId: string
+        timestamp: number
     }
 }
 
@@ -75,9 +77,9 @@ export interface GCREditIdentity {
     context: "xm" | "web2"
     operation: "add" | "remove"
     data:
-        | Web2GCRData // web2 add or remove identity
-        | XmGCRIdentityData // xm add identity
-        | XMCoreTargetIdentityPayload // xm remove identity
+    | Web2GCRData // web2 add or remove identity
+    | XmGCRIdentityData // xm add identity
+    | XMCoreTargetIdentityPayload // xm remove identity
     txhash: string
 }
 

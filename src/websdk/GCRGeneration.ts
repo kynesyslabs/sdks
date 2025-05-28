@@ -14,7 +14,9 @@ import {
     InferFromSignaturePayload,
     Web2CoreTargetIdentityPayload,
 } from "@/types/abstraction"
+import axios from "axios"
 import { Hashing } from "@/encryption/Hashing"
+import { TwitterProofParser } from "@/abstraction/parsers/twitter"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -214,20 +216,38 @@ class Web2IdentityParsers {
         this.context = context
     }
 
-    parseTwitterUsername(): string {
-        // https://x.com/demos_xyz/status/1901630063692365884
-        return this.proof_url.split("/")[3]
+    async parseTwitterUsername() {
+        const parser = await TwitterProofParser.getInstance()
+        const { username } = parser.getTweetDetails(this.proof_url)
+
+        try {
+            const userId = await parser.getTweetUserId(this.proof_url)
+            return { username, userId }
+        } catch (e) {
+            console.error(e)
+            throw new Error("Failed to get twitter userId")
+        }
     }
 
-    parseGithubUsername(): string {
+    async parseGithubUsername(): Promise<{ username: string; userId: string }> {
         // https://gist.github.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79
-        return this.proof_url.split("/")[3]
+        const username = this.proof_url.split("/")[3]
+        try {
+            const user = await axios.get(
+                `https://api.github.com/users/${username}`,
+            )
+
+            return { username: user.data.login, userId: user.data.id }
+        } catch (e) {
+            console.error(e)
+            throw new Error("Failed to get github userId")
+        }
     }
 
-    parse(): string {
+    async parse(): Promise<{ username: string; userId: string }> {
         switch (this.context) {
             case "twitter":
-                return this.parseTwitterUsername()
+                return await this.parseTwitterUsername()
             case "github":
                 return this.parseGithubUsername()
             default:
@@ -284,12 +304,15 @@ export class HandleIdentityOperations {
                     payload.context,
                 )
 
+                const { username, userId } = await parser.parse()
                 edit.data = {
                     context: payload.context,
                     data: {
-                        username: parser.parse(),
+                        username: username,
+                        userId: userId,
                         proof: payload.proof,
                         proofHash: Hashing.sha256(payload.proof),
+                        timestamp: tx.content.timestamp
                     },
                 } as Web2GCRData
 
