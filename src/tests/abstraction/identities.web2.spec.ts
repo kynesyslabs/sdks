@@ -7,8 +7,8 @@ import axios from "axios"
 import { Identities, InferFromTwitterPayload } from "@/abstraction"
 
 describe("Web2 Identities", () => {
-    // const rpc = "http://localhost:53550"
-    const rpc = "https://demos.mungaist.com"
+    const rpc = "http://localhost:53550"
+    // const rpc = "https://demos.mungaist.com"
 
     const demos = new Demos()
     const identities = new Identities()
@@ -73,8 +73,8 @@ describe("Web2 Identities", () => {
         expect(verified).toBe(true)
     })
 
-    test.skip("Infer Twitter Identity", async () => {
-        const proof = "https://x.com/cwilvxi/status/1904144804499304524"
+    test.only("Infer Twitter Identity", async () => {
+        const proof = "https://x.com/cwilvxi/status/1927048818169696329"
         const payload: InferFromTwitterPayload = {
             context: "twitter",
             proof,
@@ -98,7 +98,7 @@ describe("Web2 Identities", () => {
         console.log(res2)
     })
 
-    test.only("Add Github Identity", async () => {
+    test.skip("Add Github Identity", async () => {
         // INFO: All these proofs should work
         // const proof = "https://gist.github.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79"
         // const proof = "https://gist.githubusercontent.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79/raw/224478424c5e6e51f5eb60cb6aeea278d3418742/gistfile1.txt"
