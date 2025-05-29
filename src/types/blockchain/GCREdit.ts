@@ -56,7 +56,10 @@ export interface XmGCRIdentityData {
     // signature: string
     // signedData: string
     targetAddress: string
+    signature: string
+    publicKey: string
     isEVM: boolean
+    timestamp: number
 }
 
 export interface Web2GCRData {
@@ -75,11 +78,11 @@ export interface GCREditIdentity {
     context: "xm" | "web2" | "pqc"
     operation: "add" | "remove"
     data:
-        | Web2GCRData // web2 add or remove identity
-        | XmGCRIdentityData // xm add identity
-        | XMCoreTargetIdentityPayload // xm remove identity
-        | PqcIdentityAssignPayload // pqc add identity
-        | PqcIdentityRemovePayload["payload"] // pqc remove identity
+    | Web2GCRData // web2 add or remove identity
+    | XmGCRIdentityData // xm add identity
+    | XMCoreTargetIdentityPayload // xm remove identity
+    | PqcIdentityAssignPayload // pqc add identity
+    | PqcIdentityRemovePayload["payload"] // pqc remove identity
     txhash: string
 }
 

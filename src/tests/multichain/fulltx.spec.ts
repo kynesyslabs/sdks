@@ -96,11 +96,13 @@ describe("DEMOS Transaction", () => {
 
         // 5. Connect to the DEMOS node
         await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as any)
+        await demos.connectWallet(identity.keypair.privateKey as any, {
+            algorithm: "falcon",
+            dual_sign: true,
+        })
 
         // 6. Convert the XMScript to a DEMOS transaction
         const tx = await prepareXMPayload(xmscript, demos)
-
 
         // 7. Broadcast the transaction
         const validityData = await demos.confirm(tx)

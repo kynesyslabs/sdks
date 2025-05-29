@@ -2,18 +2,15 @@ import {
     GCREdit,
     GCREditIdentity,
     Web2GCRData,
-    XmGCRData,
-    XmGCRIdentityData,
 } from "@/types/blockchain/GCREdit"
-import { Transaction } from "@/types/blockchain/Transaction"
-import { INativePayload } from "@/types/native"
 import {
     IdentityPayload,
     InferFromSignaturePayload,
-    PqcIdentityAssignPayload,
     Web2CoreTargetIdentityPayload,
 } from "@/types/abstraction"
 import { Hashing } from "@/encryption/Hashing"
+import { INativePayload } from "@/types/native"
+import { Transaction, TransactionContent } from "@/types/blockchain/Transaction"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -42,7 +39,8 @@ export class GCRGeneration {
                 break
             case "web2Request":
             case "crosschainOperation":
-                gcrEdits.push(this.createAssignEdit(content, tx.hash))
+                const assignEdit = this.createAssignEdit(content, tx.hash)
+                gcrEdits.push(assignEdit)
                 break
             case "genesis":
                 // TODO Implement this
@@ -63,7 +61,7 @@ export class GCRGeneration {
             }
 
             let gasEdit = await this.createGasEdit(
-                content.from as string,
+                content.ed25519_address,
                 tx.hash,
             )
             gcrEdits.push(gasEdit)
@@ -73,7 +71,7 @@ export class GCRGeneration {
         }
 
         // Add nonce increment edit
-        gcrEdits.push(this.createNonceEdit(content.from as string, tx.hash))
+        gcrEdits.push(this.createNonceEdit(content.ed25519_address, tx.hash))
         return gcrEdits
     }
 
@@ -103,13 +101,13 @@ export class GCRGeneration {
      * @returns GCREdit object for assignment operations
      */
     private static createAssignEdit(
-        content: any,
+        content: TransactionContent,
         txHash: string,
         isRollback: boolean = false,
     ): GCREdit {
         return {
             type: "assign",
-            account: content.from as string,
+            account: content.ed25519_address,
             context: content.type === "web2Request" ? "web2" : "xm",
             txhash: txHash,
             isRollback,
@@ -172,7 +170,7 @@ export class HandleNativeOperations {
                     type: "balance",
                     operation: "remove",
                     isRollback: isRollback,
-                    account: tx.content.from as string, // ? Check and enforce string type as tx.content.from
+                    account: tx.content.ed25519_address,
                     txhash: tx.hash,
                     amount: amount,
                 }
@@ -240,7 +238,7 @@ export class HandleIdentityOperations {
 
         // INFO: Create the GCR edit skeleton
         const edit: GCREditIdentity = {
-            account: tx.content.from as string,
+            account: tx.content.ed25519_address,
             type: "identity",
             operation: identityPayload.method.endsWith("assign")
                 ? "add"
@@ -259,12 +257,16 @@ export class HandleIdentityOperations {
                     identityPayload.payload as InferFromSignaturePayload
                 ).target_identity
 
+                // REVIEW: Remove the signed Message from the edit data
+                // This is supposed to be the ed25519 address and should be provided by the caller
+                const data = structuredClone(payload)
+                delete data.signedData
+
                 edit.data = {
-                    chain: payload.chain,
-                    subchain: payload.subchain,
-                    targetAddress: payload.targetAddress,
-                    isEVM: payload.isEVM,
-                } as XmGCRIdentityData
+                    ...data,
+                    timestamp: tx.content.timestamp
+                }
+
                 break
             }
 

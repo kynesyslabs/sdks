@@ -83,7 +83,7 @@ export async function prepareDemosWorkPayload(
 ): Promise<Transaction> {
     const script = work.toJSON()
     let tx: Transaction = DemosTransactions.empty()
-    tx.content.from = demos.keypair.publicKey
+    // tx.content.from = demos.keypair.publicKey
     tx.content.to = tx.content.from
     tx.content.type = "demoswork"
 

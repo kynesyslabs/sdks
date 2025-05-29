@@ -45,10 +45,11 @@ export class Demos {
     private static _instance: Demos | null = null
 
     /** The RPC URL of the demos node */
-    rpc_url: string = null
+    private rpc_url: string = null
 
     /** Connection status of the RPC URL */
     connected: boolean = false
+    dual_sign: boolean = false
 
     /** Connection status of the wallet */
     get walletConnected(): boolean {
@@ -117,10 +118,16 @@ export class Demos {
              * If true, the seed will be converted to an ed25519 keypair.
              */
             isSeed?: boolean
-            algorithm?: "ed25519" | "falcon"
+            algorithm?: "ed25519" | "falcon",
+            /**
+             * Whether to include the ed25519 signature along with the PQC signature, when 
+             * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
+             */
+            dual_sign?: boolean
         },
     ) {
         this.algorithm = options?.algorithm || "ed25519"
+        this.dual_sign = options?.dual_sign || false
         // TODO: Convert masterSeed to 128 bytes
 
         if (typeof masterSeed === "string") {
@@ -230,29 +237,14 @@ export class Demos {
      * @param options - The dual-signing options
      * @returns The signed transaction
      */
-    async sign(raw_tx: Transaction, options?: {
-        /**
-         * Whether to include the ed25519 signature along with the PQC signature.
-         * This is required when signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
-         */
-        dual_sign?: boolean
-    }) {
+    async sign(raw_tx: Transaction) {
         required(this.keypair, "Wallet not connected")
         if (!raw_tx.content.timestamp || raw_tx.content.timestamp === 0) {
             raw_tx.content.timestamp = Date.now()
         }
 
-        // INFO: Use the ed25519 public key as the sender
+        // INFO: Use the connected algorithm's public key as the sender
         raw_tx.content.from = uint8ArrayToHex(this.keypair.publicKey as Uint8Array)
-
-        // INFO: Client-side enforcement of reflexive transactions
-        const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request"]
-
-        if (reflexive.includes(raw_tx.content.type)) {
-            if (raw_tx.content.from !== raw_tx.content.to) {
-                throw new Error("Transaction of type: " + raw_tx.content.type + " must have the same from and to addresses")
-            }
-        }
 
         // INFO: If no ed25519 address is provided, use the connected master seed's ed25519 address
         if (!raw_tx.content.ed25519_address) {
@@ -260,16 +252,38 @@ export class Demos {
             raw_tx.content.ed25519_address = uint8ArrayToHex(publicKey as Uint8Array)
         }
 
-        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
-        raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
+        // INFO: Client-side enforcement of reflexive transactions
+        const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request"]
 
+        if (reflexive.includes(raw_tx.content.type)) {
+            if (raw_tx.content.ed25519_address !== raw_tx.content.to) {
+                throw new Error("Transaction of type: " + raw_tx.content.type + " must have the same from and to addresses")
+            }
+        }
+
+        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
+
+        // INFO: Add 0x prefix to addresses if not present
+        if (!raw_tx.content.to.startsWith("0x")) {
+            raw_tx.content.to = "0x" + raw_tx.content.to
+        }
+
+        if (!raw_tx.content.ed25519_address.startsWith("0x")) {
+            raw_tx.content.ed25519_address = "0x" + raw_tx.content.ed25519_address
+        }
+
+        if (!raw_tx.content.from.startsWith("0x")) {
+            raw_tx.content.from = "0x" + raw_tx.content.from
+        }
+
+        raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
         const signature = await this.crypto.sign(
             this.algorithm,
             new TextEncoder().encode(raw_tx.hash),
         )
 
         // INFO: We only dual-sign when signing with PQC keypairs
-        let dual_sign = options?.dual_sign && this.algorithm !== "ed25519"
+        let dual_sign = this.dual_sign && this.algorithm !== "ed25519"
 
         if (dual_sign) {
             const ed25519_signature = await this.crypto.sign(

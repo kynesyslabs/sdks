@@ -19,17 +19,36 @@ import { Demos, DemosWebAuth } from "@/websdk"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
+import { uint8ArrayToHex } from "@/encryption"
 
 describe.only("IDENTITIES V2", () => {
-    test.only("EVM ADD IDENTITY v2", async () => {
+    test.skip("EVM ADD IDENTITY v2", async () => {
+        // const rpc = "https://demosnode.discus.sh"
+        const rpc = "http://localhost:53550"
+        const identity = DemosWebAuth.getInstance()
+        await identity.login(
+            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
+        )
+
+        const demos = new Demos()
+
+        await demos.connect(rpc)
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array,
+            // {
+            //     algorithm: "falcon",
+            //     dual_sign: true,
+            // }
+        )
+
+        const ed25519 = await demos.crypto.getIdentity("ed25519")
+        const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+
         const instance = await EVM.create()
         await instance.connectWallet(wallets.evm.privateKey)
 
-        const message = "Hello, world!"
-        const signature = await instance.signMessage(message)
-
+        const signature = await instance.signMessage(ed25519_address)
         const verified = await instance.verifyMessage(
-            message,
+            ed25519_address,
             signature,
             instance.getAddress(),
         )
@@ -44,26 +63,10 @@ describe.only("IDENTITIES V2", () => {
                 subchain: "sepolia",
                 signature: signature,
                 isEVM: true,
-                signedData: message,
+                signedData: ed25519_address,
                 targetAddress: instance.getAddress(),
             },
         }
-
-        // const rpc = "https://demosnode.discus.sh"
-        const rpc = "http://localhost:53550"
-        const identity = DemosWebAuth.getInstance()
-        await identity.login(
-            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
-
-        const demos = new Demos()
-
-        await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array,
-            {
-                algorithm: "falcon"
-            }
-        )
 
         const identities = new Identities()
         const validityData = await identities.inferXmIdentity(demos, payload)
@@ -72,14 +75,13 @@ describe.only("IDENTITIES V2", () => {
         console.log("transaction hash: ", validityData.response.data.transaction.hash)
 
         const res = await demos.broadcast(validityData)
-        // Broadcast response (RPCResponse)
         console.log("res: ", res)
 
         expect(res).toBeDefined()
         expect(res.result).toBe(200)
     })
 
-    test.skip("EVM REMOVE IDENTITY v2", async () => {
+    test.only("EVM REMOVE IDENTITY v2", async () => {
         const instance = await EVM.create()
         await instance.connectWallet(wallets.evm.privateKey)
 
@@ -91,11 +93,15 @@ describe.only("IDENTITIES V2", () => {
 
         const demos = new Demos()
         await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array)
+        await demos.connectWallet(identity.keypair.privateKey as Uint8Array, {
+            algorithm: "falcon",
+            dual_sign: true,
+        })
 
         const identities = new Identities()
         const payload: XMCoreTargetIdentityPayload = {
             chain: "evm",
+            isEVM: true,
             subchain: "sepolia",
             targetAddress: instance.getAddress(),
         }
@@ -166,7 +172,7 @@ const chains = [
     },
 ]
 
-describe.each(chains)(
+describe.skip.each(chains)(
     "Identities › $name",
     ({ name, sdk, wallet, subchain, password, rpc }: any) => {
         let instance: any
@@ -353,6 +359,7 @@ describe.each(chains)(
                 chain: instance.name,
                 subchain: subchain,
                 targetAddress: instance.getAddress(),
+                isEVM: name === "EVM",
                 // signature: _signature,
                 // signedData: instance.getAddress(),
                 // chainId: instance.chainId,

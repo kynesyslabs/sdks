@@ -6,6 +6,7 @@ import type { Transaction, XMScript } from "@/types"
 import { DemosTransactions } from "./DemosTransactions"
 import { IKeyPair } from "./types/KeyPair"
 import { Demos } from "./demosclass"
+import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 
 // INFO Using the methods below to create, manage and send chainscript-like scripts
 const XMTransactions = {
@@ -199,17 +200,19 @@ async function prepareXMPayload(
     xm_payload: XMScript,
     demos: Demos,
 ): Promise<Transaction> {
-    var xm_transaction: Transaction = DemosTransactions.empty()
-    // From and To are the same in XM transactions
-    // xm_transaction.content.from = demos.keypair.publicKey as Uint8Array
-    xm_transaction.content.to = "0x9fdab6eaa302929de6c72a4dac2bad3b6d71a373b6cf81729a5e3c7979ef82a6"
+    const tx: Transaction = DemosTransactions.empty()
+
+    const ed25519 = await demos.crypto.getIdentity("ed25519")
+    const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+    tx.content.to = ed25519_address
+
     // Setting the type and data
-    xm_transaction.content.type = "crosschainOperation"
-    xm_transaction.content.data = ["crosschainOperation", xm_payload]
+    tx.content.type = "crosschainOperation"
+    tx.content.data = ["crosschainOperation", xm_payload]
     // Producing a timestamp
-    xm_transaction.content.timestamp = Date.now()
+    tx.content.timestamp = Date.now()
     // Signing the transaction
-    return await demos.sign(xm_transaction)
+    return await demos.sign(tx)
 }
 
 export { prepareXMPayload, XMTransactions }

@@ -40,16 +40,21 @@ export const DemosTransactions = {
      */
     async pay(to: string, amount: number, demos: Demos) {
         required(demos.keypair, "Wallet not connected")
+
+        if (to.length > 66) {
+            throw new Error("Invalid Ed25519 address: " + to)
+        }
+
         let tx = DemosTransactions.empty()
 
-        const from = demos.keypair.publicKey.toString("hex")
-        const nonce = await demos.getAddressNonce(from)
-
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
-        tx.content.ed25519_address = uint8ArrayToHex(publicKey as Uint8Array)
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
 
+        // tx.content.ed25519_address = publicKeyHex
         // REVIEW Get the address nonce
-        tx.content.from = from
+        // tx.content.from = from
+
         tx.content.to = to
         tx.content.nonce = nonce + 1
         tx.content.amount = amount
@@ -60,7 +65,7 @@ export const DemosTransactions = {
             { nativeOperation: "send", args: [to, amount] },
         ]
 
-        return await demos.sign(tx, { dual_sign: false })
+        return await demos.sign(tx)
     },
     /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
@@ -78,6 +83,8 @@ export const DemosTransactions = {
     /**
      * Signs a transaction after hashing its content.
      *
+     * @deprecated Use demos.sign(tx) instead
+     * 
      * @param raw_tx - The transaction to be signed.
      * @param keypair - The keypair to use for signing.
      * @returns A Promise that resolves to the signed transaction.
@@ -86,10 +93,16 @@ export const DemosTransactions = {
         raw_tx: Transaction,
         keypair: IKeyPair,
         options: {
-            algorithm: "ed25519" | "falcon"
+            algorithm: SigningAlgorithm
         },
     ): Promise<Transaction> {
         required(keypair, "Private key not provided")
+
+        if (!options || !options.algorithm) {
+            options = {
+                algorithm: "ed25519",
+            }
+        }
 
         // REVIEW If for some reason the tx timestamp is not set, we set it to the current time
         if (!raw_tx.content.timestamp || raw_tx.content.timestamp === 0) {

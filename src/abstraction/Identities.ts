@@ -16,7 +16,7 @@ import {
 } from "@/types/abstraction"
 import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
-import { uint8ArrayToHex } from "@/encryption"
+import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 
 export default class Identities {
     formats = {
@@ -83,7 +83,6 @@ export default class Identities {
         tx.content = {
             ...tx.content,
             type: "identity",
-            from: address,
             to: address,
             amount: 0,
             data: [
@@ -115,12 +114,13 @@ export default class Identities {
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
-        const address = demos.getAddress()
+
+        const ed25519 = await demos.crypto.getIdentity("ed25519")
+        const address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
         tx.content = {
             ...tx.content,
             type: "identity",
-            from: address,
             to: address,
             amount: 0,
             data: [
@@ -237,7 +237,7 @@ export default class Identities {
         // Create the address types to bind
         if (algorithms === "all") {
             await demos.crypto.generateAllIdentities()
-            addressTypes = ["falcon", "ml-dsa"]
+            addressTypes = UnifiedCrypto.supportedPQCAlgorithms
         } else {
             for (const algorithm of algorithms) {
                 await demos.crypto.generateIdentity(algorithm)
@@ -302,12 +302,17 @@ export default class Identities {
         call = "getIdentities",
         address?: string,
     ) {
+        if (!address) {
+            const ed25519 = await demos.crypto.getIdentity("ed25519")
+            address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+        }
+
         const request = {
             method: "gcr_routine",
             params: [
                 {
                     method: call,
-                    params: [address || demos.getAddress()],
+                    params: [address],
                 },
             ],
         }
