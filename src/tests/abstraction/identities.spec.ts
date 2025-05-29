@@ -10,6 +10,7 @@ import {
     TON,
     XRPL,
     BTC,
+    SUI,
 } from "@/multichain/websdk"
 import {
     InferFromSignatureTargetIdentityPayload,
@@ -157,6 +158,13 @@ const chains = [
         wallet: wallets.btc.privateKey,
         subchain: "testnet",
     },
+    {
+        name: "SUI",
+        sdk: SUI,
+        rpc: chainProviders.sui.testnet,
+        wallet: wallets.sui.privateKey,
+        subchain: "testnet",
+    },
 ]
 
 describe.each(chains)(
@@ -179,6 +187,7 @@ describe.each(chains)(
         test("Associate an identity using a signature", async () => {
             instance = await sdk.create(null)
             let ibcBase64PublicKey = ""
+            let suiPublicKey = ""
 
             if (name === "EGLD") {
                 await instance.connectWallet(wallet, { password: password })
@@ -215,6 +224,10 @@ describe.each(chains)(
                 await instance.connectWallet(wallet)
             }
 
+            if (name === "SUI") {
+                suiPublicKey = instance.wallet.getPublicKey().toBase64()
+            }
+
             // INFO: Create the target_identity payload
             const _signature =
                 name === "IBC"
@@ -238,6 +251,8 @@ describe.each(chains)(
                 publicKey:
                     name === "IBC"
                         ? ibcBase64PublicKey
+                        : name === "SUI"
+                        ? suiPublicKey
                         : instance.wallet.publicKey,
             }
 
@@ -255,6 +270,12 @@ describe.each(chains)(
                     instance.getAddress(),
                     _signature,
                     ibcBase64PublicKey,
+                )
+            } else if (name === "SUI") {
+                verified = await instance.verifyMessage(
+                    instance.getAddress(),
+                    _signature,
+                    suiPublicKey,
                 )
             } else {
                 verified = await instance.verifyMessage(
@@ -274,7 +295,10 @@ describe.each(chains)(
 
             // INFO: Send the payload to the RPC
             // @ts-ignore
-            const validityData = await identities.inferXmIdentity(demos, payload)
+            const validityData = await identities.inferXmIdentity(
+                demos,
+                payload,
+            )
 
             const res = await demos.broadcast(validityData)
             console.log(res)
@@ -624,6 +648,27 @@ describe.skip("Individual Sign & Verify", () => {
             instance.getAddress(),
         )
 
+        expect(verified).toBe(true)
+    })
+
+    test("SUI", async () => {
+        const instance = await SUI.create()
+
+        await instance.connectWallet(wallets.sui.privateKey)
+
+        const message = "Hello, world!"
+
+        // Signing
+        const signature = await instance.signMessage(message)
+
+        const suiPublicKey = instance.wallet.getPublicKey().toBase64()
+
+        // Verifying signature
+        const verified = await instance.verifyMessage(
+            message,
+            signature,
+            suiPublicKey,
+        )
         expect(verified).toBe(true)
     })
 })
