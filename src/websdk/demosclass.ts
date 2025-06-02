@@ -29,6 +29,8 @@ import { web2Calls } from "./Web2Calls"
 import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
+import * as bip39 from "@scure/bip39"
+import { wordlist } from "@scure/bip39/wordlists/english"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -40,7 +42,7 @@ async function sleep(ms: number) {
  * This class provides methods to interact with the DEMOS blockchain.
  */
 export class Demos {
-    algorithm: "ed25519" | "falcon" = "ed25519"
+    algorithm: SigningAlgorithm = "ed25519"
     crypto: UnifiedCrypto = null
     private static _instance: Demos | null = null
 
@@ -54,7 +56,7 @@ export class Demos {
     /** Connection status of the wallet */
     get walletConnected(): boolean {
         // return this.keypair !== null && this.keypair.privateKey !== null
-        return this.crypto != null
+        return this.crypto && this.keypair != null
     }
 
     /** The keypair of the connected wallet */
@@ -86,6 +88,16 @@ export class Demos {
     }
 
     /**
+     * Generates a new mnemonic.
+     *
+     * @param strength - The strength of the mnemonic in bits
+     * @returns The mnemonic
+     */
+    newMnemonic(strength: 128 | 256 = 128) {
+        return bip39.generateMnemonic(wordlist, strength)
+    }
+
+    /**
      * Connects to a RPC URL. Throws an error if the connection fails.
      *
      * @param rpc_url - The URL of the demos node
@@ -108,17 +120,16 @@ export class Demos {
      * @param masterSeed - The master seed of the wallet
      * @param algorithm - The algorithm to use for the wallet
      * @param options - The options for the wallet connection
+     * @param options.algorithm - The algorithm to use for the wallet
+     * @param options.dual_sign - Whether to include the ed25519 signature along with the PQC signature, when 
+     * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
+     * 
      * @returns The public key of the wallet
      */
     async connectWallet(
         masterSeed: string | Uint8Array,
         options?: {
-            /**
-             * Whether the private key is a seed.
-             * If true, the seed will be converted to an ed25519 keypair.
-             */
-            isSeed?: boolean
-            algorithm?: "ed25519" | "falcon",
+            algorithm?: SigningAlgorithm,
             /**
              * Whether to include the ed25519 signature along with the PQC signature, when 
              * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
@@ -126,34 +137,44 @@ export class Demos {
             dual_sign?: boolean
         },
     ) {
+        let seed: Uint8Array = null
         this.algorithm = options?.algorithm || "ed25519"
         this.dual_sign = options?.dual_sign || false
         // TODO: Convert masterSeed to 128 bytes
 
+        if (typeof masterSeed !== "string" && !(masterSeed instanceof Uint8Array)) {
+            throw new Error("Invalid master seed: must be a string or a Uint8Array")
+        }
+
+        let hashable: string | Uint8Array = null
+
         if (typeof masterSeed === "string") {
-            masterSeed = Buffer.from(masterSeed, "hex")
+            if (masterSeed.split(" ").length % 3 === 0) {
+                hashable = bip39.mnemonicToSeedSync(masterSeed)
+            } else {
+                hashable = masterSeed
+            }
+        }
+
+        if (masterSeed.length !== 128) {
+            hashable = masterSeed
+        }
+
+        if (hashable) {
+            const seedHash = Hashing.sha3_512(hashable)
+            const seedHashHex = Buffer.from(seedHash).toString("hex")
+            seed = new TextEncoder().encode(seedHashHex)
+        } else {
+            seed = masterSeed as Uint8Array
         }
 
         // Always generate an ed25519 identity
         if (this.algorithm !== "ed25519") {
-            await this.crypto.generateIdentity("ed25519", masterSeed)
+            await this.crypto.generateIdentity("ed25519", seed)
         }
 
-        await this.crypto.generateIdentity(this.algorithm, masterSeed)
-
-        // if (options?.isSeed) {
-        //     privateKey = Cryptography.newFromSeed(privateKey).privateKey
-        // }
-
-        // const webAuthInstance = new DemosWebAuth()
-        // const [loggedIn, helptext] = await webAuthInstance.login(privateKey)
-
-        // if (loggedIn) {
-        //     this.keypair = webAuthInstance.keypair
-        //     return this.keypair.publicKey.toString("hex")
-        // }
-
-        // throw new Error(helptext)
+        await this.crypto.generateIdentity(this.algorithm, seed)
+        return this.keypair.publicKey.toString("hex")
     }
 
     /**
