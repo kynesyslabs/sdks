@@ -62,6 +62,8 @@ export interface InferFromSignaturePayload {
 export interface Web2CoreTargetIdentityPayload {
     context: string
     proof: string
+    username: string
+    userId: string
 }
 
 // ANCHOR Github Identities
@@ -85,7 +87,8 @@ export type TwitterProof = XProof
 
 export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
     context: "twitter"
-    proof: XProof
+    username: string
+    userId: string
 }
 
 export interface InferFromTwitterPayload extends InferFromXPayload {}

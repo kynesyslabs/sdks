@@ -1,9 +1,6 @@
 import {
     GCREdit,
     GCREditIdentity,
-    GCREditBalance,
-    GCREditNonce,
-    GCREditAssign,
     Web2GCRData,
     XmGCRIdentityData,
 } from "@/types/blockchain/GCREdit"
@@ -14,9 +11,7 @@ import {
     InferFromSignaturePayload,
     Web2CoreTargetIdentityPayload,
 } from "@/types/abstraction"
-import axios from "axios"
 import { Hashing } from "@/encryption/Hashing"
-import { TwitterProofParser } from "@/abstraction/parsers/twitter"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -207,55 +202,6 @@ export class HandleNativeOperations {
     }
 }
 
-class Web2IdentityParsers {
-    proof_url: string
-    context: string
-
-    constructor(proof_url: string, context: string) {
-        this.proof_url = proof_url
-        this.context = context
-    }
-
-    async parseTwitterUsername() {
-        const parser = await TwitterProofParser.getInstance()
-        const { username } = parser.getTweetDetails(this.proof_url)
-
-        try {
-            const userId = await parser.getTweetUserId(this.proof_url)
-            return { username, userId }
-        } catch (e) {
-            console.error(e)
-            throw new Error("Failed to get twitter userId")
-        }
-    }
-
-    async parseGithubUsername(): Promise<{ username: string; userId: string }> {
-        // https://gist.github.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79
-        const username = this.proof_url.split("/")[3]
-        try {
-            const user = await axios.get(
-                `https://api.github.com/users/${username}`,
-            )
-
-            return { username: user.data.login, userId: user.data.id }
-        } catch (e) {
-            console.error(e)
-            throw new Error("Failed to get github userId")
-        }
-    }
-
-    async parse(): Promise<{ username: string; userId: string }> {
-        switch (this.context) {
-            case "twitter":
-                return await this.parseTwitterUsername()
-            case "github":
-                return this.parseGithubUsername()
-            default:
-                throw new Error("Unsupported context: " + this.context)
-        }
-    }
-}
-
 export class HandleIdentityOperations {
     static async handle(tx: Transaction): Promise<GCREditIdentity[]> {
         const edits = [] as GCREditIdentity[]
@@ -299,17 +245,12 @@ export class HandleIdentityOperations {
                 // INFO: Parse the web2 username from the proof url
                 const payload =
                     identityPayload.payload as Web2CoreTargetIdentityPayload
-                const parser = new Web2IdentityParsers(
-                    payload.proof,
-                    payload.context,
-                )
 
-                const { username, userId } = await parser.parse()
                 edit.data = {
                     context: payload.context,
                     data: {
-                        username: username,
-                        userId: userId,
+                        username: payload.username,
+                        userId: payload.userId,
                         proof: payload.proof,
                         proofHash: Hashing.sha256(payload.proof),
                         timestamp: tx.content.timestamp

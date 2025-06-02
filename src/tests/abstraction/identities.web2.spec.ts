@@ -1,9 +1,7 @@
 import { Cryptography } from "@/encryption/Cryptography"
 import { HexToForge } from "@/utils/dataManipulation"
 import { DemosWebAuth, Demos } from "@/websdk"
-import { Client, auth } from "twitter-api-sdk"
 import forge from "node-forge"
-import axios from "axios"
 import { Identities, InferFromTwitterPayload } from "@/abstraction"
 
 describe("Web2 Identities", () => {
@@ -75,12 +73,7 @@ describe("Web2 Identities", () => {
 
     test.only("Infer Twitter Identity", async () => {
         const proof = "https://x.com/cwilvxi/status/1927048818169696329"
-        const payload: InferFromTwitterPayload = {
-            context: "twitter",
-            proof,
-        }
-
-        const validityData = await identities.inferWeb2Identity(demos, payload)
+        const validityData = await identities.addTwitterIdentity(demos, proof)
         const res = await demos.broadcast(validityData)
         console.log(res)
     })
@@ -142,5 +135,14 @@ describe("Web2 Identities", () => {
             expect(res.result).toBe(200)
             expect(res.response['message']).toContain("Transaction applied")
         }
+    })
+
+    test.skip("Get tweet", async () => {
+        const tweet = await demos.web2.getTweet("https://x.com/cwilvxi/status/1927048818169696329")
+        console.log(tweet)
+
+        // const parser = await TwitterProofParser.getInstance()
+        // const userId = await parser.getTweetUserId("https://x.com/cwilvxi/status/1927048818169696329")
+        // console.log(userId)
     })
 })

@@ -16,6 +16,7 @@ import forge from "node-forge"
 import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 import { IKeyPair } from "@/websdk/types/KeyPair"
+import axios from "axios"
 
 export class Identities {
     formats = {
@@ -78,11 +79,10 @@ export class Identities {
                 )
             ) {
                 // construct informative error message
-                const errorMessage = `Invalid ${
-                    payload.context
-                } proof format. Supported formats are: ${this.formats.web2[
-                    payload.context
-                ].join(", ")}`
+                const errorMessage = `Invalid ${payload.context
+                    } proof format. Supported formats are: ${this.formats.web2[
+                        payload.context
+                    ].join(", ")}`
                 throw new Error(errorMessage)
             }
         }
@@ -211,9 +211,18 @@ export class Identities {
      * @returns The response from the RPC call.
      */
     async addGithubIdentity(demos: Demos, payload: GithubProof) {
+        const username = payload.split("/")[3]
+        const ghUser = await axios.get(`https://api.github.com/users/${username}`)
+
+        if (!ghUser.data.login) {
+            throw new Error("Failed to get github user")
+        }
+
         let githubPayload: InferFromGithubPayload = {
             context: "github",
             proof: payload,
+            username: ghUser.data.login,
+            userId: ghUser.data.id,
         }
 
         return await this.inferIdentity(demos, "web2", githubPayload)
@@ -227,9 +236,17 @@ export class Identities {
      * @returns The response from the RPC call.
      */
     async addTwitterIdentity(demos: Demos, payload: TwitterProof) {
+        const data = await demos.web2.getTweet(payload)
+
+        if (!data.success) {
+            throw new Error(data.error)
+        }
+
         let twitterPayload: InferFromXPayload = {
             context: "twitter",
             proof: payload,
+            username: data.tweet.username,
+            userId: data.tweet.userId,
         }
 
         return await this.inferIdentity(demos, "web2", twitterPayload)

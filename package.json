@@ -58,7 +58,6 @@
         "@simplewebauthn/server": "^11.0.0",
         "@solana/buffer-layout": "^4.0.1",
         "@solana/web3.js": "^1.98.0",
-        "@the-convocation/twitter-scraper": "^0.15.1",
         "@ton/core": "^0.56.3",
         "@ton/crypto": "^3.2.0",
         "@ton/ton": "^13.11.2",
@@ -88,7 +87,6 @@
         "simple-peer": "^9.11.1",
         "socket.io-client": "^4.7.2",
         "superdilithium": "^2.0.6",
-        "twitter-api-sdk": "^1.2.1",
         "web3": "^4.9.0",
         "xrpl": "^3.1.0"
     },

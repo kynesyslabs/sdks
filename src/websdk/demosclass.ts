@@ -26,6 +26,7 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
+import { Tweet } from "@the-convocation/twitter-scraper"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -511,6 +512,11 @@ export class Demos {
         ...web2Calls,
         createDahr: async () => {
             return await web2Calls.createDahr(this)
+        },
+        getTweet: async (tweetUrl: string): Promise<{ success: boolean, tweet: Tweet, error?: string }> => {
+            return await this.nodeCall("getTweet", {
+                tweetUrl,
+            })
         },
     }
 
