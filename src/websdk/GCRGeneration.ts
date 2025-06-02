@@ -72,6 +72,13 @@ export class GCRGeneration {
 
         // Add nonce increment edit
         gcrEdits.push(this.createNonceEdit(content.ed25519_address, tx.hash))
+
+        for (const edit of gcrEdits) {
+            if (!edit.account.startsWith("0x")) {
+                edit.account = "0x" + edit.account
+            }
+        }
+
         return gcrEdits
     }
 
@@ -163,9 +170,8 @@ export class HandleNativeOperations {
             // Balance operations for the send native method
             case "send":
                 var [to, amount] = nativePayload.args
+
                 // First, remove the amount from the sender's balance
-                console.log("to: ", to)
-                console.log("amount: ", amount)
                 var subtractEdit: GCREdit = {
                     type: "balance",
                     operation: "remove",
@@ -271,7 +277,12 @@ export class HandleIdentityOperations {
             }
 
             case "pqc_identity_assign": {
-                edit.data = identityPayload.payload
+                edit.data = identityPayload.payload.map((payload) => {
+                    return {
+                        ...payload,
+                        timestamp: tx.content.timestamp,
+                    }
+                })
                 break
             }
 

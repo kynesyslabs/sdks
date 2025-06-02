@@ -249,12 +249,14 @@ export default class Identities {
         const payloads: PqcIdentityAssignPayload["payload"] = []
 
         for (const addressType of addressTypes) {
-            const address = await demos.crypto.getIdentity(addressType)
-            const signature = await demos.crypto.sign(addressType, new TextEncoder().encode(ed25519Address))
+            // INFO: Create an ed25519 signature for each address type
+            const keypair = await demos.crypto.getIdentity(addressType)
+            const address = uint8ArrayToHex(keypair.publicKey as Uint8Array)
+            const signature = await demos.crypto.sign("ed25519", new TextEncoder().encode(address))
 
             payloads.push({
                 algorithm: addressType,
-                address: uint8ArrayToHex(address.publicKey as Uint8Array),
+                address: address,
                 signature: uint8ArrayToHex(signature.signature),
             })
         }

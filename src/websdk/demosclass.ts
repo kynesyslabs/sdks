@@ -134,13 +134,13 @@ export class Demos {
             masterSeed = Buffer.from(masterSeed, "hex")
         }
 
-        // const seedBuffer = new TextEncoder().encode(masterSeed)
         // Always generate an ed25519 identity
         if (this.algorithm !== "ed25519") {
             await this.crypto.generateIdentity("ed25519", masterSeed)
         }
 
         await this.crypto.generateIdentity(this.algorithm, masterSeed)
+
         // if (options?.isSeed) {
         //     privateKey = Cryptography.newFromSeed(privateKey).privateKey
         // }
@@ -261,8 +261,6 @@ export class Demos {
             }
         }
 
-        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
-
         // INFO: Add 0x prefix to addresses if not present
         if (!raw_tx.content.to.startsWith("0x")) {
             raw_tx.content.to = "0x" + raw_tx.content.to
@@ -275,6 +273,8 @@ export class Demos {
         if (!raw_tx.content.from.startsWith("0x")) {
             raw_tx.content.from = "0x" + raw_tx.content.from
         }
+
+        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
 
         raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
         const signature = await this.crypto.sign(

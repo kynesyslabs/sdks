@@ -14,7 +14,7 @@ describe("IDENTITIES PQC", () => {
         await demos.connectWallet(identity.keypair.privateKey)
     })
 
-    test.only("Adding PQC identities", async () => {
+    test.skip("Adding PQC identities", async () => {
         const validityData = await identities.bindPqcIdentity(demos, "all")
         expect(validityData.result).toBe(200)
 
@@ -24,7 +24,7 @@ describe("IDENTITIES PQC", () => {
         expect(res.result).toBe(200)
     })
 
-    test.skip("Removing PQC identities", async () => {
+    test.only("Removing PQC identities", async () => {
         const validityData = await identities.removePqcIdentity(demos, "all")
         expect(validityData.result).toBe(200)
 

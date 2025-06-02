@@ -2,6 +2,7 @@
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
 import { PqcIdentityAssignPayload, PqcIdentityRemovePayload, XMCoreTargetIdentityPayload } from "../abstraction"
+import { SigningAlgorithm } from "../cryptography"
 
 export interface GCREditBalance {
     type: "balance"
@@ -53,8 +54,6 @@ export interface XmGCRData {
 export interface XmGCRIdentityData {
     chain: string
     subchain: string
-    // signature: string
-    // signedData: string
     targetAddress: string
     signature: string
     publicKey: string
@@ -71,6 +70,13 @@ export interface Web2GCRData {
     }
 }
 
+interface PQCIdentityGCREditData {
+    algorithm: SigningAlgorithm
+    address: string
+    signature: string
+    timestamp: number
+}
+
 export interface GCREditIdentity {
     type: "identity"
     isRollback: boolean
@@ -81,7 +87,7 @@ export interface GCREditIdentity {
     | Web2GCRData // web2 add or remove identity
     | XmGCRIdentityData // xm add identity
     | XMCoreTargetIdentityPayload // xm remove identity
-    | PqcIdentityAssignPayload // pqc add identity
+    | PQCIdentityGCREditData[] // pqc add identity
     | PqcIdentityRemovePayload["payload"] // pqc remove identity
     txhash: string
 }
