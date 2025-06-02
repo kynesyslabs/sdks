@@ -37,9 +37,6 @@ export class DemosWebAuth {
     }
 
     async create(seed = "") {
-        if (!seed) {
-            seed = forge.random.getBytesSync(32)
-        }
         let result: [boolean, IKeyPair] = [true, {} as any]
 
         try {
@@ -47,7 +44,13 @@ export class DemosWebAuth {
                 privateKey: null,
                 publicKey: null,
             }
-            this.keypair = Cryptography.newFromSeed(seed)
+
+            if (!seed) {
+                this.keypair = Cryptography.new()
+            } else {
+                this.keypair = Cryptography.newFromSeed(seed)
+            }
+
             this.loggedIn = true
             // Stringify the keypair
             this.stringified_keypair = {
@@ -56,9 +59,11 @@ export class DemosWebAuth {
             }
             result = [true, this.keypair]
         } catch (e) {
+            console.error(e)
             // @ts-expect-error
             result = [false, "[CREATE WALLET ERROR] " + e.message]
         }
+
         return result
     }
 
