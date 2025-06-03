@@ -3,20 +3,22 @@ import { required } from "@/multichain/core/utils"
 import axios from "axios"
 import * as bitcoin from "bitcoinjs-lib"
 import { XmTransactionResult } from "@/multichain/core/types/interfaces"
+import { IDefaultChainLocal, TransactionResponse } from "../core"
 
-export class BTC extends BTCCore {
+export class BTC extends BTCCore implements IDefaultChainLocal {
     private static instances: Map<string, BTC> = new Map<string, BTC>()
 
-    constructor(
-        rpcUrl: string,
-        network: bitcoin.Network = bitcoin.networks.testnet,
-    ) {
-        super(rpcUrl, network)
+    async getInfo() {
+        throw new Error('Method not implemented.')
+    }
+
+    async createWallet(password: string) {
+        throw new Error('Method not implemented.')
     }
 
     async sendTransaction(
         signedTxHex: string,
-    ): Promise<{ result: string; hash: string }> {
+    ): Promise<TransactionResponse> {
         required(this.provider, "Provider not connected")
 
         try {
