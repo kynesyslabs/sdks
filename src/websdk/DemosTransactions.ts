@@ -51,7 +51,7 @@ export const DemosTransactions = {
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
         const nonce = await demos.getAddressNonce(publicKeyHex)
 
-        // tx.content.ed25519_address = publicKeyHex
+        // tx.content.from_ed25519_address = publicKeyHex
         // REVIEW Get the address nonce
         // tx.content.from = from
 

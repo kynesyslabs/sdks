@@ -270,16 +270,16 @@ export class Demos {
         raw_tx.content.from = uint8ArrayToHex(this.keypair.publicKey as Uint8Array)
 
         // INFO: If no ed25519 address is provided, use the connected master seed's ed25519 address
-        if (!raw_tx.content.ed25519_address) {
+        if (!raw_tx.content.from_ed25519_address) {
             const { publicKey } = await this.crypto.getIdentity("ed25519")
-            raw_tx.content.ed25519_address = uint8ArrayToHex(publicKey as Uint8Array)
+            raw_tx.content.from_ed25519_address = uint8ArrayToHex(publicKey as Uint8Array)
         }
 
         // INFO: Client-side enforcement of reflexive transactions
         const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request"]
 
         if (reflexive.includes(raw_tx.content.type)) {
-            if (raw_tx.content.ed25519_address !== raw_tx.content.to) {
+            if (raw_tx.content.from_ed25519_address !== raw_tx.content.to) {
                 throw new Error("Transaction of type: " + raw_tx.content.type + " must have the same from and to addresses")
             }
         }
@@ -289,8 +289,8 @@ export class Demos {
             raw_tx.content.to = "0x" + raw_tx.content.to
         }
 
-        if (!raw_tx.content.ed25519_address.startsWith("0x")) {
-            raw_tx.content.ed25519_address = "0x" + raw_tx.content.ed25519_address
+        if (!raw_tx.content.from_ed25519_address.startsWith("0x")) {
+            raw_tx.content.from_ed25519_address = "0x" + raw_tx.content.from_ed25519_address
         }
 
         if (!raw_tx.content.from.startsWith("0x")) {

@@ -40,7 +40,7 @@ export interface TransactionContent {
     | "instantMessaging"
     | "nativeBridge"
     from: string
-    ed25519_address: string
+    from_ed25519_address: string
     to: string
     amount: number
     // TODO Replace below with data: XMPayload | Web2Payload | NativePayload when ready

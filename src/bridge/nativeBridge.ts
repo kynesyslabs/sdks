@@ -104,7 +104,7 @@ export const methods = {
                 data: ["nativeBridge", compiled],
                 from: "", // TODO Implement from using the identity
                 to: "", // TODO Same as from
-                ed25519_address: "",
+                from_ed25519_address: "",
                 amount: 0,
                 gcr_edits: [],
                 nonce: 0,

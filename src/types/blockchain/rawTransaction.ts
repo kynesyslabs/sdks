@@ -25,4 +25,6 @@ export interface RawTransaction {
     networkFee: number
     rpcFee: number
     additionalFee: number
+    ed25519_signature: string
+    from_ed25519_address: string
 }

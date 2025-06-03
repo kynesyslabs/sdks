@@ -61,7 +61,7 @@ export class GCRGeneration {
             }
 
             let gasEdit = await this.createGasEdit(
-                content.ed25519_address,
+                content.from_ed25519_address,
                 tx.hash,
             )
             gcrEdits.push(gasEdit)
@@ -71,7 +71,7 @@ export class GCRGeneration {
         }
 
         // Add nonce increment edit
-        gcrEdits.push(this.createNonceEdit(content.ed25519_address, tx.hash))
+        gcrEdits.push(this.createNonceEdit(content.from_ed25519_address, tx.hash))
 
         for (const edit of gcrEdits) {
             if (!edit.account.startsWith("0x")) {
@@ -114,7 +114,7 @@ export class GCRGeneration {
     ): GCREdit {
         return {
             type: "assign",
-            account: content.ed25519_address,
+            account: content.from_ed25519_address,
             context: content.type === "web2Request" ? "web2" : "xm",
             txhash: txHash,
             isRollback,
@@ -176,7 +176,7 @@ export class HandleNativeOperations {
                     type: "balance",
                     operation: "remove",
                     isRollback: isRollback,
-                    account: tx.content.ed25519_address,
+                    account: tx.content.from_ed25519_address,
                     txhash: tx.hash,
                     amount: amount,
                 }
@@ -214,7 +214,7 @@ export class HandleIdentityOperations {
 
         // INFO: Create the GCR edit skeleton
         const edit: GCREditIdentity = {
-            account: tx.content.ed25519_address,
+            account: tx.content.from_ed25519_address,
             type: "identity",
             operation: identityPayload.method.endsWith("assign")
                 ? "add"
