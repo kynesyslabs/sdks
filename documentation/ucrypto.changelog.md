@@ -92,7 +92,60 @@ const payload = identities.createWeb2ProofPayload(demos)
 console.log(payload)
 ```
 
-## 5. CrossChain
+## 5. CrossChain Identities
+
+Web3 wallet connections used to sign an arbitrary message ("Hello World" in this case) and send it to the network in the `InferFromSignaturePayload`. This has been updated to sign the ed25519 public key of the connected wallet (in hex format with '0x' prefix).
+
+The `signedData` with be read from the identity transaction's `content.data.from_ed25519_address` property during linking, or the GCR's `publicKey` column for future verification.
+
+For example, the eth.sepolia payload was created as follows:
+
+```ts
+// INFO: create web3 signature
+const instance = await EVM.create()
+await instance.connectWallet(wallets.evm.privateKey)
+
+const message = "Hello, world!"
+const signature = await instance.signMessage(message)
+
+// INFO: Create payload
+const payload: InferFromSignaturePayload = {
+    method: "identity_assign_from_signature",
+    target_identity: {
+        signedData: message,
+        signature: signature
+        // ...,
+    },
+}
+```
+
+That should now be updated to this:
+
+```ts
+const demos = new Demos()
+await demos.connect("polar scale globe beauty ...")
+
+// NOTE: Get and sign the ed25519 public key
+const ed25519 = await demos.crypto.getIdentity("ed25519")
+const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+
+// INFO: create web3 signature
+const instance = await EVM.create()
+await instance.connectWallet(wallets.evm.privateKey)
+const signature = await instance.signMessage(ed25519_address)
+
+// INFO: Create payload
+const payload: InferFromSignaturePayload = {
+    method: "identity_assign_from_signature",
+    target_identity: {
+        // NOTE: no signedData here, only include the signature
+        signature: signature
+        // ...
+    },
+}
+```
+
+## 6. CrossChain transactions
 
 The `prepareXMPayload` function now accepts a `Demos` object as the second parameter instead of an ed25519 keypair.
 
@@ -101,7 +154,7 @@ The `prepareXMPayload` function now accepts a `Demos` object as the second param
 + prepareXMPayload(xm_payload: XMScript, demos: Demos): Promise<Transaction>
 ```
 
-## 6. DemosWork
+## 7. DemosWork
 
 The `prepareDemosWorkPayload` function now accepts a `Demos` object as the second parameter instead of an ed25519 keypair.
 

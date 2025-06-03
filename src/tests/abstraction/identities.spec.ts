@@ -22,24 +22,21 @@ import { wallets } from "../utils/wallets"
 import { uint8ArrayToHex } from "@/encryption"
 
 describe.only("IDENTITIES V2", () => {
-    test.skip("EVM ADD IDENTITY v2", async () => {
-        // const rpc = "https://demosnode.discus.sh"
-        const rpc = "http://localhost:53550"
-        const identity = DemosWebAuth.getInstance()
-        await identity.login(
-            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
+    const rpc = "http://localhost:53550"
+    let demos: Demos
 
-        const demos = new Demos()
-
+    beforeAll(async () => {
+        demos = new Demos()
         await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array,
+        await demos.connectWallet("polar scale globe beauty stock employ rail exercise goat into sample embark",
             // {
             //     algorithm: "falcon",
             //     dual_sign: true,
             // }
         )
+    })
 
+    test.only("EVM ADD IDENTITY v2", async () => {
         const ed25519 = await demos.crypto.getIdentity("ed25519")
         const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
@@ -63,7 +60,6 @@ describe.only("IDENTITIES V2", () => {
                 subchain: "sepolia",
                 signature: signature,
                 isEVM: true,
-                signedData: ed25519_address,
                 targetAddress: instance.getAddress(),
             },
         }
@@ -81,22 +77,9 @@ describe.only("IDENTITIES V2", () => {
         expect(res.result).toBe(200)
     })
 
-    test.only("EVM REMOVE IDENTITY v2", async () => {
+    test.skip("EVM REMOVE IDENTITY v2", async () => {
         const instance = await EVM.create()
         await instance.connectWallet(wallets.evm.privateKey)
-
-        const rpc = "http://localhost:53550"
-        const identity = DemosWebAuth.getInstance()
-        await identity.login(
-            "0x2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-        )
-
-        const demos = new Demos()
-        await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as Uint8Array, {
-            algorithm: "falcon",
-            dual_sign: true,
-        })
 
         const identities = new Identities()
         const payload: XMCoreTargetIdentityPayload = {
@@ -229,6 +212,7 @@ describe.skip.each(chains)(
             }
 
             // INFO: Create the target_identity payload
+            // FIXME: Use the ed25519 public key instead of the wallet address
             const _signature =
                 name === "IBC"
                     ? await instance.signMessage(instance.getAddress(), {
@@ -244,7 +228,6 @@ describe.skip.each(chains)(
                 chain: instance.name,
                 subchain: subchain,
                 signature: _signature,
-                signedData: instance.getAddress(),
                 targetAddress: instance.getAddress(),
                 chainId: instance.chainId,
                 isEVM: name === "EVM",
@@ -415,6 +398,7 @@ describe.skip("Individual Sign & Verify", () => {
 
         await instance.connectWallet(wallets.evm.privateKey)
 
+        // FIXME: Use the ed25519 public key instead of HELLO WORLD
         const message = "Hello, world!"
         const signature = await instance.signMessage(message)
 
@@ -434,7 +418,6 @@ describe.skip("Individual Sign & Verify", () => {
                 isEVM: true,
                 subchain: "sepolia",
                 signature: signature,
-                signedData: message,
                 targetAddress: instance.getAddress(),
             },
         }

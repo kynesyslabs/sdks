@@ -13,11 +13,6 @@ describe("DEMOS Transaction", () => {
         const evm = await EVM.create(chainProviders.eth.sepolia)
         await evm.connectWallet(wallets.evm.privateKey)
 
-        // const evm_tx = await evm.preparePay(
-        //     "0xda3ea78Af43E6B1c63A08cD0058973F14e5556b0",
-        //     "0.000000001",
-        // )
-
         const evm_txs = await evm.preparePays([
             {
                 address: "0xda3ea78Af43E6B1c63A08cD0058973F14e5556b0",
@@ -41,24 +36,14 @@ describe("DEMOS Transaction", () => {
             type: "pay",
         })
 
-        const identity = DemosWebAuth.getInstance()
-        await identity.create()
-
         const rpc = "http://localhost:53550"
 
         const demos = new Demos()
 
         await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as any)
+        await demos.connectWallet("polar scale globe beauty stock employ rail exercise goat into sample embark")
 
         const tx = await prepareXMPayload(xmscript, demos)
-
-        console.log(xmscript)
-        console.log(tx)
-
-        console.log("address", demos.getAddress())
-        console.log("private key:", identity.keypair.privateKey.toString("hex"))
-
         const validityData = await demos.confirm(tx)
         console.log("validityData", validityData)
 
@@ -86,8 +71,8 @@ describe("DEMOS Transaction", () => {
         })
 
         // 4. Create the DEMOS identity
-        const identity = DemosWebAuth.getInstance()
-        await identity.create()
+        // const identity = DemosWebAuth.getInstance()
+        // await identity.create()
 
         // const rpc = "https://demosnode.discus.sh"
         const rpc = "http://localhost:53550"
@@ -96,7 +81,7 @@ describe("DEMOS Transaction", () => {
 
         // 5. Connect to the DEMOS node
         await demos.connect(rpc)
-        await demos.connectWallet(identity.keypair.privateKey as any, {
+        await demos.connectWallet("polar scale globe beauty stock employ rail exercise goat into sample embark", {
             algorithm: "falcon",
             dual_sign: true,
         })

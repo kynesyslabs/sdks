@@ -236,7 +236,6 @@ export class HandleIdentityOperations {
                 // REVIEW: Remove the signed Message from the edit data
                 // This is supposed to be the ed25519 address and should be provided by the caller
                 const data = structuredClone(payload)
-                delete data.signedData
 
                 edit.data = {
                     ...data,

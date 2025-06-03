@@ -16,7 +16,6 @@ export interface InferFromSignatureTargetIdentityPayload
     extends XMCoreTargetIdentityPayload {
     chainId: number | string
     signature: string
-    signedData: string
     targetAddress: string
     publicKey?: string
 }

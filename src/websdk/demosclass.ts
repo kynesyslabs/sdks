@@ -13,7 +13,6 @@ import { DemosTransactions } from "./DemosTransactions"
 import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 
-import { Cryptography } from "@/encryption/Cryptography"
 import { Block, IPeer, RawTransaction, SigningAlgorithm, Transaction, TransactionContent, XMScript } from "@/types"
 import { AddressInfo } from "@/types/blockchain/address"
 import {
@@ -26,7 +25,7 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
-import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
+import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
@@ -62,15 +61,13 @@ export class Demos {
 
     /** The keypair of the connected wallet */
     get keypair() {
-        if (!this.walletConnected) {
-            return null
-        }
-
         switch (this.algorithm) {
             case "ed25519":
                 return this.crypto.ed25519KeyPair
             case "falcon":
                 return this.crypto.enigma.falcon_signing_keypair
+            case "ml-dsa":
+                return this.crypto.enigma.ml_dsa_signing_keypair
             default:
                 throw new Error("Invalid algorithm " + this.algorithm)
         }
@@ -91,7 +88,7 @@ export class Demos {
     /**
      * Generates a new mnemonic.
      *
-     * @param strength - The strength of the mnemonic in bits
+     * @param strength - The strength of the mnemonic in bits. (128 bits = 12 words, 256 bits = 24 words). Default is 128 bits.
      * @returns The mnemonic
      */
     newMnemonic(strength: 128 | 256 = 128) {
@@ -138,6 +135,10 @@ export class Demos {
             dual_sign?: boolean
         },
     ) {
+        if (!masterSeed) {
+            throw new Error("Master seed is required. Use `demos.newMnemonic()` to generate a new mnemonic.")
+        }
+
         let seed: Uint8Array = null
         this.algorithm = options?.algorithm || "ed25519"
         this.dual_sign = options?.dual_sign || false

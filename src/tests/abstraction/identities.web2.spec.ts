@@ -10,17 +10,8 @@ describe("Web2 Identities", () => {
 
     beforeAll(async () => {
         await demos.connect(rpc)
-        await demos.connectWallet(
-            "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
-            {
-                algorithm: "falcon"
-            }
-        )
-    })
-
-    test.skip("Create Twitter Identity", async () => {
-        const payload = await identities.createWeb2ProofPayload(demos)
-        console.log(payload)
+        const mnemonic = "polar scale globe beauty stock employ rail exercise goat into sample embark"
+        await demos.connectWallet(mnemonic)
     })
 
     test.skip("Create Web2 Proof Payload", async () => {
@@ -30,7 +21,7 @@ describe("Web2 Identities", () => {
     })
 
     test.only("Infer Twitter Identity", async () => {
-        const proof = "https://x.com/cwilvxi/status/1927048818169696329"
+        const proof = "https://x.com/cwilvxi/status/1929985172293701751"
         const validityData = await identities.addTwitterIdentity(demos, proof)
         const res = await demos.broadcast(validityData)
         console.log(res)

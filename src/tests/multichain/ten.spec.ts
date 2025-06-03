@@ -69,6 +69,7 @@ describe("TEN CHAIN TESTS", () => {
         // INFO: Reconstruct the transaction from the signed payload
         // INFO: I couldn't find how to recover the raw tx using web3js
         const tx = Transaction.from(signed_tx.rawTransaction)
+        // @ts-expect-error
         expect(tx.nonce).toEqual(toNumber(ledgerNonce))
     })
 
