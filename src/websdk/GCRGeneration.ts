@@ -55,7 +55,7 @@ export class GCRGeneration {
 
         // Add gas operation edit with check for availability of gas amount in the sender's balance
         nonceEdits: try {
-            // INFO: Skip gas for identity operations
+            // INFO: Skip gas for identity
             if (content.type === "identity") {
                 break nonceEdits
             }
@@ -204,40 +204,10 @@ export class HandleNativeOperations {
     }
 }
 
-class Web2IdentityParsers {
-    proof_url: string
-    context: string
-
-    constructor(proof_url: string, context: string) {
-        this.proof_url = proof_url
-        this.context = context
-    }
-
-    parseTwitterUsername(): string {
-        // https://x.com/demos_xyz/status/1901630063692365884
-        return this.proof_url.split("/")[3]
-    }
-
-    parseGithubUsername(): string {
-        // https://gist.github.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79
-        return this.proof_url.split("/")[3]
-    }
-
-    parse(): string {
-        switch (this.context) {
-            case "twitter":
-                return this.parseTwitterUsername()
-            case "github":
-                return this.parseGithubUsername()
-            default:
-                throw new Error("Unsupported context: " + this.context)
-        }
-    }
-}
-
 export class HandleIdentityOperations {
     static async handle(tx: Transaction): Promise<GCREditIdentity[]> {
         const edits = [] as GCREditIdentity[]
+
         const identityPayloadData: ["identity", IdentityPayload] = tx.content
             .data as ["identity", IdentityPayload]
         const identityPayload: IdentityPayload = identityPayloadData[1]
@@ -290,19 +260,18 @@ export class HandleIdentityOperations {
                 // INFO: Parse the web2 username from the proof url
                 const payload =
                     identityPayload.payload as Web2CoreTargetIdentityPayload
-                const parser = new Web2IdentityParsers(
-                    payload.proof,
-                    payload.context,
-                )
 
                 edit.data = {
                     context: payload.context,
                     data: {
-                        username: parser.parse(),
+                        username: payload.username,
+                        userId: payload.userId,
                         proof: payload.proof,
                         proofHash: Hashing.sha256(payload.proof),
+                        timestamp: tx.content.timestamp
                     },
                 } as Web2GCRData
+
                 break
             }
 
@@ -324,6 +293,7 @@ export class HandleIdentityOperations {
         }
 
         edits.push(edit)
+
         return edits
     }
 }

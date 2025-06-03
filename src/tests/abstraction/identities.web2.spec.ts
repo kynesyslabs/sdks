@@ -29,14 +29,9 @@ describe("Web2 Identities", () => {
         console.log(payload)
     })
 
-    test.skip("Infer Twitter Identity", async () => {
-        const proof = "https://x.com/cwilvxi/status/1921817774764032186"
-        const payload: InferFromTwitterPayload = {
-            context: "twitter",
-            proof,
-        }
-
-        const validityData = await identities.inferWeb2Identity(demos, payload)
+    test.only("Infer Twitter Identity", async () => {
+        const proof = "https://x.com/cwilvxi/status/1927048818169696329"
+        const validityData = await identities.addTwitterIdentity(demos, proof)
         const res = await demos.broadcast(validityData)
         console.log(res)
     })
@@ -99,5 +94,14 @@ describe("Web2 Identities", () => {
             expect(res.result).toBe(200)
             expect(res.response["message"]).toContain("Transaction applied")
         }
+    })
+
+    test.skip("Get tweet", async () => {
+        const tweet = await demos.web2.getTweet("https://x.com/cwilvxi/status/1927048818169696329")
+        console.log(tweet)
+
+        // const parser = await TwitterProofParser.getInstance()
+        // const userId = await parser.getTweetUserId("https://x.com/cwilvxi/status/1927048818169696329")
+        // console.log(userId)
     })
 })

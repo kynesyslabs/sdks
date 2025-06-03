@@ -4,7 +4,7 @@ This document outlines the changes that need to be made to existing code for it 
 > [!IMPORTANT]
 > After switching to the new PQC-enabled SDK, the ed25519 keypairs for existing mnemonics will change. Connected wallets, and identities will need to be connected to the new address.
 
-## 1. Demos.connectWallet 
+## 1. Demos.connectWallet
 
 Instead of an ed25519 private key, `Demos.connectWallet` now accepts a master seed in the following two forms:
 
@@ -67,6 +67,11 @@ await demos.connectWallet(mnemonic)
 const tx: Transaction = await returnsUnsignedTx()
 const signedTx = await demos.sign(tx)
 ```
+
+The `demos.tx.sign` method now points to `demos.sign` instead of `DemosTransactions.sign`.
+
+> [!TIP]
+> If you are using `DemosTransactions` methods directly, it's recommended to replace them with their `Demos` instance equivalents for simpler integration.
 
 ## 4. Web2 Identities
 

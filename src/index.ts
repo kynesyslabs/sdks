@@ -17,3 +17,8 @@ export * as l2ps from "./l2ps" // REVIEW This is exporting the type of the L2PS,
 export * as websdk from "./websdk"
 export * as abstraction from "./abstraction"
 export * as web2 from "./websdk/Web2Calls"
+
+// Export bridge module and its types
+export * as bridge from "./bridge"
+
+export * as instantMessaging from "./instant_messaging"

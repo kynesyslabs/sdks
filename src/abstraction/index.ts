@@ -7,7 +7,7 @@
 
 import { EvmCoinFinder } from "./EvmCoinFinder"
 import { CoinFinder } from "./CoinFinder"
-import Identities from "./Identities"
+import { Identities } from "./Identities"
 import {
     InferFromWritePayload,
     InferFromSignaturePayload,
@@ -20,7 +20,8 @@ import {
     IdentityPayload,
     InferFromSignatureTargetIdentityPayload,
     PqcIdentityAssignPayload,
-    PqcIdentityRemovePayload
+    PqcIdentityRemovePayload,
+    UserPoints,
 } from "@/types/abstraction"
 
 export {
@@ -38,5 +39,6 @@ export {
     IdentityPayload,
     InferFromSignatureTargetIdentityPayload,
     PqcIdentityAssignPayload,
-    PqcIdentityRemovePayload
+    PqcIdentityRemovePayload,
+    UserPoints,
 }

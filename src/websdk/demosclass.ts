@@ -31,6 +31,7 @@ import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
+import { Tweet } from "@the-convocation/twitter-scraper"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -596,9 +597,13 @@ export class Demos {
         })
 
         if (info) {
+            // REVIEW Fix for when the balance is 0 (see FIXME below)
+            if (!info.balance) {
+                info.balance = 0
+            }
             return {
                 ...info,
-                balance: BigInt(info.balance),
+                balance: BigInt(info.balance), // FIXME This fails when the balance is 0
             } as AddressInfo
         }
 
@@ -639,6 +644,11 @@ export class Demos {
         createDahr: async () => {
             return await web2Calls.createDahr(this)
         },
+        getTweet: async (tweetUrl: string): Promise<{ success: boolean, tweet: Tweet, error?: string }> => {
+            return await this.nodeCall("getTweet", {
+                tweetUrl,
+            })
+        },
     }
 
     xm = {
@@ -655,26 +665,15 @@ export class Demos {
     tx = {
         ...DemosTransactions,
         /**
+         * Same as `demos.sign`.
          * Signs a transaction after hashing its content.
          *
          * @param raw_tx - The transaction to be signed.
-         * @param keypair - The keypair to use for signing. If not provided, the keypair connected to the wallet will be used.
-         * @returns A Promise that resolves to the signed transaction.
          */
         sign: (
             raw_tx: Transaction,
-            keypair?: IKeyPair,
-            options?: {
-                algorithm: "ed25519" | "falcon"
-            },
         ) => {
-            const usedKeypair = keypair || this.keypair
-            if (!usedKeypair) {
-                throw new Error("No keypair provided and no wallet connected")
-            }
-            return DemosTransactions.sign(raw_tx, usedKeypair, {
-                algorithm: options?.algorithm || this.algorithm,
-            })
+            return this.sign(raw_tx)
         },
     }
 

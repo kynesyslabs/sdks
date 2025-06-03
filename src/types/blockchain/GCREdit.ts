@@ -67,7 +67,16 @@ export interface Web2GCRData {
         username: string
         proof: string
         proofHash: string
+        userId: string
+        timestamp: number
     }
+}
+
+interface PQCIdentityGCREditData {
+    algorithm: SigningAlgorithm
+    address: string
+    signature: string
+    timestamp: number
 }
 
 interface PQCIdentityGCREditData {

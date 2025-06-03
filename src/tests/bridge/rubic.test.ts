@@ -4,11 +4,12 @@ import {
     CrossChainTrade,
     RubicSdkError,
     WrappedCrossChainTrade,
-} from "rubic-sdk"
-import { Demos } from "@/websdk"
-import RubicBridge from "@/bridge/rubicBridge"
-import BigNumber from "bignumber.js"
+} from "@/bridge"
+import { RubicBridge } from "@/bridge"
 import { BridgeTradePayload, SupportedChains } from "@/bridge"
+
+import { Demos } from "@/websdk"
+import BigNumber from "bignumber.js"
 
 describe("RubicService", () => {
     const rubicBridge = new RubicBridge()

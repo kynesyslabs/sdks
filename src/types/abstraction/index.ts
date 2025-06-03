@@ -80,6 +80,8 @@ export type XmIdentityPayload = XmIdentityAssignPayload | XmIdentityRemovePayloa
 export interface Web2CoreTargetIdentityPayload {
     context: string
     proof: string
+    username: string
+    userId: string
 }
 
 // ANCHOR Github Identities
@@ -103,7 +105,8 @@ export type TwitterProof = XProof
 
 export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
     context: "twitter"
-    proof: XProof
+    username: string
+    userId: string
 }
 
 export interface InferFromTwitterPayload extends InferFromXPayload { }
@@ -156,3 +159,18 @@ export type PqcIdentityPayload = PqcIdentityAssignPayload | PqcIdentityRemovePay
 
 // SECTION Final payload type
 export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload | PqcIdentityPayload
+export interface UserPoints {
+    userId: string
+    totalPoints: number
+    breakdown: {
+        web3Wallets: { [chain: string]: number }
+        socialAccounts: {
+            twitter: number
+            github: number
+            discord: number
+        }
+    }
+    linkedWallets: string[]
+    linkedSocials: { twitter?: string }
+    lastUpdated: Date
+}

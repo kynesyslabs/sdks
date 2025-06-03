@@ -2,7 +2,6 @@
 // @ts-ignore
 import forge from "node-forge"
 import { required } from "./utils/required"
-import * as forge_converter from "./utils/forge_converter"
 import { RSA } from "./rsa"
 import { IKeyPair, IStringifiedKeyPair } from "./types/KeyPair"
 import { Cryptography } from "@/encryption/Cryptography"
@@ -38,32 +37,33 @@ export class DemosWebAuth {
     }
 
     async create(seed = "") {
-        if (!seed) {
-            seed = forge.random.getBytesSync(32)
-        }
-        let result: [boolean, IStringifiedKeyPair] = [true, {} as any]
+        let result: [boolean, IKeyPair] = [true, {} as any]
 
         try {
             this.keypair = {
                 privateKey: null,
                 publicKey: null,
             }
-            this.keypair = forge.pki.ed25519.generateKeyPair({ seed })
+
+            if (!seed) {
+                this.keypair = Cryptography.new()
+            } else {
+                this.keypair = Cryptography.newFromSeed(seed)
+            }
+
             this.loggedIn = true
             // Stringify the keypair
             this.stringified_keypair = {
-                privateKey: forge_converter.forgeToString(
-                    this.keypair.privateKey,
-                ),
-                publicKey: forge_converter.forgeToString(
-                    this.keypair.publicKey,
-                ),
+                privateKey: new TextDecoder().decode(this.keypair.privateKey),
+                publicKey: new TextDecoder().decode(this.keypair.publicKey),
             }
-            result = [true, this.stringified_keypair]
+            result = [true, this.keypair]
         } catch (e) {
+            console.error(e)
             // @ts-expect-error
             result = [false, "[CREATE WALLET ERROR] " + e.message]
         }
+
         return result
     }
 
@@ -114,12 +114,8 @@ export class DemosWebAuth {
                 privateKey: privKey as Uint8Array,
             })
             this.stringified_keypair = {
-                privateKey: forge_converter.forgeToString(
-                    this.keypair.privateKey,
-                ),
-                publicKey: forge_converter.forgeToString(
-                    this.keypair.publicKey,
-                ),
+                privateKey: new TextDecoder().decode(this.keypair.privateKey),
+                publicKey: new TextDecoder().decode(this.keypair.publicKey),
             }
             this.loggedIn = true
 
@@ -151,20 +147,21 @@ export class DemosWebAuth {
         // If needed, we derive the keys from the strings
         if (!this.keypair) {
             this.keypair = {
-                privateKey: forge_converter.stringToForge(
+                privateKey: new TextEncoder().encode(
                     this.stringified_keypair?.privateKey,
                 ),
-                publicKey: forge_converter.stringToForge(
+                publicKey: new TextEncoder().encode(
                     this.stringified_keypair?.publicKey,
                 ),
             }
         }
+
         let result = [true, {}]
         try {
-            const sign_result = forge.pki.ed25519.sign({
-                message: message,
-                privateKey: this.keypair!.privateKey as Uint8Array,
-            })
+            const sign_result = Cryptography.sign(
+                message,
+                this.keypair.privateKey,
+            )
 
             result = [true, sign_result]
         } catch (e: any) {
@@ -173,11 +170,24 @@ export class DemosWebAuth {
         return result // Is already a [boolean, string]
     }
 
-    async verify(message: any, s_signature: any, s_publicKey: any) {
+    async verify(
+        message: string | Uint8Array,
+        signature: string | Uint8Array,
+        publicKey: string | Uint8Array,
+    ) {
         let result = [true, ""]
-        // Deriving the buffers from the strings
-        const publicKey = forge_converter.stringToForge(s_publicKey)
-        const signature = forge_converter.stringToForge(s_signature)
+        // If the message is a Uint8Array, we convert it to a string
+        if (typeof message === "object" && message instanceof Uint8Array) {
+            message = new TextDecoder().decode(message)
+        }
+        // If the signature is a string, we convert it to a Uint8Array
+        if (typeof signature === "string") {
+            signature = new TextEncoder().encode(signature)
+        }
+        // If the public key is a string, we convert it to a Uint8Array
+        if (typeof publicKey === "string") {
+            publicKey = new TextEncoder().encode(publicKey)
+        }
 
         if (!signature) {
             return [false, "Invalid signature"]
@@ -188,11 +198,11 @@ export class DemosWebAuth {
         }
 
         try {
-            const verify_result = forge.pki.ed25519.verify({
-                message: message,
-                signature: signature,
-                publicKey: publicKey,
-            })
+            const verify_result = Cryptography.verify(
+                message,
+                signature,
+                publicKey,
+            )
 
             result = [true, verify_result]
         } catch (e: any) {

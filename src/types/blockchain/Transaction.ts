@@ -2,13 +2,17 @@ import * as forge from "node-forge"
 import { ISignature } from "./ISignature"
 import { TxFee } from "./TxFee"
 import { DemoScript } from "../demoswork"
-import { IWeb2Payload, IWeb2Request } from "../web2"
+import { IWeb2Payload } from "../web2"
 import { XMScript } from "../xm"
 import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
 import { SubnetPayload } from "../../l2ps"
 import { IdentityPayload } from "../abstraction"
 import { InstantMessagingPayload } from "../instantMessaging"
+import { BridgeOperationCompiled } from "@/bridge/nativeBridgeTypes"
+
+// TODO Implement multisignature transactions
+
 // export type StringifiedPayload = [string, string]
 
 export type TransactionContentData =
@@ -19,6 +23,7 @@ export type TransactionContentData =
     | ["subnet", SubnetPayload]
     | ["identity", IdentityPayload]
     | ["instantMessaging", InstantMessagingPayload]
+    | ["nativeBridge", BridgeOperationCompiled]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
@@ -33,6 +38,7 @@ export interface TransactionContent {
     | "NODE_ONLINE"
     | "identity"
     | "instantMessaging"
+    | "nativeBridge"
     from: string
     ed25519_address: string
     to: string
@@ -54,7 +60,6 @@ export interface Transaction {
 
     // INFO: Main signature (can be PQC or ed25519)
     signature: ISignature | null
-
     hash: string
     status: string
     blockNumber: number | null

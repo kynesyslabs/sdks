@@ -26,12 +26,13 @@ describe("Web2", () => {
                 url: "https://google.com",
             })
 
-            console.log(res)
-            // 4. Cleanup
-            const res2 = await proxy.stopProxy()
-            console.log(res2)
-        }
+            console.log("Response:", res)
 
-        demos.disconnect()
+            // 4. Cleanup
+            await proxy.stopProxy()
+
+            // 5. Disconnect from the demos instance
+            demos.disconnect()
+        }
     })
 })
