@@ -1,9 +1,4 @@
-import { Cryptography } from "@/encryption/Cryptography"
-import { HexToForge } from "@/utils/dataManipulation"
-import { DemosWebAuth, Demos } from "@/websdk"
-import { Client, auth } from "twitter-api-sdk"
-import forge from "node-forge"
-import axios from "axios"
+import { Demos } from "@/websdk"
 import { Identities, InferFromTwitterPayload } from "@/abstraction"
 
 describe("Web2 Identities", () => {

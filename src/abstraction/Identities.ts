@@ -1,7 +1,6 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
-import { Cryptography } from "@/encryption/Cryptography"
 import { RPCResponseWithValidityData, SigningAlgorithm } from "@/types"
 import {
     XMCoreTargetIdentityPayload,
