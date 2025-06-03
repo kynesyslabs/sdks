@@ -76,7 +76,7 @@ export class TEN extends DefaultChain {
         console.log("ledger nonce: ", nonce)
 
         //INFO: Max safe integer: 9007199254740991
-        // @ts-expect-error
+        // @ts-ignore
         let currentNonce = toNumber(nonce) as number
 
         return Promise.all(
@@ -123,7 +123,7 @@ export class TEN extends DefaultChain {
                 ...baseTx,
                 // from: this.getAddress(),
                 to: payment.address,
-                // @ts-expect-error
+                // @ts-ignore
                 value: toNumber(toWei(payment.amount, "ether")),
             }
         })
@@ -138,7 +138,7 @@ export class TEN extends DefaultChain {
 
     async getBalance(address: string) {
         const balance = await this.provider.getBalance(address)
-        // @ts-expect-error
+        // @ts-ignore
         return toNumber(balance).toString()
     }
 
