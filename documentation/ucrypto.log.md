@@ -4,7 +4,7 @@ This document outlines the changes that need to be made to existing code for it 
 > [!IMPORTANT]
 > After switching to the new PQC-enabled SDK, the ed25519 keypairs for existing mnemonics will change. Connected wallets, and identities will need to be connected to the new address.
 
-## 1. Demos.connectWallet
+## 1. Demos.connectWallet 
 
 Instead of an ed25519 private key, `Demos.connectWallet` now accepts a master seed in the following two forms:
 
