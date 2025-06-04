@@ -10,11 +10,7 @@ yarn add @kynesyslabs/demosdk
 npm -i @kynesyslabs/demosdk
 ```
 
-### Installing from local source
-
-To use this package from a local folder, follow these steps:
-
-On the root of this repo, run:
+#
 
 ```sh
 yarn build

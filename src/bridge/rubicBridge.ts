@@ -6,9 +6,7 @@ import { WrappedCrossChainTrade } from "rubic-sdk"
 export default class RubicBridge {
     async getTrade(
         demos: Demos,
-        chain: string,
-        payload: BridgeTradePayload,
-    ): Promise<RPCResponse> {
+
         const request = {
             method: "bridge",
             params: [

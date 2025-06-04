@@ -5,13 +5,6 @@ export {
     SupportedTokens,
 } from "@/types/bridge/constants"
 import RubicBridge from "./rubicBridge"
-export {
-    BLOCKCHAIN_NAME,
-    CROSS_CHAIN_TRADE_TYPE,
-    CrossChainTrade,
-    RubicSdkError,
-    WrappedCrossChainTrade,
-} from "rubic-sdk"
 
 import { methods as NativeBridgeMethods } from "./nativeBridge"
 export { NativeBridgeMethods }
