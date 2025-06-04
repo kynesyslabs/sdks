@@ -17,6 +17,7 @@ export interface InferFromSignatureTargetIdentityPayload
     chainId: number | string
     signature: string
     targetAddress: string
+    signedData: string
     publicKey?: string
 }
 

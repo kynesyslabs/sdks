@@ -2,7 +2,8 @@ import { Demos } from "@/websdk"
 import { Identities, InferFromTwitterPayload } from "@/abstraction"
 
 describe("Web2 Identities", () => {
-    const rpc = "http://localhost:53550"
+    const rpc = "http://node2.demos.sh:53560"
+    // const rpc = "http://localhost:53550"
     // const rpc = "https://demos.mungaist.com"
 
     const demos = new Demos()
@@ -20,14 +21,14 @@ describe("Web2 Identities", () => {
         console.log(payload)
     })
 
-    test.only("Infer Twitter Identity", async () => {
+    test.skip("Infer Twitter Identity", async () => {
         const proof = "https://x.com/cwilvxi/status/1929985172293701751"
         const validityData = await identities.addTwitterIdentity(demos, proof)
         const res = await demos.broadcast(validityData)
         console.log(res)
     })
 
-    test.skip("Remove Twitter Identity", async () => {
+    test.only("Remove Twitter Identity", async () => {
         const payload = {
             context: "twitter",
             username: "cwilvxi",

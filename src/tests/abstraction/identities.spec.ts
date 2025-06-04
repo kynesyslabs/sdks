@@ -22,7 +22,8 @@ import { wallets } from "../utils/wallets"
 import { uint8ArrayToHex } from "@/encryption"
 
 describe.only("IDENTITIES V2", () => {
-    const rpc = "http://localhost:53550"
+    const rpc = "http://node2.demos.sh:53560"
+    // const rpc = "http://localhost:53550"
     let demos: Demos
 
     beforeAll(async () => {
@@ -36,7 +37,23 @@ describe.only("IDENTITIES V2", () => {
         )
     })
 
-    test.only("EVM ADD IDENTITY v2", async () => {
+    test.only("EVM Signature verify", async () => {
+        const instance = await EVM.create()
+        await instance.connectWallet("24c0de42ea07fb26fd8f77413986c40c9a6fd8bb810c38860b2f7515906b3ef2")
+
+        const _signature = await instance.signMessage("0xe76a59744d0f6ad28b21aeacbcf20ed968b95ed059b0c70dee30659b71f4005a")
+        console.log(_signature)
+
+        const message = "0xe76a59744d0f6ad28b21aeacbcf20ed968b95ed059b0c70dee30659b71f4005a"
+        const signature = "0x5911b5fd070ec1d5be78ffc52327aa08d118ff32ea9de9d45180808ac972dbba2ae53372d742f0440971f073dee2c5a1f78d98f66e2763e03ed6f8d0598c3ca31b"
+        const publicKey = "0x5Fee0e5852aD03939f97cA6856291a1Fe16494fb"
+
+        const verified = await instance.verifyMessage(message, signature, publicKey)
+        console.log(verified)
+        expect(verified).toBe(true)
+    })
+
+    test.skip("EVM ADD IDENTITY v2", async () => {
         const ed25519 = await demos.crypto.getIdentity("ed25519")
         const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
@@ -58,6 +75,7 @@ describe.only("IDENTITIES V2", () => {
                 chain: "evm",
                 chainId: instance.chainId,
                 subchain: "sepolia",
+                signedData: ed25519_address,
                 signature: signature,
                 isEVM: true,
                 targetAddress: instance.getAddress(),
@@ -228,6 +246,7 @@ describe.skip.each(chains)(
                 chain: instance.name,
                 subchain: subchain,
                 signature: _signature,
+                signedData: instance.getAddress(),
                 targetAddress: instance.getAddress(),
                 chainId: instance.chainId,
                 isEVM: name === "EVM",
@@ -415,6 +434,7 @@ describe.skip("Individual Sign & Verify", () => {
             target_identity: {
                 chain: instance.name,
                 chainId: instance.chainId,
+                signedData: instance.getAddress(),
                 isEVM: true,
                 subchain: "sepolia",
                 signature: signature,

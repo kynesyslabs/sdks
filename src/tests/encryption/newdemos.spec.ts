@@ -5,7 +5,8 @@ import { wordlist } from "@scure/bip39/wordlists/english"
 
 describe("New Demos", () => {
     test.only("Send Native tokens", async () => {
-        const rpc = "http://localhost:53550"
+        // const rpc = "http://localhost:53550"
+        const rpc = "http://node2.demos.sh:53560"
 
         const demos = new Demos()
         await demos.connect(rpc)
