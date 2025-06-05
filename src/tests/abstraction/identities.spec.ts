@@ -37,7 +37,7 @@ describe.only("IDENTITIES V2", () => {
         )
     })
 
-    test.only("EVM Signature verify", async () => {
+    test.skip("EVM Signature verify", async () => {
         const instance = await EVM.create()
         await instance.connectWallet("24c0de42ea07fb26fd8f77413986c40c9a6fd8bb810c38860b2f7515906b3ef2")
 
@@ -53,7 +53,7 @@ describe.only("IDENTITIES V2", () => {
         expect(verified).toBe(true)
     })
 
-    test.skip("EVM ADD IDENTITY v2", async () => {
+    test.only("EVM ADD IDENTITY v2", async () => {
         const ed25519 = await demos.crypto.getIdentity("ed25519")
         const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 

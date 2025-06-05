@@ -189,6 +189,15 @@ export class Demos {
         return uint8ArrayToHex(this.keypair.publicKey)
     }
 
+    /**
+     * Returns the ed25519 address of the connected wallet.
+     *
+     */
+    async getEd25519Address() {
+        const { publicKey } = await this.crypto.getIdentity("ed25519")
+        return uint8ArrayToHex(publicKey as Uint8Array)
+    }
+
     // !SECTION Connection and listeners
 
     /**
