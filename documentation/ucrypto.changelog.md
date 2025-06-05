@@ -33,6 +33,13 @@ const publicKey = await demos.connectWallet(mnenomic, {
 })
 ```
 
+The `demos.getAddress` method now returns the `publicKey` of the connected algorithm. To get the ed25519 address of the connected master seed, you can do this:
+
+```ts
+const address = await demos.getEd25519Address();
+console.log("address: ", address)
+```
+
 ### What is a master seed anyway?
 
 With the introduction of Quantum-safe algorithms with support for ed25519, a lot of key types need to be generated. To keep this organized, a master seed is used together with a key derivation function to generate deterministic seeds for the various key types. These seeds are then used to generate keypairs.
