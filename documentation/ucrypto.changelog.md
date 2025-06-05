@@ -3,6 +3,8 @@ This document outlines the changes that need to be made to existing code for it 
 
 > [!IMPORTANT]
 > After switching to the new PQC-enabled SDK, the ed25519 keypairs for existing mnemonics will change. Connected wallets, and identities will need to be connected to the new address.
+> 
+> Please upgrade to SDK `v2.2.52`.
 
 ## 1. Demos.connectWallet
 
