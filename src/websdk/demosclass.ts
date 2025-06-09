@@ -25,7 +25,7 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
-import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
+import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
@@ -332,6 +332,70 @@ export class Demos {
 
         return raw_tx
     }
+
+    /**
+     * Signs a message.
+     *
+     * @param message - The message to sign
+     * @param options - The options for the message signing
+     * @param options.algorithm - The algorithm to use for the message signing. Defaults to the connected wallet's algorithm.
+     * @returns The signature of the message
+     */
+    async signMessage(message: string | Buffer, options?: { algorithm?: SigningAlgorithm }): Promise<{ type: SigningAlgorithm, data: string }> {
+        const algorithm = options?.algorithm || this.algorithm
+
+        const keypair = await this.crypto.getIdentity(algorithm)
+
+        if (!keypair) {
+            await this.crypto.generateIdentity(algorithm)
+        }
+
+        let messageBuffer: Uint8Array = null
+        if (typeof message === "string") {
+            messageBuffer = new TextEncoder().encode(message)
+        } else {
+            messageBuffer = message
+        }
+
+        const signature = await this.crypto.sign(
+            algorithm,
+            messageBuffer,
+        )
+
+        return { type: algorithm, data: uint8ArrayToHex(signature.signature) }
+    }
+
+    /**
+     * Verifies a message.
+     *
+     * @param message - The message to verify
+     * @param signature - The signature of the message
+     * @param publicKey - The public key of the message
+     * @param options - The options for the message verification
+     * @param options.algorithm - The algorithm to use for the message verification. Defaults to the connected wallet's algorithm or ed25519 if no wallet is connected.
+     * 
+     * @returns Whether the message is verified
+     */
+    async verifyMessage(message: string | Buffer, signature: string, publicKey: string, options?: { algorithm?: SigningAlgorithm }): Promise<boolean> {
+        const algorithm = options?.algorithm || this.algorithm
+
+        let messageBuffer: Uint8Array = null
+        if (typeof message === "string") {
+            messageBuffer = new TextEncoder().encode(message)
+        } else {
+            messageBuffer = message
+        }
+
+        const verified = await this.crypto.verify({
+            algorithm: algorithm,
+            signature: hexToUint8Array(signature),
+            publicKey: hexToUint8Array(publicKey),
+            message: messageBuffer,
+        })
+
+        return verified
+    }
+
     // L2PS calls are defined here
 
     async rpcCall(
@@ -646,6 +710,7 @@ export class Demos {
         // this.keypair = null
 
         this.connected = false
+        this.crypto = null
     }
 
     // ANCHOR Web2 Endpoints
