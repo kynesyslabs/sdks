@@ -104,6 +104,7 @@ export const methods = {
                 data: ["nativeBridge", compiled],
                 from: "", // TODO Implement from using the identity
                 to: "", // TODO Same as from
+                from_ed25519_address: "",
                 amount: 0,
                 gcr_edits: [],
                 nonce: 0,
@@ -121,6 +122,7 @@ export const methods = {
             hash: "",
             status: "empty",
             blockNumber: 0,
+            ed25519_signature: ""
         }
         // TODO Hash and sign the transaction
         return tx

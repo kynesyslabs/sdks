@@ -5,8 +5,7 @@ import { EncryptedTransaction } from "@/types/blockchain/encryptedTransaction"
 import { Block } from "@/types"
 import { Transaction } from "@/types"
 import { Hashing } from "@/encryption/Hashing"
-import { demos, DemosTransactions, skeletons } from "@/websdk"
-import { KeyPair } from "@ton/crypto"
+import { demos, DemosTransactions } from "@/websdk"
 import { Message, MessageMap } from "./L2PSMessagingSystem"
 import { ForgeToHex } from "@/utils/dataManipulation"
 import { IKeyPair } from "@/websdk/types/KeyPair"
@@ -204,7 +203,7 @@ export class l2psCalls {
         // Creating the subnet transaction
         let subnetTx: Transaction = DemosTransactions.empty()
         // ? From and To are the same in Subnet transactions (or should we use the subnet's uid somehow?)
-        subnetTx.content.from = keypair.publicKey as Uint8Array
+        // subnetTx.content.from = keypair.publicKey as Uint8Array
         subnetTx.content.to = subnetTx.content.from
         subnetTx.content.type = "subnet"
         subnetTx.content.data = ["subnet", payload]

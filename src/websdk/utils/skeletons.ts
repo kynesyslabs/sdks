@@ -64,7 +64,10 @@ const web2_request: IWeb2Request = {
     result: null,
     attestations: {},
     hash: "",
-    signature: "",
+    signature: {
+        type: "ed25519",
+        data: "",
+    },
 }
 
 export { crosschain_operation, transaction, web2_request }

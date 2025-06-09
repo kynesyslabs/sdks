@@ -400,7 +400,7 @@ export class MessagingPeer {
         const serializedProofSignature: SerializedSignedObject = {
             algorithm: "ml-dsa",
             serializedSignedData: serializeUint8Array(
-                proofSignature.signedData,
+                proofSignature.signature,
             ),
             serializedPublicKey: serializeUint8Array(proofSignature.publicKey),
             serializedMessage: serializeUint8Array(proofSignature.message),

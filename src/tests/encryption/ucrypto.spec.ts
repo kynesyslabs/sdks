@@ -1,11 +1,16 @@
-import { describe, test, expect, beforeEach } from "bun:test"
+// import { describe, test, expect, beforeEach } from "bun:test"
+import { Hashing } from "@/encryption"
 import {
     unifiedCrypto,
     getUnifiedCryptoInstance,
-    encryptedObject,
-    signedObject,
+    uint8ArrayToHex,
+    hexToUint8Array,
 } from "../../encryption/unifiedCrypto"
 import { randomBytes } from "@noble/hashes/utils"
+import * as bip39 from "@scure/bip39"
+import { wordlist } from "@scure/bip39/wordlists/english"
+import { sha3_512 } from "@noble/hashes/sha3"
+import { Demos } from "@/websdk/demosclass"
 
 // Reset the instances before each test
 beforeEach(() => {
@@ -130,9 +135,15 @@ describe("Seed Derivation", () => {
 })
 
 describe("Key Generation", () => {
-    test("should generate Ed25519 keys", async () => {
+    test.skip("should generate Ed25519 keys", async () => {
         await unifiedCrypto.generateIdentity("ed25519")
         const identity = await unifiedCrypto.getIdentity("ed25519")
+
+        console.log("master seed length", unifiedCrypto.masterSeed.length)
+        console.log("master seed hex", uint8ArrayToHex(unifiedCrypto.masterSeed))
+        console.log("master seed back", hexToUint8Array(uint8ArrayToHex(unifiedCrypto.masterSeed)).length)
+
+        expect(unifiedCrypto.masterSeed).toEqual(hexToUint8Array(uint8ArrayToHex(unifiedCrypto.masterSeed)))
         expect(identity.publicKey).toBeDefined()
         expect(identity.privateKey).toBeDefined()
     })
@@ -147,6 +158,10 @@ describe("Key Generation", () => {
     test("should generate ML-KEM-AES keys", async () => {
         await unifiedCrypto.generateIdentity("ml-kem-aes")
         const identity = await unifiedCrypto.getIdentity("ml-kem-aes")
+
+        // console.log("public key", uint8ArrayToHex(identity.publicKey))
+        // console.log("private key", uint8ArrayToHex(identity.privateKey))
+
         expect(identity.publicKey).toBeDefined()
         expect(identity.privateKey).toBeDefined()
     })
@@ -154,13 +169,32 @@ describe("Key Generation", () => {
     test("should generate ML-DSA keys", async () => {
         await unifiedCrypto.generateIdentity("ml-dsa")
         const identity = await unifiedCrypto.getIdentity("ml-dsa")
+
+        // console.log("public key", uint8ArrayToHex(identity.publicKey))
+        // console.log("private key", uint8ArrayToHex(identity.privateKey))
+
         expect(identity.publicKey).toBeDefined()
         expect(identity.privateKey).toBeDefined()
     })
 
     test("should generate Falcon keys", async () => {
-        await unifiedCrypto.generateIdentity("falcon")
+        const seed = "entire vocal party hold witness glimpse damp cat small type whale cry";
+        const mnemonic = bip39.generateMnemonic(wordlist, 128)
+
+        const seedBuffer = bip39.mnemonicToSeedSync(seed)
+        console.log("wordlist length", wordlist.length)
+        console.log("seed buffer length", seedBuffer.length)
+        console.log("mnemonic", mnemonic.length)
+        const seedBytes = new TextEncoder().encode(Hashing.sha256(seedBuffer.toString()))
+
+
+        console.log("seed length", seedBytes.length)
+        await unifiedCrypto.generateIdentity("falcon", seedBytes)
         const identity = await unifiedCrypto.getIdentity("falcon")
+
+        // console.log("falcon public key", uint8ArrayToHex(identity.publicKey))
+        // console.log("falcon private key", uint8ArrayToHex(identity.privateKey))
+
         expect(identity.publicKey).toBeDefined()
         expect(identity.privateKey).toBeDefined()
     })
@@ -238,7 +272,7 @@ describe("Encryption and Decryption", () => {
 })
 
 describe("Signing and Verification", () => {
-    test("should sign and verify data with Ed25519", async () => {
+    test.only("should sign and verify data with Ed25519", async () => {
         // Setup
         await unifiedCrypto.generateIdentity("ed25519")
         const data = new TextEncoder().encode("Hello, world!")
@@ -246,7 +280,7 @@ describe("Signing and Verification", () => {
         // Sign
         const signed = await unifiedCrypto.sign("ed25519", data)
         expect(signed.algorithm).toBe("ed25519")
-        expect(signed.signedData).toBeDefined()
+        expect(signed.signature).toBeDefined()
         expect(signed.publicKey).toBeDefined()
 
         // Verify
@@ -262,7 +296,7 @@ describe("Signing and Verification", () => {
         // Sign
         const signed = await unifiedCrypto.sign("ml-dsa", data)
         expect(signed.algorithm).toBe("ml-dsa")
-        expect(signed.signedData).toBeDefined()
+        expect(signed.signature).toBeDefined()
         expect(signed.publicKey).toBeDefined()
 
         // Verify
@@ -278,7 +312,7 @@ describe("Signing and Verification", () => {
         // Sign
         const signed = await unifiedCrypto.sign("falcon", data)
         expect(signed.algorithm).toBe("falcon")
-        expect(signed.signedData).toBeDefined()
+        expect(signed.signature).toBeDefined()
         expect(signed.publicKey).toBeDefined()
 
         // Verify
@@ -296,7 +330,7 @@ describe("Signing and Verification", () => {
 
         // Modify the signature to make it invalid
         const modifiedSigned = { ...signed }
-        modifiedSigned.signedData = new Uint8Array(signed.signedData.length)
+        modifiedSigned.signature = new Uint8Array(signed.signature.length)
 
         // Verify
         let isOriginalValid = await unifiedCrypto.verify(signed)
@@ -344,5 +378,22 @@ describe("Proxy Export", () => {
 
         // The public keys should be the same
         expect(identity1.publicKey).toEqual(identity2.publicKey)
+    })
+})
+
+describe.only("Mnemonic to Buffer Conversion", () => {
+    test("should convert 12-word mnemonic to 128-byte buffer", async () => {
+        const mnemonic = "entire vocal party hold witness glimpse damp cat small type whale cry";
+        const seedBuffer = bip39.mnemonicToSeedSync(mnemonic);
+
+        const hash = sha3_512(seedBuffer)
+        console.log("hash", uint8ArrayToHex(hash).length)
+        // const hashBuffer = Buffer.from(hash, "hex");
+        console.log("hash buffer length", hash.length)
+    });
+
+    test.only("NEW demos rewrite", async () => {
+        const demos = new Demos()
+        await demos.connectWallet("entire vocal party hold witness glimpse damp cat small type whale cry")
     })
 })

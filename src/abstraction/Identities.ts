@@ -1,8 +1,7 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
-import { Cryptography } from "@/encryption/Cryptography"
-import { RPCResponseWithValidityData } from "@/types"
+import { RPCResponseWithValidityData, SigningAlgorithm } from "@/types"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
@@ -11,12 +10,14 @@ import {
     InferFromGithubPayload,
     InferFromXPayload,
     InferFromSignaturePayload,
+    PqcIdentityAssignPayload,
+    PqcIdentityRemovePayload,
 } from "@/types/abstraction"
-import forge from "node-forge"
 import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
-import { IKeyPair } from "@/websdk/types/KeyPair"
+import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import axios from "axios"
+import { PQCAlgorithm } from "@/types/cryptography"
 
 export class Identities {
     formats = {
@@ -36,26 +37,14 @@ export class Identities {
      * @param keypair The keypair of the demos account.
      * @returns The web2 proof payload string.
      */
-    async createWeb2ProofPayload(keypair: IKeyPair) {
+    async createWeb2ProofPayload(demos: Demos) {
         const message = "dw2p"
-        const signature = Cryptography.sign(message, keypair.privateKey)
-        const payload = {
-            message,
-            signature: signature.toString("hex"),
-            publicKey: keypair.publicKey.toString("hex"),
-        }
-
-        const verified = Cryptography.verify(
-            message,
-            forge.util.binary.hex.decode(payload.signature),
-            forge.util.binary.hex.decode(payload.publicKey),
+        const signature = await demos.crypto.sign(
+            demos.algorithm,
+            new TextEncoder().encode(message),
         )
 
-        if (!verified) {
-            throw new Error("Failed to verify web2 proof payload")
-        }
-
-        return `demos:${payload.message}:${payload.signature}:${payload.publicKey}`
+        return `demos:${message}:${demos.algorithm}:${uint8ArrayToHex(signature.signature)}`
     }
 
     /**
@@ -69,7 +58,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2",
+        context: "xm" | "web2" | "pqc",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -88,12 +77,12 @@ export class Identities {
         }
 
         const tx = DemosTransactions.empty()
-        const address = demos.getAddress()
+        const ed25519 = await demos.crypto.getIdentity("ed25519")
+        const address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
         tx.content = {
             ...tx.content,
             type: "identity",
-            from: address,
             to: address,
             amount: 0,
             data: [
@@ -121,16 +110,17 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2",
+        context: "xm" | "web2" | "pqc",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
-        const address = demos.getAddress()
+
+        const ed25519 = await demos.crypto.getIdentity("ed25519")
+        const address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
         tx.content = {
             ...tx.content,
             type: "identity",
-            from: address,
             to: address,
             amount: 0,
             data: [
@@ -252,6 +242,68 @@ export class Identities {
         return await this.inferIdentity(demos, "web2", twitterPayload)
     }
 
+    // SECTION: PQC Identities
+    async bindPqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+        let addressTypes: PQCAlgorithm[] = []
+
+        // Create the address types to bind
+        if (algorithms === "all") {
+            await demos.crypto.generateAllIdentities()
+            addressTypes = UnifiedCrypto.supportedPQCAlgorithms
+        } else {
+            for (const algorithm of algorithms) {
+                await demos.crypto.generateIdentity(algorithm)
+                addressTypes.push(algorithm)
+            }
+        }
+
+        // Create the payloads
+        const payloads: PqcIdentityAssignPayload["payload"] = []
+
+        for (const addressType of addressTypes) {
+            // INFO: Create an ed25519 signature for each address type
+            const keypair = await demos.crypto.getIdentity(addressType)
+            const address = uint8ArrayToHex(keypair.publicKey as Uint8Array)
+            const signature = await demos.crypto.sign("ed25519", new TextEncoder().encode(address))
+
+            payloads.push({
+                algorithm: addressType,
+                address: address,
+                signature: uint8ArrayToHex(signature.signature),
+            })
+        }
+
+        return await this.inferIdentity(demos, "pqc", payloads)
+    }
+
+    async removePqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+        let addressTypes: PQCAlgorithm[] = []
+
+        // Create the address types to remove
+        if (algorithms === "all") {
+            await demos.crypto.generateAllIdentities()
+            addressTypes = UnifiedCrypto.supportedPQCAlgorithms
+        } else {
+            for (const algorithm of algorithms) {
+                await demos.crypto.generateIdentity(algorithm)
+                addressTypes.push(algorithm)
+            }
+        }
+
+        // Create the payloads
+        const payloads: PqcIdentityRemovePayload["payload"] = []
+
+        for (const addressType of addressTypes) {
+            const address = await demos.crypto.getIdentity(addressType)
+            payloads.push({
+                algorithm: addressType,
+                address: uint8ArrayToHex(address.publicKey as Uint8Array),
+            })
+        }
+
+        return await this.removeIdentity(demos, "pqc", payloads)
+    }
+
     /**
      * Get the identities associated with an address.
      *
@@ -264,12 +316,17 @@ export class Identities {
         call = "getIdentities",
         address?: string,
     ) {
+        if (!address) {
+            const ed25519 = await demos.crypto.getIdentity("ed25519")
+            address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+        }
+
         const request = {
             method: "gcr_routine",
             params: [
                 {
                     method: call,
-                    params: [address || demos.getAddress()],
+                    params: [address],
                 },
             ],
         }

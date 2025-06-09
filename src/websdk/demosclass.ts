@@ -13,8 +13,7 @@ import { DemosTransactions } from "./DemosTransactions"
 import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 
-import { Cryptography } from "@/encryption/Cryptography"
-import { Block, IPeer, RawTransaction, Transaction, XMScript } from "@/types"
+import { Block, IPeer, RawTransaction, SigningAlgorithm, Transaction, TransactionContent, XMScript } from "@/types"
 import { AddressInfo } from "@/types/blockchain/address"
 import {
     RPCRequest,
@@ -26,6 +25,11 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
+import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
+import { GCRGeneration } from "./GCRGeneration"
+import { Hashing } from "@/encryption/Hashing"
+import * as bip39 from "@scure/bip39"
+import { wordlist } from "@scure/bip39/wordlists/english"
 import { Tweet } from "@the-convocation/twitter-scraper"
 
 async function sleep(ms: number) {
@@ -38,21 +42,44 @@ async function sleep(ms: number) {
  * This class provides methods to interact with the DEMOS blockchain.
  */
 export class Demos {
+    algorithm: SigningAlgorithm = "ed25519"
+    crypto: UnifiedCrypto = null
     private static _instance: Demos | null = null
 
     /** The RPC URL of the demos node */
-    rpc_url: string = null
+    private rpc_url: string = null
 
     /** Connection status of the RPC URL */
     connected: boolean = false
+    dual_sign: boolean = false
 
     /** Connection status of the wallet */
     get walletConnected(): boolean {
-        return this.keypair !== null && this.keypair.privateKey !== null
+        // return this.keypair !== null && this.keypair.privateKey !== null
+        return this.crypto && this.keypair != null
     }
 
     /** The keypair of the connected wallet */
-    keypair: IKeyPair = null
+    get keypair() {
+        if (!this.crypto) {
+            return null
+        }
+
+        switch (this.algorithm) {
+            case "ed25519":
+                return this.crypto.ed25519KeyPair
+            case "falcon":
+                return this.crypto.enigma.falcon_signing_keypair
+            case "ml-dsa":
+                return this.crypto.enigma.ml_dsa_signing_keypair
+            default:
+                throw new Error("Invalid algorithm " + this.algorithm)
+        }
+    }
+
+    constructor() {
+        this.crypto = UnifiedCrypto.getInstance()
+    }
 
     static get instance() {
         if (!Demos._instance) {
@@ -60,6 +87,16 @@ export class Demos {
         }
 
         return Demos._instance
+    }
+
+    /**
+     * Generates a new mnemonic.
+     *
+     * @param strength - The strength of the mnemonic in bits. (128 bits = 12 words, 256 bits = 24 words). Default is 128 bits.
+     * @returns The mnemonic
+     */
+    newMnemonic(strength: 128 | 256 = 128) {
+        return bip39.generateMnemonic(wordlist, strength)
     }
 
     /**
@@ -80,35 +117,69 @@ export class Demos {
     }
 
     /**
-     * Connects to a Demos wallet using the provided private key.
+     * Connects to a Demos wallet using the provided master seed.
      *
-     * @param privateKey - The private key of the wallet
+     * @param masterSeed - The master seed of the wallet
+     * @param algorithm - The algorithm to use for the wallet
      * @param options - The options for the wallet connection
+     * @param options.algorithm - The algorithm to use for the wallet
+     * @param options.dual_sign - Whether to include the ed25519 signature along with the PQC signature, when 
+     * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
+     * 
      * @returns The public key of the wallet
      */
     async connectWallet(
-        privateKey: string | Buffer | Uint8Array,
+        masterSeed: string | Uint8Array,
         options?: {
+            algorithm?: SigningAlgorithm,
             /**
-             * Whether the private key is a seed.
-             * If true, the seed will be converted to an ed25519 keypair.
+             * Whether to include the ed25519 signature along with the PQC signature, when 
+             * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
              */
-            isSeed?: boolean
+            dual_sign?: boolean
         },
     ) {
-        if (options?.isSeed) {
-            privateKey = Cryptography.newFromSeed(privateKey).privateKey
+        if (!masterSeed) {
+            throw new Error("Master seed is required. Use `demos.newMnemonic()` to generate a new mnemonic.")
         }
 
-        const webAuthInstance = new DemosWebAuth()
-        const [loggedIn, helptext] = await webAuthInstance.login(privateKey)
+        let seed: Uint8Array = null
+        this.algorithm = options?.algorithm || "ed25519"
+        this.dual_sign = options?.dual_sign || false
+        // TODO: Convert masterSeed to 128 bytes
 
-        if (loggedIn) {
-            this.keypair = webAuthInstance.keypair
-            return this.keypair.publicKey.toString("hex")
+        if (typeof masterSeed !== "string" && !(masterSeed instanceof Uint8Array)) {
+            throw new Error("Invalid master seed: must be a string or a Uint8Array")
         }
 
-        throw new Error(helptext)
+        let hashable: string | Uint8Array = null
+
+        if (typeof masterSeed === "string") {
+            if (masterSeed.split(" ").length % 3 === 0) {
+                hashable = bip39.mnemonicToSeedSync(masterSeed)
+            } else {
+                hashable = masterSeed
+            }
+        } else if (masterSeed.length !== 128) {
+            hashable = masterSeed
+        }
+
+        if (hashable) {
+            const seedHash = Hashing.sha3_512(hashable)
+            // remove the 0x prefix
+            const seedHashHex = uint8ArrayToHex(seedHash).slice(2)
+            seed = new TextEncoder().encode(seedHashHex)
+        } else {
+            seed = masterSeed as Uint8Array
+        }
+
+        // Always generate an ed25519 identity
+        if (this.algorithm !== "ed25519") {
+            await this.crypto.generateIdentity("ed25519", seed)
+        }
+
+        await this.crypto.generateIdentity(this.algorithm, seed)
+        return uint8ArrayToHex(this.keypair.publicKey)
     }
 
     /**
@@ -118,7 +189,16 @@ export class Demos {
      */
     getAddress() {
         required(this.walletConnected, "Wallet not connected")
-        return this.keypair.publicKey.toString("hex")
+        return uint8ArrayToHex(this.keypair.publicKey)
+    }
+
+    /**
+     * Returns the ed25519 address of the connected wallet.
+     *
+     */
+    async getEd25519Address() {
+        const { publicKey } = await this.crypto.getIdentity("ed25519")
+        return uint8ArrayToHex(publicKey as Uint8Array)
     }
 
     // !SECTION Connection and listeners
@@ -188,11 +268,140 @@ export class Demos {
     /**
      * Signs a transaction.
      *
-     * @param raw_tx - The transaction to sign
+     * @param raw_tx - The transaction to sign  
+     * @param options - The dual-signing options
      * @returns The signed transaction
      */
-    sign(raw_tx: Transaction) {
-        return DemosTransactions.sign(raw_tx, this.keypair)
+    async sign(raw_tx: Transaction) {
+        required(this.keypair, "Wallet not connected")
+        if (!raw_tx.content.timestamp || raw_tx.content.timestamp === 0) {
+            raw_tx.content.timestamp = Date.now()
+        }
+
+        // INFO: Use the connected algorithm's public key as the sender
+        raw_tx.content.from = uint8ArrayToHex(this.keypair.publicKey as Uint8Array)
+
+        // INFO: If no ed25519 address is provided, use the connected master seed's ed25519 address
+        if (!raw_tx.content.from_ed25519_address) {
+            const { publicKey } = await this.crypto.getIdentity("ed25519")
+            raw_tx.content.from_ed25519_address = uint8ArrayToHex(publicKey as Uint8Array)
+        }
+
+        // INFO: Client-side enforcement of reflexive transactions
+        const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request"]
+
+        if (reflexive.includes(raw_tx.content.type)) {
+            if (raw_tx.content.from_ed25519_address !== raw_tx.content.to) {
+                throw new Error("Transaction of type: " + raw_tx.content.type + " must have the same from and to addresses")
+            }
+        }
+
+        // INFO: Add 0x prefix to addresses if not present
+        if (!raw_tx.content.to.startsWith("0x")) {
+            raw_tx.content.to = "0x" + raw_tx.content.to
+        }
+
+        const isHex = /^0x[0-9a-f]{66}$/i.test(raw_tx.content.to)
+        if (!isHex) {
+            throw new Error(`Invalid To address: ${raw_tx.content.to}`)
+        }
+
+        if (!raw_tx.content.from_ed25519_address.startsWith("0x")) {
+            raw_tx.content.from_ed25519_address = "0x" + raw_tx.content.from_ed25519_address
+        }
+
+        if (!raw_tx.content.from.startsWith("0x")) {
+            raw_tx.content.from = "0x" + raw_tx.content.from
+        }
+
+        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
+
+        raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
+        const signature = await this.crypto.sign(
+            this.algorithm,
+            new TextEncoder().encode(raw_tx.hash),
+        )
+
+        // INFO: We only dual-sign when signing with PQC keypairs
+        let dual_sign = this.dual_sign && this.algorithm !== "ed25519"
+
+        if (dual_sign) {
+            const ed25519_signature = await this.crypto.sign(
+                "ed25519",
+                new TextEncoder().encode(raw_tx.hash),
+            )
+            raw_tx.ed25519_signature = uint8ArrayToHex(ed25519_signature.signature)
+        }
+
+        raw_tx.signature = {
+            type: this.algorithm,
+            data: uint8ArrayToHex(signature.signature),
+        }
+
+        return raw_tx
+    }
+
+    /**
+     * Signs a message.
+     *
+     * @param message - The message to sign
+     * @param options - The options for the message signing
+     * @param options.algorithm - The algorithm to use for the message signing. Defaults to the connected wallet's algorithm.
+     * @returns The signature of the message
+     */
+    async signMessage(message: string | Buffer, options?: { algorithm?: SigningAlgorithm }): Promise<{ type: SigningAlgorithm, data: string }> {
+        const algorithm = options?.algorithm || this.algorithm
+
+        const keypair = await this.crypto.getIdentity(algorithm)
+
+        if (!keypair) {
+            await this.crypto.generateIdentity(algorithm)
+        }
+
+        let messageBuffer: Uint8Array = null
+        if (typeof message === "string") {
+            messageBuffer = new TextEncoder().encode(message)
+        } else {
+            messageBuffer = message
+        }
+
+        const signature = await this.crypto.sign(
+            algorithm,
+            messageBuffer,
+        )
+
+        return { type: algorithm, data: uint8ArrayToHex(signature.signature) }
+    }
+
+    /**
+     * Verifies a message.
+     *
+     * @param message - The message to verify
+     * @param signature - The signature of the message
+     * @param publicKey - The public key of the message
+     * @param options - The options for the message verification
+     * @param options.algorithm - The algorithm to use for the message verification. Defaults to the connected wallet's algorithm or ed25519 if no wallet is connected.
+     * 
+     * @returns Whether the message is verified
+     */
+    async verifyMessage(message: string | Buffer, signature: string, publicKey: string, options?: { algorithm?: SigningAlgorithm }): Promise<boolean> {
+        const algorithm = options?.algorithm || this.algorithm
+
+        let messageBuffer: Uint8Array = null
+        if (typeof message === "string") {
+            messageBuffer = new TextEncoder().encode(message)
+        } else {
+            messageBuffer = message
+        }
+
+        const verified = await this.crypto.verify({
+            algorithm: algorithm,
+            signature: hexToUint8Array(signature),
+            publicKey: hexToUint8Array(publicKey),
+            message: messageBuffer,
+        })
+
+        return verified
     }
 
     // L2PS calls are defined here
@@ -208,11 +417,12 @@ export class Demos {
         let signature = ""
 
         if (isAuthenticated) {
-            publicKey = this.keypair.publicKey.toString("hex")
-            signature = Cryptography.sign(
-                publicKey,
-                this.keypair.privateKey,
-            ).toString("hex")
+            publicKey = uint8ArrayToHex(this.keypair.publicKey)
+            const _signature = await this.crypto.sign(
+                this.algorithm,
+                new TextEncoder().encode(publicKey),
+            )
+            signature = uint8ArrayToHex(_signature.signature)
         }
 
         try {
@@ -222,7 +432,7 @@ export class Demos {
                 {
                     headers: {
                         "Content-Type": "application/json",
-                        identity: publicKey,
+                        identity: this.algorithm + ":" + publicKey,
                         signature: signature,
                     },
                 },
@@ -301,11 +511,14 @@ export class Demos {
                 )
             }
 
-            pubkey_string = this.keypair.publicKey.toString("hex")
-            pubkey_signature = Cryptography.sign(
-                pubkey_string,
-                this.keypair.privateKey,
-            ).toString("hex")
+            const publicKey = uint8ArrayToHex(this.keypair.publicKey)
+            const signature = await this.crypto.sign(
+                this.algorithm,
+                new TextEncoder().encode(publicKey),
+            )
+
+            pubkey_string = this.algorithm + ":" + publicKey
+            pubkey_signature = uint8ArrayToHex(signature.signature)
         }
 
         try {
@@ -502,9 +715,12 @@ export class Demos {
     disconnect() {
         // remove rpc_url and wallet connection
         this.rpc_url = null
-        this.keypair = null
+        this.dual_sign = false
+        // this.keypair = null
 
         this.connected = false
+        this.crypto = null
+        this.algorithm = "ed25519"
     }
 
     // ANCHOR Web2 Endpoints
@@ -527,25 +743,22 @@ export class Demos {
             if (!usedKeypair) {
                 throw new Error("No keypair provided and no wallet connected")
             }
-            return prepareXMPayload(xm_payload, usedKeypair)
+            return prepareXMPayload(xm_payload, this)
         },
     }
 
     tx = {
         ...DemosTransactions,
         /**
+         * Same as `demos.sign`.
          * Signs a transaction after hashing its content.
          *
          * @param raw_tx - The transaction to be signed.
-         * @param keypair - The keypair to use for signing. If not provided, the keypair connected to the wallet will be used.
-         * @returns A Promise that resolves to the signed transaction.
          */
-        sign: (raw_tx: Transaction, keypair?: IKeyPair) => {
-            const usedKeypair = keypair || this.keypair
-            if (!usedKeypair) {
-                throw new Error("No keypair provided and no wallet connected")
-            }
-            return DemosTransactions.sign(raw_tx, usedKeypair)
+        sign: (
+            raw_tx: Transaction,
+        ) => {
+            return this.sign(raw_tx)
         },
     }
 

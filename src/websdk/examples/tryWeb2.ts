@@ -1,4 +1,3 @@
-import { demos } from "../demos"
 import { EnumWeb2Methods } from "../../types"
 import { DemosWebAuth } from "../DemosWebAuth"
 import { Demos } from "../demosclass"

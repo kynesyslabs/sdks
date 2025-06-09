@@ -1,9 +1,3 @@
-import {
-    encryptedObject,
-    SerializedEncryptedObject,
-    signedObject,
-    SerializedSignedObject,
-} from "./unifiedCrypto"
 export * as FHE from "./FHE"
 export * as PQC from "./PQC/enigma"
 export * as zK from "./zK"
@@ -16,4 +10,10 @@ export {
     SerializedEncryptedObject,
     signedObject,
     SerializedSignedObject,
+    hexToUint8Array,
+    uint8ArrayToHex,
+    Ed25519SignedObject,
+    PqcSignedObject,
+    UnifiedCrypto,
+    getUnifiedCryptoInstance,
 } from "./unifiedCrypto"
