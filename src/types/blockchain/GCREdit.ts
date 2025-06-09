@@ -72,14 +72,7 @@ export interface Web2GCRData {
     }
 }
 
-interface PQCIdentityGCREditData {
-    algorithm: SigningAlgorithm
-    address: string
-    signature: string
-    timestamp: number
-}
-
-interface PQCIdentityGCREditData {
+export interface PQCIdentityGCREditData {
     algorithm: SigningAlgorithm
     address: string
     signature: string

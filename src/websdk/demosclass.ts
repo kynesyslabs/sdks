@@ -61,6 +61,10 @@ export class Demos {
 
     /** The keypair of the connected wallet */
     get keypair() {
+        if (!this.crypto) {
+            return null
+        }
+
         switch (this.algorithm) {
             case "ed25519":
                 return this.crypto.ed25519KeyPair
@@ -156,15 +160,14 @@ export class Demos {
             } else {
                 hashable = masterSeed
             }
-        }
-
-        if (masterSeed.length !== 128) {
+        } else if (masterSeed.length !== 128) {
             hashable = masterSeed
         }
 
         if (hashable) {
             const seedHash = Hashing.sha3_512(hashable)
-            const seedHashHex = Buffer.from(seedHash).toString("hex")
+            // remove the 0x prefix
+            const seedHashHex = uint8ArrayToHex(seedHash).slice(2)
             seed = new TextEncoder().encode(seedHashHex)
         } else {
             seed = masterSeed as Uint8Array
@@ -176,7 +179,7 @@ export class Demos {
         }
 
         await this.crypto.generateIdentity(this.algorithm, seed)
-        return this.keypair.publicKey.toString("hex")
+        return uint8ArrayToHex(this.keypair.publicKey)
     }
 
     /**
@@ -296,6 +299,11 @@ export class Demos {
         // INFO: Add 0x prefix to addresses if not present
         if (!raw_tx.content.to.startsWith("0x")) {
             raw_tx.content.to = "0x" + raw_tx.content.to
+        }
+
+        const isHex = /^0x[0-9a-f]{66}$/i.test(raw_tx.content.to)
+        if (!isHex) {
+            throw new Error(`Invalid To address: ${raw_tx.content.to}`)
         }
 
         if (!raw_tx.content.from_ed25519_address.startsWith("0x")) {
@@ -707,10 +715,12 @@ export class Demos {
     disconnect() {
         // remove rpc_url and wallet connection
         this.rpc_url = null
+        this.dual_sign = false
         // this.keypair = null
 
         this.connected = false
         this.crypto = null
+        this.algorithm = "ed25519"
     }
 
     // ANCHOR Web2 Endpoints

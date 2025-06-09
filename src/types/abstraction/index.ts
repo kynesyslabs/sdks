@@ -141,7 +141,7 @@ export interface BasePqcIdentityPayload {
 export interface PqcIdentityAssignPayload extends BasePqcIdentityPayload {
     method: "pqc_identity_assign"
     payload: {
-        algorithm: SigningAlgorithm
+        algorithm: "falcon" | "ml-dsa"
         address: string
         signature: string
     }[]
@@ -150,7 +150,7 @@ export interface PqcIdentityAssignPayload extends BasePqcIdentityPayload {
 export interface PqcIdentityRemovePayload extends BasePqcIdentityPayload {
     method: "pqc_identity_remove"
     payload: {
-        algorithm: SigningAlgorithm
+        algorithm: "falcon" | "ml-dsa"
         address: string
     }[]
 }

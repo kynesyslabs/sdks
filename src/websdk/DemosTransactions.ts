@@ -41,10 +41,6 @@ export const DemosTransactions = {
     async pay(to: string, amount: number, demos: Demos) {
         required(demos.keypair, "Wallet not connected")
 
-        if (to.length > 66) {
-            throw new Error("Invalid Ed25519 address: " + to)
-        }
-
         let tx = DemosTransactions.empty()
 
         const { publicKey } = await demos.crypto.getIdentity("ed25519")

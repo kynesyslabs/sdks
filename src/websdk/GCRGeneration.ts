@@ -30,13 +30,14 @@ export class GCRGeneration {
             case "demoswork":
                 // TODO Implement this
                 break
-            case "native":
+            case "native": {
                 var nativeEdits = await HandleNativeOperations.handle(
                     tx,
                     isRollback,
                 )
                 gcrEdits.push(...nativeEdits)
                 break
+            }
             case "web2Request":
             case "crosschainOperation":
                 const assignEdit = this.createAssignEdit(content, tx.hash)

@@ -17,6 +17,7 @@ import { DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import axios from "axios"
+import { PQCAlgorithm } from "@/types/cryptography"
 
 export class Identities {
     formats = {
@@ -242,13 +243,8 @@ export class Identities {
     }
 
     // SECTION: PQC Identities
-    async bindPqcIdentity(demos: Demos, algorithms: "all" | SigningAlgorithm[] = "all") {
-        let ed25519Address: string = null
-        let addressTypes: SigningAlgorithm[] = []
-
-        // Get the ed25519 address (paylaod to be signed)
-        const ed25519 = await demos.crypto.getIdentity("ed25519")
-        ed25519Address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+    async bindPqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+        let addressTypes: PQCAlgorithm[] = []
 
         // Create the address types to bind
         if (algorithms === "all") {
@@ -280,8 +276,8 @@ export class Identities {
         return await this.inferIdentity(demos, "pqc", payloads)
     }
 
-    async removePqcIdentity(demos: Demos, algorithms: "all" | SigningAlgorithm[] = "all") {
-        let addressTypes: SigningAlgorithm[] = []
+    async removePqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+        let addressTypes: PQCAlgorithm[] = []
 
         // Create the address types to remove
         if (algorithms === "all") {

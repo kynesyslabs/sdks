@@ -4,7 +4,7 @@ import { hkdf } from "@noble/hashes/hkdf"
 import { randomBytes } from "@noble/hashes/utils"
 import * as forge from "node-forge"
 import { Cryptography } from "./Cryptography"
-import { SigningAlgorithm } from '@/types/cryptography';
+import { PQCAlgorithm, SigningAlgorithm } from '@/types/cryptography';
 
 /* The two interfaces below are used to route the encrypted and signed data through the unified crypto system */
 export interface encryptedObject {
@@ -120,7 +120,7 @@ export function hexToUint8Array(hexString: string): Uint8Array {
  */
 export class UnifiedCrypto {
     // Multiton pattern: store multiple instances
-    static supportedPQCAlgorithms = ["falcon", "ml-dsa"] as SigningAlgorithm[]
+    static supportedPQCAlgorithms = ["falcon", "ml-dsa"] as PQCAlgorithm[]
     private static instances: Map<string, UnifiedCrypto> = new Map()
     private static DEFAULT_INSTANCE_ID = "default"
 
