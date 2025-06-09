@@ -282,7 +282,7 @@ export class Identities {
         // Create the address types to remove
         if (algorithms === "all") {
             await demos.crypto.generateAllIdentities()
-            addressTypes = ["falcon", "ml-dsa"]
+            addressTypes = UnifiedCrypto.supportedPQCAlgorithms
         } else {
             for (const algorithm of algorithms) {
                 await demos.crypto.generateIdentity(algorithm)
