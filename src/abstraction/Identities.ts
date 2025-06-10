@@ -13,7 +13,7 @@ import {
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
 } from "@/types/abstraction"
-import { DemosTransactions } from "@/websdk"
+import { _required as required, DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import axios from "axios"
@@ -360,15 +360,22 @@ export class Identities {
      * Get the points associated with an identity
      *
      * @param demos A Demos instance to communicate with the RPC
+     * @param address The address to get points for. Defaults to the connected wallet's address.
      * @returns The points data for the identity
      */
-    async getUserPoints(demos: Demos): Promise<RPCResponseWithValidityData> {
+    async getUserPoints(demos: Demos, address?: string): Promise<RPCResponseWithValidityData> {
+        required(address || demos.walletConnected, "No address provided and no wallet connected")
+
+        if (!address) {
+            address = await demos.getEd25519Address()
+        }
+
         const request = {
             method: "gcr_routine",
             params: [
                 {
                     method: "getPoints",
-                    params: [demos.getAddress()],
+                    params: [address],
                 },
             ],
         }
