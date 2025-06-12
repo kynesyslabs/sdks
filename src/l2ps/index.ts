@@ -1,8 +1,4 @@
-import L2PS from "./L2PS"
+import L2PS from "./l2ps"
+import { L2PSConfig } from "./l2ps"
 
-export const l2ps = {
-    L2PS,
-}
-
-export type { SubnetPayload } from "./L2PS"
-export { l2psCalls } from "./L2PS"
+export { L2PS, L2PSConfig }
