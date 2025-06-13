@@ -7,17 +7,33 @@ export const supportedStablecoins = ["USDC"] as const
 // Types for the operation
 // NOTE: This will be sent from the client to the node
 export type BridgeOperation = {
-    demoAddress: string
-    originChainType: SupportedChain
-    originChain: SupportedEVMChain | SupportedNonEVMChain
-    destinationChainType: SupportedChain
-    destinationChain: SupportedEVMChain | SupportedNonEVMChain
-    originAddress: string
-    destinationAddress: string
-    amount: string
-    token: SupportedStablecoin
-    txHash: string
-    status: "empty" | "pending" | "completed" | "failed"
+    // demoAddress: string
+    // originChainType: SupportedChain
+    // originChain: SupportedEVMChain | SupportedNonEVMChain
+    // destinationChainType: SupportedChain
+    // destinationChain: SupportedEVMChain | SupportedNonEVMChain
+    // originAddress: string
+    // destinationAddress: string
+    // amount: string
+    // token: SupportedStablecoin
+
+    address: string;
+    from: {
+        chain: SupportedEVMChain | SupportedNonEVMChain
+        address: string
+    }
+    to: {
+        chain: SupportedEVMChain | SupportedNonEVMChain
+        address: string
+    }
+    token: {
+        type: SupportedStablecoin
+        amount: string
+    }
+
+    // TODO: Ask Cris about these:
+    // txHash: string
+    // status: "empty" | "pending" | "completed" | "failed"
 }
 
 // Types compiled from the node
@@ -29,17 +45,17 @@ export type BridgeOperationCompiled = {
         validUntil: number // Block number until which the operation is valid
     } & (
         | {
-              originChain: "EVM"
-              contractAddress: string // Address of the tank contract
-              contractABI: string[]
-          }
+            originChain: "EVM"
+            contractAddress: string // Address of the tank contract
+            contractABI: string[]
+        }
         | {
-              originChain: "SOLANA"
-              solanaAddress: string // Address of the tank account
-          }
+            originChain: "SOLANA"
+            solanaAddress: string // Address of the tank account
+        }
     )
     signature: string // Signed hash of the content
-    rpc: string // public key of the node that sent us back the operation
+    rpcPublicKey: string // public key of the node that sent us back the operation
 }
 
 // Supported chains for EVM
@@ -57,14 +73,25 @@ export const supportedNonEVMChains = ["SOLANA"] as const
 
 // USDC contract addresses for different chains (testnet addresses)
 export const usdcContracts = {
-    ETHEREUM: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // Sepolia USDC
-    POLYGON: "0x0FA8781a83E46826621b3BC094Ea2A0212e71B23", // Mumbai USDC
-    BSC: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", // BSC Testnet USDC
-    ARBITRUM: "0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63", // Arbitrum Sepolia USDC
-    OPTIMISM: "0x5fd84259d66Cd46123540766Be93DFE6D43130D7", // Optimism Sepolia USDC
-    AVALANCHE: "0x5425890298aed601595a70AB815c96711a31Bc65", // Fuji USDC
-    BASE: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // Base Sepolia USDC
-    SOLANA: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Solana Devnet USDC
+    "eth": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // Sepolia USDC
+    "polygon": "0x0FA8781a83E46826621b3BC094Ea2A0212e71B23", // Mumbai USDC
+    "bsc": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", // BSC Testnet USDC
+    "arbitrum": "0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63", // Arbitrum Sepolia USDC
+    "optimism": "0x5fd84259d66Cd46123540766Be93DFE6D43130D7", // Optimism Sepolia USDC
+    "avalanche": "0x5425890298aed601595a70AB815c96711a31Bc65", // Fuji USDC
+    "base": "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // Base Sepolia USDC
+    "solana": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Solana Devnet USDC
+}
+
+export const providerUrls = {
+    "eth": "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID",
+    "polygon": "https://polygon-mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID",
+    "bsc": "https://bsc-dataseed.binance.org/",
+    "arbitrum": "https://arbitrum-mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID",
+    "optimism": "https://optimism-mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID",
+    "avalanche": "https://avalanche-mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID",
+    "base": "https://base-mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID",
+    "solana": "https://api.mainnet-beta.solana.com",
 }
 
 // USDC ABI for balance checking
