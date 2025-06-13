@@ -12,7 +12,7 @@ export * as xmcore from "./multichain/core" // Exporting the core module too
 export * as wallet from "./wallet"
 export * as demoswork from "./demoswork"
 
-export * as l2ps from "./l2ps" // REVIEW This is exporting the type of the L2PS, but the l2psCalls is in the websdk
+export * as l2ps from "./l2ps" 
 
 export * as websdk from "./websdk"
 export * as abstraction from "./abstraction"
