@@ -99,7 +99,6 @@
         "xrpl": "^3.1.0"
     },
     "devDependencies": {
-        "@kynesyslabs/demosdk": "^2.2.25",
         "@orbs-network/ton-access": "^2.3.3",
         "@types/cors": "^2.8.17",
         "@types/jest": "^29.5.12",
