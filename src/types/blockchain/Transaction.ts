@@ -6,21 +6,24 @@ import { IWeb2Payload } from "../web2"
 import { XMScript } from "../xm"
 import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
-import { SubnetPayload } from "../../l2ps"
+// import { SubnetPayload } from "../../l2ps" // Obsolete - using new L2PS implementation
 import { IdentityPayload } from "../abstraction"
 import { InstantMessagingPayload } from "../instantMessaging"
 import { BridgeOperationCompiled } from "@/bridge/nativeBridgeTypes"
+import { L2PSEncryptedPayload } from "@/l2ps"
 
 // TODO Implement multisignature transactions
 
 // export type StringifiedPayload = [string, string]
+
+
 
 export type TransactionContentData =
     | ["web2Request", IWeb2Payload]
     | ["crosschainOperation", XMScript]
     | ["native", INativePayload]
     | ["demoswork", DemoScript]
-    | ["subnet", SubnetPayload]
+    | ["l2psEncryptedTx", L2PSEncryptedPayload]
     | ["identity", IdentityPayload]
     | ["instantMessaging", InstantMessagingPayload]
     | ["nativeBridge", BridgeOperationCompiled]
@@ -31,7 +34,7 @@ export interface TransactionContent {
     type:
         | "web2Request"
         | "crosschainOperation"
-        | "subnet"
+        | "l2psEncryptedTx"
         | "native"
         | "demoswork"
         | "genesis"

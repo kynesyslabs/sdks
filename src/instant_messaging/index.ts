@@ -1,3 +1,5 @@
+// FIXME Integrate with l2ps.ts
+
 /**
  * MessagingPeer class for peer-to-peer communication through a signaling server
  *
