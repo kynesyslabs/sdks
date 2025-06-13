@@ -216,6 +216,7 @@ export default class L2PS {
                 type: "l2psEncryptedTx",
                 from: senderIdentity || tx.content.from,
                 to: tx.content.to,
+                from_ed25519_address: tx.content.from_ed25519_address,
                 amount: 0,
                 data: ["l2psEncryptedTx", encryptedPayload],
                 gcr_edits: [],
@@ -226,6 +227,7 @@ export default class L2PS {
 
             const encryptedTx: Transaction = {
                 content: encryptedTxContent,
+                ed25519_signature: tx.ed25519_signature,
                 signature: null,
                 hash: Hashing.sha256(JSON.stringify(encryptedTxContent)),
                 status: "pending",

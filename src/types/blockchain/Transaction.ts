@@ -42,6 +42,7 @@ export interface TransactionContent {
     | "identity"
     | "instantMessaging"
     | "nativeBridge"
+    | "l2psEncryptedTx"
     from: string
     from_ed25519_address: string
     to: string
