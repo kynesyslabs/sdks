@@ -94,14 +94,14 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
 
         await identity.create()
 
-        const tx = await prepareXMPayload(xmscript, identity.keypair)
         const rpc = "http://localhost:53550"
         // const rpc = "https://demos.mungaist.com"
 
         const demos = new Demos()
-
         await demos.connect(rpc)
         await demos.connectWallet(identity.keypair.privateKey as any)
+
+        const tx = await prepareXMPayload(xmscript, demos)
 
         const validityData = await demos.confirm(tx)
         const res = await demos.broadcast(validityData)

@@ -5,7 +5,6 @@ import type {
     Transaction,
     IWeb2Payload,
 } from "@/types"
-import { demos } from "./demos"
 import { web2_request } from "./utils/skeletons"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"
@@ -114,19 +113,16 @@ export const web2Calls = {
 
         const web2Tx: Transaction = DemosTransactions.empty()
         // From and To are the same in Web2 transactions
-        web2Tx.content.from = usedKeyPair.publicKey as Uint8Array
+        // web2Tx.content.from = usedKeyPair.publicKey as Uint8Array
         web2Tx.content.to = web2Tx.content.from
         web2Tx.content.type = "web2Request"
         web2Tx.content.data = ["web2Request", web2Payload]
         web2Tx.content.timestamp = Date.now()
 
         // Signing and broadcasting the transaction
-        const signedWeb2Tx = await DemosTransactions.sign(web2Tx, usedKeyPair)
-        const validityData = await DemosTransactions.confirm(
-            signedWeb2Tx,
-            demos,
-        )
-        await DemosTransactions.broadcast(validityData, demos)
+        const signedWeb2Tx = await demos.sign(web2Tx)
+        const validityData = await demos.confirm(signedWeb2Tx)
+        await demos.broadcast(validityData)
         return new Web2Proxy(sessionId, demos)
     },
 }

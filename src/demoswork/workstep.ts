@@ -95,7 +95,10 @@ export function prepareWeb2Step({
     // Ensuring content is a known property
     web2_payload.attestations = new Map()
     web2_payload.hash = ""
-    web2_payload.signature = ""
+    web2_payload.signature = {
+        type: "ed25519",
+        data: null,
+    }
     web2_payload.result = ""
     return new Web2WorkStep(web2_payload)
 }

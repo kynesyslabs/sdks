@@ -1,7 +1,7 @@
 import { Transaction } from "@/types"
 import { DemoScript } from "@/types/demoswork"
 
-import { DemosTransactions } from "@/websdk"
+import { Demos, DemosTransactions } from "@/websdk"
 import executeScript from "./executor"
 import { DemosWorkOperation } from "./operations"
 import { runSanityChecks } from "./validator"
@@ -78,17 +78,18 @@ export class DemosWork {
 }
 
 export async function prepareDemosWorkPayload(
-    work: DemosWork, keypair: IKeyPair
+    work: DemosWork,
+    demos: Demos,
 ): Promise<Transaction> {
     const script = work.toJSON()
     let tx: Transaction = DemosTransactions.empty()
-    tx.content.from = keypair.publicKey as Uint8Array
+    // tx.content.from = demos.keypair.publicKey
     tx.content.to = tx.content.from
     tx.content.type = "demoswork"
 
     tx.content.data = ["demoswork", script]
     tx.content.timestamp = Date.now()
-    tx = await DemosTransactions.sign(tx, keypair)
+    tx = await demos.sign(tx)
 
     return tx
 }

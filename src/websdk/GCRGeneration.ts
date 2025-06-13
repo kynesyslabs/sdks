@@ -2,16 +2,15 @@ import {
     GCREdit,
     GCREditIdentity,
     Web2GCRData,
-    XmGCRIdentityData,
 } from "@/types/blockchain/GCREdit"
-import { Transaction } from "@/types/blockchain/Transaction"
-import { INativePayload } from "@/types/native"
 import {
     IdentityPayload,
     InferFromSignaturePayload,
     Web2CoreTargetIdentityPayload,
 } from "@/types/abstraction"
 import { Hashing } from "@/encryption/Hashing"
+import { INativePayload } from "@/types/native"
+import { Transaction, TransactionContent } from "@/types/blockchain/Transaction"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -27,32 +26,30 @@ export class GCRGeneration {
         const { content } = tx
 
         // Handle main transaction edits
-        if (content.type) {
-            switch (content.type) {
-                case "demoswork":
-                    // TODO Implement this
-                    break
-                case "native":
-                    var nativeEdits = await HandleNativeOperations.handle(
-                        tx,
-                        isRollback,
-                    )
-                    gcrEdits.push(...nativeEdits)
-                    break
-                case "web2Request":
-                case "crosschainOperation":
-                    gcrEdits.push(this.createAssignEdit(content, tx.hash))
-                    break
-                case "genesis":
-                    // TODO Implement this
-                    break
-                case "identity":
-                    var identityEdits = await HandleIdentityOperations.handle(
-                        tx,
-                    )
-                    gcrEdits.push(...identityEdits)
-                    break
+        switch (content.type) {
+            case "demoswork":
+                // TODO Implement this
+                break
+            case "native": {
+                var nativeEdits = await HandleNativeOperations.handle(
+                    tx,
+                    isRollback,
+                )
+                gcrEdits.push(...nativeEdits)
+                break
             }
+            case "web2Request":
+            case "crosschainOperation":
+                const assignEdit = this.createAssignEdit(content, tx.hash)
+                gcrEdits.push(assignEdit)
+                break
+            case "genesis":
+                // TODO Implement this
+                break
+            case "identity":
+                var identityEdits = await HandleIdentityOperations.handle(tx)
+                gcrEdits.push(...identityEdits)
+                break
         }
 
         // SECTION Operations valid for all tx types
@@ -65,7 +62,7 @@ export class GCRGeneration {
             }
 
             let gasEdit = await this.createGasEdit(
-                content.from as string,
+                content.from_ed25519_address,
                 tx.hash,
             )
             gcrEdits.push(gasEdit)
@@ -75,7 +72,14 @@ export class GCRGeneration {
         }
 
         // Add nonce increment edit
-        gcrEdits.push(this.createNonceEdit(content.from as string, tx.hash))
+        gcrEdits.push(this.createNonceEdit(content.from_ed25519_address, tx.hash))
+
+        for (const edit of gcrEdits) {
+            if (!edit.account.startsWith("0x")) {
+                edit.account = "0x" + edit.account
+            }
+        }
+
         return gcrEdits
     }
 
@@ -105,13 +109,13 @@ export class GCRGeneration {
      * @returns GCREdit object for assignment operations
      */
     private static createAssignEdit(
-        content: any,
+        content: TransactionContent,
         txHash: string,
         isRollback: boolean = false,
     ): GCREdit {
         return {
             type: "assign",
-            account: content.from as string,
+            account: content.from_ed25519_address,
             context: content.type === "web2Request" ? "web2" : "xm",
             txhash: txHash,
             isRollback,
@@ -167,14 +171,13 @@ export class HandleNativeOperations {
             // Balance operations for the send native method
             case "send":
                 var [to, amount] = nativePayload.args
+
                 // First, remove the amount from the sender's balance
-                console.log("to: ", to)
-                console.log("amount: ", amount)
                 var subtractEdit: GCREdit = {
                     type: "balance",
                     operation: "remove",
                     isRollback: isRollback,
-                    account: tx.content.from as string, // ? Check and enforce string type as tx.content.from
+                    account: tx.content.from_ed25519_address,
                     txhash: tx.hash,
                     amount: amount,
                 }
@@ -212,7 +215,7 @@ export class HandleIdentityOperations {
 
         // INFO: Create the GCR edit skeleton
         const edit: GCREditIdentity = {
-            account: tx.content.from as string,
+            account: tx.content.from_ed25519_address,
             type: "identity",
             operation: identityPayload.method.endsWith("assign")
                 ? "add"
@@ -231,13 +234,25 @@ export class HandleIdentityOperations {
                     identityPayload.payload as InferFromSignaturePayload
                 ).target_identity
 
-                edit.data = {
-                    chain: payload.chain,
-                    subchain: payload.subchain,
-                    targetAddress: payload.targetAddress,
-                    isEVM: payload.isEVM,
-                } as XmGCRIdentityData
+                // REVIEW: Remove the signed Message from the edit data
+                // This is supposed to be the ed25519 address and should be provided by the caller
+                const data = structuredClone(payload)
 
+                edit.data = {
+                    ...data,
+                    timestamp: tx.content.timestamp
+                }
+
+                break
+            }
+
+            case "pqc_identity_assign": {
+                edit.data = identityPayload.payload.map((payload) => {
+                    return {
+                        ...payload,
+                        timestamp: tx.content.timestamp,
+                    }
+                })
                 break
             }
 
@@ -261,7 +276,8 @@ export class HandleIdentityOperations {
             }
 
             case "xm_identity_remove":
-            case "web2_identity_remove": {
+            case "web2_identity_remove":
+            case "pqc_identity_remove": {
                 // INFO: Passthrough the payload
                 edit.data = identityPayload.payload as any
                 break
