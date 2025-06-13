@@ -10,23 +10,12 @@ import { INativePayload } from "../native"
 import { IdentityPayload } from "../abstraction"
 import { InstantMessagingPayload } from "../instantMessaging"
 import { BridgeOperationCompiled } from "@/bridge/nativeBridgeTypes"
-//import { L2PSEncryptedPayload } from "@/l2ps/l2ps"
+import { L2PSEncryptedPayload } from "@/l2ps"
 
 // TODO Implement multisignature transactions
 
 // export type StringifiedPayload = [string, string]
 
-// REVIEW Dirty hack to avoid build errors when importing from l2ps
-interface L2PSEncryptedPayload {
-    /** UID of the L2PS network that encrypted this transaction */
-    l2ps_uid: string;
-    /** Base64-encoded encrypted transaction data */
-    encrypted_data: string;
-    /** Base64-encoded AES-GCM authentication tag */
-    tag: string;
-    /** Hash of the original transaction for integrity verification */
-    original_hash: string;
-}
 
 export type TransactionContentData =
     | ["web2Request", IWeb2Payload]

@@ -14,8 +14,9 @@ export {
     Transaction,
     TransactionContent,
     TransactionContentData,
-    L2PSEncryptedPayload,
 } from "./blockchain/Transaction"
+
+export { L2PSEncryptedPayload } from "@/l2ps"
 
 // SECTION Payload types
 export { INativePayload } from "./native/INativePayload"
