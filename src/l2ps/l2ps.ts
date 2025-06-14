@@ -12,7 +12,8 @@
 import { UnifiedCrypto } from "@/encryption/unifiedCrypto";
 import * as forge from "node-forge";
 import { Hashing } from "@/encryption/Hashing";
-import { Transaction, TransactionContent } from "@/types";
+import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
+import { L2PSTransactionContent, L2PSTransactionData } from "@/types/blockchain/Transaction";
 
 /**
  * Configuration interface for L2PS instances.
@@ -188,7 +189,7 @@ export default class L2PS {
      * // encryptedTx can now be inserted into mempool like any other transaction
      * ```
      */
-    async encryptTx(tx: Transaction, senderIdentity?: any): Promise<Transaction> {
+    async encryptTx(tx: Transaction, senderIdentity?: any): Promise<L2PSTransaction> {
         if (!tx) {
             throw new Error('Transaction is required for encryption');
         }
@@ -212,7 +213,7 @@ export default class L2PS {
                 original_hash: tx.hash
             };
 
-            const encryptedTxContent: TransactionContent = {
+            const encryptedTxContent: L2PSTransactionContent = {
                 type: "l2psEncryptedTx",
                 from: senderIdentity || tx.content.from,
                 to: tx.content.to,
@@ -225,7 +226,7 @@ export default class L2PS {
                 transaction_fee: tx.content.transaction_fee
             };
 
-            const encryptedTx: Transaction = {
+            const encryptedTx: L2PSTransaction = {
                 content: encryptedTxContent,
                 ed25519_signature: tx.ed25519_signature,
                 signature: null,
@@ -260,13 +261,13 @@ export default class L2PS {
      * // originalTx is now the original transaction before encryption
      * ```
      */
-    async decryptTx(encryptedTx: Transaction): Promise<Transaction> {
+    async decryptTx(encryptedTx: L2PSTransaction): Promise<Transaction> {
         if (!encryptedTx || encryptedTx.content.type !== "l2psEncryptedTx") {
             throw new Error('Transaction must be of type l2psEncryptedTx');
         }
 
         try {
-            const [dataType, payload] = encryptedTx.content.data;
+            const [dataType, payload] = encryptedTx.content.data as L2PSTransactionData;
             if (dataType !== "l2psEncryptedTx") {
                 throw new Error('Invalid encrypted transaction data type');
             }
