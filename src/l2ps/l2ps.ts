@@ -276,6 +276,8 @@ export default class L2PS {
             if (encryptedPayload.l2ps_uid !== (this.config?.uid || this.id)) {
                 throw new Error('Transaction encrypted for different L2PS');
             }
+            
+            // TODO Verify the signature of the encrypted transaction
 
             const encryptedData = forge.util.createBuffer(forge.util.decode64(encryptedPayload.encrypted_data));
             const tag = forge.util.createBuffer(forge.util.decode64(encryptedPayload.tag));

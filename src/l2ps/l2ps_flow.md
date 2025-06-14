@@ -1,10 +1,65 @@
-# L2PS Transaction Flow Documentation
+# L2PS Client-Side Transaction Flow
 
 ## Overview
 
-L2PS (Layer 2 Parallel Subnets) provides encrypted transaction processing capabilities as subnets of the main DEMOS network. This document outlines the complete transaction flow for sending encrypted transactions through L2PS networks.
+This document explains how to create, encrypt, and send L2PS (Layer 2 Privacy Subnets) transactions from the client side using the DEMOS SDK. For node-side processing, see `node/src/libs/l2ps/l2ps_node_flow.md`.
 
 ## Transaction Flow Comparison
+
+### Client-Side L2PS Transaction Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     CLIENT-SIDE L2PS FLOW                           │
+│                    (SDK Implementation)                             │
+└─────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────┐
+    │   Client App    │
+    └─────────────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ 1. Create       │ ──► ✅ IMPLEMENTED: Standard transaction creation
+    │ Original TX     │     using DEMOS SDK
+    └─────────────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ 2. Sign         │ ──► ✅ IMPLEMENTED: Ed25519 signature
+    │ Original TX     │     on transaction content
+    └─────────────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ 3. Load L2PS    │ ──► ✅ IMPLEMENTED: L2PS.create(privateKey, iv)
+    │ Instance        │     from network configuration
+    └─────────────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ 4. Encrypt TX   │ ──► ✅ IMPLEMENTED: l2ps.encryptTx(originalTx)
+    │ with L2PS       │     AES-GCM encryption + wrapper creation
+    └─────────────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ 5. Sign         │ ──► ✅ IMPLEMENTED: Sign encrypted wrapper
+    │ Encrypted TX    │     with user private key
+    └─────────────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ 6. Send to      │ ──► ✅ IMPLEMENTED: Standard RPC call
+    │ Network         │     to DEMOS node
+    └─────────────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ 7. Network      │ ──► 🔄 TODO: Enhanced error handling
+    │ Response        │     for L2PS-specific failures
+    └─────────────────┘
+```
 
 ### Normal DEMOS Transaction Flow
 
@@ -78,6 +133,49 @@ sendTransaction(encryptedTx) // Appears as normal transaction to the network
 
 ## Key Concepts
 
+### Transaction Structure Transformation
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Original Transaction                              │
+├─────────────────────────────────────────────────────────────────────┤
+│ {                                                                   │
+│   content: {                                                        │
+│     type: "native",                                                │
+│     from: "user_pubkey",                                           │
+│     to: "recipient_pubkey",                                        │
+│     amount: 100,                                                   │
+│     data: ["native", payload]                                     │
+│   },                                                               │
+│   signature: "user_signature_on_original",    ◄─── First Signature │
+│   hash: "original_tx_hash"                                         │
+│ }                                                                   │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                │ L2PS Encryption
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   Encrypted Transaction Wrapper                     │
+├─────────────────────────────────────────────────────────────────────┤
+│ {                                                                   │
+│   content: {                                                        │
+│     type: "l2psEncryptedTx",           ◄─── New Type              │
+│     from: "user_pubkey",                                           │
+│     to: "recipient_pubkey",                                        │
+│     amount: 0,                         ◄─── Amount Hidden         │
+│     data: ["l2psEncryptedTx", {                                   │
+│       l2ps_uid: "network-id",                                     │
+│       encrypted_data: "base64_encrypted_original_tx", ◄─── HIDDEN │
+│       tag: "aes_gcm_auth_tag",                                    │
+│       original_hash: "original_tx_hash"                           │
+│     }]                                                            │
+│   },                                                              │
+│   signature: "user_signature_on_wrapper",   ◄─── Second Signature │
+│   hash: "wrapper_tx_hash"                                         │
+│ }                                                                  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
 ### Double Signing Process
 
 1. **First Signature**: Applied to the original transaction before encryption
@@ -129,27 +227,56 @@ sendTransaction(encryptedTx) // Appears as normal transaction to the network
 
 ## Processing Flow
 
-### Sender Side (Client)
+### Network Privacy Model
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        L2PS Privacy Layers                          │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Regular Node   │    │  Regular Node   │    │   L2PS Node     │
+│                 │    │                 │    │                 │
+│   👁️ Can See:    │    │   👁️ Can See:    │    │   👁️ Can See:    │
+│   • Wrapper TX  │    │   • Wrapper TX  │    │   • Wrapper TX  │
+│   • L2PS UID    │    │   • L2PS UID    │    │   • L2PS UID    │
+│   • Signatures  │    │   • Signatures  │    │   • Signatures  │
+│                 │    │                 │    │   • Original TX │
+│   🚫 Cannot:     │    │   🚫 Cannot:     │    │   • Real Amount │
+│   • Decrypt     │    │   • Decrypt     │    │   • Real Data   │
+│   • See Amount  │    │   • See Amount  │    │                 │
+│   • See Data    │    │   • See Data    │    │   🔐 Can Do:     │
+│                 │    │                 │    │   • Decrypt     │
+│   ✅ Can Do:     │    │   ✅ Can Do:     │    │   • Process TX  │
+│   • Route TX    │    │   • Route TX    │    │   • Execute     │
+│   • Reject TX   │    │   • Reject TX   │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              Encrypted Transaction Flow                              │
+│                                                                     │
+│  [Encrypted TX] ──► Route ──► Route ──► L2PS Node                  │
+│                                              │                      │
+│                                              ▼                      │
+│                                        [Decrypted TX]               │
+│                                              │                      │
+│                                              ▼                      │
+│                                        [Process & Execute]          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Client-Side Processing Steps
 
 1. **Create** → Original transaction with all required fields
 2. **Sign** → Apply user signature to original transaction  
 3. **Encrypt** → Use L2PS to encrypt the signed transaction
 4. **Sign** → Apply user signature to encrypted wrapper
 5. **Send** → Submit to DEMOS network
+6. **Handle Response** → Process network response and errors
 
-### Network Side (Nodes)
-
-1. **Receive** → Encrypted transaction appears as normal "l2psEncryptedTx"
-2. **Validate** → Verify wrapper signature (standard validation)
-3. **Route** → Forward to appropriate L2PS nodes
-4. **Process** → L2PS nodes decrypt and process original transaction
-
-### L2PS Node Side
-
-1. **Decrypt** → Extract original transaction from encrypted payload
-2. **Verify** → Validate original transaction signature
-3. **Process** → Execute transaction within L2PS network
-4. **Consensus** → Reach agreement on transaction validity
+> **Note**: For network-side processing (steps 7-10), see the node-side documentation: `node/src/libs/l2ps/l2ps_node_flow.md`
 
 ## Security Features
 
@@ -177,126 +304,222 @@ sendTransaction(encryptedTx) // Appears as normal transaction to the network
 - **Privacy Guarantees**: Non-L2PS nodes cannot access encrypted transaction details
 - **Secure Routing**: Encrypted transactions can be safely routed through non-participating nodes
 
-## Node Behavior and Privacy Model
+## Client-Side Privacy and Security
 
-### Non-L2PS Nodes Receiving L2PS Transactions
+### What Clients Need to Know
 
-When a regular DEMOS node receives an L2PS encrypted transaction (by mistake, routing, or broadcast), it encounters a transaction that looks like this:
+When you send an L2PS transaction, here's what happens from a privacy perspective:
 
 ```typescript
+// What you send (visible to all nodes):
 {
     content: {
         type: "l2psEncryptedTx",
-        from: "user_public_key",
+        from: "your_public_key",
         to: "recipient_public_key", 
-        amount: 0,
+        amount: 0,                              // ✅ Hidden: Real amount encrypted
         data: ["l2psEncryptedTx", {
-            l2ps_uid: "l2ps-network-xyz",
-            encrypted_data: "base64-encrypted-data-here", // ENCRYPTED
-            tag: "base64-auth-tag-here",                   // AUTH TAG  
-            original_hash: "sha256-hash"
+            l2ps_uid: "l2ps-network-xyz",       // ✅ Visible: Network identifier
+            encrypted_data: "base64-encrypted", // ❌ Hidden: Actual transaction
+            tag: "base64-auth-tag",             // ✅ Visible: Integrity tag
+            original_hash: "sha256-hash"        // ✅ Visible: Original TX hash
         }]
     },
-    signature: "valid_wrapper_signature",
-    hash: "transaction_hash"
+    signature: "your_wrapper_signature",       // ✅ Visible: Wrapper signature
+    hash: "wrapper_transaction_hash"           // ✅ Visible: Wrapper hash
 }
 ```
 
-### What Non-L2PS Nodes CANNOT Do
+### Privacy Guarantees for Clients
 
-- ❌ **Decrypt** the `encrypted_data` (lacks the L2PS private key)
-- ❌ **Read** the original transaction content
-- ❌ **Process** the actual transaction logic
-- ❌ **Validate** the business logic within the encrypted payload
+#### What's Hidden from Network
+- ❌ **Real transaction amount** (wrapper shows 0)
+- ❌ **Transaction data/payload** (encrypted in `encrypted_data`)
+- ❌ **Original transaction type** (could be native, web2Request, etc.)
+- ❌ **Business logic details** (completely encrypted)
 
-### What Non-L2PS Nodes CAN Do
+#### What's Visible to Network
+- ✅ **L2PS network identifier** (which privacy subnet you're using)
+- ✅ **Wrapper transaction structure** (standard DEMOS transaction format)
+- ✅ **Authentication tags** (for integrity verification)
+- ✅ **Routing information** (so nodes know where to send it)
 
-- ✅ **Validate** the wrapper transaction structure
-- ✅ **Verify** the wrapper signature
-- ✅ **Route** it to appropriate L2PS nodes (if routing table exists)
-- ✅ **Reject** gracefully with appropriate error message
-
-### Privacy Guarantees
-
-#### Confidentiality
-
-- Transaction details (amounts, recipients, data) remain completely hidden
-- Only L2PS UID is visible (identifies which L2PS network, but not the content)
-- Non-L2PS nodes act as blind routers for encrypted packages
-
-#### Authenticity
-
-- Non-L2PS nodes can verify the transaction came from a legitimate sender
-- Wrapper signature ensures the encrypted payload hasn't been tampered with
-- Cannot verify internal transaction validity without decryption
-
-#### Integrity
-
-- AES-GCM authentication tag prevents tampering
-- Any modification to encrypted data will be detected during decryption
-- Hash verification ensures original transaction integrity after decryption
-
-### Network Routing Behavior
+### Client Security Model
 
 ```
-Regular Node receives L2PS tx → 
-"I can see this is for l2ps-network-xyz, but I can't decrypt it" →
-Route to known L2PS-xyz participants OR reject gracefully
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CLIENT SECURITY LAYERS                           │
+└─────────────────────────────────────────────────────────────────────┘
+
+Your Original Transaction
+         │
+         ▼ (First Signature)
+┌─────────────────┐
+│ Sign Original   │ ──► ✅ IMPLEMENTED: Proves transaction authenticity
+│ TX Content      │     to L2PS nodes after decryption
+└─────────────────┘
+         │
+         ▼ (AES-GCM Encryption)
+┌─────────────────┐
+│ L2PS Encrypt    │ ──► ✅ IMPLEMENTED: Hides content from non-participants
+│ with Network    │     Only L2PS nodes can decrypt
+│ Private Key     │
+└─────────────────┘
+         │
+         ▼ (Second Signature)
+┌─────────────────┐
+│ Sign Encrypted  │ ──► ✅ IMPLEMENTED: Proves wrapper authenticity
+│ Wrapper         │     to all network nodes
+└─────────────────┘
+         │
+         ▼
+    Network Routing ──► 🔄 REVIEW: Node-side implementation
+                        (See node flow documentation)
 ```
 
-### Error Handling for Non-L2PS Nodes
+## Client-Side Error Handling
+
+### Common Client Errors and Solutions
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CLIENT-SIDE ERROR SCENARIOS                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+                      Create L2PS Transaction
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │ Load L2PS Instance  │
+                    └─────────────────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    ▼                     ▼
+              ✅ L2PS Loaded       ❌ L2PS Load Failed
+                    │                     │
+                    ▼                     ▼
+         ┌─────────────────────┐  ┌─────────────────────┐
+         │ Encrypt Transaction │  │ 🔄 TODO: Better     │
+         └─────────────────────┘  │ Error Messages      │
+                    │             │ "Invalid L2PS Config"│
+         ┌──────────┴──────────┐  └─────────────────────┘
+         ▼                     ▼
+  ✅ Encrypt OK        ❌ Encrypt Failed
+         │                     │
+         ▼                     ▼
+┌─────────────────────┐ ┌─────────────────────┐
+│ Send to Network     │ │ 🔄 TODO: Retry      │
+└─────────────────────┘ │ Logic for Failed    │
+         │               │ Encryption          │
+┌────────┴────────┐     └─────────────────────┘
+▼                 ▼
+✅ TX Accepted   ❌ Network Error
+│                 │
+▼                 ▼
+┌─────────────┐   ┌─────────────────────┐
+│ Success     │   │ 🔄 TODO: Enhanced   │
+│ Response    │   │ Network Error       │
+└─────────────┘   │ Handling            │
+                  └─────────────────────┘
+```
+
+### Error Types and Handling
+
+#### 🔄 TODO: Configuration Errors
+- **Invalid L2PS Keys**: Wrong private key or IV format
+- **Missing Network Config**: L2PS network not found
+- **Key Mismatch**: Private key doesn't match network
+
+#### ✅ IMPLEMENTED: Encryption Errors  
+- **Transaction Signing Failed**: Invalid private key for signing
+- **Encryption Failed**: AES-GCM encryption error
+- **Wrapper Creation Failed**: Invalid transaction structure
+
+#### 🔄 TODO: Network Errors
+- **L2PS Network Unavailable**: No participating nodes online
+- **Transaction Rejected**: Node-side validation failures
+- **Timeout Errors**: Network request timeouts
+
+### Error Recovery Strategies
+
+#### 🔄 TODO: Client-Side Retry Logic
+```typescript
+// TODO: Implement exponential backoff for network errors
+async function sendL2PSTransactionWithRetry(tx: Transaction, maxRetries: number) {
+    // Implementation needed
+}
+```
+
+#### 🔄 TODO: Fallback Mechanisms
+```typescript
+// TODO: Option to send as regular transaction if L2PS fails
+async function sendWithL2PSFallback(tx: Transaction, useL2PS: boolean) {
+    // Implementation needed
+}
+```
+
+## SDK Implementation Status
+
+### ✅ Currently Implemented (Client SDK)
+
+1. **L2PS Class**: Complete AES-GCM encryption/decryption
+2. **Transaction Encryption**: `l2ps.encryptTx()` method
+3. **Key Management**: L2PS instance creation with private key/IV
+4. **Wrapper Creation**: Proper l2psEncryptedTx transaction format
+5. **Double Signing**: Both original and wrapper transaction signing
+
+### 🔄 TODO: Client SDK Enhancements
+
+1. **Error Handling**: Better error messages and recovery
+2. **Configuration Validation**: Validate L2PS network configs
+3. **Retry Logic**: Automatic retry for failed network requests
+4. **Batch Operations**: Encrypt multiple transactions efficiently
+5. **Key Rotation**: Support for dynamic key updates
+
+### 🔍 REVIEW: Integration Points
+
+1. **Network Detection**: Auto-detect available L2PS networks
+2. **Fallback Mechanisms**: Regular transaction if L2PS unavailable
+3. **Monitoring**: Track L2PS transaction success rates
+4. **Performance**: Optimize encryption for mobile devices
+
+## Usage Examples
+
+### 🔄 TODO: Complete SDK Examples
 
 ```typescript
-// Example error response
-{
-    success: false,
-    error: "Transaction type l2psEncryptedTx for unknown L2PS network: l2ps-network-xyz",
-    code: "L2PS_NETWORK_UNAVAILABLE"
+// TODO: Add comprehensive usage examples
+import { L2PS } from '@kynesyslabs/demosdk/l2ps'
+
+// Example 1: Basic L2PS transaction
+async function sendL2PSTransaction() {
+    // Implementation example needed
+}
+
+// Example 2: Error handling
+async function sendWithErrorHandling() {
+    // Implementation example needed  
+}
+
+// Example 3: Batch processing
+async function sendMultipleL2PSTransactions() {
+    // Implementation example needed
 }
 ```
 
-### Security Model Summary
+### Client Integration Checklist
 
-- **L2PS Networks**: Cryptographic access-controlled subnets with shared secrets
-- **Main DEMOS Network**: Public routing infrastructure that carries encrypted packages
-- **Privacy Layer**: Selective transparency where only authorized participants can decrypt content
-- **Routing Security**: Encrypted transactions can safely traverse untrusted network paths
+- [ ] 🔄 TODO: Validate L2PS network availability
+- [ ] ✅ IMPLEMENTED: Load L2PS instance with proper keys
+- [ ] ✅ IMPLEMENTED: Create and sign original transaction
+- [ ] ✅ IMPLEMENTED: Encrypt transaction with L2PS
+- [ ] ✅ IMPLEMENTED: Sign encrypted wrapper
+- [ ] ✅ IMPLEMENTED: Send to DEMOS network
+- [ ] 🔄 TODO: Handle network responses and errors
+- [ ] 🔄 TODO: Implement retry logic for failures
+- [ ] 🔄 TODO: Add transaction status monitoring
 
-## Error Handling
+---
 
-### Common Error Scenarios
-
-- **Invalid L2PS UID**: Transaction encrypted for unknown L2PS network
-- **Decryption Failure**: Invalid keys or corrupted encrypted data
-- **Hash Mismatch**: Original transaction hash doesn't match after decryption
-- **Signature Verification**: Either original or wrapper signature validation fails
-
-### Error Recovery
-
-- **Graceful Degradation**: Failed L2PS transactions don't affect main network
-- **Detailed Logging**: Comprehensive error messages for debugging
-- **Fallback Mechanisms**: Alternative processing paths for edge cases
-
-## Implementation Notes
-
-### Performance Considerations
-
-- **Encryption Overhead**: AES-GCM encryption adds minimal computational cost
-- **Size Increase**: Base64 encoding increases payload size by ~33%
-- **Memory Usage**: Temporary storage of both original and encrypted transactions
-
-### Development Guidelines
-
-- **Key Management**: Secure storage and rotation of L2PS encryption keys
-- **Testing**: Comprehensive test coverage for encryption/decryption flows
-- **Monitoring**: Track L2PS transaction success/failure rates
-- **Documentation**: Maintain clear API documentation for L2PS integration
-
-## Future Enhancements
-
-### Possible Features
-
-- **Key Rotation**: Dynamic L2PS encryption key updates
-- **Multi-L2PS**: Transactions spanning multiple L2PS networks
-- **Batch Processing**: Efficient handling of multiple encrypted transactions
-- **Advanced Privacy**: Additional privacy-preserving techniques
+> **For Node-Side Processing**: See `node/src/libs/l2ps/l2ps_node_flow.md`  
+> **For Complete System Flow**: See `node/src/libs/l2ps/l2ps_complete_flow.md`

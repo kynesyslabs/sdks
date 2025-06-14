@@ -16,6 +16,15 @@ import { L2PSEncryptedPayload } from "@/l2ps"
 
 // export type StringifiedPayload = [string, string]
 
+/* SECTION Specific transaction types */
+export interface L2PSTransaction extends Transaction {
+    content: TransactionContent & {
+        type: "l2psEncryptedTx"
+        data: L2PSEncryptedPayload
+    }
+}
+
+/* SECTION Transaction types */
 
 export type TransactionContentData =
     | ["web2Request", IWeb2Payload]
