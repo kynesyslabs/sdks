@@ -16,19 +16,7 @@ import { L2PSEncryptedPayload } from "@/l2ps"
 
 // export type StringifiedPayload = [string, string]
 
-/* SECTION Specific transaction types */
-
-export type L2PSTransactionDataType = "l2psEncryptedTx"
-export type L2PSTransactionData = ["l2psEncryptedTx", L2PSEncryptedPayload]
-
-export type L2PSTransactionContent = TransactionContent & {
-    type: L2PSTransactionDataType
-    data: L2PSTransactionData
-}
-
-export interface L2PSTransaction extends Transaction {
-    content: L2PSTransactionContent
-}
+/* NOTE This is an old, backward compatible file that should be deprecated in favor of the TransactionSubtypes folder */
 
 /* SECTION Transaction types */
 
@@ -82,3 +70,6 @@ export interface Transaction {
     status: string
     blockNumber: number | null
 }
+
+// Re-export specific transaction types
+export * from './TransactionSubtypes'

@@ -13,7 +13,7 @@ import { UnifiedCrypto } from "@/encryption/unifiedCrypto";
 import * as forge from "node-forge";
 import { Hashing } from "@/encryption/Hashing";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
-import { L2PSTransactionContent, L2PSTransactionData } from "@/types/blockchain/Transaction";
+import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
 
 /**
  * Configuration interface for L2PS instances.
@@ -267,7 +267,7 @@ export default class L2PS {
         }
 
         try {
-            const [dataType, payload] = encryptedTx.content.data as L2PSTransactionData;
+            const [dataType, payload] = encryptedTx.content.data;
             if (dataType !== "l2psEncryptedTx") {
                 throw new Error('Invalid encrypted transaction data type');
             }

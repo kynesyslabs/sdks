@@ -8,7 +8,6 @@ export {
 
 export { Block, BlockContent, NativeTablesHashes } from "./blockchain/blocks"
 //export { EncryptedTransaction } from "./blockchain/encryptedTransaction" // Obsolete - using new L2PS implementation
-export { L2PSTransaction } from "./blockchain/Transaction"
 export { ISignature } from "./blockchain/ISignature"
 export { RawTransaction } from "./blockchain/rawTransaction"
 export {
@@ -16,6 +15,19 @@ export {
     TransactionContent,
     TransactionContentData,
 } from "./blockchain/Transaction"
+
+// Export all specific transaction types
+export {
+    L2PSTransaction,
+    Web2Transaction,
+    CrosschainTransaction,
+    NativeTransaction,
+    DemosworkTransaction,
+    IdentityTransaction,
+    InstantMessagingTransaction,
+    NativeBridgeTransaction,
+    SpecificTransaction
+} from "./blockchain/TransactionSubtypes"
 
 export { L2PSEncryptedPayload } from "@/l2ps"
 
@@ -135,3 +147,9 @@ export {
     SerializedSignedObject,
     signedObject,
 } from "../encryption/unifiedCrypto"
+
+// Export transaction utilities
+export {
+    isTransactionType,
+    isTransactionDataType,
+} from "./blockchain/TransactionSubtypes/utils"
