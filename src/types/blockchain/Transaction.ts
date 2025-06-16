@@ -6,21 +6,26 @@ import { IWeb2Payload } from "../web2"
 import { XMScript } from "../xm"
 import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
-import { SubnetPayload } from "../../l2ps"
+// import { SubnetPayload } from "../../l2ps" // Obsolete - using new L2PS implementation
 import { IdentityPayload } from "../abstraction"
 import { InstantMessagingPayload } from "../instantMessaging"
 import { BridgeOperationCompiled } from "@/bridge/nativeBridgeTypes"
+import { L2PSEncryptedPayload } from "@/l2ps"
 
 // TODO Implement multisignature transactions
 
 // export type StringifiedPayload = [string, string]
+
+/* NOTE This is an old, backward compatible file that should be deprecated in favor of the TransactionSubtypes folder */
+
+/* SECTION Transaction types */
 
 export type TransactionContentData =
     | ["web2Request", IWeb2Payload]
     | ["crosschainOperation", XMScript]
     | ["native", INativePayload]
     | ["demoswork", DemoScript]
-    | ["subnet", SubnetPayload]
+    | ["l2psEncryptedTx", L2PSEncryptedPayload]
     | ["identity", IdentityPayload]
     | ["instantMessaging", InstantMessagingPayload]
     | ["nativeBridge", BridgeOperationCompiled]
@@ -39,6 +44,7 @@ export interface TransactionContent {
     | "identity"
     | "instantMessaging"
     | "nativeBridge"
+    | "l2psEncryptedTx"
     from: string
     from_ed25519_address: string
     to: string
@@ -64,3 +70,6 @@ export interface Transaction {
     status: string
     blockNumber: number | null
 }
+
+// Re-export specific transaction types
+export * from './TransactionSubtypes'

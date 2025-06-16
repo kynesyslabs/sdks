@@ -20,7 +20,7 @@ import {
     RPCResponse,
     RPCResponseWithValidityData,
 } from "@/types/communication/rpc"
-import { l2psCalls } from "@/l2ps"
+//import { l2psCalls } from "@/l2ps"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
@@ -771,5 +771,5 @@ export class Demos {
 
     // INFO Calling demos.skeletons.NAME provides an empty skeleton that can be used for reference while calling other demos functions
     skeletons = skeletons
-    l2ps = l2psCalls
+    //l2ps = l2psCalls
 }

@@ -13,3 +13,7 @@ docs
 __pycache__
 bun.lockb
 mise.toml
+
+
+# Claude specific files
+CLAUDE.md
