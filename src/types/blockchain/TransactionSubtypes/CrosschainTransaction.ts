@@ -8,4 +8,4 @@ export type CrosschainTransactionContent = Omit<TransactionContent, 'type' | 'da
 
 export interface CrosschainTransaction extends Omit<Transaction, 'content'> {
     content: CrosschainTransactionContent
-} 
+}

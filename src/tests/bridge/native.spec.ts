@@ -40,5 +40,8 @@ describe("Native bridge Playground", () => {
 
         const receipt = await bridge.confirm(compiled)
         console.log(receipt)
+
+        const res = await bridge.broadcast(receipt)
+        console.log(res)
     })
 })

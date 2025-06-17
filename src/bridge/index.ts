@@ -13,9 +13,7 @@ export {
     WrappedCrossChainTrade,
 } from "rubic-sdk"
 
-import { methods as NativeBridgeMethods } from "./nativeBridge"
-export { NativeBridgeMethods }
-
+export { NativeBridge } from "./nativeBridge"
 // Export types from nativeBridgeTypes
 export {
     BridgeOperation as NativeBridgeOperation,

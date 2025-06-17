@@ -1,4 +1,3 @@
-import { Cryptography, Hashing, hexToUint8Array, uint8ArrayToHex } from "@/encryption"
 import {
     BridgeOperation,
     BridgeOperationCompiled,
@@ -13,14 +12,15 @@ import {
     usdcAbi,
     providerUrls,
 } from "./nativeBridgeTypes"
-import { Transaction } from "@/types/blockchain/Transaction"
-import { RPCRequest, RPCResponse } from "@/types"
-import { Demos } from "@/websdk/demosclass"
 import { ethers } from "ethers"
+import { Demos } from "@/websdk/demosclass"
+import { RPCRequest, RPCResponse } from "@/types"
 import { Connection, PublicKey } from "@solana/web3.js"
-import { getAssociatedTokenAddress } from "@solana/spl-token"
-import { RPCResponseWithBridgeOperationCompiled, RPCResponseWithValidityData } from "@/types/communication/rpc"
 import { _required as required, skeletons } from "@/websdk"
+import { Transaction } from "@/types/blockchain/Transaction"
+import { getAssociatedTokenAddress } from "@solana/spl-token"
+import { Cryptography, Hashing, hexToUint8Array, uint8ArrayToHex } from "@/encryption"
+import { RPCResponseWithBridgeOperationCompiled, RPCResponseWithValidityData } from "@/types/communication/rpc"
 
 export class NativeBridge {
     private demos: Demos
@@ -36,7 +36,7 @@ export class NativeBridge {
      * 
      * @param operation The operation to validate
      */
-    private async validateOperation(operation: BridgeOperation): Promise<void> {
+    async validateOperation(operation: BridgeOperation): Promise<void> {
         const validations: Array<Function> = [
             this.validateChainSupport,
             this.validateAmount,

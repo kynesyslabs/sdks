@@ -8,4 +8,4 @@ export type IdentityTransactionContent = Omit<TransactionContent, 'type' | 'data
 
 export interface IdentityTransaction extends Omit<Transaction, 'content'> {
     content: IdentityTransactionContent
-} 
+}  
