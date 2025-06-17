@@ -301,7 +301,7 @@ export class Demos {
             raw_tx.content.to = "0x" + raw_tx.content.to
         }
 
-        const isHex = /^0x[0-9a-f]{66}$/i.test(raw_tx.content.to)
+        const isHex = /^0x[0-9a-f]{64}$/i.test(raw_tx.content.to)
         if (!isHex) {
             throw new Error(`Invalid To address: ${raw_tx.content.to}`)
         }
