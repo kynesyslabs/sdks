@@ -288,7 +288,7 @@ export class Demos {
         }
 
         // INFO: Client-side enforcement of reflexive transactions
-        const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request"]
+        const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request", "nativeBridge"]
 
         if (reflexive.includes(raw_tx.content.type)) {
             if (raw_tx.content.from_ed25519_address !== raw_tx.content.to) {
@@ -301,7 +301,7 @@ export class Demos {
             raw_tx.content.to = "0x" + raw_tx.content.to
         }
 
-        const isHex = /^0x[0-9a-f]{66}$/i.test(raw_tx.content.to)
+        const isHex = /^0x[0-9a-f]{64}$/i.test(raw_tx.content.to)
         if (!isHex) {
             throw new Error(`Invalid To address: ${raw_tx.content.to}`)
         }
