@@ -288,7 +288,7 @@ export class Demos {
         }
 
         // INFO: Client-side enforcement of reflexive transactions
-        const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request"]
+        const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request", "nativeBridge"]
 
         if (reflexive.includes(raw_tx.content.type)) {
             if (raw_tx.content.from_ed25519_address !== raw_tx.content.to) {
