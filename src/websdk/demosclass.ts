@@ -406,13 +406,13 @@ export class Demos {
 
     // L2PS calls are defined here
 
-    async rpcCall(
+    async rpcCall<T = RPCResponse>(
         request: RPCRequest,
         isAuthenticated: boolean = false,
         retries = 0,
         sleepTime = 250,
         allowedErrorCodes: number[] = [],
-    ): Promise<RPCResponse> {
+    ): Promise<T> {
         let publicKey = ""
         let signature = ""
 
@@ -442,7 +442,7 @@ export class Demos {
                 response.data.result == 200 ||
                 allowedErrorCodes.includes(response.data.result)
             ) {
-                return response.data
+                return response.data as T
             }
 
             if (retries > 0) {
@@ -456,7 +456,7 @@ export class Demos {
                 )
             }
 
-            return response.data
+            return response.data as T
         } catch (error) {
             console.error(error)
             return {
@@ -464,7 +464,7 @@ export class Demos {
                 response: error,
                 require_reply: false,
                 extra: null,
-            } as RPCResponse
+            } as T
         }
     }
 

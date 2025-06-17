@@ -28,5 +28,12 @@ export {
     supportedEVMChains as NativeBridgeSupportedEVMChains,
     usdcContracts as NativeBridgeUSDCContracts,
     usdcAbi as NativeBridgeUSDCAbi,
+    CompiledContent,
+    EVMTankData,
+    SolanaTankData,
+    SupportedNonEVMChain,
+    TankData,
+    providerUrls,
+    supportedNonEVMChains,
 } from "./nativeBridgeTypes"
 export { RubicBridge }

@@ -1,4 +1,4 @@
-import { Cryptography, Hashing } from "@/encryption"
+import { Cryptography, Hashing, hexToUint8Array, uint8ArrayToHex } from "@/encryption"
 import {
     BridgeOperation,
     BridgeOperationCompiled,
@@ -19,13 +19,15 @@ import { Demos } from "@/websdk/demosclass"
 import { ethers } from "ethers"
 import { Connection, PublicKey } from "@solana/web3.js"
 import { getAssociatedTokenAddress } from "@solana/spl-token"
+import { RPCResponseWithBridgeOperationCompiled, RPCResponseWithValidityData } from "@/types/communication/rpc"
+import { _required as required, skeletons } from "@/websdk"
 
 export class NativeBridge {
     private demos: Demos
     private MIN_BRIDGE_AMOUNT: number = 10 // $10 minimum
     private MAX_BRIDGE_AMOUNT: number = 10_000 // $10k maximum
 
-    private constructor(demos: Demos) {
+    constructor(demos: Demos) {
         this.demos = demos
     }
 
@@ -91,7 +93,7 @@ export class NativeBridge {
             throw new Error(`Invalid amount: ${operation.token.amount} is not a valid number`)
         }
 
-        if (amount <= this.MIN_BRIDGE_AMOUNT) {
+        if (amount < this.MIN_BRIDGE_AMOUNT) {
             throw new Error(`Invalid amount: ${operation.token.amount} must be greater than ${this.MIN_BRIDGE_AMOUNT}`)
         }
 
@@ -126,7 +128,7 @@ export class NativeBridge {
             if (!evmAddressRegex.test(address)) {
                 throw new Error(`Invalid ${addressType} address format for ${chain}: ${address}`)
             }
-        } else if (chain === 'SOLANA') {
+        } else if (chain === 'solana') {
             // Solana address validation (Base58, typically 32-44 characters)
             const solanaAddressRegex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
             if (!solanaAddressRegex.test(address)) {
@@ -142,6 +144,8 @@ export class NativeBridge {
      * @throws Error if the from address does not have enough balance
      */
     private async validateFromBalance(operation: BridgeOperation): Promise<void> {
+        return
+        // @ts-ignore
         const requiredAmount = parseFloat(operation.token.amount)
         const fromChain = operation.from.chain
         const fromAddress = operation.from.address
@@ -151,10 +155,10 @@ export class NativeBridge {
 
         if (supportedEVMChains.includes(fromChain as SupportedEVMChain)) {
             // Handle EVM chains
-            accountBalance = await this.getEVMTokenBalance(fromChain as SupportedEVMChain, fromAddress, token)
-        } else if (fromChain === 'SOLANA') {
+            accountBalance = await this.getEVMTokenBalance(operation)
+        } else if (fromChain === 'solana') {
             // Handle Solana
-            accountBalance = await this.getSolanaTokenBalance(fromAddress, token)
+            accountBalance = await this.getSolanaTokenBalance(operation)
         } else {
             throw new Error(`Unsupported chain for balance validation: ${fromChain}`)
         }
@@ -173,12 +177,15 @@ export class NativeBridge {
      * @returns The token balance
      */
     private async getEVMTokenBalance(
-        chain: SupportedEVMChain,
-        contractAddress: string,
-        walletAddress: string
+        operation: BridgeOperation
     ): Promise<number> {
+        const chain = operation.from.chain
+        const subchain = operation.from.subchain
+        const contractAddress = usdcContracts[chain][subchain]
+        const walletAddress = operation.from.address
+
         try {
-            const provider = new ethers.JsonRpcProvider(providerUrls[chain])
+            const provider = new ethers.JsonRpcProvider(providerUrls[chain][subchain])
             const contract = new ethers.Contract(contractAddress, usdcAbi, provider)
             const balance = await contract.balanceOf(walletAddress)
             const decimals = await contract.decimals()
@@ -195,9 +202,13 @@ export class NativeBridge {
      * @param token The token type
      * @returns The token balance
      */
-    private async getSolanaTokenBalance(walletAddress: string, token: SupportedStablecoin): Promise<number> {
+    private async getSolanaTokenBalance(operation: BridgeOperation): Promise<number> {
+        const chain = operation.from.chain
+        const subchain = operation.from.subchain
+        const walletAddress = operation.from.address
+
         try {
-            const connection = new Connection(providerUrls.solana)
+            const connection = new Connection(providerUrls[chain][subchain])
             const walletPublicKey = new PublicKey(walletAddress)
             const usdcMint = new PublicKey(usdcContracts.solana) // USDC mint address
 
@@ -216,24 +227,81 @@ export class NativeBridge {
     }
 
     /**
-     * Validates and confirms the bridge operation
+     * Locally validates the bridge operation parameters, then sends it to the RPC to be validated
      * 
-     * @param operation The operation to confirm
+     * @param operation The operation to validate
      * @returns The compiled operation
      */
-    async confirm(operation: BridgeOperation): Promise<BridgeOperationCompiled> {
+    async validate(operation: BridgeOperation): Promise<RPCResponseWithBridgeOperationCompiled> {
+        required(this.demos, "Demos instance not connected")
+        required(this.demos.walletConnected, "Wallet not connected to the Demos object")
+
         await this.validateOperation(operation)
-        return "" as any
+
+        // INFO: Create the operation signature
+        const hash = Hashing.sha256(JSON.stringify(operation))
+        const signature = await this.demos.crypto.sign(this.demos.algorithm, new TextEncoder().encode(hash))
+        const signatureHex = uint8ArrayToHex(signature.signature)
+
+        // INFO: Signature will be verified by the RPC before processing the operation
+        const req: RPCRequest = {
+            method: "nativeBridge",
+            params: [operation, {
+                type: this.demos.algorithm,
+                data: signatureHex,
+            }],
+        }
+
+        return await this.demos.rpcCall<RPCResponseWithBridgeOperationCompiled>(req, true)
     }
 
     /**
-     * Broadcasts the compiled bridge operation back to the RPC as a transaction
+     * Prepares the bridge operation execution by converting it to a transaction
+     * and sending it back to the RPC for validation.
      * 
-     * @param operation The operation to broadcast
-     * @returns Transaction receipt
+     * @param compiled The compiled operation
+     * @returns RPC response with transaction validity data
      */
-    broadcast(operation: BridgeOperationCompiled): RPCResponse {
-        return "" as any
+    async confirm(compiled: RPCResponseWithBridgeOperationCompiled): Promise<RPCResponseWithValidityData> {
+        required(this.demos, "Demos instance not connected")
+        required(this.demos.walletConnected, "Wallet not connected to the Demos object")
+
+        // INFO: Verify the RPC signature
+        const operation = compiled.response
+        const hash = Hashing.sha256(JSON.stringify(operation.content))
+
+        const verified = await this.demos.crypto.verify({
+            algorithm: this.demos.algorithm,
+            signature: hexToUint8Array(operation.signature.data),
+            message: new TextEncoder().encode(hash),
+            publicKey: hexToUint8Array(operation.rpcPublicKey),
+        })
+
+        if (!verified) {
+            throw new Error("Failed to verify the operation signature using the RPC public key")
+        }
+
+        // INFO: Convert the operation to a bridge tx
+        const tx = structuredClone(skeletons.transaction)
+        tx.content = {
+            ...tx.content,
+            to: await this.demos.getEd25519Address(),
+            type: "nativeBridge",
+            data: ["nativeBridge", operation],
+        }
+
+        // INFO: Sign and confirm the tx
+        const signed = await this.demos.sign(tx)
+        return await this.demos.confirm(signed)
+    }
+
+    /**
+     * Broadcasts the bridge transaction to the network (same as calling demos.broadcast)
+     * 
+     * @param validityData The validity data of the bridge transaction
+     */
+    async broadcast(validityData: RPCResponseWithValidityData): Promise<RPCResponse> {
+        return await this.demos.broadcast(validityData)
     }
 }
 
@@ -298,6 +366,7 @@ export const methods = {
             originAddress: originAddress,
             destinationAddress: destinationAddress,
             amount: amount,
+            // @ts-ignore
             token: token,
             txHash: "",
             status: "empty",

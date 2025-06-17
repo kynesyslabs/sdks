@@ -1,3 +1,4 @@
+import { BridgeOperationCompiled } from "@/bridge/nativeBridgeTypes"
 import { ValidityData } from "../blockchain/ValidityData"
 
 export interface RPCRequest {
@@ -14,6 +15,10 @@ export interface RPCResponse {
 
 export interface RPCResponseWithValidityData extends RPCResponse {
     response: ValidityData
+}
+
+export interface RPCResponseWithBridgeOperationCompiled extends RPCResponse {
+    response: BridgeOperationCompiled
 }
 
 export interface BrowserRequest {
