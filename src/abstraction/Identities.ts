@@ -1,8 +1,7 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
-import { Cryptography } from "@/encryption/Cryptography"
-import { RPCResponseWithValidityData } from "@/types"
+import { RPCResponseWithValidityData, SigningAlgorithm } from "@/types"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
@@ -11,13 +10,16 @@ import {
     InferFromGithubPayload,
     InferFromXPayload,
     InferFromSignaturePayload,
+    PqcIdentityAssignPayload,
+    PqcIdentityRemovePayload,
 } from "@/types/abstraction"
-import forge from "node-forge"
-import { DemosTransactions } from "@/websdk"
+import { _required as required, DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
-import { IKeyPair } from "@/websdk/types/KeyPair"
+import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
+import axios from "axios"
+import { PQCAlgorithm } from "@/types/cryptography"
 
-export default class Identities {
+export class Identities {
     formats = {
         web2: {
             github: [
@@ -35,26 +37,14 @@ export default class Identities {
      * @param keypair The keypair of the demos account.
      * @returns The web2 proof payload string.
      */
-    async createWeb2ProofPayload(keypair: IKeyPair) {
+    async createWeb2ProofPayload(demos: Demos) {
         const message = "dw2p"
-        const signature = Cryptography.sign(message, keypair.privateKey)
-        const payload = {
-            message,
-            signature: signature.toString("hex"),
-            publicKey: keypair.publicKey.toString("hex"),
-        }
-
-        const verified = Cryptography.verify(
-            message,
-            forge.util.binary.hex.decode(payload.signature),
-            forge.util.binary.hex.decode(payload.publicKey),
+        const signature = await demos.crypto.sign(
+            demos.algorithm,
+            new TextEncoder().encode(message),
         )
 
-        if (!verified) {
-            throw new Error("Failed to verify web2 proof payload")
-        }
-
-        return `demos:${payload.message}:${payload.signature}:${payload.publicKey}`
+        return `demos:${message}:${demos.algorithm}:${uint8ArrayToHex(signature.signature)}`
     }
 
     /**
@@ -66,35 +56,33 @@ export default class Identities {
      *
      * @returns The validity data of the identity transaction.
      */
-    async inferIdentity(
+    private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2",
+        context: "xm" | "web2" | "pqc",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
-            console.log
             if (
                 !this.formats.web2[payload.context].some((format: string) =>
                     payload.proof.startsWith(format),
                 )
             ) {
                 // construct informative error message
-                const errorMessage = `Invalid ${
-                    payload.context
-                } proof format. Supported formats are: ${this.formats.web2[
-                    payload.context
-                ].join(", ")}`
+                const errorMessage = `Invalid ${payload.context
+                    } proof format. Supported formats are: ${this.formats.web2[
+                        payload.context
+                    ].join(", ")}`
                 throw new Error(errorMessage)
             }
         }
 
         const tx = DemosTransactions.empty()
-        const address = demos.getAddress()
+        const ed25519 = await demos.crypto.getIdentity("ed25519")
+        const address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
         tx.content = {
             ...tx.content,
             type: "identity",
-            from: address,
             to: address,
             amount: 0,
             data: [
@@ -120,18 +108,19 @@ export default class Identities {
      * @param payload The payload to remove the identity from.
      * @returns The response from the RPC call.
      */
-    async removeIdentity(
+    private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2",
+        context: "xm" | "web2" | "pqc",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
-        const address = demos.getAddress()
+
+        const ed25519 = await demos.crypto.getIdentity("ed25519")
+        const address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
         tx.content = {
             ...tx.content,
             type: "identity",
-            from: address,
             to: address,
             amount: 0,
             data: [
@@ -212,9 +201,18 @@ export default class Identities {
      * @returns The response from the RPC call.
      */
     async addGithubIdentity(demos: Demos, payload: GithubProof) {
+        const username = payload.split("/")[3]
+        const ghUser = await axios.get(`https://api.github.com/users/${username}`)
+
+        if (!ghUser.data.login) {
+            throw new Error("Failed to get github user")
+        }
+
         let githubPayload: InferFromGithubPayload = {
             context: "github",
             proof: payload,
+            username: ghUser.data.login,
+            userId: ghUser.data.id,
         }
 
         return await this.inferIdentity(demos, "web2", githubPayload)
@@ -228,12 +226,82 @@ export default class Identities {
      * @returns The response from the RPC call.
      */
     async addTwitterIdentity(demos: Demos, payload: TwitterProof) {
+        const data = await demos.web2.getTweet(payload)
+
+        if (!data.success) {
+            throw new Error(data.error)
+        }
+
         let twitterPayload: InferFromXPayload = {
             context: "twitter",
             proof: payload,
+            username: data.tweet.username,
+            userId: data.tweet.userId,
         }
 
         return await this.inferIdentity(demos, "web2", twitterPayload)
+    }
+
+    // SECTION: PQC Identities
+    async bindPqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+        let addressTypes: PQCAlgorithm[] = []
+
+        // Create the address types to bind
+        if (algorithms === "all") {
+            await demos.crypto.generateAllIdentities()
+            addressTypes = UnifiedCrypto.supportedPQCAlgorithms
+        } else {
+            for (const algorithm of algorithms) {
+                await demos.crypto.generateIdentity(algorithm)
+                addressTypes.push(algorithm)
+            }
+        }
+
+        // Create the payloads
+        const payloads: PqcIdentityAssignPayload["payload"] = []
+
+        for (const addressType of addressTypes) {
+            // INFO: Create an ed25519 signature for each address type
+            const keypair = await demos.crypto.getIdentity(addressType)
+            const address = uint8ArrayToHex(keypair.publicKey as Uint8Array)
+            const signature = await demos.crypto.sign("ed25519", new TextEncoder().encode(address))
+
+            payloads.push({
+                algorithm: addressType,
+                address: address,
+                signature: uint8ArrayToHex(signature.signature),
+            })
+        }
+
+        return await this.inferIdentity(demos, "pqc", payloads)
+    }
+
+    async removePqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+        let addressTypes: PQCAlgorithm[] = []
+
+        // Create the address types to remove
+        if (algorithms === "all") {
+            await demos.crypto.generateAllIdentities()
+            addressTypes = UnifiedCrypto.supportedPQCAlgorithms
+        } else {
+            for (const algorithm of algorithms) {
+                await demos.crypto.generateIdentity(algorithm)
+                addressTypes.push(algorithm)
+            }
+        }
+
+        // Create the payloads
+        const payloads: PqcIdentityRemovePayload["payload"] = []
+
+        for (const addressType of addressTypes) {
+            const address = await demos.crypto.getIdentity(addressType)
+            payloads.push({
+                algorithm: addressType,
+                address: uint8ArrayToHex(address.publicKey as Uint8Array),
+            })
+        }
+
+        return await this.removeIdentity(demos, "pqc", payloads)
     }
 
     /**
@@ -248,12 +316,17 @@ export default class Identities {
         call = "getIdentities",
         address?: string,
     ) {
+        if (!address) {
+            const ed25519 = await demos.crypto.getIdentity("ed25519")
+            address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+        }
+
         const request = {
             method: "gcr_routine",
             params: [
                 {
                     method: call,
-                    params: [address || demos.getAddress()],
+                    params: [address],
                 },
             ],
         }
@@ -281,5 +354,32 @@ export default class Identities {
      */
     async getWeb2Identities(demos: Demos, address?: string) {
         return await this.getIdentities(demos, "getWeb2Identities", address)
+    }
+
+    /**
+     * Get the points associated with an identity
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param address The address to get points for. Defaults to the connected wallet's address.
+     * @returns The points data for the identity
+     */
+    async getUserPoints(demos: Demos, address?: string): Promise<RPCResponseWithValidityData> {
+        required(address || demos.walletConnected, "No address provided and no wallet connected")
+
+        if (!address) {
+            address = await demos.getEd25519Address()
+        }
+
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getPoints",
+                    params: [address],
+                },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
     }
 }

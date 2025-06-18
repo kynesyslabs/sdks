@@ -37,28 +37,33 @@ export class DemosWebAuth {
     }
 
     async create(seed = "") {
-        if (!seed) {
-            seed = forge.random.getBytesSync(32)
-        }
-        let result: [boolean, IStringifiedKeyPair] = [true, {} as any]
+        let result: [boolean, IKeyPair] = [true, {} as any]
 
         try {
             this.keypair = {
                 privateKey: null,
                 publicKey: null,
             }
-            this.keypair = forge.pki.ed25519.generateKeyPair({ seed })
+
+            if (!seed) {
+                this.keypair = Cryptography.new()
+            } else {
+                this.keypair = Cryptography.newFromSeed(seed)
+            }
+
             this.loggedIn = true
             // Stringify the keypair
             this.stringified_keypair = {
                 privateKey: new TextDecoder().decode(this.keypair.privateKey),
                 publicKey: new TextDecoder().decode(this.keypair.publicKey),
             }
-            result = [true, this.stringified_keypair]
+            result = [true, this.keypair]
         } catch (e) {
+            console.error(e)
             // @ts-expect-error
             result = [false, "[CREATE WALLET ERROR] " + e.message]
         }
+
         return result
     }
 

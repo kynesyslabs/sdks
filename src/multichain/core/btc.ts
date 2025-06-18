@@ -462,26 +462,24 @@ export class BTC extends DefaultChain {
         message: string,
         options?: { privateKey?: string },
     ): Promise<string> {
-        return "";
+        return ""
+        // let keyPair: ECPairInterface
+        // if (options?.privateKey) {
+        //     keyPair = ECPair.fromWIF(options.privateKey, this.network)
+        // } else {
+        //     required(this.wallet, "Wallet not connected")
+        //     keyPair = this.wallet
+        // }
 
-        let keyPair: ECPairInterface
-        if (options?.privateKey) {
-            keyPair = ECPair.fromWIF(options.privateKey, this.network)
-        } else {
-            required(this.wallet, "Wallet not connected")
-            keyPair = this.wallet
-        }
+        // const privateKey = Buffer.from(keyPair.privateKey!)
+        // const signature = bitcoinMessage.sign(
+        //     message,
+        //     privateKey,
+        //     keyPair.compressed,
+        //     { segwitType: "p2wpkh" },
+        // )
 
-        const privateKey = Buffer.from(keyPair.privateKey!)
-        // @ts-expect-error
-        const signature = bitcoinMessage.sign(
-            message,
-            privateKey,
-            keyPair.compressed,
-            { segwitType: "p2wpkh" },
-        )
-
-        return signature.toString("base64")
+        // return signature.toString("base64")
     }
 
     async verifyMessage(
@@ -489,19 +487,17 @@ export class BTC extends DefaultChain {
         signature: string,
         address: string,
     ): Promise<boolean> {
-        return false;
-
-        try {
-            // @ts-expect-error
-            return bitcoinMessage.verify(
-                message,
-                address,
-                Buffer.from(signature, "base64"),
-                this.network.messagePrefix,
-                true, // checkSegwitAlways to support SegWit
-            )
-        } catch (error) {
-            return false
-        }
+        return false
+        // try {
+        //     return bitcoinMessage.verify(
+        //         message,
+        //         address,
+        //         Buffer.from(signature, "base64"),
+        //         this.network.messagePrefix,
+        //         true, // checkSegwitAlways to support SegWit
+        //     )
+        // } catch (error) {
+        //     return false
+        // }
     }
 }

@@ -11,7 +11,7 @@ const jestConfig: JestConfigWithTsJest = {
 	preset: 'ts-jest',
 	roots: ['<rootDir>'],
 	modulePaths: ['./'],
-	transform: { '^.+\\.(t|j)s?$': ['ts-jest', { isolatedModules: true }] },
+	transform: { '^.+\\.(t|j)s?$': 'ts-jest' },
 
 	// INFO: Tests involving ledger lookups need this
 	testTimeout: 20_000,

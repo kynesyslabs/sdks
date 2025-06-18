@@ -67,9 +67,7 @@ describe("COMMUNICATION TESTS", () => {
         const mnemonic =
             "property gym walk decorate laundry grab cabin outer artist nest castle vote"
 
-        const publicKey = await demos.connectWallet(mnemonic, {
-            isSeed: true,
-        })
+        const publicKey = await demos.connectWallet(mnemonic)
         expect(publicKey).toBe('8cdc77be55fa6d91df62cf21079597cdc3fc8125443989ef2d4beae8b8501c4b')
     })
 

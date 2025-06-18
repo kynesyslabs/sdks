@@ -5,7 +5,7 @@ import { prepareWeb2Step, prepareXMStep } from "../workstep"
 
 import { EVM } from "@/multichain/core"
 import { XmStepResult } from "@/types/demoswork/steps"
-import { DemosWebAuth } from "@/websdk"
+import { Demos, DemosWebAuth } from "@/websdk"
 import { EnumWeb2Methods, Transaction } from "@/types"
 import { ConditionalOperation } from "../operations/conditional"
 import { BaseOperation } from "../operations/baseoperation"
@@ -64,5 +64,11 @@ export default async function createTestWorkScript(): Promise<Transaction> {
     const identity = DemosWebAuth.getInstance()
     await identity.create()
 
-    return await prepareDemosWorkPayload(work, identity.keypair)
+    const demos = new Demos()
+    await demos.connectWallet(
+        "entire vocal party hold witness glimpse damp cat small type whale cry",
+        { algorithm: "ed25519" },
+    )
+
+    return await prepareDemosWorkPayload(work, demos)
 }

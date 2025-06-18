@@ -19,7 +19,6 @@ import { Falcon } from "./falconts"
 import { randomBytes } from "crypto"
 
 export class Enigma {
-
     // ml-dsa signing keypair
     ml_dsa_signing_keypair: {
         publicKey: Uint8Array
@@ -51,7 +50,10 @@ export class Enigma {
      * @param data The data to hash
      * @returns The hash of the data
      */
-    static async hash(data: string, algorithm: string = "sha3-256"): Promise<Uint8Array> {
+    static async hash(
+        data: string,
+        algorithm: string = "sha3-256",
+    ): Promise<Uint8Array> {
         // NOTE: algorithm is not used yet, but will be used in the future
         return sha3_256.create().update(data).digest()
     }
@@ -94,21 +96,35 @@ export class Enigma {
      * @param message The message to sign
      * @returns The signature of the message
      */
-    async sign_ml_dsa(message: Uint8Array): Promise<Uint8Array> {
-        if (!this.ml_dsa_signing_keypair.privateKey) {
+    async sign_ml_dsa(
+        message: Uint8Array,
+        keypair?: typeof this.ml_dsa_signing_keypair,
+    ): Promise<Uint8Array> {
+        if (!keypair) {
+            keypair = this.ml_dsa_signing_keypair
+        }
+        if (!keypair.privateKey) {
             throw new Error("ml_dsa_signing_keypair.privateKey is not set")
         }
-        return ml_dsa65.sign(this.ml_dsa_signing_keypair.privateKey, message)
+        return ml_dsa65.sign(keypair.privateKey, message)
     }
 
     /** Sign data using falcon
      * @param message The message to sign
      * @returns The signature of the message
      */
-    async sign_falcon(message: string): Promise<Uint8Array> {
-        if (!this.falcon_signing_keypair.privateKey) {
+    async sign_falcon(
+        message: string,
+        keypair?: typeof this.falcon_signing_keypair,
+    ): Promise<Uint8Array> {
+        if (!keypair) {
+            keypair = this.falcon_signing_keypair
+        }
+
+        if (!keypair.privateKey) {
             throw new Error("falcon_signing_keypair.privateKey is not set")
         }
+
         const falcon = new Falcon()
         await falcon.init()
         await falcon.setKeypair({
@@ -120,8 +136,8 @@ export class Enigma {
     }
 
     async encapsulate_ml_kem(peerPublicKey: Uint8Array): Promise<{
-        cipherText: Uint8Array;
-        sharedSecret: Uint8Array;
+        cipherText: Uint8Array
+        sharedSecret: Uint8Array
     }> {
         if (!this.ml_kem_encryption_keypair.privateKey) {
             throw new Error("ml_kem_encryption_keypair.privateKey is not set")
@@ -133,7 +149,10 @@ export class Enigma {
         if (!this.ml_kem_encryption_keypair.privateKey) {
             throw new Error("ml_kem_encryption_keypair.privateKey is not set")
         }
-        return ml_kem768.decapsulate(cipherText, this.ml_kem_encryption_keypair.privateKey)
+        return ml_kem768.decapsulate(
+            cipherText,
+            this.ml_kem_encryption_keypair.privateKey,
+        )
     }
 
     /** Encrypt data using ml_kem + aes
@@ -196,7 +215,10 @@ export class Enigma {
             throw new Error("ml_kem_encryption_keypair.privateKey is not set")
         }
         // Get the shared secret from the cipher text
-        const sharedSecret = ml_kem768.decapsulate(cipherText, this.ml_kem_encryption_keypair.privateKey)
+        const sharedSecret = ml_kem768.decapsulate(
+            cipherText,
+            this.ml_kem_encryption_keypair.privateKey,
+        )
 
         // Decrypt the message using AES-256-GCM with the shared secret
         const iv = encryptedMessage.slice(0, 12)

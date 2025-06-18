@@ -1,5 +1,6 @@
 import forge from "node-forge"
 import { IncomingHttpHeaders, OutgoingHttpHeaders } from "http"
+import { SigningAlgorithm } from "../cryptography"
 
 export interface IParam {
     name: string
@@ -18,7 +19,10 @@ export interface IWeb2Request {
     result: any
     attestations: {}
     hash: string
-    signature?: forge.pki.ed25519.BinaryBuffer
+    signature?: {
+        type: SigningAlgorithm
+        data: string
+    }
 }
 
 export interface IWeb2Payload {
@@ -64,7 +68,10 @@ export interface IWeb2Attestation {
     hash: string
     timestamp: number
     identity: forge.pki.PublicKey
-    signature: forge.pki.ed25519.BinaryBuffer
+    signature: {
+        type: SigningAlgorithm
+        data: string
+    }
     valid: boolean
 }
 

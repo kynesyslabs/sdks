@@ -4,6 +4,7 @@ import { hkdf } from "@noble/hashes/hkdf"
 import { randomBytes } from "@noble/hashes/utils"
 import * as forge from "node-forge"
 import { Cryptography } from "./Cryptography"
+import { PQCAlgorithm, SigningAlgorithm } from '@/types/cryptography';
 
 /* The two interfaces below are used to route the encrypted and signed data through the unified crypto system */
 export interface encryptedObject {
@@ -24,16 +25,17 @@ export interface SerializedSignedObject {
     serializedPublicKey: string
     serializedMessage: string
 }
-interface Ed25519SignedObject {
+
+export interface Ed25519SignedObject {
     algorithm: "ed25519"
-    signedData: Uint8Array
+    signature: Uint8Array
     publicKey: forge.pki.ed25519.NativeBuffer
     message: Uint8Array
 }
 
-interface PqcSignedObject {
+export interface PqcSignedObject {
     algorithm: "ml-dsa" | "falcon"
-    signedData: Uint8Array
+    signature: Uint8Array
     publicKey: Uint8Array
     message: Uint8Array
 }
@@ -118,6 +120,7 @@ export function hexToUint8Array(hexString: string): Uint8Array {
  */
 export class UnifiedCrypto {
     // Multiton pattern: store multiple instances
+    static supportedPQCAlgorithms = ["falcon", "ml-dsa"] as PQCAlgorithm[]
     private static instances: Map<string, UnifiedCrypto> = new Map()
     private static DEFAULT_INSTANCE_ID = "default"
 
@@ -366,7 +369,7 @@ export class UnifiedCrypto {
             }
             signedObject = {
                 algorithm: "ed25519",
-                signedData: Cryptography.sign(
+                signature: Cryptography.sign(
                     new TextDecoder().decode(data),
                     this.ed25519KeyPair.privateKey,
                 ),
@@ -376,7 +379,7 @@ export class UnifiedCrypto {
         } else if (algorithm === "ml-dsa") {
             signedObject = {
                 algorithm: algorithm,
-                signedData: await this.enigma.sign_ml_dsa(data),
+                signature: await this.enigma.sign_ml_dsa(data),
                 message: data,
                 publicKey: this.enigma.ml_dsa_signing_keypair.publicKey,
             } as PqcSignedObject
@@ -384,7 +387,7 @@ export class UnifiedCrypto {
             let dataString = new TextDecoder().decode(data)
             signedObject = {
                 algorithm: algorithm,
-                signedData: await this.enigma.sign_falcon(dataString),
+                signature: await this.enigma.sign_falcon(dataString),
                 message: data,
                 publicKey: this.enigma.falcon_signing_keypair.publicKey,
             } as PqcSignedObject
@@ -426,7 +429,7 @@ export class UnifiedCrypto {
     async verify(signedObject: signedObject): Promise<boolean> {
         if (signedObject.algorithm === "ml-dsa") {
             return await Enigma.verify_ml_dsa(
-                signedObject.signedData,
+                signedObject.signature,
                 signedObject.message,
                 signedObject.publicKey as Uint8Array,
             )
@@ -434,7 +437,7 @@ export class UnifiedCrypto {
             // Convert the message to a string
             const messageString = new TextDecoder().decode(signedObject.message)
             return await Enigma.verify_falcon(
-                signedObject.signedData,
+                signedObject.signature,
                 messageString,
                 signedObject.publicKey as Uint8Array,
             )
@@ -448,7 +451,7 @@ export class UnifiedCrypto {
             const messageString = new TextDecoder().decode(signedObject.message)
             return Cryptography.verify(
                 messageString,
-                signedObject.signedData,
+                signedObject.signature,
                 signedObject.publicKey,
             )
         } else {

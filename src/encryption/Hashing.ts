@@ -10,11 +10,16 @@ KyneSys Labs: https://www.kynesys.xyz/
 */
 
 import forge from "node-forge"
+import { sha3_512 } from "@noble/hashes/sha3"
 
 export class Hashing {
     static sha256(message: string) {
         const md = forge.sha256.create()
         md.update(message)
         return md.digest().toHex()
+    }
+
+    static sha3_512(message: Uint8Array | string) {
+        return sha3_512(message)
     }
 }
