@@ -35,13 +35,19 @@ describe("Native bridge Playground", () => {
             }
         }
 
+        // Validates the operation params (locally), then sends to the node
         const compiled = await bridge.validate(operation)
         console.log(compiled)
 
-        const receipt = await bridge.confirm(compiled)
-        console.log(receipt)
+        // Confirms the compiled operation's signature, creates a tx and sends it
+        // to the node using demos.confirm
+        const validityData = await bridge.confirm(compiled)
+        console.log(validityData)
 
-        const res = await bridge.broadcast(receipt)
+        // Broadcasts the tx to the node (same as demos.broadcast)
+        const res = await bridge.broadcast(validityData)
         console.log(res)
     })
 })
+
+
