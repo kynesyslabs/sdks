@@ -33,7 +33,7 @@ describe("New Demos", () => {
         expect(result.result).toBe(200)
     })
 
-    test.only("Master seed generation", async () => {
+    test.skip("Master seed generation", async () => {
         const mnemonic = bip39.generateMnemonic(wordlist, 128)
         const seed = bip39.mnemonicToSeedSync(mnemonic)
 
@@ -44,5 +44,15 @@ describe("New Demos", () => {
         const demos = new Demos()
         await demos.connectWallet(mhashBuff)
         console.log(demos.getAddress())
+    })
+
+
+    test.only("Mnemonic to keypair", async () => {
+        const mnemonic = "symbol crew island order tumble document grocery art lake olive wall obvious"
+        const demos = new Demos()
+        await demos.connectWallet(mnemonic)
+
+        const pubkey = await demos.getEd25519Address()
+        expect(pubkey).toBe("0x6d43826dfb8b61c4276a33a94539e3cd27250435918336f56fe8de7e4c2e3534")
     })
 })

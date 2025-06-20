@@ -160,7 +160,12 @@ export class Demos {
             } else {
                 hashable = masterSeed
             }
-        } else if (masterSeed.length !== 128) {
+        }
+
+        // NOTE: Reverted this bug to keep generating the same keypair
+        // with the same mnemonic for mnemonics added to testnet during the incentives campaign.
+        // TODO: Put back the "else" when we clear the testnet database.
+        /* else */  if (masterSeed.length !== 128) {
             hashable = masterSeed
         }
 
