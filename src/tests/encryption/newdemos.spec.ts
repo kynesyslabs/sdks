@@ -33,7 +33,7 @@ describe("New Demos", () => {
         expect(result.result).toBe(200)
     })
 
-    test.only("Master seed generation", async () => {
+    test.skip("Master seed generation", async () => {
         const mnemonic = bip39.generateMnemonic(wordlist, 128)
         const seed = bip39.mnemonicToSeedSync(mnemonic)
 

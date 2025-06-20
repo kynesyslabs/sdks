@@ -146,8 +146,8 @@ export class Identities {
      * @param payload The payload to infer the identity from.
      * @returns The validity data of the identity transaction.
      */
-    async inferXmIdentity(demos: Demos, payload: InferFromSignaturePayload) {
-        return await this.inferIdentity(demos, "xm", payload)
+    async inferXmIdentity(demos: Demos, payload: InferFromSignaturePayload, referralCode?: string) {
+        return await this.inferIdentity(demos, "xm", { ...payload, referralCode: referralCode })
     }
 
     /**
@@ -200,7 +200,7 @@ export class Identities {
      * @param payload The payload to add the identity to.
      * @returns The response from the RPC call.
      */
-    async addGithubIdentity(demos: Demos, payload: GithubProof) {
+    async addGithubIdentity(demos: Demos, payload: GithubProof, referralCode?: string) {
         const username = payload.split("/")[3]
         const ghUser = await axios.get(`https://api.github.com/users/${username}`)
 
@@ -213,6 +213,7 @@ export class Identities {
             proof: payload,
             username: ghUser.data.login,
             userId: ghUser.data.id,
+            referralCode: referralCode,
         }
 
         return await this.inferIdentity(demos, "web2", githubPayload)
@@ -225,7 +226,7 @@ export class Identities {
      * @param payload The payload to add the identity to.
      * @returns The response from the RPC call.
      */
-    async addTwitterIdentity(demos: Demos, payload: TwitterProof) {
+    async addTwitterIdentity(demos: Demos, payload: TwitterProof, referralCode?: string) {
         const data = await demos.web2.getTweet(payload)
 
         if (!data.success) {
@@ -237,6 +238,7 @@ export class Identities {
             proof: payload,
             username: data.tweet.username,
             userId: data.tweet.userId,
+            referralCode: referralCode,
         }
 
         return await this.inferIdentity(demos, "web2", twitterPayload)
