@@ -164,6 +164,7 @@ export type PqcIdentityPayload = PqcIdentityAssignPayload | PqcIdentityRemovePay
 export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload | PqcIdentityPayload
 export interface UserPoints {
     userId: string
+    referralCode: string
     totalPoints: number
     breakdown: {
         web3Wallets: { [chain: string]: number }
@@ -172,6 +173,7 @@ export interface UserPoints {
             github: number
             discord: number
         }
+        referrals: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
