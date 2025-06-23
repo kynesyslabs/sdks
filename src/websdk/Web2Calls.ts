@@ -113,8 +113,8 @@ export const web2Calls = {
 
         const web2Tx: Transaction = DemosTransactions.empty()
         // From and To are the same in Web2 transactions
-        // web2Tx.content.from = usedKeyPair.publicKey as Uint8Array
-        web2Tx.content.to = web2Tx.content.from
+        // From will be set during tx signing
+        web2Tx.content.to = await demos.getEd25519Address()
         web2Tx.content.type = "web2Request"
         web2Tx.content.data = ["web2Request", web2Payload]
         web2Tx.content.timestamp = Date.now()
