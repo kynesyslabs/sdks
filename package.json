@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.2.67",
+    "version": "2.2.68",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -42,7 +42,8 @@
         "test:rubic-service": "rm -rf build && jest --testMatch '**/tests/**/rubic*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template* --verbose",
         "test:btc": "rm -rf build && jest --testMatch '**/tests/multichain**/bitcoin*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:pqc": "rm -rf build && jest --testMatch '**/tests/encryption/pqc*.ts' --verbose",
-        "test:pcq": "yarn test:pqc"
+        "test:pcq": "yarn test:pqc",
+        "test:referrals": "rm -rf build && jest --testMatch '**/tests/**/referrals.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
     },
     "dependencies": {
         "@bitcoinerlab/secp256k1": "^1.2.0",

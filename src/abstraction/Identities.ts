@@ -384,4 +384,44 @@ export class Identities {
 
         return await demos.rpcCall(request, true)
     }
+
+    /**
+     * Validate a referral code to check if it exists and is valid.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param referralCode The referral code to validate.
+     * @returns The validation result containing validity status, referrer public key, and message.
+     */
+    async validateReferralCode(demos: Demos, referralCode: string) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                { method: "validateReferralCode", params: [referralCode] },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Get referral information for an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param address The address to get referral info for. Defaults to the connected wallet's address.
+     * @returns The referral information associated with the address.
+     */
+    async getReferralInfo(demos: Demos, address?: string) {
+        if (!address) {
+            address = await demos.getEd25519Address()
+        }
+
+        const request = {
+            method: "gcr_routine",
+            params: [
+                { method: "getReferralInfo", params: [address] },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
 }

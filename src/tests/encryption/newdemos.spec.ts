@@ -10,7 +10,7 @@ describe("New Demos", () => {
 
         const demos = new Demos()
         await demos.connect(rpc)
-        const mnemonic = demos.newMnemonic(256)
+        const mnemonic = demos.newMnemonic()
         console.log("mnemonic: ", mnemonic)
 
         await demos.connectWallet("null",
