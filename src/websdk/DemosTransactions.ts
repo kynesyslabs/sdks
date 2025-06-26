@@ -237,5 +237,40 @@ export const DemosTransactions = {
             return res
         }
     },
+    
+    /**
+     * Create a signed DEMOS transaction to store binary data on the blockchain.
+     * Data is stored in the sender's account.
+     *
+     * @param bytes - The binary data to store (will be base64-encoded)
+     * @param demos - The demos instance (for getting the address nonce)
+     *
+     * @returns The signed storage transaction.
+     */
+    async store(bytes: Uint8Array, demos: Demos) {
+        required(demos.keypair, "Wallet not connected")
+
+        let tx = DemosTransactions.empty()
+
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
+
+        // Convert bytes to base64 for JSONB compatibility
+        const base64Bytes = Buffer.from(bytes).toString('base64')
+
+        tx.content.to = publicKeyHex // Storage is always to the sender's address
+        tx.content.nonce = nonce + 1
+        tx.content.amount = 0 // Storage transactions don't transfer native tokens
+        tx.content.type = "storage"
+        tx.content.timestamp = Date.now()
+        tx.content.data = [
+            "storage",
+            { bytes: base64Bytes },
+        ]
+
+        return await demos.sign(tx)
+    },
+    
     // NOTE Subnet transactions methods are imported and exposed in demos.ts from the l2ps.ts file.
 }
