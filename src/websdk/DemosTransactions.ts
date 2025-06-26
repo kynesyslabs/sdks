@@ -12,6 +12,7 @@ import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 import { Cryptography } from "@/encryption"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { Enigma } from "@/encryption/PQC/enigma"
+import { L2PSHashPayload } from "@/types/blockchain/TransactionSubtypes/L2PSHashTransaction"
 
 export const DemosTransactions = {
     // REVIEW All this part
@@ -267,6 +268,82 @@ export const DemosTransactions = {
         tx.content.data = [
             "storage",
             { bytes: base64Bytes },
+        ]
+
+        return await demos.sign(tx)
+    },
+
+    /**
+     * Create a signed L2PS hash update transaction for DTR relay to validators.
+     * 
+     * This method creates a specialized transaction containing consolidated hash
+     * information for a specific L2PS network. The transaction is self-directed
+     * but will be automatically relayed to validators via the DTR (Distributed
+     * Transaction Routing) system when processed on non-validator nodes.
+     * 
+     * Key Features:
+     * - Self-directed transaction (from = to) for DTR routing
+     * - Zero token transfer (amount = 0)
+     * - Contains consolidated L2PS network state hash
+     * - Preserves L2PS privacy (no individual transaction exposure)
+     * - Enables validator consensus on L2PS state changes
+     * 
+     * @param l2psUid - L2PS network identifier (e.g., "network_1", "private_subnet_alpha")
+     * @param consolidatedHash - SHA256 hash representing all L2PS transactions for this UID
+     * @param transactionCount - Number of transactions included in the consolidated hash
+     * @param demos - The demos instance (for getting the address nonce and signing)
+     * 
+     * @returns Promise resolving to the signed L2PS hash update transaction
+     * 
+     * @example
+     * ```typescript
+     * // Create hash update for L2PS network "network_1"
+     * const hashTx = await DemosTransactions.createL2PSHashUpdate(
+     *     "network_1",
+     *     "0xa1b2c3d4e5f6789...",
+     *     42,
+     *     demos
+     * )
+     * 
+     * // This transaction will be automatically relayed to validators via DTR
+     * const result = await demos.broadcast(await demos.confirm(hashTx))
+     * ```
+     * 
+     * @throws {Error} If wallet is not connected
+     * @throws {Error} If nonce retrieval fails
+     * @throws {Error} If transaction signing fails
+     */
+    async createL2PSHashUpdate(
+        l2psUid: string,
+        consolidatedHash: string,
+        transactionCount: number,
+        demos: Demos
+    ): Promise<Transaction> {
+        required(demos.keypair, "Wallet not connected")
+
+        let tx = DemosTransactions.empty()
+
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
+
+        // NOTE: Self-directed transaction that will be relayed to validators via DTR
+        // The DTR system will automatically route this to all validators regardless of 'to' field
+        // when this transaction is processed on a non-validator node in production mode.
+        // This approach ensures proper transaction validation while leveraging DTR's relay infrastructure.
+        tx.content.to = publicKeyHex
+        tx.content.nonce = nonce + 1
+        tx.content.amount = 0  // No tokens transferred - this is a state update only
+        tx.content.type = "l2ps_hash_update"
+        tx.content.timestamp = Date.now()
+        tx.content.data = [
+            "l2ps_hash_update",
+            {
+                l2ps_uid: l2psUid,
+                consolidated_hash: consolidatedHash,
+                transaction_count: transactionCount,
+                timestamp: Date.now()
+            } satisfies L2PSHashPayload
         ]
 
         return await demos.sign(tx)
