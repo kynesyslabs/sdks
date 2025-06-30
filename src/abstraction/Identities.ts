@@ -1,7 +1,7 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
-import { RPCResponseWithValidityData, SigningAlgorithm } from "@/types"
+import axios from "axios"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
@@ -13,11 +13,11 @@ import {
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
 } from "@/types/abstraction"
-import { _required as required, DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
-import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
-import axios from "axios"
 import { PQCAlgorithm } from "@/types/cryptography"
+import { RPCResponseWithValidityData } from "@/types"
+import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
+import { _required as required, DemosTransactions } from "@/websdk"
 
 export class Identities {
     formats = {
