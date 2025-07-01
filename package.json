@@ -43,7 +43,8 @@
         "test:btc": "rm -rf build && jest --testMatch '**/tests/multichain**/bitcoin*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:pqc": "rm -rf build && jest --testMatch '**/tests/encryption/pqc*.ts' --verbose",
         "test:pcq": "yarn test:pqc",
-        "test:referrals": "rm -rf build && jest --testMatch '**/tests/**/referrals.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
+        "test:referrals": "rm -rf build && jest --testMatch '**/tests/**/referrals.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:evm": "rm -rf build && jest --testMatch '**/tests/**/evm.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
     },
     "dependencies": {
         "@bitcoinerlab/secp256k1": "^1.2.0",

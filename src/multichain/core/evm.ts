@@ -409,10 +409,10 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         options?: { gasLimit?: number; value?: string }
     ): Promise<string> {
         required(this.wallet, "Wallet not connected")
-        
+
         // Connect wallet to contract for signing capability
         const contractWithSigner = contract_instance.connect(this.wallet)
-        
+
         // Prepare transaction options
         const txOptions: any = {}
         if (options?.gasLimit) {
@@ -421,26 +421,30 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         if (options?.value) {
             txOptions.value = parseEther(options.value)
         }
-        
+
+        // Get nonce
+        const nonce = await this.provider.getTransactionCount(this.wallet.address)
+
         // Get populated transaction without executing
         const populatedTx = await contractWithSigner[function_name].populateTransaction(...args, txOptions)
-        
+
         // Ensure transaction has required fields
         if (!populatedTx.chainId) {
             populatedTx.chainId = this.chainId
         }
-        
+
         // Get base transaction data (gas pricing, etc.)
         const baseTx = await this.prepareBaseTxWithType()
-        
+
         // Merge base transaction data with populated transaction
         const finalTx = {
+            nonce,
             ...baseTx,
             ...populatedTx,
             // Override gasLimit if provided in options
             ...(options?.gasLimit && { gasLimit: options.gasLimit })
         }
-        
+
         // Sign the transaction for node execution
         return await this.wallet.signTransaction(finalTx)
     }
