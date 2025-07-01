@@ -38,6 +38,7 @@ export interface InferFromWritePayload {
      * The identity of the target address to bind to the Demos identity
      */
     target_identity: InferFromWriteTargetIdentityPayload
+    referralCode?: string
 }
 
 // Interface for the payload of the inferIdentityFromSignature method
@@ -47,6 +48,7 @@ export interface InferFromSignaturePayload {
      * The identity of the target address to bind to the Demos identity
      */
     target_identity: InferFromSignatureTargetIdentityPayload
+    referralCode?: string
 }
 
 
@@ -82,6 +84,7 @@ export interface Web2CoreTargetIdentityPayload {
     proof: string
     username: string
     userId: string
+    referralCode?: string
 }
 
 // ANCHOR Github Identities
@@ -161,6 +164,7 @@ export type PqcIdentityPayload = PqcIdentityAssignPayload | PqcIdentityRemovePay
 export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload | PqcIdentityPayload
 export interface UserPoints {
     userId: string
+    referralCode: string
     totalPoints: number
     breakdown: {
         web3Wallets: { [chain: string]: number }
@@ -169,6 +173,7 @@ export interface UserPoints {
             github: number
             discord: number
         }
+        referrals: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }

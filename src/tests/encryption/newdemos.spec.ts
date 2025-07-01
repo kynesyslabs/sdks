@@ -4,13 +4,13 @@ import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
 
 describe("New Demos", () => {
-    test.skip("Send Native tokens", async () => {
-        // const rpc = "http://localhost:53550"
-        const rpc = "http://node2.demos.sh:53560"
+    test.only("Send Native tokens", async () => {
+        const rpc = "http://localhost:53550"
+        // const rpc = "http://node2.demos.sh:53560"
 
         const demos = new Demos()
         await demos.connect(rpc)
-        const mnemonic = demos.newMnemonic(256)
+        const mnemonic = demos.newMnemonic()
         console.log("mnemonic: ", mnemonic)
 
         await demos.connectWallet("null",
@@ -47,7 +47,7 @@ describe("New Demos", () => {
     })
 
 
-    test.only("Mnemonic to keypair", async () => {
+    test.skip("Mnemonic to keypair", async () => {
         const mnemonic = "symbol crew island order tumble document grocery art lake olive wall obvious"
         const demos = new Demos()
         await demos.connectWallet(mnemonic)

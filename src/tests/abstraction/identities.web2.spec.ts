@@ -21,14 +21,14 @@ describe("Web2 Identities", () => {
         console.log(payload)
     })
 
-    test.skip("Infer Twitter Identity", async () => {
+    test.only("Infer Twitter Identity", async () => {
         const proof = "https://x.com/cwilvxi/status/1929985172293701751"
         const validityData = await identities.addTwitterIdentity(demos, proof)
         const res = await demos.broadcast(validityData)
         console.log(res)
     })
 
-    test.only("Remove Twitter Identity", async () => {
+    test.skip("Remove Twitter Identity", async () => {
         const payload = {
             context: "twitter",
             username: "cwilvxi",

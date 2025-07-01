@@ -224,6 +224,7 @@ export class HandleIdentityOperations {
             isRollback: false,
             context: identityPayload.context,
             data: null,
+            referralCode: null,
         }
 
         // INFO: Fill the GCR edit with the correct data
@@ -242,7 +243,7 @@ export class HandleIdentityOperations {
                     ...data,
                     timestamp: tx.content.timestamp
                 }
-
+                edit.referralCode = identityPayload.payload.referralCode
                 break
             }
 
@@ -271,6 +272,7 @@ export class HandleIdentityOperations {
                         timestamp: tx.content.timestamp
                     },
                 } as Web2GCRData
+                edit.referralCode = identityPayload.payload.referralCode
 
                 break
             }

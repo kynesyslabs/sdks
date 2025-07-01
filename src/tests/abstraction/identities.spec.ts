@@ -22,8 +22,8 @@ import { wallets } from "../utils/wallets"
 import { uint8ArrayToHex } from "@/encryption"
 
 describe.only("IDENTITIES V2", () => {
-    const rpc = "http://node2.demos.sh:53560"
-    // const rpc = "http://localhost:53550"
+    // const rpc = "http://node2.demos.sh:53560"
+    const rpc = "http://localhost:53550"
     let demos: Demos
 
     beforeAll(async () => {
@@ -83,7 +83,7 @@ describe.only("IDENTITIES V2", () => {
         }
 
         const identities = new Identities()
-        const validityData = await identities.inferXmIdentity(demos, payload)
+        const validityData = await identities.inferXmIdentity(demos, payload, "DanWT2XcFTKU")
         // validityData (RPCResponseWithValidityData)
         console.log("validityData: ", validityData)
         console.log("transaction hash: ", validityData.response.data.transaction.hash)

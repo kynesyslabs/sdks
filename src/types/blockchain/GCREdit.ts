@@ -92,6 +92,7 @@ export interface GCREditIdentity {
     | PQCIdentityGCREditData[] // pqc add identity
     | PqcIdentityRemovePayload["payload"] // pqc remove identity
     txhash: string
+    referralCode?: string
 }
 
 export type GCREdit =
