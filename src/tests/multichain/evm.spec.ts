@@ -1,4 +1,4 @@
-import { Transaction } from "ethers"
+import { Transaction, parseEther } from "ethers"
 
 import { EVM } from "@/multichain/core"
 import { getSampleTranfers, verifyNumberOrder } from "../utils"
@@ -88,5 +88,84 @@ describe("EVM CHAIN TESTS", () => {
         )
         
         console.log(balance)
+    })
+
+    test("writeToContract generates valid signed transaction", async () => {
+        // REVIEW: Test the updated writeToContract method
+        const testERC20ABI = [
+            {
+                constant: false,
+                inputs: [
+                    { name: "dst", type: "address" },
+                    { name: "wad", type: "uint256" },
+                ],
+                name: "transfer",
+                outputs: [{ name: "", type: "bool" }],
+                payable: false,
+                stateMutability: "nonpayable",
+                type: "function",
+            },
+        ]
+
+        // Use a mock ERC20 contract address (doesn't need to exist for signing test)
+        const mockContractAddress = "0x1234567890123456789012345678901234567890"
+        const contract = await instance.getContractInstance(mockContractAddress, JSON.stringify(testERC20ABI))
+        
+        const recipient = "0x742d35Cc6634C0532925a3b8D6e1a0f17B1c78b5"
+        const amount = parseEther("1.0")
+
+        const signedTx = await instance.writeToContract(contract, "transfer", [recipient, amount])
+
+        // Verify it's a valid signed transaction
+        expect(typeof signedTx).toBe("string")
+        expect(signedTx.startsWith("0x")).toBe(true)
+        expect(signedTx.length).toBeGreaterThan(100) // Signed transactions are substantial in length
+
+        // Reconstruct transaction to verify structure
+        const tx = Transaction.from(signedTx)
+        expect(tx.to).toBe(mockContractAddress)
+        expect(tx.data).toBeDefined()
+        expect(tx.data.length).toBeGreaterThan(10) // Should contain encoded function call
+        expect(tx.signature).toBeDefined()
+        expect(tx.signature.r).toBeDefined()
+        expect(tx.signature.s).toBeDefined()
+        expect(tx.signature.v).toBeDefined()
+    })
+
+    test("writeToContract with custom gas and value options", async () => {
+        // REVIEW: Test custom options support
+        const payableABI = [
+            {
+                constant: false,
+                inputs: [],
+                name: "deposit",
+                outputs: [],
+                payable: true,
+                stateMutability: "payable",
+                type: "function",
+            },
+        ]
+
+        const mockContractAddress = "0x1234567890123456789012345678901234567890"
+        const contract = await instance.getContractInstance(mockContractAddress, JSON.stringify(payableABI))
+
+        const signedTx = await instance.writeToContract(
+            contract, 
+            "deposit", 
+            [],
+            { 
+                gasLimit: 100000,
+                value: "0.1" 
+            }
+        )
+
+        // Verify transaction structure
+        expect(typeof signedTx).toBe("string")
+        expect(signedTx.startsWith("0x")).toBe(true)
+
+        const tx = Transaction.from(signedTx)
+        expect(tx.to).toBe(mockContractAddress)
+        expect(tx.gasLimit).toBe(BigInt(100000))
+        expect(tx.value).toBe(parseEther("0.1"))
     })
 })

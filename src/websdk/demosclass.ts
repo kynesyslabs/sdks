@@ -251,6 +251,19 @@ export class Demos {
     }
 
     /**
+     * Create a signed DEMOS transaction to store binary data on the blockchain.
+     * Data is stored in the sender's account.
+     *
+     * @param bytes - The binary data to store
+     * 
+     * @returns The signed storage transaction.
+     */
+    store(bytes: Uint8Array) {
+        required(this.keypair, "Wallet not connected")
+        return DemosTransactions.store(bytes, this)
+    }
+
+    /**
      * Confirms a transaction.
      *
      * @param transaction - The transaction to confirm
