@@ -30,7 +30,7 @@ import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
-import { Tweet } from "@the-convocation/twitter-scraper"
+import { TweetSimplified } from "@/types/web2"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -747,7 +747,7 @@ export class Demos {
         createDahr: async () => {
             return await web2Calls.createDahr(this)
         },
-        getTweet: async (tweetUrl: string): Promise<{ success: boolean, tweet: Tweet, error?: string }> => {
+        getTweet: async (tweetUrl: string): Promise<{ success: boolean, tweet: TweetSimplified, error?: string }> => {
             return await this.nodeCall("getTweet", {
                 tweetUrl,
             })

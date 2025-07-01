@@ -84,6 +84,8 @@ export {
     IDAHRStartProxyParams,
     EnumWeb2Methods,
     EnumWeb2Actions,
+    TweetSimplified,
+    Tweet
 } from "./web2"
 
 export { IOperation, ITask, XMScript } from "./xm"

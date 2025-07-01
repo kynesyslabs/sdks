@@ -1,9 +1,9 @@
 import { Demos } from "@/websdk"
-import { Identities, InferFromTwitterPayload } from "@/abstraction"
+import { Identities } from "@/abstraction"
 
 describe("Web2 Identities", () => {
-    const rpc = "http://node2.demos.sh:53560"
-    // const rpc = "http://localhost:53550"
+    // const rpc = "http://node2.demos.sh:53560"
+    const rpc = "http://localhost:53550"
     // const rpc = "https://demos.mungaist.com"
 
     const demos = new Demos()
@@ -56,7 +56,7 @@ describe("Web2 Identities", () => {
             console.log(res)
 
             expect(res.result).toBe(200)
-            expect(res.response["message"]).toContain("Transaction applied")
+            expect(res.response['extra']["message"]).toContain("Transaction applied")
         }
     })
 
