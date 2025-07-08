@@ -26,7 +26,7 @@ export {
     IdentityTransaction,
     InstantMessagingTransaction,
     NativeBridgeTransaction,
-    SpecificTransaction
+    SpecificTransaction,
 } from "./blockchain/TransactionSubtypes"
 
 export { L2PSEncryptedPayload } from "@/l2ps"
@@ -71,7 +71,6 @@ export { IPeerConfig, IPeer } from "./peers/Peer"
 export {
     IParam,
     IRawWeb2Request,
-    IWeb2Attestation,
     IWeb2Request,
     IWeb2Payload,
     IWeb2Result,
@@ -80,12 +79,11 @@ export {
     IAuthorizationConfig,
     IWeb2RequestOptions,
     IStartProxyParams,
-    IAttestationWithResponse,
     IDAHRStartProxyParams,
     EnumWeb2Methods,
     EnumWeb2Actions,
     TweetSimplified,
-    Tweet
+    Tweet,
 } from "./web2"
 
 export { IOperation, ITask, XMScript } from "./xm"

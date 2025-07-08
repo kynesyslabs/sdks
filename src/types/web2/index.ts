@@ -17,7 +17,6 @@ export interface IWeb2Result {
 export interface IWeb2Request {
     raw: IRawWeb2Request
     result: any
-    attestations: {}
     hash: string
     signature?: {
         type: SigningAlgorithm
@@ -54,29 +53,12 @@ export interface IRawWeb2Request {
     method: EnumWeb2Methods
     url: string
     headers?: OutgoingHttpHeaders
-    minAttestations: number
     stage: {
         origin: {
             identity: forge.pki.ed25519.BinaryBuffer
             connection_url: string
         }
-        hop_number: number
     }
-}
-
-export interface IWeb2Attestation {
-    hash: string
-    timestamp: number
-    identity: forge.pki.PublicKey
-    signature: {
-        type: SigningAlgorithm
-        data: string
-    }
-    valid: boolean
-}
-
-export interface IAttestationWithResponse extends IWeb2Attestation {
-    web2Response: IWeb2Result
 }
 
 export interface ISendHTTPRequestParams {
