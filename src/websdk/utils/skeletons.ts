@@ -49,7 +49,6 @@ const web2_request: IWeb2Request = {
         method: EnumWeb2Methods.GET,
         url: "",
         headers: {},
-        minAttestations: 2,
         // Handling the various stages of an IWeb2Request
         stage: {
             // The one that will handle the response too
@@ -57,12 +56,9 @@ const web2_request: IWeb2Request = {
                 identity: "",
                 connection_url: "",
             },
-            // Starting from 0, each attestation it is increased
-            hop_number: 0,
         },
     },
     result: null,
-    attestations: {},
     hash: "",
     signature: {
         type: "ed25519",

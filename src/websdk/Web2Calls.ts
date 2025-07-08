@@ -1,13 +1,13 @@
 import { EnumWeb2Actions } from "@/types"
-import type {
-    IAttestationWithResponse,
-    IStartProxyParams,
-    Transaction,
-    IWeb2Payload,
-} from "@/types"
 import { web2_request } from "./utils/skeletons"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"
+import type {
+    IStartProxyParams,
+    Transaction,
+    IWeb2Payload,
+    IWeb2Result,
+} from "@/types"
 
 const web2Request = { ...web2_request }
 
@@ -41,7 +41,7 @@ export class Web2Proxy {
             payload: {},
             authorization: "",
         },
-    }: IStartProxyParams): Promise<IAttestationWithResponse> {
+    }: IStartProxyParams): Promise<IWeb2Result> {
         web2Request.raw = {
             ...web2Request.raw,
             action: EnumWeb2Actions.START_PROXY,
@@ -123,6 +123,7 @@ export const web2Calls = {
         const signedWeb2Tx = await demos.sign(web2Tx)
         const validityData = await demos.confirm(signedWeb2Tx)
         await demos.broadcast(validityData)
+
         return new Web2Proxy(sessionId, demos)
     },
 }
