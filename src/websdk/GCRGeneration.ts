@@ -11,6 +11,7 @@ import {
 import { Hashing } from "@/encryption/Hashing"
 import { INativePayload } from "@/types/native"
 import { Transaction, TransactionContent } from "@/types/blockchain/Transaction"
+import { ILogicExecutionPayload } from "@/types/logicexecution/ILogicExecutionPayload"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -49,6 +50,10 @@ export class GCRGeneration {
             case "identity":
                 var identityEdits = await HandleIdentityOperations.handle(tx)
                 gcrEdits.push(...identityEdits)
+                break
+            case "logic_execution":
+                var logicExecutionEdits = await HandleLogicExecutionOperations.handle(tx)
+                gcrEdits.push(...logicExecutionEdits)
                 break
         }
 
@@ -296,6 +301,36 @@ export class HandleIdentityOperations {
 
         edits.push(edit)
 
+        return edits
+    }
+}
+
+export class HandleLogicExecutionOperations {
+    static async handle(tx: Transaction): Promise<GCREdit[]> {
+        const edits: GCREdit[] = []
+        
+        const logicExecutionPayloadData: ["logic_execution", ILogicExecutionPayload] = tx.content.data as ["logic_execution", ILogicExecutionPayload]
+        const logicExecutionPayload: ILogicExecutionPayload = logicExecutionPayloadData[1]
+        
+        // Generate request ID from payload data
+        const requestId = Hashing.sha256(JSON.stringify(logicExecutionPayload, (_, v) => typeof v === "bigint" ? v.toString() : v))
+        
+        // Create logic execution GCR edit following proper type structure
+        const logicExecutionEdit: GCREdit = {
+            type: "logic_execution",
+            operation: "store",
+            account: tx.content.from_ed25519_address,
+            txhash: tx.hash,
+            isRollback: false,
+            data: {
+                requestId,
+                payload: logicExecutionPayload,
+                status: "pending",
+                timestamp: tx.content.timestamp
+            }
+        }
+        
+        edits.push(logicExecutionEdit)
         return edits
     }
 }

@@ -95,6 +95,20 @@ export interface GCREditIdentity {
     referralCode?: string
 }
 
+export interface GCREditLogicExecution {
+    type: "logic_execution"
+    isRollback: boolean
+    account: string
+    operation: "store"
+    data: {
+        requestId: string
+        payload: any // The logic execution payload
+        status: "pending" | "executed" | "failed"
+        timestamp: number
+    }
+    txhash: string
+}
+
 export type GCREdit =
     | GCREditBalance
     | GCREditNonce
@@ -102,3 +116,4 @@ export type GCREdit =
     | GCREditAssignIdentity
     | GCREditSubnetsTx
     | GCREditIdentity
+    | GCREditLogicExecution
