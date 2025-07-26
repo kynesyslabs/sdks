@@ -49,7 +49,8 @@ export interface AptosDefaultChain extends DefaultChain {
         moduleAddress: string,
         moduleName: string,
         functionName: string,
-        args: any[]
+        args: any[],
+        typeArguments?: string[]
     ) => Promise<any>
 
     /**
@@ -365,23 +366,48 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      * @param moduleName The module name
      * @param functionName The function name
      * @param args Function arguments
+     * @param typeArguments Type arguments for generic functions (optional)
      * @returns The function result
      */
     async readFromContract(
         moduleAddress: string,
         moduleName: string,
         functionName: string,
-        args: any[]
+        args: any[],
+        typeArguments: string[] = []
     ): Promise<any> {
         try {
-            return await this.aptos.view({
-                payload: {
-                    function: `${moduleAddress}::${moduleName}::${functionName}`,
-                    functionArguments: args
-                }
-            })
-        } catch (error) {
-            throw new Error(`Failed to read from contract: ${error}`)
+            // Validate module address format
+            if (!this.isAddress(moduleAddress)) {
+                throw new Error(`Invalid module address format: ${moduleAddress}`)
+            }
+
+            // Build the view function payload with proper typing
+            const fullFunctionName = `${moduleAddress}::${moduleName}::${functionName}` as `${string}::${string}::${string}`
+            
+            const payload = {
+                function: fullFunctionName,
+                functionArguments: args,
+                ...(typeArguments.length > 0 && { typeArguments })
+            }
+
+            const result = await this.aptos.view({ payload })
+            return result
+        } catch (error: any) {
+            // Enhanced error handling for Move-specific errors
+            const errorMsg = error?.message || error?.toString() || 'Unknown error'
+            
+            if (errorMsg.includes('MODULE_NOT_FOUND')) {
+                throw new Error(`Module not found: ${moduleAddress}::${moduleName}`)
+            } else if (errorMsg.includes('FUNCTION_NOT_FOUND')) {
+                throw new Error(`Function not found: ${functionName} in ${moduleAddress}::${moduleName}`)
+            } else if (errorMsg.includes('Type argument count mismatch')) {
+                throw new Error(`Type argument mismatch for ${functionName}. Expected different count than ${typeArguments.length}`)
+            } else if (errorMsg.includes('INVALID_ARGUMENT')) {
+                throw new Error(`Invalid arguments for ${functionName}: ${JSON.stringify(args)}`)
+            }
+            
+            throw new Error(`Failed to read from contract ${moduleAddress}::${moduleName}::${functionName}: ${errorMsg}`)
         }
     }
 

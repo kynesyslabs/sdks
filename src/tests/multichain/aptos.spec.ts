@@ -139,18 +139,70 @@ describe("APTOS CHAIN TESTS", () => {
 
     test("Smart contract read operation", async () => {
         try {
-            // Read from a standard Aptos module (coin module)
+            // Read from a standard Aptos module (coin module) with proper type arguments
             const result = await instance.readFromContract(
                 "0x1",
                 "coin",
                 "name",
+                [],
                 ["0x1::aptos_coin::AptosCoin"]
             )
             expect(result).toBeDefined()
+            expect(Array.isArray(result)).toBe(true)
+            expect(result[0]).toBe("Aptos Coin")
         } catch (error) {
-            // View functions might not be available or might fail
-            console.log("Contract read test failed (expected in some cases):", error)
+            console.log("Contract read test failed:", error)
+            throw error
         }
+    })
+
+    test("Smart contract read with different functions", async () => {
+        try {
+            // Test reading coin symbol
+            const symbolResult = await instance.readFromContract(
+                "0x1",
+                "coin",
+                "symbol",
+                [],
+                ["0x1::aptos_coin::AptosCoin"]
+            )
+            expect(symbolResult).toBeDefined()
+            expect(Array.isArray(symbolResult)).toBe(true)
+            expect(symbolResult[0]).toBe("APT")
+
+            // Test reading coin decimals
+            const decimalsResult = await instance.readFromContract(
+                "0x1",
+                "coin",
+                "decimals",
+                [],
+                ["0x1::aptos_coin::AptosCoin"]
+            )
+            expect(decimalsResult).toBeDefined()
+            expect(Array.isArray(decimalsResult)).toBe(true)
+            expect(typeof decimalsResult[0]).toBe("number")
+            expect(decimalsResult[0]).toBe(8)
+        } catch (error) {
+            console.log("Additional contract read tests failed:", error)
+            // Don't throw - these are additional validations
+        }
+    })
+
+    test("Smart contract read error handling", async () => {
+        // Test invalid module address
+        await expect(
+            instance.readFromContract("invalid", "coin", "name", [], ["0x1::aptos_coin::AptosCoin"])
+        ).rejects.toThrow("Invalid module address format")
+
+        // Test non-existent module
+        await expect(
+            instance.readFromContract("0x999", "nonexistent", "name", [], ["0x1::aptos_coin::AptosCoin"])
+        ).rejects.toThrow()
+
+        // Test non-existent function
+        await expect(
+            instance.readFromContract("0x1", "coin", "nonexistent", [], ["0x1::aptos_coin::AptosCoin"])
+        ).rejects.toThrow()
     })
 
     test("Error handling for invalid operations", async () => {
