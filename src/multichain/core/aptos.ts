@@ -33,19 +33,40 @@ export interface AptosDefaultChain extends DefaultChain {
     network: Network
 
     /**
-     * Get APT balance for an account
+     * Get APT balance for an account (default: XM operation)
      */
-    getAPTBalance: (address: string) => Promise<string>
+    getAPTBalance: (address: string) => Promise<any>
 
     /**
-     * Get coin balance for a specific coin type
+     * Get APT balance directly from Aptos RPC (bypasses Demos Network)
      */
-    getCoinBalance: (coinType: string, address: string) => Promise<string>
+    getAPTBalanceDirect: (address: string) => Promise<string>
 
     /**
-     * Read from a smart contract (view function)
+     * Get coin balance for a specific coin type (default: XM operation)
+     */
+    getCoinBalance: (coinType: string, address: string) => Promise<any>
+
+    /**
+     * Get coin balance directly from Aptos RPC (bypasses Demos Network)
+     */
+    getCoinBalanceDirect: (coinType: string, address: string) => Promise<string>
+
+    /**
+     * Read from a smart contract (default: XM operation)
      */
     readFromContract: (
+        moduleAddress: string,
+        moduleName: string,
+        functionName: string,
+        args: any[],
+        typeArguments?: string[]
+    ) => Promise<any>
+
+    /**
+     * Read from a smart contract directly (bypasses Demos Network)
+     */
+    readFromContractDirect: (
         moduleAddress: string,
         moduleName: string,
         functionName: string,
@@ -162,20 +183,22 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     }
 
     /**
-     * Gets the APT balance of a wallet
+     * Gets the APT balance directly from Aptos RPC (bypasses Demos Network)
+     * Use only when explicit direct access is needed
      * @param address The wallet address
      * @returns The balance as a string (in Octas, 1 APT = 100,000,000 Octas)
      */
-    async getBalance(address: string): Promise<string> {
-        return this.getAPTBalance(address)
+    async getBalanceDirect(address: string): Promise<string> {
+        return this.getAPTBalanceDirect(address)
     }
 
     /**
-     * Gets the APT balance using official SDK method
+     * Gets the APT balance directly using official SDK method (bypasses Demos Network)
+     * Use only when explicit direct access is needed
      * @param address The wallet address
      * @returns The balance as a string (in Octas)
      */
-    async getAPTBalance(address: string): Promise<string> {
+    async getAPTBalanceDirect(address: string): Promise<string> {
         try {
             const balance = await this.aptos.getAccountAPTAmount({
                 accountAddress: address
@@ -187,12 +210,13 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     }
 
     /**
-     * Gets the balance of a specific coin type
+     * Gets the balance of a specific coin type directly (bypasses Demos Network)
+     * Use only when explicit direct access is needed
      * @param coinType The coin type (e.g., "0x1::aptos_coin::AptosCoin")
      * @param address The wallet address
      * @returns The balance as a string
      */
-    async getCoinBalance(coinType: string, address: string): Promise<string> {
+    async getCoinBalanceDirect(coinType: string, address: string): Promise<string> {
         try {
             const resource = await this.aptos.getAccountResource({
                 accountAddress: address,
@@ -201,6 +225,70 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
             return (resource as any).coin.value
         } catch (error) {
             throw new Error(`Failed to get coin balance: ${error}`)
+        }
+    }
+
+    /**
+     * Gets the APT balance via Demos Network XM operation (default behavior)
+     * @param address The wallet address
+     * @returns XM operation object for Demos Network relay
+     */
+    async getBalance(address: string): Promise<any> {
+        const subchain = this.network === Network.MAINNET ? "mainnet" : 
+                        this.network === Network.TESTNET ? "testnet" : "devnet"
+        return {
+            chain: "aptos",
+            subchain: subchain,
+            task: {
+                type: "balance_query",
+                params: {
+                    address: address,
+                    coinType: "0x1::aptos_coin::AptosCoin"
+                }
+            }
+        }
+    }
+
+    /**
+     * Gets the APT balance via Demos Network XM operation (default behavior)
+     * @param address The wallet address
+     * @returns XM operation object for Demos Network relay
+     */
+    async getAPTBalance(address: string): Promise<any> {
+        const subchain = this.network === Network.MAINNET ? "mainnet" : 
+                        this.network === Network.TESTNET ? "testnet" : "devnet"
+        return {
+            chain: "aptos",
+            subchain: subchain,
+            task: {
+                type: "balance_query",
+                params: {
+                    address: address,
+                    coinType: "0x1::aptos_coin::AptosCoin"
+                }
+            }
+        }
+    }
+
+    /**
+     * Gets the coin balance via Demos Network XM operation (default behavior)
+     * @param coinType The coin type (e.g., "0x1::aptos_coin::AptosCoin")
+     * @param address The wallet address
+     * @returns XM operation object for Demos Network relay
+     */
+    async getCoinBalance(coinType: string, address: string): Promise<any> {
+        const subchain = this.network === Network.MAINNET ? "mainnet" : 
+                        this.network === Network.TESTNET ? "testnet" : "devnet"
+        return {
+            chain: "aptos",
+            subchain: subchain,
+            task: {
+                type: "balance_query",
+                params: {
+                    address: address,
+                    coinType: coinType
+                }
+            }
         }
     }
 
@@ -362,7 +450,8 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     }
 
     /**
-     * Read from a smart contract (view function)
+     * Read from a smart contract directly (bypasses Demos Network)
+     * Use only when explicit direct access is needed
      * @param moduleAddress The module address
      * @param moduleName The module name
      * @param functionName The function name
@@ -370,7 +459,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      * @param typeArguments Type arguments for generic functions (optional)
      * @returns The function result
      */
-    async readFromContract(
+    async readFromContractDirect(
         moduleAddress: string,
         moduleName: string,
         functionName: string,
@@ -409,6 +498,40 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
             }
             
             throw new Error(`Failed to read from contract ${moduleAddress}::${moduleName}::${functionName}: ${errorMsg}`)
+        }
+    }
+
+    /**
+     * Read from a smart contract via Demos Network XM operation (default behavior)
+     * @param moduleAddress The module address
+     * @param moduleName The module name
+     * @param functionName The function name
+     * @param args Function arguments
+     * @param typeArguments Type arguments for generic functions (optional)
+     * @returns XM operation object for Demos Network relay
+     */
+    async readFromContract(
+        moduleAddress: string,
+        moduleName: string,
+        functionName: string,
+        args: any[],
+        typeArguments: string[] = []
+    ): Promise<any> {
+        const subchain = this.network === Network.MAINNET ? "mainnet" : 
+                        this.network === Network.TESTNET ? "testnet" : "devnet"
+        return {
+            chain: "aptos",
+            subchain: subchain,
+            task: {
+                type: "contract_read",
+                params: {
+                    moduleAddress: moduleAddress,
+                    moduleName: moduleName,
+                    functionName: functionName,
+                    args: args,
+                    typeArguments: typeArguments
+                }
+            }
         }
     }
 
