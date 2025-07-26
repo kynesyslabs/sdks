@@ -29,7 +29,7 @@ export {
     SpecificTransaction,
 } from "./blockchain/TransactionSubtypes"
 
-export { L2PSEncryptedPayload } from "@/l2ps"
+// L2PSEncryptedPayload removed to avoid circular dependency - import directly from @/l2ps
 
 // SECTION Payload types
 export { INativePayload } from "./native/INativePayload"
