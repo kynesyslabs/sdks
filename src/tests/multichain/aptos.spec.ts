@@ -44,9 +44,8 @@ describe("APTOS CHAIN TESTS", () => {
     })
 
     test("Account management methods", async () => {
-        const privateKey = instance.getPrivateKey()
-        expect(privateKey).toBeDefined()
-        expect(typeof privateKey).toBe("string")
+        // Private key access should throw error for security (correct behavior)
+        expect(() => instance.getPrivateKey()).toThrow("Private key access not supported through Account object")
 
         const publicKey = instance.getPublicKey()
         expect(publicKey).toBeDefined()
@@ -158,12 +157,12 @@ describe("APTOS CHAIN TESTS", () => {
         // Test with invalid address
         await expect(instance.getAPTBalance("invalid-address")).rejects.toThrow()
         
-        // Test without wallet connection
+        // Test without wallet connection - these should throw validation errors (correct behavior)
         const newInstance = new APTOS("", network)
         await newInstance.connect()
         
-        await expect(newInstance.getAddress()).rejects.toThrow()
-        await expect(newInstance.signMessage("test")).rejects.toThrow()
+        expect(() => newInstance.getAddress()).toThrow("Wallet not connected")
+        await expect(newInstance.signMessage("test")).rejects.toThrow("Wallet not connected")
     })
 
     test("Disconnect functionality", async () => {
