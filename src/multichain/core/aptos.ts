@@ -54,7 +54,7 @@ export interface AptosDefaultChain extends DefaultChain {
     ) => Promise<any>
 
     /**
-     * Write to a smart contract (entry function)
+     * Write to a smart contract (entry function) - returns signed transaction for XM
      */
     writeToContract: (
         moduleAddress: string,
@@ -62,7 +62,8 @@ export interface AptosDefaultChain extends DefaultChain {
         functionName: string,
         args: any[],
         typeArguments?: string[]
-    ) => Promise<string>
+    ) => Promise<Uint8Array>
+
 
     /**
      * Wait for transaction confirmation
@@ -412,13 +413,15 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     }
 
     /**
-     * Write to a smart contract (entry function)
+     * Prepare a smart contract write transaction for Demos Network relay
+     * Builds transaction for XM operations - does NOT execute directly
+     * All contract writes must go through Demos Network XM system
      * @param moduleAddress The module address
      * @param moduleName The module name
      * @param functionName The function name
      * @param args Function arguments
      * @param typeArguments Type arguments (optional)
-     * @returns The transaction hash
+     * @returns The serialized transaction bytes for XM relay
      */
     async writeToContract(
         moduleAddress: string,
@@ -426,7 +429,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
         functionName: string,
         args: any[],
         typeArguments: string[] = []
-    ): Promise<string> {
+    ): Promise<Uint8Array> {
         required(this.account, "Wallet not connected")
         
         try {
@@ -439,16 +442,15 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
                 }
             })
             
-            const response = await this.aptos.signAndSubmitTransaction({
-                signer: this.account,
-                transaction
-            })
-            
-            return response.hash
+            // For XM operations, we serialize and return the transaction for later submission
+            // The node will handle the actual submission via sendTransaction
+            const serializedTransaction = transaction.bcsToBytes()
+            return serializedTransaction
         } catch (error) {
-            throw new Error(`Failed to write to contract: ${error}`)
+            throw new Error(`Failed to prepare contract write transaction: ${error}`)
         }
     }
+
 
     /**
      * Wait for transaction confirmation
