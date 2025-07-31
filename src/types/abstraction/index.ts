@@ -174,6 +174,7 @@ export interface UserPoints {
             discord: number
         }
         referrals: number
+        demosFollow: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
