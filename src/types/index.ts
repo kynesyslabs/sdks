@@ -82,9 +82,9 @@ export {
     IDAHRStartProxyParams,
     EnumWeb2Methods,
     EnumWeb2Actions,
-    TweetSimplified,
-    Tweet,
 } from "./web2"
+export { TweetSimplified, Tweet, TwitterTimelineResponse, TwitterProfile, TwitterFollowersResponse } from "./web2/twitter"
+export { EthTransactionResponse, EthTransaction, SolanaTransactionResponse, SolTransaction } from "./xm/apiTools"
 
 export { IOperation, ITask, XMScript } from "./xm"
 

@@ -30,7 +30,7 @@ import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
-import { TweetSimplified } from "@/types/web2"
+import { TweetSimplified } from "@/types"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))

@@ -54,45 +54,85 @@ describe.only("IDENTITIES V2", () => {
     })
 
     test.only("EVM ADD IDENTITY v2", async () => {
+        const count = 1
+
+        for (let i = 0; i < count; i++) {
+            const ed25519 = await demos.crypto.getIdentity("ed25519")
+            const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+
+            const instance = await EVM.create(chainProviders.eth.mainnet)
+            await instance.connectWallet(wallets.evm.privateKey)
+
+            const signature = await instance.signMessage(ed25519_address)
+            const verified = await instance.verifyMessage(
+                ed25519_address,
+                signature,
+                instance.getAddress(),
+            )
+
+            expect(verified).toBe(true)
+
+            const payload: InferFromSignaturePayload = {
+                method: "identity_assign_from_signature",
+                target_identity: {
+                    chain: "evm",
+                    chainId: instance.chainId,
+                    subchain: "mainnet",
+                    signedData: ed25519_address,
+                    signature: signature,
+                    isEVM: true,
+                    targetAddress: instance.getAddress(),
+                },
+            }
+
+            const identities = new Identities()
+            const validityData = await identities.inferXmIdentity(demos, payload)
+            // validityData (RPCResponseWithValidityData)
+            console.log("validityData: ", validityData)
+            console.log("transaction hash: ", validityData.response.data.transaction.hash)
+
+            const res = await demos.broadcast(validityData)
+            console.log("res: ", res)
+
+            expect(res).toBeDefined()
+            expect(res.result).toBe(200)
+        }
+    })
+
+    test.skip("Add SOLANA IDENTITY v2", async () => {
         const ed25519 = await demos.crypto.getIdentity("ed25519")
         const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
-        const instance = await EVM.create()
-        await instance.connectWallet(wallets.evm.privateKey)
+        const instance = await SOLANA.create(chainProviders.solana.mainnet)
+        await instance.connectWallet(wallets.solana.privateKey)
 
         const signature = await instance.signMessage(ed25519_address)
-        const verified = await instance.verifyMessage(
-            ed25519_address,
-            signature,
-            instance.getAddress(),
-        )
+        const verified = await instance.verifyMessage(ed25519_address, signature, instance.getAddress())
 
         expect(verified).toBe(true)
 
         const payload: InferFromSignaturePayload = {
             method: "identity_assign_from_signature",
             target_identity: {
-                chain: "evm",
-                chainId: instance.chainId,
-                subchain: "sepolia",
+                chain: "solana",
+                chainId: undefined,
+                subchain: "mainnet",
                 signedData: ed25519_address,
                 signature: signature,
-                isEVM: true,
                 targetAddress: instance.getAddress(),
+                isEVM: false,
             },
         }
 
         const identities = new Identities()
-        const validityData = await identities.inferXmIdentity(demos, payload, "DanWT2XcFTKU")
-        // validityData (RPCResponseWithValidityData)
+
+        const validityData = await identities.inferXmIdentity(demos, payload)
         console.log("validityData: ", validityData)
         console.log("transaction hash: ", validityData.response.data.transaction.hash)
 
         const res = await demos.broadcast(validityData)
         console.log("res: ", res)
-
-        expect(res).toBeDefined()
-        expect(res.result).toBe(200)
+        expect(res["result"]).toBe(200)
     })
 
     test.skip("EVM REMOVE IDENTITY v2", async () => {

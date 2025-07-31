@@ -235,6 +235,10 @@ export class HandleIdentityOperations {
                     identityPayload.payload as InferFromSignaturePayload
                 ).target_identity
 
+                if (payload.isEVM && !payload.chainId) {
+                    throw new Error("Failed: chainId not provided")
+                }
+
                 // REVIEW: Remove the signed Message from the edit data
                 // This is supposed to be the ed25519 address and should be provided by the caller
                 const data = structuredClone(payload)

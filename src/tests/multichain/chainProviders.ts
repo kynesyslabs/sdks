@@ -7,7 +7,7 @@ const tenTokenAlt = "05F95F81F11474C151F27854BD43DDA1C8616BBF"
 
 export default {
     eth: {
-        mainnet: "https://rpc.ankr.com/eth",
+        mainnet: "https://ethereum-rpc.publicnode.com",
         sepolia: "https://ethereum-sepolia-rpc.publicnode.com",
         goerli: "https://ethereum-goerli.publicnode.com",
     },
