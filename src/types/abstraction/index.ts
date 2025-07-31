@@ -179,4 +179,6 @@ export interface UserPoints {
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
     lastUpdated: Date
+    flagged: boolean | null
+    flaggedReason: string | null
 }
