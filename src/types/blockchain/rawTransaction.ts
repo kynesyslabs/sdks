@@ -9,6 +9,8 @@ KyneSys Labs: https://www.kynesys.xyz/
 
 */
 
+import { TransactionContent } from "./Transaction"
+
 export interface RawTransaction {
     id: number
     blockNumber: number
@@ -16,7 +18,7 @@ export interface RawTransaction {
     status: string
     hash: string
     content: NonNullable<string>
-    type: string
+    type: TransactionContent["type"]
     from: any
     to: any
     amount: number

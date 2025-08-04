@@ -1,3 +1,4 @@
+import { Identities } from "@/abstraction"
 import { Hashing, uint8ArrayToHex } from "@/encryption"
 import { Demos, DemosWebAuth } from "@/websdk"
 import * as bip39 from "@scure/bip39"
@@ -147,7 +148,7 @@ describe("New Demos", () => {
         console.log(unblocked)
     })
 
-    test.only("get address info", async () => {
+    test.skip("get address info", async () => {
         const demos = new Demos()
         await demos.connect("http://localhost:53550")
         await demos.connectWallet("clock coffee open foam tell price urban deposit stadium motor since cover cushion recall chat master fabric arrange embrace zebra kind congress scene dutch")
@@ -156,5 +157,17 @@ describe("New Demos", () => {
             address: "0xcb54f467d4c13f84bd4ab956e1bb3738bdd30956d2d2718e5b5ff28c40475db5",
         })
         console.log(addressInfo)
+    })
+
+    test.only("get transaction history", async () => {
+        const demos = new Demos()
+        await demos.connect("http://localhost:53550")
+        // await demos.connectWallet("clock coffee recall chat master fabric arrange embrace zebra kind congress scene dutch")
+
+        const transactionHistory = await demos.getTransactionHistory("0x4401feab4dfc36e1166ad0dc1c4987dd0c728a57616fa496c25ca2a260651808", "all", {
+            start: 1,
+            limit: 2
+        })
+        console.log(transactionHistory)
     })
 })

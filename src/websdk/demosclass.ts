@@ -655,6 +655,20 @@ export class Demos {
     }
 
     /**
+     * Get the transaction history of an address.
+     *
+     * @param address - The address
+     * @param type - The type of transaction. Defaults to "all".
+     * @param start - The start index. Defaults to 0.
+     * @param limit - The number of transactions to return. Defaults to 100.
+     *
+     * @returns A list of transaction ordered from the most recent to the oldest.
+     */
+    async getTransactionHistory(address: string, type: TransactionContent["type"] | "all" = "all", options: { start?: number, limit?: number } = {}): Promise<Transaction[]> {
+        return await this.nodeCall("getTransactionHistory", { address, type, ...options })
+    }
+
+    /**
      * Get all transactions.
      */
     async getTransactions(
