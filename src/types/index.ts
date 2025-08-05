@@ -84,6 +84,13 @@ export {
     EnumWeb2Actions,
 } from "./web2"
 export { TweetSimplified, Tweet, TwitterTimelineResponse, TwitterProfile, TwitterFollowersResponse } from "./web2/twitter"
+export { 
+    TelegramChallengeRequest, 
+    TelegramChallengeResponse, 
+    TelegramVerificationResponse, 
+    TelegramUser, 
+    TelegramVerificationRequest 
+} from "./web2/telegram"
 export { EthTransactionResponse, EthTransaction, SolanaTransactionResponse, SolTransaction } from "./xm/apiTools"
 
 export { IOperation, ITask, XMScript } from "./xm"
