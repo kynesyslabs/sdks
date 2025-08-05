@@ -34,6 +34,8 @@ export interface TelegramVerificationResponse {
         username: string
         timestamp: number
     }
+    /** Unsigned identity transaction to be signed by user (only present on success) */
+    unsignedTransaction?: any // Will be Transaction type, but avoiding circular imports
 }
 
 /**
