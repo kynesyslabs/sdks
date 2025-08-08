@@ -62,30 +62,76 @@ The SDK provides multiple entry points:
 
 ## Quick Start
 
-### Initialize Demos SDK
+### Initialize and Connect Wallet
 
 ```typescript
 import { Demos } from "@kynesyslabs/demosdk/websdk"
 
-// Initialize with your configuration
-const demos = new Demos({
-  network: "testnet", // or "mainnet"
-  // additional configuration
-})
+// 1. Initialize Demos SDK (no parameters)
+const demos = new Demos()
+
+// 2. Connect to the network
+const rpc = "https://demosnode.discus.sh"
+await demos.connect(rpc)
+
+// 3. Generate a new mnemonic or use existing one
+const mnemonic = demos.newMnemonic() // Generates 12-word mnemonic
+// const mnemonic = "your existing mnemonic phrase..." // Or use existing
+
+// 4. Connect your wallet
+await demos.connectWallet(mnemonic)
+
+// 5. Get your wallet address
+const address = demos.getAddress()
+console.log("Wallet address:", address)
+```
+
+### Native Transaction Example
+
+```typescript
+// Send native DEM tokens
+const tx = await demos.transfer(
+  "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
+  100 // amount in DEM
+)
+
+// Confirm and broadcast transaction
+const validityData = await demos.confirm(tx)
+const result = await demos.broadcast(validityData)
 ```
 
 ### Cross-chain Transaction Example
 
 ```typescript
-import { prepareXMPayload } from "@kynesyslabs/demosdk/xm-websdk"
+import { 
+  prepareXMPayload, 
+  prepareXMScript 
+} from "@kynesyslabs/demosdk/websdk"
+import { EVM } from "@kynesyslabs/demosdk/xm-websdk"
 
-// Prepare a cross-chain payload
-const payload = await prepareXMPayload({
-  fromChain: "ethereum",
-  toChain: "solana",
-  amount: "1000000000", // in smallest unit
-  recipient: "recipient_address"
+// 1. Create cross-chain payload (e.g., Ethereum Sepolia)
+const evm = await EVM.create("https://rpc.ankr.com/eth_sepolia")
+await evm.connectWallet("your_ethereum_private_key")
+
+const evmTx = await evm.preparePay(
+  "0xRecipientAddress",
+  "0.001" // 0.001 ETH
+)
+
+// 2. Create XMScript
+const xmscript = prepareXMScript({
+  chain: "eth",
+  subchain: "sepolia", 
+  signedPayloads: [evmTx],
+  type: "pay"
 })
+
+// 3. Convert to Demos transaction
+const tx = await prepareXMPayload(xmscript, demos)
+
+// 4. Confirm and broadcast
+const validityData = await demos.confirm(tx)
+const result = await demos.broadcast(validityData)
 ```
 
 ## Development
