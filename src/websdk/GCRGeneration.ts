@@ -63,17 +63,6 @@ export class GCRGeneration {
 
             var gasAmount = 1 // TODO Implement gas calculation to reach 1 cent per tx
 
-            if (!content.transaction_fee) {
-                content.transaction_fee = {
-                    network_fee: 1,
-                    rpc_fee: 0,
-                    additional_fee: 0,
-                }
-            } else {
-                content.transaction_fee.network_fee =
-                    (content.transaction_fee.network_fee || 0) + gasAmount
-            }
-
             let gasEdit = await this.createGasEdit(
                 content.from_ed25519_address,
                 tx.hash,
