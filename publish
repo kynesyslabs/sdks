@@ -1,0 +1,128 @@
+#!/bin/bash
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Get current version from package.json
+get_current_version() {
+    node -p "require('./package.json').version"
+}
+
+# Bump version and return new version
+bump_version() {
+    local bump_type=$1
+    case $bump_type in
+        patch)
+            npm version patch --no-git-tag-version
+            ;;
+        minor)
+            npm version minor --no-git-tag-version
+            ;;
+        major)
+            npm version major --no-git-tag-version
+            ;;
+        *)
+            echo -e "${RED}Invalid bump type. Use: patch, minor, or major${NC}"
+            exit 1
+            ;;
+    esac
+    get_current_version
+}
+
+# Confirm action with user
+confirm() {
+    local message=$1
+    echo -e "${YELLOW}$message${NC}"
+    read -p "Continue? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${RED}Cancelled.${NC}"
+        exit 1
+    fi
+}
+
+# Main script
+case "$1" in
+    -r|--redo)
+        echo -e "${BLUE}=== REDO LAST RELEASE ===${NC}"
+        CURRENT_VERSION=$(get_current_version)
+        echo -e "Current version: ${GREEN}v$CURRENT_VERSION${NC}"
+        
+        confirm "This will create a new commit for the same version and trigger the release workflow."
+        
+        git commit --allow-empty -m "release v$CURRENT_VERSION"
+        echo -e "${GREEN}✓ Created empty commit for release v$CURRENT_VERSION${NC}"
+        
+        git push
+        echo -e "${GREEN}✓ Pushed to remote${NC}"
+        echo -e "${BLUE}🚀 Release workflow should start shortly for v$CURRENT_VERSION${NC}"
+        ;;
+        
+    "")
+        echo -e "${BLUE}=== NEW RELEASE ===${NC}"
+        CURRENT_VERSION=$(get_current_version)
+        echo -e "Current version: ${GREEN}v$CURRENT_VERSION${NC}"
+        echo
+        echo "Select version bump type:"
+        echo "1) patch (v$CURRENT_VERSION → v$(npm version patch --dry-run --no-git-tag-version 2>/dev/null | sed 's/v//'))"
+        echo "2) minor (v$CURRENT_VERSION → v$(npm version minor --dry-run --no-git-tag-version 2>/dev/null | sed 's/v//'))"
+        echo "3) major (v$CURRENT_VERSION → v$(npm version major --dry-run --no-git-tag-version 2>/dev/null | sed 's/v//'))"
+        echo
+        read -p "Enter choice (1/2/3): " -n 1 -r
+        echo
+        
+        case $REPLY in
+            1)
+                BUMP_TYPE="patch"
+                ;;
+            2)
+                BUMP_TYPE="minor"
+                ;;
+            3)
+                BUMP_TYPE="major"
+                ;;
+            *)
+                echo -e "${RED}Invalid choice. Cancelled.${NC}"
+                exit 1
+                ;;
+        esac
+        
+        NEW_VERSION=$(bump_version $BUMP_TYPE)
+        echo -e "${GREEN}✓ Version bumped to v$NEW_VERSION${NC}"
+        
+        confirm "This will commit the version bump and push 'release v$NEW_VERSION' to trigger the release workflow."
+        
+        git add package.json
+        git commit -m "release v$NEW_VERSION"
+        echo -e "${GREEN}✓ Committed version bump${NC}"
+        
+        git push
+        echo -e "${GREEN}✓ Pushed to remote${NC}"
+        echo -e "${BLUE}🚀 Release workflow should start shortly for v$NEW_VERSION${NC}"
+        ;;
+        
+    -h|--help)
+        echo "Usage: $0 [OPTIONS]"
+        echo
+        echo "Publish script for automated releases"
+        echo
+        echo "OPTIONS:"
+        echo "  (no args)    Interactive release - bump version, commit, and push"
+        echo "  -r, --redo   Redo last release without version bump"
+        echo "  -h, --help   Show this help message"
+        echo
+        echo "Examples:"
+        echo "  $0           # Interactive new release"
+        echo "  $0 -r        # Redo current version release"
+        ;;
+        
+    *)
+        echo -e "${RED}Unknown option: $1${NC}"
+        echo "Use -h or --help for usage information"
+        exit 1
+        ;;
+esac

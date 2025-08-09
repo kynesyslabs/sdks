@@ -19,14 +19,13 @@ jobs:
               uses: oven-sh/setup-bun@v1
               with:
                   bun-version: latest
-            - name: Enable Corepack for Yarn
-              run: corepack enable
             - name: Install dependencies
               run: bun install
             - name: Build package
               run: bun run build
-            - name: Read NPM Key
+            - name: Setup NPM Auth for Bun
               run: |
-                  echo 'npmAuthToken: "${{ secrets.NPM_PUBLISH_KEY }}"' >> .yarnrc.yml
+                  echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_PUBLISH_KEY }}" >> ~/.npmrc
+                  echo "registry=https://registry.npmjs.org/" >> ~/.npmrc
             - name: Publish 🎉
-              run: yarn publish
+              run: bun publish --access public
