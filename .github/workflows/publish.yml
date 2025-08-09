@@ -4,7 +4,9 @@ name: Build and Publish
 permissions: read-all
 
 # INFO: Run workflow on changes to the sdks
-on: push
+on: 
+  push:
+  workflow_dispatch:
 
 jobs:
     build:
@@ -21,8 +23,8 @@ jobs:
               run: bun install
             - name: Build package
               run: bun run build
-            - name: Setup NPM Auth
+            - name: Read NPM Key
               run: |
-                  echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_PUBLISH_KEY }}" > ~/.npmrc
+                  echo 'npmAuthToken: "${{ secrets.NPM_PUBLISH_KEY }}"' >> .yarnrc.yml
             - name: Publish 🎉
-              run: bun publish
+              run: npx yarn publish
