@@ -36,5 +36,5 @@ jobs:
                   npm whoami || echo "npm whoami failed"
             - name: Publish 🎉
               run: |
-                  echo "Publishing with Bun..."
-                  bun publish --access public --verbose
+                  echo "Publishing with npm..."
+                  npm publish --access public
