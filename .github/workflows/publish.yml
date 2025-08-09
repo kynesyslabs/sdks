@@ -27,5 +27,14 @@ jobs:
               run: |
                   echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_PUBLISH_KEY }}" >> ~/.npmrc
                   echo "registry=https://registry.npmjs.org/" >> ~/.npmrc
+                  echo "access=public" >> ~/.npmrc
+            - name: Debug NPM config
+              run: |
+                  echo "NPM config:"
+                  cat ~/.npmrc
+                  echo "Checking npm whoami:"
+                  npm whoami || echo "npm whoami failed"
             - name: Publish 🎉
-              run: bun publish --access public
+              run: |
+                  echo "Publishing with Bun..."
+                  bun publish --access public --verbose
