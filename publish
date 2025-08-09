@@ -17,13 +17,13 @@ bump_version() {
     local bump_type=$1
     case $bump_type in
         patch)
-            npm version patch --no-git-tag-version
+            npm version patch --no-git-tag-version > /dev/null
             ;;
         minor)
-            npm version minor --no-git-tag-version
+            npm version minor --no-git-tag-version > /dev/null
             ;;
         major)
-            npm version major --no-git-tag-version
+            npm version major --no-git-tag-version > /dev/null
             ;;
         *)
             echo -e "${RED}Invalid bump type. Use: patch, minor, or major${NC}"
