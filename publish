@@ -15,31 +15,55 @@ get_current_version() {
 # Bump version and return new version
 bump_version() {
     local bump_type=$1
+    local current_version=$(get_current_version)
+    local new_version=""
+
+    # Parse current version
+    IFS='.' read -ra VERSION_PARTS <<< "$current_version"
+    local major=${VERSION_PARTS[0]}
+    local minor=${VERSION_PARTS[1]}
+    local patch=${VERSION_PARTS[2]}
+
     case $bump_type in
         patch)
-            npm version patch --no-git-tag-version > /dev/null
+            patch=$((patch + 1))
+            new_version="${major}.${minor}.${patch}"
             ;;
         minor)
-            npm version minor --no-git-tag-version > /dev/null
+            minor=$((minor + 1))
+            patch=0
+            new_version="${major}.${minor}.${patch}"
             ;;
         major)
-            npm version major --no-git-tag-version > /dev/null
+            major=$((major + 1))
+            minor=0
+            patch=0
+            new_version="${major}.${minor}.${patch}"
             ;;
         *)
             echo -e "${RED}Invalid bump type. Use: patch, minor, or major${NC}"
             exit 1
             ;;
     esac
-    get_current_version
+
+    # Update package.json
+    node -e "
+        const fs = require('fs');
+        const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+        pkg.version = '$new_version';
+        fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 4) + '\n');
+    "
+
+    echo "$new_version"
 }
 
 # Confirm action with user
 confirm() {
     local message=$1
     echo -e "${YELLOW}$message${NC}"
-    read -p "Continue? (y/N): " -n 1 -r
+    read -p "Continue? (Y/n): " -n 1 -r
     echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
         echo -e "${RED}Cancelled.${NC}"
         exit 1
     fi
@@ -51,30 +75,57 @@ case "$1" in
         echo -e "${BLUE}=== REDO LAST RELEASE ===${NC}"
         CURRENT_VERSION=$(get_current_version)
         echo -e "Current version: ${GREEN}v$CURRENT_VERSION${NC}"
-        
+
         confirm "This will create a new commit for the same version and trigger the release workflow."
-        
+
         git commit --allow-empty -m "release v$CURRENT_VERSION"
         echo -e "${GREEN}✓ Created empty commit for release v$CURRENT_VERSION${NC}"
-        
+
         git push
         echo -e "${GREEN}✓ Pushed to remote${NC}"
         echo -e "${BLUE}🚀 Release workflow should start shortly for v$CURRENT_VERSION${NC}"
         ;;
-        
+
     "")
         echo -e "${BLUE}=== NEW RELEASE ===${NC}"
+
+        # Run build first and only proceed if successful
+        echo -e "${BLUE}Building project...${NC}"
+        if ! bun run build; then
+            echo -e "${RED}Build failed. Please fix the build errors before proceeding.${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✓ Build successful${NC}"
+        echo
+
         CURRENT_VERSION=$(get_current_version)
         echo -e "Current version: ${GREEN}v$CURRENT_VERSION${NC}"
         echo
         echo "Select version bump type:"
-        echo "1) patch (v$CURRENT_VERSION → v$(npm version patch --dry-run --no-git-tag-version 2>/dev/null | sed 's/v//'))"
-        echo "2) minor (v$CURRENT_VERSION → v$(npm version minor --dry-run --no-git-tag-version 2>/dev/null | sed 's/v//'))"
-        echo "3) major (v$CURRENT_VERSION → v$(npm version major --dry-run --no-git-tag-version 2>/dev/null | sed 's/v//'))"
+        echo "1) patch (v$CURRENT_VERSION → v$(node -e "
+            const pkg = require('./package.json');
+            const [major, minor, patch] = pkg.version.split('.').map(Number);
+            console.log(major + '.' + minor + '.' + (patch + 1));
+        ")) [default]"
+        echo "2) minor (v$CURRENT_VERSION → v$(node -e "
+            const pkg = require('./package.json');
+            const [major, minor, patch] = pkg.version.split('.').map(Number);
+            console.log(major + '.' + (minor + 1) + '.0');
+        "))"
+        echo "3) major (v$CURRENT_VERSION → v$(node -e "
+            const pkg = require('./package.json');
+            const [major, minor, patch] = pkg.version.split('.').map(Number);
+            console.log((major + 1) + '.0.0');
+        "))"
         echo
-        read -p "Enter choice (1/2/3): " -n 1 -r
+        read -p "Enter choice (1/2/3) [default: 1]: " -n 1 -r
         echo
-        
+
+        # Set default to patch (option 1) if no input or invalid input
+        if [[ -z "$REPLY" ]] || [[ ! "$REPLY" =~ ^[1-3]$ ]]; then
+            REPLY="1"
+        fi
+
         case $REPLY in
             1)
                 BUMP_TYPE="patch"
@@ -90,28 +141,28 @@ case "$1" in
                 exit 1
                 ;;
         esac
-        
+
         NEW_VERSION=$(bump_version $BUMP_TYPE)
         echo -e "${GREEN}✓ Version bumped to v$NEW_VERSION${NC}"
-        
+
         confirm "This will commit the version bump and push 'release v$NEW_VERSION' to trigger the release workflow."
-        
+
         git add package.json
         git commit -m "release v$NEW_VERSION"
         echo -e "${GREEN}✓ Committed version bump${NC}"
-        
+
         git push
         echo -e "${GREEN}✓ Pushed to remote${NC}"
         echo -e "${BLUE}🚀 Release workflow should start shortly for v$NEW_VERSION${NC}"
         ;;
-        
+
     -h|--help)
         echo "Usage: $0 [OPTIONS]"
         echo
         echo "Publish script for automated releases"
         echo
         echo "OPTIONS:"
-        echo "  (no args)    Interactive release - bump version, commit, and push"
+        echo "  (no args)    Interactive release - build, bump version, commit, and push"
         echo "  -r, --redo   Redo last release without version bump"
         echo "  -h, --help   Show this help message"
         echo
@@ -119,7 +170,7 @@ case "$1" in
         echo "  $0           # Interactive new release"
         echo "  $0 -r        # Redo current version release"
         ;;
-        
+
     *)
         echo -e "${RED}Unknown option: $1${NC}"
         echo "Use -h or --help for usage information"
