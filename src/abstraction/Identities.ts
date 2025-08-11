@@ -233,6 +233,10 @@ export class Identities {
             throw new Error(data.error)
         }
 
+        if (!data.tweet.userId || !data.tweet.username) {
+            throw new Error("Unable to get twitter user info. Please try again.")
+        }
+
         let twitterPayload: InferFromXPayload = {
             context: "twitter",
             proof: payload,
