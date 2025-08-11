@@ -1,6 +1,5 @@
 import { Demos } from "@/websdk"
 import { DemosWebAuth } from "@/websdk"
-import { EnumWeb2Methods } from "@/types"
 
 describe("Web2", () => {
     test("Full Web2 Transaction", async () => {
@@ -22,16 +21,13 @@ describe("Web2", () => {
 
             // 3. Start the proxy and send a request
             const res = await proxy.startProxy({
-                method: EnumWeb2Methods.GET,
+                method: "GET",
                 url: "https://google.com",
             })
 
             console.log("Response:", res)
 
-            // 4. Cleanup
-            await proxy.stopProxy()
-
-            // 5. Disconnect from the demos instance
+            // 4. Disconnect from the demos instance
             demos.disconnect()
         }
     })

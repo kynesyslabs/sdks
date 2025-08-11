@@ -12,6 +12,8 @@ export interface IWeb2Result {
     statusText: string
     headers: IncomingHttpHeaders
     data: any
+    dataHash: string
+    headersHash: string
 }
 
 export interface IWeb2Request {
@@ -33,24 +35,17 @@ export interface IWeb2Payload {
     }
 }
 
-export enum EnumWeb2Methods {
-    GET = "GET",
-    POST = "POST",
-    PUT = "PUT",
-    DELETE = "DELETE",
-    PATCH = "PATCH",
-}
+export type Web2Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
 
 export enum EnumWeb2Actions {
     CREATE = "create",
     START_PROXY = "startProxy",
-    STOP_PROXY = "stopProxy",
 }
 
 export interface IRawWeb2Request {
     action: EnumWeb2Actions
     parameters: IParam[]
-    method: EnumWeb2Methods
+    method: Web2Method
     url: string
     headers?: OutgoingHttpHeaders
     stage: {
@@ -63,15 +58,15 @@ export interface IRawWeb2Request {
 
 export interface ISendHTTPRequestParams {
     web2Request: IWeb2Request
-    targetMethod: EnumWeb2Methods
-    targetHeaders: IWeb2Request["raw"]["headers"]
+    targetMethod: Web2Method
+    targetHeaders: OutgoingHttpHeaders
     payload: unknown
     targetAuthorization: string
 }
 
 export interface IAuthorizationException {
     urlPattern: RegExp
-    methods: EnumWeb2Methods[]
+    methods: Web2Method[]
 }
 
 export interface IAuthorizationConfig {
@@ -88,13 +83,14 @@ export interface IWeb2RequestOptions {
 
 export interface IStartProxyParams {
     url: string
-    method: IWeb2Request["raw"]["method"]
+    method: Web2Method
     options?: IWeb2RequestOptions
 }
 
 export interface IDAHRStartProxyParams {
-    method: IWeb2Request["raw"]["method"]
-    headers: IWeb2Request["raw"]["headers"]
+    url: string
+    method: Web2Method
+    headers: OutgoingHttpHeaders
     payload?: IWeb2RequestOptions["payload"]
     authorization?: IWeb2RequestOptions["authorization"]
 }
