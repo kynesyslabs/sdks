@@ -49,8 +49,6 @@ export class Web2Proxy {
             method,
             url,
             headers: options?.headers,
-            /*    parameters: freshWeb2Request.raw.parameters,
-            stage: freshWeb2Request.raw.stage, */
         }
 
         const response = await this._demos.call("web2ProxyRequest", {
