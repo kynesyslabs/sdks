@@ -61,9 +61,13 @@ export class GCRGeneration {
                 break nonceEdits
             }
 
+            var gasAmount = 1 // TODO Implement gas calculation to reach 1 cent per tx
+
             let gasEdit = await this.createGasEdit(
                 content.from_ed25519_address,
                 tx.hash,
+                isRollback,
+                gasAmount,
             )
             gcrEdits.push(gasEdit)
         } catch (e) {
@@ -72,7 +76,9 @@ export class GCRGeneration {
         }
 
         // Add nonce increment edit
-        gcrEdits.push(this.createNonceEdit(content.from_ed25519_address, tx.hash))
+        gcrEdits.push(
+            this.createNonceEdit(content.from_ed25519_address, tx.hash),
+        )
 
         for (const edit of gcrEdits) {
             if (!edit.account.startsWith("0x")) {
@@ -87,8 +93,8 @@ export class GCRGeneration {
         account: string,
         txHash: string,
         isRollback: boolean = false,
+        gasAmount: number = 1,
     ): Promise<GCREdit> {
-        var gasAmount = 1 // TODO Implement gas calculation to reach 1 cent per tx
         // Checking if the gas can be paid is done in the node
 
         return {
@@ -235,20 +241,24 @@ export class HandleIdentityOperations {
                     identityPayload.payload as InferFromSignaturePayload
                 ).target_identity
 
+                if (payload.isEVM && !payload.chainId) {
+                    throw new Error("Failed: chainId not provided")
+                }
+
                 // REVIEW: Remove the signed Message from the edit data
                 // This is supposed to be the ed25519 address and should be provided by the caller
                 const data = structuredClone(payload)
 
                 edit.data = {
                     ...data,
-                    timestamp: tx.content.timestamp
+                    timestamp: tx.content.timestamp,
                 }
                 edit.referralCode = identityPayload.payload.referralCode
                 break
             }
 
             case "pqc_identity_assign": {
-                edit.data = identityPayload.payload.map((payload) => {
+                edit.data = identityPayload.payload.map(payload => {
                     return {
                         ...payload,
                         timestamp: tx.content.timestamp,
@@ -269,7 +279,7 @@ export class HandleIdentityOperations {
                         userId: payload.userId,
                         proof: payload.proof,
                         proofHash: Hashing.sha256(payload.proof),
-                        timestamp: tx.content.timestamp
+                        timestamp: tx.content.timestamp,
                     },
                 } as Web2GCRData
                 edit.referralCode = identityPayload.payload.referralCode

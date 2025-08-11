@@ -30,7 +30,7 @@ import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
-import { TweetSimplified } from "@/types/web2"
+import { TweetSimplified } from "@/types"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -652,6 +652,20 @@ export class Demos {
      */
     async getAllTxs(): Promise<RawTransaction[]> {
         return await this.getTransactions("latest", 50)
+    }
+
+    /**
+     * Get the transaction history of an address.
+     *
+     * @param address - The address
+     * @param type - The type of transaction. Defaults to "all".
+     * @param start - The start index. Defaults to 0.
+     * @param limit - The number of transactions to return. Defaults to 100.
+     *
+     * @returns A list of transaction ordered from the most recent to the oldest.
+     */
+    async getTransactionHistory(address: string, type: TransactionContent["type"] | "all" = "all", options: { start?: number, limit?: number } = {}): Promise<Transaction[]> {
+        return await this.nodeCall("getTransactionHistory", { address, type, ...options })
     }
 
     /**

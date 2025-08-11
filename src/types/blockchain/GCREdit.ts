@@ -95,6 +95,30 @@ export interface GCREditIdentity {
     referralCode?: string
 }
 
+export interface GCREditSmartContract {
+    type: "smartContract"
+    operation: "deploy" | "call" | "store" | "retrieve"
+    account: string           // Contract address
+    txhash: string
+    isRollback: boolean
+    
+    // Deploy-specific fields
+    code?: string
+    deployer?: string
+    
+    // Call-specific fields
+    method?: string
+    args?: any[]
+    
+    // State-specific fields
+    key?: string
+    value?: any
+    
+    // Results
+    result?: any
+    gasUsed?: number
+}
+
 export type GCREdit =
     | GCREditBalance
     | GCREditNonce
@@ -102,3 +126,4 @@ export type GCREdit =
     | GCREditAssignIdentity
     | GCREditSubnetsTx
     | GCREditIdentity
+    | GCREditSmartContract

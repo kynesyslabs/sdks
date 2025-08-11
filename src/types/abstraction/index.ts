@@ -114,6 +114,13 @@ export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
 
 export interface InferFromTwitterPayload extends InferFromXPayload { }
 
+// ANCHOR Telegram Identities
+export interface InferFromTelegramPayload extends Web2CoreTargetIdentityPayload {
+    context: "telegram"
+    username: string
+    userId: string
+}
+
 // SECTION Web2 Identities
 export interface BaseWeb2IdentityPayload {
     context: "web2"
@@ -123,7 +130,7 @@ export interface BaseWeb2IdentityPayload {
 
 export interface Web2IdentityAssignPayload extends BaseWeb2IdentityPayload {
     method: "web2_identity_assign"
-    payload: InferFromGithubPayload | InferFromTwitterPayload
+    payload: InferFromGithubPayload | InferFromTwitterPayload | InferFromTelegramPayload
 }
 
 export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
@@ -174,8 +181,11 @@ export interface UserPoints {
             discord: number
         }
         referrals: number
+        demosFollow: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
     lastUpdated: Date
+    flagged: boolean | null
+    flaggedReason: string | null
 }
