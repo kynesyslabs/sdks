@@ -1,5 +1,5 @@
 import type { IWeb2Request, Transaction } from "@/types"
-import { EnumWeb2Methods, EnumWeb2Actions } from "@/types"
+import { EnumWeb2Actions } from "@/types"
 // TODO This should be a collection of classes now that we use TypeScript
 // FIXME ^
 
@@ -46,7 +46,7 @@ const web2_request: IWeb2Request = {
     raw: {
         action: EnumWeb2Actions.CREATE,
         parameters: [],
-        method: EnumWeb2Methods.GET,
+        method: "GET",
         url: "",
         headers: {},
         // Handling the various stages of an IWeb2Request

@@ -80,7 +80,7 @@ export {
     IWeb2RequestOptions,
     IStartProxyParams,
     IDAHRStartProxyParams,
-    EnumWeb2Methods,
+    Web2Method,
     EnumWeb2Actions,
 } from "./web2"
 export { TweetSimplified, Tweet, TwitterTimelineResponse, TwitterProfile, TwitterFollowersResponse } from "./web2/twitter"
