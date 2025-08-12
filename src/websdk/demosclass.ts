@@ -334,6 +334,11 @@ export class Demos {
 
         raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
 
+        // We derive the network fee from GCR edits (sum of sender balance removals minus `amount`).
+        // This is a pragmatic interim approach; ideally the node should authoritatively return fees
+        // to avoid drift between SDK and node logic.
+        raw_tx = this._calculateAndApplyGasFee(raw_tx)
+
         raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
         const signature = await this.crypto.sign(
             this.algorithm,
@@ -420,6 +425,58 @@ export class Demos {
         })
 
         return verified
+    }
+
+    /**
+     * @private
+     * Calculates and applies the gas fee for a transaction (SDK-level fallback).
+     * NOTE: We infer the fee by analyzing the generated GCR (Gas Consumption Record) edits:
+     * - Sum all "balance" edits with operation "remove" for the sender
+     * - Subtract the declared transaction `amount`
+     * The remainder is treated as the network fee. If a fee already exists on the tx, we only raise
+     * `network_fee` if the newly inferred fee is higher (prevents double-charging on re-sign).
+     * This is an interim approach; the preferred design is for the node to return fees explicitly.
+     *
+     * @param raw_tx - The transaction for which to calculate the fee.
+     * @returns The updated transaction with the fee applied.
+     */
+    private _calculateAndApplyGasFee(raw_tx: Transaction): Transaction {
+        if (!raw_tx.content.gcr_edits || !Array.isArray(raw_tx.content.gcr_edits)) {
+            throw new Error("Failed to generate GCR edits or GCR edits are in an invalid format.")
+        }
+
+        // INFO: The gas fee is calculated by summing up all "remove" balance edits for the sender's account
+        // and then subtracting the actual transaction amount. This gives the value of the fee.
+        const totalRemoved = raw_tx.content.gcr_edits
+            .filter(
+                (edit: any) =>
+                    edit.type === "balance" &&
+                    edit.operation === "remove" &&
+                    edit.account === raw_tx.content.from_ed25519_address,
+            )
+            .reduce((acc: number, edit: any) => acc + edit.amount, 0)
+
+        const calculatedFee = totalRemoved - (raw_tx.content.amount || 0)
+
+        if (calculatedFee < 0) {
+            throw new Error("Calculated gas fee is negative, which is not allowed.")
+        }
+
+        // INFO: This logic handles both initial fee creation and accumulation for re-signed transactions.
+        // To avoid fee accumulation, a new transaction object should be created for each signing.
+        if (!raw_tx.content.transaction_fee) {
+            raw_tx.content.transaction_fee = {
+                network_fee: calculatedFee,
+                rpc_fee: 0,
+                additional_fee: 0,
+            }
+        } else {
+            const existingFee = raw_tx.content.transaction_fee.network_fee || 0
+            if (calculatedFee > existingFee) {
+                raw_tx.content.transaction_fee.network_fee = calculatedFee
+            }
+        }
+        return raw_tx
     }
 
     // L2PS calls are defined here
