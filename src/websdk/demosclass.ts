@@ -337,7 +337,12 @@ export class Demos {
         // We derive the network fee from GCR edits (sum of sender balance removals minus `amount`).
         // This is a pragmatic interim approach; ideally the node should authoritatively return fees
         // to avoid drift between SDK and node logic.
-        raw_tx = this._calculateAndApplyGasFee(raw_tx)
+        try {
+            raw_tx = this._calculateAndApplyGasFee(raw_tx)
+        } catch (e) {
+            // Non-fatal: if fee derivation fails, continue without modifying fees
+            console.warn("[demos] fee derivation skipped:", e)
+        }
 
         raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
         const signature = await this.crypto.sign(
@@ -441,39 +446,49 @@ export class Demos {
      * @returns The updated transaction with the fee applied.
      */
     private _calculateAndApplyGasFee(raw_tx: Transaction): Transaction {
-        if (!raw_tx.content.gcr_edits || !Array.isArray(raw_tx.content.gcr_edits)) {
-            throw new Error("Failed to generate GCR edits or GCR edits are in an invalid format.")
+        const edits = raw_tx.content.gcr_edits
+        if (!Array.isArray(edits)) {
+            // Fail silently: don’t block signing if GCR edits aren’t available
+            return raw_tx
         }
 
         // INFO: The gas fee is calculated by summing up all "remove" balance edits for the sender's account
         // and then subtracting the actual transaction amount. This gives the value of the fee.
-        const totalRemoved = raw_tx.content.gcr_edits
-            .filter(
-                (edit: any) =>
+        const sender = (raw_tx.content.from_ed25519_address ?? "").toLowerCase()
+        const totalRemoved = edits.reduce((sum, edit: any) => {
+            try {
+                if (
                     edit.type === "balance" &&
                     edit.operation === "remove" &&
-                    edit.account === raw_tx.content.from_ed25519_address,
-            )
-            .reduce((acc: number, edit: any) => acc + edit.amount, 0)
+                    typeof edit.account === "string" &&
+                    edit.account.toLowerCase() === sender
+                ) {
+                    const amt = Number(edit.amount)
+                    return sum + (Number.isFinite(amt) ? amt : 0)
+                }
+            } catch {
+                // skip malformed entries
+            }
+            return sum
+        }, 0)
 
-        const calculatedFee = totalRemoved - (raw_tx.content.amount || 0)
-
-        if (calculatedFee < 0) {
-            throw new Error("Calculated gas fee is negative, which is not allowed.")
-        }
+        const txAmt = Number(raw_tx.content.amount ?? 0)
+        const calculatedFee = Math.max(totalRemoved - (Number.isFinite(txAmt) ? txAmt : 0), 0)
 
         // INFO: This logic handles both initial fee creation and accumulation for re-signed transactions.
         // To avoid fee accumulation, a new transaction object should be created for each signing.
-        if (!raw_tx.content.transaction_fee) {
+        const existing = raw_tx.content.transaction_fee ?? { network_fee: 0, rpc_fee: 0, additional_fee: 0 }
+        const totalExisting =
+            (Number(existing.network_fee) || 0) +
+            (Number(existing.rpc_fee) || 0) +
+            (Number(existing.additional_fee) || 0)
+
+        // Only set the fee if no fees are already applied
+        if (totalExisting === 0) {
             raw_tx.content.transaction_fee = {
                 network_fee: calculatedFee,
                 rpc_fee: 0,
                 additional_fee: 0,
-            }
-        } else {
-            const existingFee = raw_tx.content.transaction_fee.network_fee || 0
-            if (calculatedFee > existingFee) {
-                raw_tx.content.transaction_fee.network_fee = calculatedFee
             }
         }
         return raw_tx
