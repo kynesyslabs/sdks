@@ -638,13 +638,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
                         subchain: subchain,
                         task: {
                             type: "contract_write",
-                            params: {
-                                moduleAddress: moduleAddress,
-                                moduleName: moduleName,
-                                functionName: functionName,
-                                args: args,
-                                typeArguments: typeArguments
-                            },
+                            params: null,
                             signedPayloads: [signedTx]
                         },
                         is_evm: false,

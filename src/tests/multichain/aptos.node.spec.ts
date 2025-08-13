@@ -11,8 +11,8 @@ import { XMScript } from "@/types"
 import { hexToUint8Array, uint8ArrayToHex } from "@/encryption"
 
 describe.only("APTOS CHAIN TESTS", () => {
-    const rpc = "http://localhost:53550"
-    // const rpc = "https://dev.node2.demos.sh"
+    // const rpc = "http://localhost:53550"
+    const rpc = "https://dev.node2.demos.sh"
     const network = Network.DEVNET
     const instance = new APTOS("", network)
     const demos = new Demos()
@@ -42,7 +42,7 @@ describe.only("APTOS CHAIN TESTS", () => {
         // }
     })
 
-    test.only("Websdk test", async () => {
+    test.skip("Websdk test", async () => {
         const webInstance = new AptosWeb("", network)
         const connected = await webInstance.connect()
         // assert.strictEqual(connected, true)
@@ -242,7 +242,7 @@ describe.only("APTOS CHAIN TESTS", () => {
         console.log("tx", tx)
     })
 
-    test.skip("Sign and verify message", async () => {
+    test.only("Sign and verify message", async () => {
         const message = "Hello Aptos!"
         const signature = await instance.signMessage(message)
         console.log("signature", signature)
