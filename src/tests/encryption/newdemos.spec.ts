@@ -159,12 +159,13 @@ describe("New Demos", () => {
         console.log(addressInfo)
     })
 
-    test.only("get transaction history", async () => {
+    test.skip("get transaction history", async () => {
         const demos = new Demos()
-        await demos.connect("http://localhost:53550")
+        // await demos.connect("http://localhost:53550")
+        await demos.connect("https://node2.demos.sh")
         // await demos.connectWallet("clock coffee recall chat master fabric arrange embrace zebra kind congress scene dutch")
 
-        const transactionHistory = await demos.getTransactionHistory("0x4401feab4dfc36e1166ad0dc1c4987dd0c728a57616fa496c25ca2a260651808", "all", {
+        const transactionHistory = await demos.getTransactionHistory("0xf70270e8664000d392141d6281a652b23704097dbdbc5a4239cee7f4a701f2d1", "all", {
             start: 1,
             limit: 2
         })

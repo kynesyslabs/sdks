@@ -155,7 +155,9 @@ export class Demos {
         let hashable: string | Uint8Array = null
 
         if (typeof masterSeed === "string") {
-            if (masterSeed.split(" ").length % 3 === 0) {
+            masterSeed = masterSeed.trim()
+
+            if (!bip39.validateMnemonic(masterSeed, wordlist)) {
                 hashable = bip39.mnemonicToSeedSync(masterSeed)
             } else {
                 hashable = masterSeed

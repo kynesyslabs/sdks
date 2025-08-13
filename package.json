@@ -44,7 +44,10 @@
         "test:pqc": "rm -rf build && jest --testMatch '**/tests/encryption/pqc*.ts' --verbose",
         "test:pcq": "yarn test:pqc",
         "test:referrals": "rm -rf build && jest --testMatch '**/tests/**/referrals.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
-        "test:evm": "rm -rf build && jest --testMatch '**/tests/**/evm.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
+        "test:evm": "rm -rf build && jest --testMatch '**/tests/**/evm.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:aptos": "rm -rf build && jest --testMatch '**/tests/**/aptos.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:node": "node --require ts-node/register --require tsconfig-paths/register --test src/tests/multichain/aptos.node.spec.ts",
+        "test:node:only": "node --require ts-node/register --require tsconfig-paths/register --test --test-only src/tests/multichain/aptos.node.spec.ts"
     },
     "dependencies": {
         "@aptos-labs/ts-sdk": "^1.28.0",
@@ -56,8 +59,9 @@
         "@multiversx/sdk-extension-provider": "^3.0.0",
         "@multiversx/sdk-network-providers": "^2.4.3",
         "@multiversx/sdk-wallet": "^4.4.0",
-        "@noble/hashes": "^1.8.0",
+        "@noble/hashes": "1.8.0",
         "@noble/post-quantum": "^0.4.0",
+        "@noble/curves": "1.9.4",
         "@project-serum/anchor": "^0.26.0",
         "@roamhq/wrtc": "^0.8.0",
         "@simplewebauthn/browser": "^11.0.0",

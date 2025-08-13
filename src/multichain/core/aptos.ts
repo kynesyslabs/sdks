@@ -8,10 +8,14 @@ import {
     UserTransactionResponse,
     Ed25519PrivateKey,
 } from "@aptos-labs/ts-sdk"
+import { generateSignedTransaction } from "@aptos-labs/ts-sdk";
 
 import { DefaultChain } from "./types/defaultChain"
 import { IPayParams, XmTransactionResponse } from "./types/interfaces"
 import { required } from "./utils"
+import { XMScript } from "@/types"
+import { hexToUint8Array, uint8ArrayToHex } from "@/encryption";
+import * as forge from "node-forge";
 
 /* LICENSE
 
@@ -31,6 +35,13 @@ export interface AptosDefaultChain extends DefaultChain {
     aptos: Aptos
     account: Account | null
     network: Network
+    wallet: Account | null
+
+    /**
+     * Gets the public key of the connected wallet
+     * @returns The public key as hex string
+     */
+    getPublicKey: () => string
 
     /**
      * Get APT balance for an account (default: XM operation)
@@ -61,7 +72,7 @@ export interface AptosDefaultChain extends DefaultChain {
         functionName: string,
         args: any[],
         typeArguments?: string[]
-    ) => Promise<any>
+    ) => Promise<XMScript>
 
     /**
      * Read from a smart contract directly (bypasses Demos Network)
@@ -83,7 +94,7 @@ export interface AptosDefaultChain extends DefaultChain {
         functionName: string,
         args: any[],
         typeArguments?: string[]
-    ) => Promise<Uint8Array>
+    ) => Promise<XMScript>
 
 
     /**
@@ -105,9 +116,9 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
         super(rpc_url)
         this.name = "aptos"
         this.network = network
-        
+
         // Initialize Aptos client with network configuration
-        const config = new AptosConfig({ 
+        const config = new AptosConfig({
             network: this.network,
             // If custom RPC URL provided, use it
             ...(rpc_url && { fullnode: rpc_url })
@@ -121,8 +132,8 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      */
     override setRpc(rpc_url: string): void {
         this.rpc_url = rpc_url
-        
-        const config = new AptosConfig({ 
+
+        const config = new AptosConfig({
             network: this.network,
             fullnode: rpc_url
         })
@@ -135,8 +146,8 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      */
     setNetwork(network: Network): void {
         this.network = network
-        
-        const config = new AptosConfig({ 
+
+        const config = new AptosConfig({
             network: this.network,
             ...(this.rpc_url && { fullnode: this.rpc_url })
         })
@@ -146,6 +157,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
 
     /**
      * Connects to the Aptos network
+     * 
      * @returns A boolean indicating whether the connection was successful
      */
     async connect(): Promise<boolean> {
@@ -168,11 +180,11 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      */
     async connectWallet(privateKey: string): Promise<Account> {
         required(privateKey, "Private key is required")
-        
+
         try {
             // Create Ed25519PrivateKey from hex string
             const privateKeyBytes = new Ed25519PrivateKey(privateKey)
-            
+
             // Create account from private key using official SDK method
             this.account = Account.fromPrivateKey({ privateKey: privateKeyBytes })
             this.wallet = this.account
@@ -183,18 +195,10 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     }
 
     /**
-     * Gets the APT balance directly from Aptos RPC (bypasses Demos Network)
-     * Use only when explicit direct access is needed
-     * @param address The wallet address
-     * @returns The balance as a string (in Octas, 1 APT = 100,000,000 Octas)
-     */
-    async getBalanceDirect(address: string): Promise<string> {
-        return this.getAPTBalanceDirect(address)
-    }
-
-    /**
-     * Gets the APT balance directly using official SDK method (bypasses Demos Network)
-     * Use only when explicit direct access is needed
+     * Gets the APT balance directly from Aptos RPC given an address
+     * 
+     * The other get balance methods use this method to get the balance
+     * 
      * @param address The wallet address
      * @returns The balance as a string (in Octas)
      */
@@ -210,8 +214,10 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     }
 
     /**
-     * Gets the balance of a specific coin type directly (bypasses Demos Network)
-     * Use only when explicit direct access is needed
+     * Gets the balance of a specific coin type directly from Aptos RPC given a coin type and address
+     * 
+     * The other get balance methods use this method to get the balance
+     * 
      * @param coinType The coin type (e.g., "0x1::aptos_coin::AptosCoin")
      * @param address The wallet address
      * @returns The balance as a string
@@ -229,13 +235,16 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     }
 
     /**
-     * Gets the APT balance via Demos Network XM operation (default behavior)
+     * Gets the APT balance from the Aptos network given an address
+     * 
      * @param address The wallet address
      * @returns XM operation object for Demos Network relay
      */
     async getBalance(address: string): Promise<any> {
-        const subchain = this.network === Network.MAINNET ? "mainnet" : 
-                        this.network === Network.TESTNET ? "testnet" : "devnet"
+        return await this.getAPTBalanceDirect(address)
+
+        const subchain = this.network === Network.MAINNET ? "mainnet" :
+            this.network === Network.TESTNET ? "testnet" : "devnet"
         return {
             chain: "aptos",
             subchain: subchain,
@@ -250,13 +259,16 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     }
 
     /**
-     * Gets the APT balance via Demos Network XM operation (default behavior)
+     * Gets the APT balance from the Aptos network given an address
+     * 
      * @param address The wallet address
      * @returns XM operation object for Demos Network relay
      */
     async getAPTBalance(address: string): Promise<any> {
-        const subchain = this.network === Network.MAINNET ? "mainnet" : 
-                        this.network === Network.TESTNET ? "testnet" : "devnet"
+        return await this.getAPTBalanceDirect(address)
+
+        const subchain = this.network === Network.MAINNET ? "mainnet" :
+            this.network === Network.TESTNET ? "testnet" : "devnet"
         return {
             chain: "aptos",
             subchain: subchain,
@@ -271,14 +283,19 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     }
 
     /**
-     * Gets the coin balance via Demos Network XM operation (default behavior)
+     * Gets a coin balance from the Aptos network given a coin type and address
+     * 
      * @param coinType The coin type (e.g., "0x1::aptos_coin::AptosCoin")
      * @param address The wallet address
+     * 
      * @returns XM operation object for Demos Network relay
      */
     async getCoinBalance(coinType: string, address: string): Promise<any> {
-        const subchain = this.network === Network.MAINNET ? "mainnet" : 
-                        this.network === Network.TESTNET ? "testnet" : "devnet"
+        return this.getCoinBalanceDirect(coinType, address)
+
+        const subchain = this.network === Network.MAINNET ? "mainnet" :
+            this.network === Network.TESTNET ? "testnet" : "devnet"
+
         return {
             chain: "aptos",
             subchain: subchain,
@@ -294,15 +311,17 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
 
     /**
      * Creates a signed transaction to transfer APT
+     * 
      * @param receiver The receiver's address
      * @param amount The amount to transfer (in Octas)
-     * @returns The signed transaction
+     * 
+     * @returns The signed Aptos transaction as hex string
      */
-    async preparePay(receiver: string, amount: string): Promise<Uint8Array> {
-        required(this.account, "Wallet not connected")
-        
+    async preparePay(receiver: string, amount: string): Promise<string> {
+        required(this.account, "[Core] Wallet not connected")
+
         try {
-            // Build transaction using official SDK pattern
+            // INFO: Construct the transaction
             const transaction = await this.aptos.transaction.build.simple({
                 sender: this.account.accountAddress,
                 data: {
@@ -312,13 +331,8 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
                 }
             })
 
-            // Sign and submit transaction
-            const response = await this.aptos.signAndSubmitTransaction({
-                signer: this.account,
-                transaction
-            })
-
-            return new TextEncoder().encode(response.hash)
+            // INFO: Sign the transaction
+            return this.signTransaction(transaction)
         } catch (error) {
             throw new Error(`Failed to prepare payment: ${error}`)
         }
@@ -326,19 +340,21 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
 
     /**
      * Creates multiple signed transactions to transfer APT
+     * 
      * @param payments Array of payment parameters
-     * @returns Array of signed transactions
+     * 
+     * @returns Array of signed Aptos transactions as hex strings
      */
-    async preparePays(payments: IPayParams[]): Promise<Uint8Array[]> {
+    async preparePays(payments: IPayParams[]): Promise<string[]> {
         required(this.account, "Wallet not connected")
-        
-        const signedTransactions: Uint8Array[] = []
-        
+
+        const signedTransactions: string[] = []
+
         for (const payment of payments) {
             const signedTx = await this.preparePay(payment.address, payment.amount.toString())
             signedTransactions.push(signedTx)
         }
-        
+
         return signedTransactions
     }
 
@@ -347,7 +363,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      */
     async getEmptyTransaction(): Promise<SimpleTransaction> {
         required(this.account, "Wallet not connected")
-        
+
         return await this.aptos.transaction.build.simple({
             sender: this.account.accountAddress,
             data: {
@@ -358,8 +374,24 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
         })
     }
 
+
+    /**
+     * Gets the public key of the connected wallet
+     * 
+     * @returns The public key as hex string
+     */
+    getPublicKey(): string {
+        if (!this.account) {
+            throw new Error("No wallet connected")
+        }
+
+        return this.account.publicKey.toString()
+    }
+
     /**
      * Returns the address of the connected wallet
+     * 
+     * @returns The wallet address as hex string
      */
     getAddress(): string {
         required(this.account, "Wallet not connected")
@@ -369,14 +401,15 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     /**
      * Signs a message using the connected wallet
      * @param message The message to sign
-     * @returns The signed message
+     * 
+     * @returns The signed message as hex string
      */
-    async signMessage(message: string): Promise<Uint8Array> {
+    async signMessage(message: string): Promise<string> {
         required(this.account, "Wallet not connected")
-        
+
         try {
             const signature = this.account.sign(new TextEncoder().encode(message))
-            return signature.toUint8Array()
+            return uint8ArrayToHex(signature.toUint8Array())
         } catch (error) {
             throw new Error(`Failed to sign message: ${error}`)
         }
@@ -384,29 +417,40 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
 
     /**
      * Verifies a message signature
+     * 
      * @param message The original message
      * @param signature The signature to verify
      * @param publicKey The public key to verify against
+     * 
      * @returns Boolean indicating if the signature is valid
      */
     async verifyMessage(
         message: string,
-        signature: string | Uint8Array,
-        publicKey: string | Uint8Array
+        signature: string,
+        publicKey: string
     ): Promise<boolean> {
         try {
-            // Convert inputs to proper format
-            const messageBytes = new TextEncoder().encode(message)
-            const sigBytes = typeof signature === "string" 
-                ? new TextEncoder().encode(signature) 
-                : signature
-            const pubKeyBytes = typeof publicKey === "string"
-                ? new TextEncoder().encode(publicKey)
-                : publicKey
-            
-            // For now, return true as verification implementation depends on signature format
-            // TODO: Implement proper signature verification using Aptos SDK methods
-            return true
+            // Convert hex strings to Uint8Arrays
+            const signatureBytes = hexToUint8Array(signature)
+            const publicKeyBytes = hexToUint8Array(publicKey)
+
+            // Validate input sizes
+            if (signatureBytes.length !== 64) {
+                throw new Error("Invalid signature length. Ed25519 signatures must be 64 bytes.")
+            }
+            if (publicKeyBytes.length !== 32) {
+                throw new Error("Invalid public key length. Ed25519 public keys must be 32 bytes.")
+            }
+
+            // Use node-forge for Ed25519 signature verification
+            const isValid = forge.pki.ed25519.verify({
+                message: message,
+                encoding: "utf8",
+                signature: signatureBytes,
+                publicKey: publicKeyBytes
+            })
+
+            return isValid
         } catch (error) {
             console.error("Failed to verify message:", error)
             return false
@@ -416,18 +460,24 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     /**
      * Signs a transaction using the connected wallet
      * @param transaction The transaction to sign
-     * @returns The signed transaction
+     * 
+     * @returns The signed Aptos transaction as hex string
      */
-    async signTransaction(transaction: SimpleTransaction): Promise<Uint8Array> {
+    async signTransaction(transaction: SimpleTransaction): Promise<string> {
         required(this.account, "Wallet not connected")
-        
+
         try {
-            const response = await this.aptos.signAndSubmitTransaction({
+            const senderAuthenticator = this.aptos.sign({
                 signer: this.account,
                 transaction
             })
-            
-            return new TextEncoder().encode(response.hash)
+
+            const bufferTx = generateSignedTransaction({
+                transaction,
+                senderAuthenticator
+            })
+
+            return uint8ArrayToHex(bufferTx)
         } catch (error) {
             throw new Error(`Failed to sign transaction: ${error}`)
         }
@@ -436,16 +486,17 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
     /**
      * Signs multiple transactions
      * @param transactions Array of transactions to sign
-     * @returns Array of signed transactions
+     * 
+     * @returns Array of signed Aptos transactions as hex strings
      */
-    async signTransactions(transactions: SimpleTransaction[]): Promise<Uint8Array[]> {
-        const signedTransactions: Uint8Array[] = []
-        
+    async signTransactions(transactions: SimpleTransaction[]): Promise<string[]> {
+        const signedTransactions: string[] = []
+
         for (const transaction of transactions) {
             const signedTx = await this.signTransaction(transaction)
             signedTransactions.push(signedTx)
         }
-        
+
         return signedTransactions
     }
 
@@ -457,6 +508,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      * @param functionName The function name
      * @param args Function arguments
      * @param typeArguments Type arguments for generic functions (optional)
+     * 
      * @returns The function result
      */
     async readFromContractDirect(
@@ -474,7 +526,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
 
             // Build the view function payload with proper typing
             const fullFunctionName = `${moduleAddress}::${moduleName}::${functionName}` as `${string}::${string}::${string}`
-            
+
             const payload = {
                 function: fullFunctionName,
                 functionArguments: args,
@@ -486,7 +538,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
         } catch (error: any) {
             // Enhanced error handling for Move-specific errors
             const errorMsg = error?.message || error?.toString() || 'Unknown error'
-            
+
             if (errorMsg.includes('MODULE_NOT_FOUND')) {
                 throw new Error(`Module not found: ${moduleAddress}::${moduleName}`)
             } else if (errorMsg.includes('FUNCTION_NOT_FOUND')) {
@@ -496,7 +548,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
             } else if (errorMsg.includes('INVALID_ARGUMENT')) {
                 throw new Error(`Invalid arguments for ${functionName}: ${JSON.stringify(args)}`)
             }
-            
+
             throw new Error(`Failed to read from contract ${moduleAddress}::${moduleName}::${functionName}: ${errorMsg}`)
         }
     }
@@ -508,7 +560,8 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      * @param functionName The function name
      * @param args Function arguments
      * @param typeArguments Type arguments for generic functions (optional)
-     * @returns XM operation object for Demos Network relay
+     * 
+     * @returns The XMScript object ready to be used in a Demos transaction
      */
     async readFromContract(
         moduleAddress: string,
@@ -516,22 +569,30 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
         functionName: string,
         args: any[],
         typeArguments: string[] = []
-    ): Promise<any> {
-        const subchain = this.network === Network.MAINNET ? "mainnet" : 
-                        this.network === Network.TESTNET ? "testnet" : "devnet"
+    ): Promise<XMScript> {
+        const subchain = this.network === Network.MAINNET ? "mainnet" :
+            this.network === Network.TESTNET ? "testnet" : "devnet"
         return {
-            chain: "aptos",
-            subchain: subchain,
-            task: {
-                type: "contract_read",
-                params: {
-                    moduleAddress: moduleAddress,
-                    moduleName: moduleName,
-                    functionName: functionName,
-                    args: args,
-                    typeArguments: typeArguments
+            operations: {
+                "aptos_contract_read": {
+                    chain: "aptos",
+                    subchain: subchain,
+                    task: {
+                        type: "contract_read",
+                        params: {
+                            moduleAddress: moduleAddress,
+                            moduleName: moduleName,
+                            functionName: functionName,
+                            args: args,
+                            typeArguments: typeArguments
+                        },
+                        signedPayloads: []
+                    },
+                    is_evm: false,
+                    rpc: null,
                 }
-            }
+            },
+            operations_order: ["aptos_contract_read"]
         }
     }
 
@@ -544,7 +605,8 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      * @param functionName The function name
      * @param args Function arguments
      * @param typeArguments Type arguments (optional)
-     * @returns The serialized transaction bytes for XM relay
+     * 
+     * @returns The XMScript object ready to be used in a Demos transaction
      */
     async writeToContract(
         moduleAddress: string,
@@ -552,9 +614,9 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
         functionName: string,
         args: any[],
         typeArguments: string[] = []
-    ): Promise<Uint8Array> {
+    ): Promise<XMScript> {
         required(this.account, "Wallet not connected")
-        
+
         try {
             const transaction = await this.aptos.transaction.build.simple({
                 sender: this.account.accountAddress,
@@ -564,11 +626,33 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
                     functionArguments: args
                 }
             })
-            
-            // For XM operations, we serialize and return the transaction for later submission
-            // The node will handle the actual submission via sendTransaction
-            const serializedTransaction = transaction.bcsToBytes()
-            return serializedTransaction
+
+            const signedTx = await this.signTransaction(transaction)
+            const subchain = this.network === Network.MAINNET ? "mainnet" :
+                this.network === Network.TESTNET ? "testnet" : "devnet"
+
+            return {
+                operations: {
+                    "aptos_contract_write": {
+                        chain: "aptos",
+                        subchain: subchain,
+                        task: {
+                            type: "contract_write",
+                            params: {
+                                moduleAddress: moduleAddress,
+                                moduleName: moduleName,
+                                functionName: functionName,
+                                args: args,
+                                typeArguments: typeArguments
+                            },
+                            signedPayloads: [signedTx]
+                        },
+                        is_evm: false,
+                        rpc: null,
+                    }
+                },
+                operations_order: ["aptos_contract_write"]
+            }
         } catch (error) {
             throw new Error(`Failed to prepare contract write transaction: ${error}`)
         }
@@ -582,8 +666,8 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      */
     async waitForTransaction(transactionHash: string): Promise<UserTransactionResponse> {
         try {
-            return await this.aptos.waitForTransaction({ 
-                transactionHash 
+            return await this.aptos.waitForTransaction({
+                transactionHash
             }) as UserTransactionResponse
         } catch (error) {
             throw new Error(`Failed to wait for transaction: ${error}`)

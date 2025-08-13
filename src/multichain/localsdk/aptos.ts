@@ -103,18 +103,6 @@ export class APTOS extends AptosCore implements IDefaultChainLocal {
     }
 
     /**
-     * Gets the public key of the connected wallet
-     * @returns The public key as hex string
-     */
-    getPublicKey(): string {
-        if (!this.account) {
-            throw new Error("No wallet connected")
-        }
-        
-        return this.account.publicKey.toString()
-    }
-
-    /**
      * Fund account using faucet (only available on devnet/testnet)
      * @param address The address to fund
      * @param amount The amount to fund (in Octas)
