@@ -11,7 +11,7 @@
     "lib": ["es2021", "DOM"],
     "strictNullChecks": false,
     "target": "es2020",
-    "module": "commonjs",
+    "module": "esnext",
     "moduleResolution": "node",
     "newLine": "LF",
     "noEmitOnError": true,
@@ -31,7 +31,7 @@
     }
   },
   "include": ["src/**/*.ts", "bun.d.ts"],
-  "exclude": ["src/**/archive/**/*"],
+  "exclude": ["src/**/archive/**/*", "src/**/tests/**/*"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",
