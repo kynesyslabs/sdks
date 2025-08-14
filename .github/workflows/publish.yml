@@ -22,7 +22,7 @@ jobs:
             - name: Install dependencies
               run: bun install
             - name: Build package
-              run: bun run build
+              run: bun run build:prod
             - name: Setup NPM Auth for Bun
               run: |
                   echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_PUBLISH_KEY }}" >> ~/.npmrc
