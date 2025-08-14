@@ -13,13 +13,16 @@ import { ApiNetworkProvider } from "@multiversx/sdk-network-providers"
 import { INetworkProvider } from "@multiversx/sdk-network-providers/out/interface"
 import { UserSigner } from "@multiversx/sdk-wallet"
 import bech32 from 'bech32'; 
+import { DefaultChain } from "./types/defaultChain"
+import { required } from "./utils"
+import { EGLDSignTxOptions, IPayParams } from "./types/interfaces"
 
-import {
-    DefaultChain,
-    EGLDSignTxOptions,
-    IPayOptions,
-    required,
-} from "@/multichain/core"
+// import {
+//     DefaultChain,
+//     EGLDSignTxOptions,
+//     IPayOptions,
+//     required,
+// } from "@/multichain/core"
 
 export class MULTIVERSX extends DefaultChain {
     declare provider: INetworkProvider
@@ -208,7 +211,7 @@ export class MULTIVERSX extends DefaultChain {
         return txs[0]
     }
 
-    async preparePays(payments: IPayOptions[]) {
+    async preparePays(payments: IPayParams[]) {
         required(this.wallet)
 
         const sender = this.getAddress()

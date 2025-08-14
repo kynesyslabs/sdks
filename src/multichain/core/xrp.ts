@@ -7,8 +7,10 @@ import {
     xrpToDrops,
 } from 'xrpl'
 
-import { DefaultChain, IPayOptions, required } from '@/multichain/core'
 import { sign, verify } from 'ripple-keypairs'
+import { DefaultChain } from './types/defaultChain'
+import { required } from './utils'
+import { IPayParams } from './types/interfaces'
 
 /**
  * Get the last sequence number of an address
@@ -211,7 +213,7 @@ export class XRPL extends DefaultChain {
         return txs[0]
     }
 
-    async preparePays(payments: IPayOptions[]) {
+    async preparePays(payments: IPayParams[]) {
         const base_tx = await this.getEmptyTransaction()
 
         const txs = payments.map((payment) => {

@@ -1,4 +1,4 @@
-import { WorkStep } from "@/demoswork"
+// import { WorkStep } from "@/demoswork"
 import { getNewUID } from "@/demoswork/utils"
 import { ICondition, operators, DataTypes } from "@/types"
 import { DemosWorkOutputKey } from "@/types/demoswork"
@@ -9,6 +9,7 @@ import {
     UnaryConditionParams,
     ConditionParams,
 } from "@/types/demoswork/operations"
+import { WorkStep } from "@/demoswork/workstep"
 
 export class Condition implements ICondition {
     id: string = "cond_" + getNewUID()

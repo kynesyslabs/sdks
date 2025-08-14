@@ -12,8 +12,9 @@ import {
 import BigNumber from "bignumber.js"
 import { KeyPair, mnemonicToPrivateKey, sign, signVerify } from "@ton/crypto"
 
-import { IPayOptions, required } from "."
 import { DefaultChain } from "./types/defaultChain"
+import { required } from "./utils"
+import { IPayParams } from "./types/interfaces"
 
 export class TON extends DefaultChain {
     declare provider: TonClient
@@ -123,7 +124,7 @@ export class TON extends DefaultChain {
     }
 
     async preparePays(
-        payments: IPayOptions[],
+        payments: IPayParams[],
         options?: {
             /**
              * A private key mnemonic to use for signing the transaction(s) instead of the connected wallet

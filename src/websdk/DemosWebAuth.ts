@@ -2,7 +2,6 @@
 // @ts-ignore
 import forge from "node-forge"
 import { required } from "./utils/required"
-import { RSA } from "./rsa"
 import { IKeyPair, IStringifiedKeyPair } from "./types/KeyPair"
 import { Cryptography } from "@/encryption/Cryptography"
 
@@ -209,10 +208,6 @@ export class DemosWebAuth {
             result = [false, "[VERIFY ERROR] " + e.message]
         }
         return result // Is already a [boolean, string]
-    }
-
-    rsa() {
-        return RSA.getInstance()
     }
 }
 
