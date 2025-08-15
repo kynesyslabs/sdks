@@ -1,0 +1,1 @@
+export { Prover, Verifier } from './interactive' // interactive.Prover and interactive.Verifier

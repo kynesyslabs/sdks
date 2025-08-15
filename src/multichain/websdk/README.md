@@ -1,1 +1,0 @@
-# Multichain Web SDK

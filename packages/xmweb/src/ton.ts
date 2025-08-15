@@ -1,0 +1,1 @@
+export { TON } from "@kynesyslabs/xmcore";

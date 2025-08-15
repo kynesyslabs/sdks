@@ -1,0 +1,15 @@
+{
+    "name": "@kynesyslabs/xmlocal",
+    "version": "1.0.0",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "test": "echo \"No tests specified\""
+    },
+    "dependencies": {
+        "@kynesyslabs/xmcore": "workspace:*",
+        "@kynesyslabs/utils": "workspace:*",
+        "axios": "^1.7.4"
+    }
+}

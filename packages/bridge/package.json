@@ -1,0 +1,16 @@
+{
+    "name": "@kynesyslabs/bridge",
+    "version": "1.0.0",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "test": "echo \"No tests specified\""
+    },
+    "dependencies": {
+        "@kynesyslabs/encryption": "workspace:*",
+        "@kynesyslabs/types": "workspace:*",
+        "@kynesyslabs/websdk": "workspace:*",
+        "rubic-sdk": "^5.52.6"
+    }
+}
