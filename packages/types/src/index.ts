@@ -108,26 +108,6 @@ export { EthTransactionResponse, EthTransaction, SolanaTransactionResponse, SolT
 
 export { IOperation, ITask, XMScript } from "./xm"
 
-// DemosWork
-export { DemoScript, DemosWorkOutputKey } from "./demoswork"
-export { DataTypes, operators } from "./demoswork/datatypes"
-export {
-    ConditionalOperationScript,
-    DemosWorkOperationScripts,
-    OperationScript,
-    OperationType,
-    BaseOperationScript, BinaryConditionParams, ConditionParams, DemosWorkOperations, OperationOutputKey, UnaryConditionParams,
-} from "./demoswork/operations"
-export {
-    ICondition,
-    Conditional,
-    StepOutputKey,
-    WorkStepInput,
-    XmStepResult,
-    stepKeys,
-    stepKeysEnum,
-    Operand
-} from "./demoswork/steps"
 
 export {
     BrowserRequest,
@@ -161,14 +141,6 @@ export {
 } from "./bridge/constants"
 
 export { type SigningAlgorithm, type EncryptionAlgorithm, PQCAlgorithm } from "./cryptography"
-export type {
-    Ed25519SignedObject,
-    PqcSignedObject,
-    encryptedObject,
-    SerializedEncryptedObject,
-    SerializedSignedObject,
-    signedObject,
-} from "@kynesyslabs/encryption"
 
 // Export transaction utilities
 export {

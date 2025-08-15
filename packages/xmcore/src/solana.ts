@@ -30,7 +30,7 @@ import {
     SolanaRunRawProgramParams,
     SolanarunProgramParams,
 } from "./types/interfaces"
-import { required } from "@kynesyslabs/utils"
+import { required } from "@kimcalc/utils"
 
 /* LICENSE
 

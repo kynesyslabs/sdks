@@ -13,25 +13,25 @@ import { DemosTransactions } from "./DemosTransactions"
 import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 
-import { Block, IPeer, RawTransaction, SigningAlgorithm, Transaction, TransactionContent, XMScript } from "@kynesyslabs/types"
-import { AddressInfo } from "@kynesyslabs/types"
+import { Block, IPeer, RawTransaction, SigningAlgorithm, Transaction, TransactionContent, XMScript } from "@kimcalc/types"
+import { AddressInfo } from "@kimcalc/types"
 import {
     RPCRequest,
     RPCResponse,
     RPCResponseWithValidityData,
-} from "@kynesyslabs/types"
+} from "@kimcalc/types"
 //import { l2psCalls } from "@/l2ps"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
-import { required } from "@kynesyslabs/utils"
+import { required } from "@kimcalc/utils"
 import { web2Calls } from "./Web2Calls"
-import { UnifiedCrypto } from "@kynesyslabs/encryption"
-import { hexToUint8Array, uint8ArrayToHex } from "@kynesyslabs/utils"
+import { UnifiedCrypto } from "@kimcalc/encryption"
+import { hexToUint8Array, uint8ArrayToHex } from "@kimcalc/utils"
 import { GCRGeneration } from "./GCRGeneration"
-import { Hashing } from "@kynesyslabs/encryption"
+import { Hashing } from "@kimcalc/encryption"
 import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
-import { TweetSimplified } from "@kynesyslabs/types"
+import { TweetSimplified } from "@kimcalc/types"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))

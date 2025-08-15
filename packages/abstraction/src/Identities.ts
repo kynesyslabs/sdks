@@ -12,13 +12,13 @@ import {
     InferFromSignaturePayload,
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
-} from "@kynesyslabs/types"
-import { PQCAlgorithm } from "@kynesyslabs/types"
-import { RPCResponseWithValidityData } from "@kynesyslabs/types"
+} from "@kimcalc/types"
+import { PQCAlgorithm } from "@kimcalc/types"
+import { RPCResponseWithValidityData } from "@kimcalc/types"
 
-import { UnifiedCrypto } from "@kynesyslabs/encryption"
-import { uint8ArrayToHex, required } from "@kynesyslabs/utils"
-import { Demos, DemosTransactions } from "@kynesyslabs/websdk"
+import { UnifiedCrypto } from "@kimcalc/encryption"
+import { uint8ArrayToHex, required } from "@kimcalc/utils"
+import { Demos, DemosTransactions } from "@kimcalc/websdk"
 
 export class Identities {
     formats = {

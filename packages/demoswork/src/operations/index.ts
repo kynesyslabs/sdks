@@ -1,11 +1,11 @@
 import {
     OperationScript,
     OperationType,
-} from "@kynesyslabs/types"
+} from "../types"
 
 import { getNewUID } from "../utils"
 import { WorkStep } from "../workstep"
-import { DataTypes } from "@kynesyslabs/types"
+import { DataTypes } from "../types"
 
 export abstract class DemosWorkOperation {
     id: string = "op_" + getNewUID()

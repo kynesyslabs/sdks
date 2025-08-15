@@ -1,10 +1,10 @@
-import { DataTypes } from "@kynesyslabs/types"
-import { DemoScript } from "@kynesyslabs/types"
+import { DataTypes } from "../types"
+import { DemoScript } from "../types"
 import {
     ConditionalOperationScript,
     DemosWorkOperationScripts,
-} from "@kynesyslabs/types"
-import { Operand } from "@kynesyslabs/types"
+} from "../types"
+import { Operand } from "../types"
 
 function getMappedScriptSteps(script: DemoScript) {
     // return a map of step ids mapped to their descriptions

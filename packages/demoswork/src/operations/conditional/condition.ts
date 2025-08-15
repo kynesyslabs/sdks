@@ -2,10 +2,10 @@ import {
     BinaryConditionParams,
     UnaryConditionParams,
     ConditionParams,
-} from "@kynesyslabs/types"
-import { Operand } from "@kynesyslabs/types"
-import { DemosWorkOutputKey } from "@kynesyslabs/types"
-import { ICondition, operators, DataTypes } from "@kynesyslabs/types"
+} from "../../types"
+import { Operand } from "../../types"
+import { DemosWorkOutputKey } from "../../types"
+import { ICondition, operators, DataTypes } from "../../types"
 
 import { DemosWorkOperation } from ".."
 import { getNewUID } from "../../utils"

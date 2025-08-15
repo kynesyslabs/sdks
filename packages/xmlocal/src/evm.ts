@@ -1,8 +1,8 @@
 import { TransactionRequest } from 'ethers'
 
-import { required } from '@kynesyslabs/utils'
-import { EVM as EVMCore, IDefaultChainLocal } from '@kynesyslabs/xmcore'
-import { XmTransactionResult, TransactionResponse } from '@kynesyslabs/xmcore'
+import { required } from '@kimcalc/utils'
+import { EVM as EVMCore, IDefaultChainLocal } from '@kimcalc/xmcore'
+import { XmTransactionResult, TransactionResponse } from '@kimcalc/xmcore'
 
 export class EVM extends EVMCore implements IDefaultChainLocal {
     private static instances: Map<number, EVM> = new Map<number, EVM>()

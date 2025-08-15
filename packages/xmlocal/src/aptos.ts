@@ -6,8 +6,8 @@ import {
 import {
     IDefaultChainLocal,
     APTOS as AptosCore,
-} from "@kynesyslabs/xmcore"
-import { XmTransactionResult, TransactionResponse } from "@kynesyslabs/xmcore"
+} from "@kimcalc/xmcore"
+import { XmTransactionResult, TransactionResponse } from "@kimcalc/xmcore"
 
 /**
  * Aptos LocalSDK implementation for Node.js environments

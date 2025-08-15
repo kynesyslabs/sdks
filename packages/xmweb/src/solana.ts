@@ -1,9 +1,9 @@
 import base58 from "bs58"
 import { Keypair, VersionedTransaction } from "@solana/web3.js"
 
-import { required } from "@kynesyslabs/utils"
-import { SolanaSignTxOptions } from "@kynesyslabs/xmcore"
-import { SOLANA as SolanaCore } from "@kynesyslabs/xmcore"
+import { required } from "@kimcalc/utils"
+import { SolanaSignTxOptions } from "@kimcalc/xmcore"
+import { SOLANA as SolanaCore } from "@kimcalc/xmcore"
 import { PhantomProvider } from "./types/SolanaPhantomProvider"
 
 export function detectPhantomProvider() {

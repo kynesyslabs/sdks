@@ -7,7 +7,7 @@ MultiversX (formerly Elrond) is a highly scalable, fast, and secure blockchain p
 To interact with the MultiversX blockchain, you first need to create an instance of the SDK. Here's how you can do it:
 
 ```ts
-import { MULTIVERSX } from "@kynesyslabs/demosdk/xm-websdk"
+import { MULTIVERSX } from "@kimcalc/demosdk/xm-websdk"
 
 const rpc_url = "https://testnet-api.multiversx.com"
 

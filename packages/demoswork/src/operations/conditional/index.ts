@@ -5,8 +5,8 @@ import {
     ConditionalOperationScript,
     operators,
     DataTypes,
-} from "@kynesyslabs/types"
-import { DemosWorkOutputKey, Operand } from "@kynesyslabs/types"
+} from "../../types"
+import { DemosWorkOutputKey, Operand } from "../../types"
 
 export class ConditionalOperation extends DemosWorkOperation {
     override type: OperationType = "conditional"

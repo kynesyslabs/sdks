@@ -23,7 +23,7 @@ For testing purposes, you can use faucets to get testnet tokens. For example, fo
 Import the SDK and create a new instance:
 
 ```ts
-import { EVM } from "@kynesyslabs/demosdk/xm-websdk"
+import { EVM } from "@kimcalc/demosdk/xm-websdk"
 
 const rpc_url = "https://sepolia.infura.io/v3/YOUR-PROJECT-ID"
 const instance = await EVM.create(rpc_url)

@@ -1,5 +1,5 @@
-import { RPCResponse } from "@kynesyslabs/types"
-import { BridgeTradePayload } from "@kynesyslabs/types"
+import { RPCResponse } from "@kimcalc/types"
+import { BridgeTradePayload } from "@kimcalc/types"
 import { Demos } from "./demosclass"
 import { WrappedCrossChainTrade } from "rubic-sdk"
 

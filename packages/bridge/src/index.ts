@@ -10,9 +10,9 @@ export {
     ChainProviders,
     SupportedChains,
     SupportedTokens,
-} from "@kynesyslabs/types"
+} from "@kimcalc/types"
 import RubicBridge from "./rubicBridge"
-export { BridgeTradePayload } from "@kynesyslabs/types"
+export { BridgeTradePayload } from "@kimcalc/types"
 import { methods as NativeBridgeMethods } from "./nativeBridge"
 
 export { NativeBridgeMethods }

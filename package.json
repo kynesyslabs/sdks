@@ -1,5 +1,5 @@
 {
-    "name": "@kynesyslabs/demosdk",
+    "name": "@kimcalc/demosdk",
     "version": "2.3.18",
     "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
@@ -36,6 +36,7 @@
     "scripts": {
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
         "build:all": "yarn workspaces foreach --all --parallel --topological run build",
+        "publish:all": "yarn config set npmAuthToken $NPMTOKEN && yarn build && yarn workspaces foreach --all --parallel --no-private exec yarn npm publish --access public",
         "typedoc": "typedoc",
         "test": "jest",
         "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",

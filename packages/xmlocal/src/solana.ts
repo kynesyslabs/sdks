@@ -2,8 +2,8 @@ import {
     IDefaultChainLocal,
     SOLANA as SolanaCore,
     TransactionResponse,
-} from "@kynesyslabs/xmcore"
-import { XmTransactionResult } from "@kynesyslabs/xmcore"
+} from "@kimcalc/xmcore"
+import { XmTransactionResult } from "@kimcalc/xmcore"
 
 export class SOLANA extends SolanaCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {

@@ -10,9 +10,9 @@
  */
 
 import * as forge from "node-forge";
-import { Hashing } from "@kynesyslabs/encryption";
-import { L2PSTransaction, Transaction } from "@kynesyslabs/types";
-import { L2PSTransactionContent } from "@kynesyslabs/types";
+import { Hashing } from "@kimcalc/encryption";
+import { L2PSTransaction, Transaction } from "@kimcalc/types";
+import { L2PSTransactionContent } from "@kimcalc/types";
 
 /**
  * Configuration interface for L2PS instances.

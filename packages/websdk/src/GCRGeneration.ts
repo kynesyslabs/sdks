@@ -5,8 +5,8 @@ import {
     IdentityPayload, INativePayload,
     InferFromSignaturePayload,
     Web2CoreTargetIdentityPayload, Transaction, TransactionContent
-} from "@kynesyslabs/types"
-import { Hashing } from "@kynesyslabs/encryption"
+} from "@kimcalc/types"
+import { Hashing } from "@kimcalc/encryption"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used

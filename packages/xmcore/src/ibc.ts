@@ -19,7 +19,7 @@ import {
     IBCTransaction,
     IPayParams,
 } from './types/interfaces'
-import { required } from '@kynesyslabs/utils'
+import { required } from '@kimcalc/utils'
 import { createHash } from 'crypto';
 import { Secp256k1, Secp256k1Signature } from '@cosmjs/crypto';
 import * as bip39 from "@scure/bip39"

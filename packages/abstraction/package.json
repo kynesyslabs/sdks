@@ -1,17 +1,17 @@
 {
-    "name": "@kynesyslabs/abstraction",
+    "name": "@kimcalc/abstraction",
     "version": "1.0.0",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --build tsconfig.json",
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kynesyslabs/encryption": "workspace:*",
-        "@kynesyslabs/types": "workspace:*",
-        "@kynesyslabs/utils": "workspace:*",
-        "@kynesyslabs/websdk": "workspace:*",
+        "@kimcalc/encryption": "workspace:*",
+        "@kimcalc/types": "workspace:*",
+        "@kimcalc/utils": "workspace:*",
+        "@kimcalc/websdk": "workspace:*",
         "axios": "^1.7.9"
     }
 }

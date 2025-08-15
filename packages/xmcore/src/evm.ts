@@ -9,7 +9,7 @@ import {
     toNumber,
     verifyMessage,
 } from "ethers"
-import { required } from "@kynesyslabs/utils"
+import { required } from "@kimcalc/utils"
 import { IPayParams } from "./types/interfaces"
 import { DefaultChain, IEVMDefaultChain } from "./types/defaultChain"
 

@@ -28,7 +28,7 @@
         "resolveJsonModule": true,
         "sourceMap": true,
         "paths": {
-            "@kynesyslabs/*": ["packages/*/src"],
+            "@kimcalc/*": ["packages/*/src"],
             "@/*": ["*"]
         }
     },

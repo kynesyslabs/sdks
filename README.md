@@ -10,9 +10,9 @@ A JavaScript/TypeScript SDK providing a unified interface for interacting with t
 ## Installation
 
 ```sh
-npm install @kynesyslabs/demosdk
+npm install @kimcalc/demosdk
 # or
-yarn add @kynesyslabs/demosdk
+yarn add @kimcalc/demosdk
 ```
 
 ## Features
@@ -37,35 +37,35 @@ yarn add @kynesyslabs/demosdk
 ### Basic Import
 
 ```typescript
-import { Demos } from "@kynesyslabs/demosdk/websdk"
-import { prepareXMPayload } from "@kynesyslabs/demosdk/xm-websdk"
-import { DemosWork } from "@kynesyslabs/demosdk/demoswork"
+import { Demos } from "@kimcalc/demosdk/websdk"
+import { prepareXMPayload } from "@kimcalc/demosdk/xm-websdk"
+import { DemosWork } from "@kimcalc/demosdk/demoswork"
 ```
 
 ### Module Exports
 
 The SDK provides multiple entry points:
 
-- `@kynesyslabs/demosdk` - Main entry point
-- `@kynesyslabs/demosdk/websdk` - Web SDK components
-- `@kynesyslabs/demosdk/xm-websdk` - Cross-chain web SDK
-- `@kynesyslabs/demosdk/xm-localsdk` - Cross-chain local SDK
-- `@kynesyslabs/demosdk/xmcore` - Cross-chain core functionality
-- `@kynesyslabs/demosdk/demoswork` - Workflow engine
-- `@kynesyslabs/demosdk/wallet` - Wallet utilities
-- `@kynesyslabs/demosdk/abstraction` - Chain abstraction layer
-- `@kynesyslabs/demosdk/bridge` - Bridging functionality
-- `@kynesyslabs/demosdk/encryption` - Cryptographic utilities
-- `@kynesyslabs/demosdk/utils` - Common utilities
-- `@kynesyslabs/demosdk/types` - TypeScript type definitions
-- `@kynesyslabs/demosdk/l2ps` - Layer 2 payment solutions
+- `@kimcalc/demosdk` - Main entry point
+- `@kimcalc/demosdk/websdk` - Web SDK components
+- `@kimcalc/demosdk/xm-websdk` - Cross-chain web SDK
+- `@kimcalc/demosdk/xm-localsdk` - Cross-chain local SDK
+- `@kimcalc/demosdk/xmcore` - Cross-chain core functionality
+- `@kimcalc/demosdk/demoswork` - Workflow engine
+- `@kimcalc/demosdk/wallet` - Wallet utilities
+- `@kimcalc/demosdk/abstraction` - Chain abstraction layer
+- `@kimcalc/demosdk/bridge` - Bridging functionality
+- `@kimcalc/demosdk/encryption` - Cryptographic utilities
+- `@kimcalc/demosdk/utils` - Common utilities
+- `@kimcalc/demosdk/types` - TypeScript type definitions
+- `@kimcalc/demosdk/l2ps` - Layer 2 payment solutions
 
 ## Quick Start
 
 ### Initialize and Connect Wallet
 
 ```typescript
-import { Demos } from "@kynesyslabs/demosdk/websdk"
+import { Demos } from "@kimcalc/demosdk/websdk"
 
 // 1. Initialize Demos SDK (no parameters)
 const demos = new Demos()
@@ -106,8 +106,8 @@ const result = await demos.broadcast(validityData)
 import { 
   prepareXMPayload, 
   prepareXMScript 
-} from "@kynesyslabs/demosdk/websdk"
-import { EVM } from "@kynesyslabs/demosdk/xm-websdk"
+} from "@kimcalc/demosdk/websdk"
+import { EVM } from "@kimcalc/demosdk/xm-websdk"
 
 // 1. Create cross-chain payload (e.g., Ethereum Sepolia)
 const evm = await EVM.create("https://rpc.ankr.com/eth_sepolia")

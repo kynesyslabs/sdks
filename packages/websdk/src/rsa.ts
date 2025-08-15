@@ -1,6 +1,6 @@
 import forge from 'node-forge'
 import { DemosWebAuth } from './DemosWebAuth'
-import { required } from '@kynesyslabs/utils'
+import { required } from '@kimcalc/utils'
 
 // INFO This class is to be used as part of DemosWebAuthenticator (e.g. DemosWebAuth.getInstance().rsa().refresh())
 export class RSA {

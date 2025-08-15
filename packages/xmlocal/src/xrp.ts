@@ -1,8 +1,8 @@
 import * as xrpl from 'xrpl'
 
-import { XmTransactionResult } from '@kynesyslabs/xmcore'
-import { XRPL as XRPLSdkCore } from '@kynesyslabs/xmcore'
-import { IDefaultChainLocal, TransactionResponse } from '@kynesyslabs/xmcore'
+import { XmTransactionResult } from '@kimcalc/xmcore'
+import { XRPL as XRPLSdkCore } from '@kimcalc/xmcore'
+import { IDefaultChainLocal, TransactionResponse } from '@kimcalc/xmcore'
 
 export class XRPL extends XRPLSdkCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {

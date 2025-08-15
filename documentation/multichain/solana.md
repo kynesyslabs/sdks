@@ -81,7 +81,7 @@ The solana sdk provides a utility function to get the [rpc url](https://solana.c
 
 ```ts
 import { clusterApiUrl } from "@solana/web3.js"
-import { SOLANA } from "@kynesyslabs/demosdk/xm-<localsdk|websdk>"
+import { SOLANA } from "@kimcalc/demosdk/xm-<localsdk|websdk>"
 
 const testnet = clusterApiUrl("testnet")
 // const devnet = clusterApiUrl("devnet")

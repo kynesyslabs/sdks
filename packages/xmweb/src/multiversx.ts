@@ -6,8 +6,8 @@ import {
     MULTIVERSX as EGLDCore,
     EGLDSignTxOptions,
     IDefaultChainWeb,
-} from "@kynesyslabs/xmcore"
-import { required } from "@kynesyslabs/utils"
+} from "@kimcalc/xmcore"
+import { required } from "@kimcalc/utils"
 
 export class MULTIVERSX extends EGLDCore implements IDefaultChainWeb {
     constructor(rpc_url: string) {

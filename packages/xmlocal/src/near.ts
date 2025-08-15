@@ -1,8 +1,8 @@
 import { KeyPair } from "near-api-js";
 import { SignedTransaction } from "near-api-js/lib/transaction";
 
-import { XmTransactionResult } from "@kynesyslabs/xmcore";
-import { IDefaultChainLocal, NEAR as NearCore, TransactionResponse } from "@kynesyslabs/xmcore";
+import { XmTransactionResult } from "@kimcalc/xmcore";
+import { IDefaultChainLocal, NEAR as NearCore, TransactionResponse } from "@kimcalc/xmcore";
 
 export class NEAR extends NearCore implements IDefaultChainLocal {
     async sendTransaction(signed_tx: Uint8Array): Promise<TransactionResponse> {

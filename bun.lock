@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "@kynesyslabs/demosdk",
+      "name": "@kimcalc/demosdk",
       "dependencies": {
         "@aptos-labs/ts-sdk": "^1.28.0",
         "@bitcoinerlab/secp256k1": "^1.2.0",

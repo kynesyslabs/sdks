@@ -1,5 +1,5 @@
 import { DemosWork } from "../work"
-import { OperationScript } from "@kynesyslabs/types"
+import { OperationScript } from "../types"
 
 export default async function (work: DemosWork) {
     // TODO! Rewrite forEach to for...of

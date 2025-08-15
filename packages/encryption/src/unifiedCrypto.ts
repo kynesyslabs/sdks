@@ -5,7 +5,7 @@ import { randomBytes } from "@noble/hashes/utils"
 
 import { Enigma } from "./PQC/enigma"
 import { Cryptography } from "./Cryptography"
-import { PQCAlgorithm } from '@kynesyslabs/types';
+// import { PQCAlgorithm } from '@kimcalc/types';
 
 /* The two interfaces below are used to route the encrypted and signed data through the unified crypto system */
 export interface encryptedObject {
@@ -58,7 +58,7 @@ export type signedObject = Ed25519SignedObject | PqcSignedObject
  */
 export class UnifiedCrypto {
     // Multiton pattern: store multiple instances
-    static supportedPQCAlgorithms = ["falcon", "ml-dsa"] as PQCAlgorithm[]
+    static supportedPQCAlgorithms = ["falcon", "ml-dsa"] as any[]
     private static instances: Map<string, UnifiedCrypto> = new Map()
     private static DEFAULT_INSTANCE_ID = "default"
 

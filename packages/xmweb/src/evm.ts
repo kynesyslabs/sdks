@@ -1,1 +1,1 @@
-export { EVM } from "@kynesyslabs/xmcore";
+export { EVM } from "@kimcalc/xmcore";

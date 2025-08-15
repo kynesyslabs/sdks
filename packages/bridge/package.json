@@ -1,16 +1,16 @@
 {
-    "name": "@kynesyslabs/bridge",
+    "name": "@kimcalc/bridge",
     "version": "1.0.0",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --build tsconfig.json",
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kynesyslabs/encryption": "workspace:*",
-        "@kynesyslabs/types": "workspace:*",
-        "@kynesyslabs/websdk": "workspace:*",
+        "@kimcalc/encryption": "workspace:*",
+        "@kimcalc/types": "workspace:*",
+        "@kimcalc/websdk": "workspace:*",
         "rubic-sdk": "^5.52.6"
     }
 }

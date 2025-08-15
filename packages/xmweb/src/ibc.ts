@@ -1,1 +1,1 @@
-export { IBC } from "@kynesyslabs/xmcore";
+export { IBC } from "@kimcalc/xmcore";

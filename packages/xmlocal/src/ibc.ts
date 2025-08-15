@@ -1,7 +1,7 @@
-import { required } from '@kynesyslabs/utils'
+import { required } from '@kimcalc/utils'
 
-import { IBC as IBCCore, IDefaultChainLocal } from '@kynesyslabs/xmcore'
-import { XmTransactionResult, TransactionResponse } from '@kynesyslabs/xmcore'
+import { IBC as IBCCore, IDefaultChainLocal } from '@kimcalc/xmcore'
+import { XmTransactionResult, TransactionResponse } from '@kimcalc/xmcore'
 
 export class IBC extends IBCCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {

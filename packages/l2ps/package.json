@@ -1,15 +1,15 @@
 {
-    "name": "@kynesyslabs/l2ps",
+    "name": "@kimcalc/l2ps",
     "version": "1.0.0",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --build tsconfig.json",
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kynesyslabs/encryption": "workspace:*",
-        "@kynesyslabs/types": "workspace:*",
+        "@kimcalc/encryption": "workspace:*",
+        "@kimcalc/types": "workspace:*",
         "node-forge": "^1.3.1"
     }
 }

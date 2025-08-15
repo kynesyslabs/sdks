@@ -1,4 +1,4 @@
-export { APTOS } from "@kynesyslabs/xmcore"
+export { APTOS } from "@kimcalc/xmcore"
 
 // /**
 //  * Aptos WebSDK implementation for browser environments

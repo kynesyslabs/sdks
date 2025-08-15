@@ -1,9 +1,9 @@
 import axios from "axios"
 import * as bitcoin from "bitcoinjs-lib"
 
-import { required } from "@kynesyslabs/utils"
-import { BTC as BTCCore } from "@kynesyslabs/xmcore"
-import { XmTransactionResult } from "@kynesyslabs/xmcore"
+import { required } from "@kimcalc/utils"
+import { BTC as BTCCore } from "@kimcalc/xmcore"
+import { XmTransactionResult } from "@kimcalc/xmcore"
 
 export class BTC extends BTCCore {
     private static instances: Map<string, BTC> = new Map<string, BTC>()

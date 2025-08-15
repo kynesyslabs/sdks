@@ -1,4 +1,4 @@
-import { WorkStep } from "@kynesyslabs/demoswork"
+import { WorkStep } from "../workstep"
 import { DemosWorkOperationScripts, OperationOutputKey } from "./operations"
 import { StepOutputKey } from "./steps"
 

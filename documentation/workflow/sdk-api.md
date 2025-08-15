@@ -3,13 +3,13 @@
 Start by creating a DemoScript builder instance.
 
 ```ts
-import { DemosWork } from "@kynesyslabs/demosdk-beta/demoswork"
+import { DemosWork } from "@kimcalc/demosdk-beta/demoswork"
 
 const work = new DemosWork()
 ```
 
 > [!TIP]
-> All imports used here come from `@kynesyslabs/demosdk-beta/demoswork`
+> All imports used here come from `@kimcalc/demosdk-beta/demoswork`
 
 ## Steps
 

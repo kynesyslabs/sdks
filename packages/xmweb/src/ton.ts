@@ -1,1 +1,1 @@
-export { TON } from "@kynesyslabs/xmcore";
+export { TON } from "@kimcalc/xmcore";

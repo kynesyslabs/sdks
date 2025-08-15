@@ -1,16 +1,16 @@
 {
-    "name": "@kynesyslabs/websdk",
+    "name": "@kimcalc/websdk",
     "version": "1.0.0",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --build tsconfig.json",
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kynesyslabs/encryption": "workspace:*",
-        "@kynesyslabs/types": "workspace:*",
-        "@kynesyslabs/utils": "workspace:*",
+        "@kimcalc/encryption": "workspace:*",
+        "@kimcalc/types": "workspace:*",
+        "@kimcalc/utils": "workspace:*",
         "axios": "^1.7.9"
     }
 }

@@ -1,13 +1,14 @@
 {
-    "name": "@kynesyslabs/demoswork",
+    "name": "@kimcalc/demoswork",
     "version": "1.0.0",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --build tsconfig.json",
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kynesyslabs/types": "workspace:*"
+        "@kimcalc/types": "workspace:*",
+        "@kimcalc/websdk": "workspace:*"
     }
 }

@@ -1,4 +1,6 @@
-import { ConditionalOperation, DemosWorkOperation, WorkStep } from "@kynesyslabs/demoswork"
+import { ConditionalOperation } from "../operations/conditional"
+import { DemosWorkOperation } from "../operations"
+import { WorkStep } from "../workstep"
 import { Conditional } from "./steps"
 import { DataTypes, operators } from "./datatypes"
 import { DemosWorkOutputKey } from "."

@@ -14,7 +14,7 @@ import { promises as fs } from "fs"
 import forge from "node-forge"
 
 import * as bip39 from "@scure/bip39"
-import { HexToForge } from "@kynesyslabs/utils"
+import { HexToForge } from "@kimcalc/utils"
 import { Hashing } from "./Hashing"
 
 const algorithm = "aes-256-cbc"

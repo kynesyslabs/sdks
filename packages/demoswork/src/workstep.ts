@@ -1,11 +1,11 @@
 import { getNewUID } from "./utils"
 
-import { skeletons } from "@kynesyslabs/websdk"
-import { Web2Method, IWeb2Request, XMScript } from "@kynesyslabs/types"
-import { INativePayload } from "@kynesyslabs/types"
-import { DataTypes } from "@kynesyslabs/types"
-import { StepOutputKey, WorkStepInput } from "@kynesyslabs/types"
-import { EnumWeb2Actions } from "@kynesyslabs/types"
+import { skeletons } from "@kimcalc/websdk"
+import { Web2Method, IWeb2Request, XMScript } from "@kimcalc/types"
+import { INativePayload } from "@kimcalc/types"
+import { DataTypes } from "./types"
+import { StepOutputKey, WorkStepInput } from "./types"
+import { EnumWeb2Actions } from "@kimcalc/types"
 
 export class WorkStep {
     id: string

@@ -1,10 +1,11 @@
-import { XMScript } from "../xm"
+import { XMScript } from "@kimcalc/types"
 import { DataTypes, operators } from "./datatypes"
 
-import { Condition, DemosWorkOperation } from "@kynesyslabs/demoswork"
-import { WorkStep } from "@kynesyslabs/demoswork"
-import { INativePayload } from "../native"
-import { IWeb2Request } from "../web2"
+import { Condition } from "../operations/conditional/condition"
+import { DemosWorkOperation } from "../operations"
+import { WorkStep } from "../workstep"
+import { INativePayload } from "@kimcalc/types"
+import { IWeb2Request } from "@kimcalc/types"
 
 /**
  * The condition operand type

@@ -1,23 +1,16 @@
 import { ISignature } from "./ISignature"
 import { TxFee } from "./TxFee"
-import { DemoScript } from "../demoswork"
 import { IWeb2Payload } from "../web2"
 import { XMScript } from "../xm"
 import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
-// import { SubnetPayload } from "../../l2ps" // Obsolete - using new L2PS implementation
 import { IdentityPayload } from "../abstraction"
-import { L2PSEncryptedPayload } from "@kynesyslabs/l2ps"
 import { InstantMessagingPayload } from "../instantMessaging"
-import { NativeBridgeOperationCompiled } from "@kynesyslabs/bridge"
 import { StoragePayload } from "./TransactionSubtypes/StorageTransaction"
 import { L2PSHashPayload } from "./TransactionSubtypes/L2PSHashTransaction"
 import { SmartContractPayload } from "./TransactionSubtypes/SmartContractTransaction"
 
 // TODO Implement multisignature transactions
-
-// export type StringifiedPayload = [string, string]
-
 /* NOTE This is an old, backward compatible file that should be deprecated in favor of the TransactionSubtypes folder */
 
 /* SECTION Transaction types */
@@ -26,11 +19,11 @@ export type TransactionContentData =
     | ["web2Request", IWeb2Payload]
     | ["crosschainOperation", XMScript]
     | ["native", INativePayload]
-    | ["demoswork", DemoScript]
-    | ["l2psEncryptedTx", L2PSEncryptedPayload]
+    | ["demoswork", any]
+    | ["l2psEncryptedTx", any]
     | ["identity", IdentityPayload]
     | ["instantMessaging", InstantMessagingPayload]
-    | ["nativeBridge", NativeBridgeOperationCompiled]
+    | ["nativeBridge", any]
     | ["storage", StoragePayload]
     | ["l2ps_hash_update", L2PSHashPayload]
     | ["smartContract", SmartContractPayload]

@@ -489,7 +489,7 @@ async function sendWithL2PSFallback(tx: Transaction, useL2PS: boolean) {
 
 ```typescript
 // TODO: Add comprehensive usage examples
-import { L2PS } from '@kynesyslabs/demosdk/l2ps'
+import { L2PS } from '@kimcalc/demosdk/l2ps'
 
 // Example 1: Basic L2PS transaction
 async function sendL2PSTransaction() {

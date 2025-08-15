@@ -1,1 +1,1 @@
-export { XRPL } from "@kynesyslabs/xmcore";
+export { XRPL } from "@kimcalc/xmcore";

@@ -22,7 +22,7 @@ For development purposes, you can generate a test wallet using the [XRPL Faucet]
 Import the SDK and create a new instance:
 
 ```ts
-import { XRPL } from "@kynesyslabs/demosdk/xm-websdk"
+import { XRPL } from "@kimcalc/demosdk/xm-websdk"
 
 const rpc_url = "wss://s.altnet.rippletest.net:51233"
 const with_reconnect = false

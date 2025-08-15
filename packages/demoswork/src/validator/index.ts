@@ -1,7 +1,7 @@
-import { DemoScript } from "@kynesyslabs/types"
+import { DemoScript } from "../types"
 import { noUnusedSteps } from "./steps.validator"
 import { WorkStep } from "../workstep"
-import { OperationScript } from "@kynesyslabs/types"
+import { OperationScript } from "../types"
 
 function dependsOnIsAnArrayOfWorkUIDs(script: DemoScript): void {
     const validPrefixes = ["step_", "op_"]

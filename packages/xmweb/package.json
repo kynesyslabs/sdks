@@ -1,15 +1,15 @@
 {
-    "name": "@kynesyslabs/xmweb",
+    "name": "@kimcalc/xmweb",
     "version": "1.0.0",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --build tsconfig.json",
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kynesyslabs/utils": "workspace:*",
-        "@kynesyslabs/xmcore": "workspace:*",
+        "@kimcalc/utils": "workspace:*",
+        "@kimcalc/xmcore": "workspace:*",
         "bs58": "^5.0.0"
     }
 }

@@ -134,15 +134,15 @@
  * ```
  */
 
-import { unifiedCrypto, encryptedObject } from "@kynesyslabs/encryption"
+import { unifiedCrypto, encryptedObject } from "@kimcalc/encryption"
 import {
     serializeUint8Array,
     deserializeUint8Array,
-} from "@kynesyslabs/utils"
+} from "@kimcalc/utils"
 import {
     SerializedEncryptedObject,
     SerializedSignedObject,
-} from "@kynesyslabs/encryption"
+} from "@kimcalc/encryption"
 
 export interface MessagingPeerConfig {
     serverUrl: string

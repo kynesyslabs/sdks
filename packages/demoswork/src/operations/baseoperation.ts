@@ -3,7 +3,7 @@ import { DemosWorkOperation } from "."
 import {
     BaseOperationScript,
     OperationType,
-} from "@kynesyslabs/types"
+} from "../types"
 
 export class BaseOperation extends DemosWorkOperation {
     override type: OperationType = "base"
