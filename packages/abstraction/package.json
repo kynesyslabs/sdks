@@ -1,6 +1,6 @@
 {
-    "name": "@kimcalc/abstraction",
-    "version": "1.0.0",
+    "name": "@demosdk/abstraction",
+    "version": "1.0.1",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
@@ -8,10 +8,10 @@
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kimcalc/encryption": "workspace:*",
-        "@kimcalc/types": "workspace:*",
-        "@kimcalc/utils": "workspace:*",
-        "@kimcalc/websdk": "workspace:*",
+        "@demosdk/encryption": "workspace:*",
+        "@demosdk/types": "workspace:*",
+        "@demosdk/utils": "workspace:*",
+        "@demosdk/websdk": "workspace:*",
         "axios": "^1.7.9"
     }
 }

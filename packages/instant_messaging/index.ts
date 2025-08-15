@@ -134,15 +134,15 @@
  * ```
  */
 
-import { unifiedCrypto, encryptedObject } from "@kimcalc/encryption"
+import { unifiedCrypto, encryptedObject } from "@demosdk/encryption"
 import {
     serializeUint8Array,
     deserializeUint8Array,
-} from "@kimcalc/utils"
+} from "@demosdk/utils"
 import {
     SerializedEncryptedObject,
     SerializedSignedObject,
-} from "@kimcalc/encryption"
+} from "@demosdk/encryption"
 
 export interface MessagingPeerConfig {
     serverUrl: string

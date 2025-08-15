@@ -1,4 +1,4 @@
-import { Cryptography, Hashing } from "@kimcalc/encryption"
+import { Cryptography, Hashing } from "@demosdk/encryption"
 import {
     BridgeOperation,
     BridgeOperationCompiled,
@@ -9,9 +9,9 @@ import {
     SupportedNonEVMChain,
     supportedNonEVMChains,
 } from "./nativeBridgeTypes"
-import { RPCRequest } from "@kimcalc/types"
-import type { Demos } from "@kimcalc/websdk"
-import type { Transaction } from "@kimcalc/types"
+import { RPCRequest } from "@demosdk/types"
+import type { Demos } from "@demosdk/websdk"
+import type { Transaction } from "@demosdk/types"
 
 export const methods = {
     /**

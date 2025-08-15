@@ -5,9 +5,9 @@ import {
     MULTIVERSX as EGLDCore,
     IDefaultChainLocal,
     TransactionResponse,
-} from '@kimcalc/xmcore'
-import { required } from '@kimcalc/utils'
-import { XmTransactionResult } from '@kimcalc/xmcore'
+} from '@demosdk/xmcore'
+import { required } from '@demosdk/utils'
+import { XmTransactionResult } from '@demosdk/xmcore'
 
 export class MULTIVERSX extends EGLDCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {

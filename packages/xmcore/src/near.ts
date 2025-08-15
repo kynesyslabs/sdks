@@ -8,7 +8,7 @@ import {
 } from "near-api-js"
 import bigInt from "big-integer"
 import { IPayOptions } from "."
-import { required } from "@kimcalc/utils"
+import { required } from "@demosdk/utils"
 import { DefaultChain } from "./types/defaultChain"
 import { Transaction } from "near-api-js/lib/transaction"
 import { baseDecode, parseNearAmount } from "@near-js/utils"

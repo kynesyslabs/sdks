@@ -1,1 +1,1 @@
-export { EVM } from "@kimcalc/xmcore";
+export { EVM } from "@demosdk/xmcore";

@@ -1,6 +1,6 @@
 {
-    "name": "@kimcalc/websdk",
-    "version": "1.0.0",
+    "name": "@demosdk/websdk",
+    "version": "1.0.1",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
@@ -8,9 +8,9 @@
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kimcalc/encryption": "workspace:*",
-        "@kimcalc/types": "workspace:*",
-        "@kimcalc/utils": "workspace:*",
+        "@demosdk/encryption": "workspace:*",
+        "@demosdk/types": "workspace:*",
+        "@demosdk/utils": "workspace:*",
         "axios": "^1.7.9"
     }
 }

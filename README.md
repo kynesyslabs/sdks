@@ -10,9 +10,9 @@ A JavaScript/TypeScript SDK providing a unified interface for interacting with t
 ## Installation
 
 ```sh
-npm install @kimcalc/demosdk
+npm install @demosdk/demosdk
 # or
-yarn add @kimcalc/demosdk
+yarn add @demosdk/demosdk
 ```
 
 ## Features
@@ -37,35 +37,35 @@ yarn add @kimcalc/demosdk
 ### Basic Import
 
 ```typescript
-import { Demos } from "@kimcalc/demosdk/websdk"
-import { prepareXMPayload } from "@kimcalc/demosdk/xm-websdk"
-import { DemosWork } from "@kimcalc/demosdk/demoswork"
+import { Demos } from "@demosdk/demosdk/websdk"
+import { prepareXMPayload } from "@demosdk/demosdk/xm-websdk"
+import { DemosWork } from "@demosdk/demosdk/demoswork"
 ```
 
 ### Module Exports
 
 The SDK provides multiple entry points:
 
-- `@kimcalc/demosdk` - Main entry point
-- `@kimcalc/demosdk/websdk` - Web SDK components
-- `@kimcalc/demosdk/xm-websdk` - Cross-chain web SDK
-- `@kimcalc/demosdk/xm-localsdk` - Cross-chain local SDK
-- `@kimcalc/demosdk/xmcore` - Cross-chain core functionality
-- `@kimcalc/demosdk/demoswork` - Workflow engine
-- `@kimcalc/demosdk/wallet` - Wallet utilities
-- `@kimcalc/demosdk/abstraction` - Chain abstraction layer
-- `@kimcalc/demosdk/bridge` - Bridging functionality
-- `@kimcalc/demosdk/encryption` - Cryptographic utilities
-- `@kimcalc/demosdk/utils` - Common utilities
-- `@kimcalc/demosdk/types` - TypeScript type definitions
-- `@kimcalc/demosdk/l2ps` - Layer 2 payment solutions
+- `@demosdk/demosdk` - Main entry point
+- `@demosdk/demosdk/websdk` - Web SDK components
+- `@demosdk/demosdk/xm-websdk` - Cross-chain web SDK
+- `@demosdk/demosdk/xm-localsdk` - Cross-chain local SDK
+- `@demosdk/demosdk/xmcore` - Cross-chain core functionality
+- `@demosdk/demosdk/demoswork` - Workflow engine
+- `@demosdk/demosdk/wallet` - Wallet utilities
+- `@demosdk/demosdk/abstraction` - Chain abstraction layer
+- `@demosdk/demosdk/bridge` - Bridging functionality
+- `@demosdk/demosdk/encryption` - Cryptographic utilities
+- `@demosdk/demosdk/utils` - Common utilities
+- `@demosdk/demosdk/types` - TypeScript type definitions
+- `@demosdk/demosdk/l2ps` - Layer 2 payment solutions
 
 ## Quick Start
 
 ### Initialize and Connect Wallet
 
 ```typescript
-import { Demos } from "@kimcalc/demosdk/websdk"
+import { Demos } from "@demosdk/demosdk/websdk"
 
 // 1. Initialize Demos SDK (no parameters)
 const demos = new Demos()
@@ -106,8 +106,8 @@ const result = await demos.broadcast(validityData)
 import { 
   prepareXMPayload, 
   prepareXMScript 
-} from "@kimcalc/demosdk/websdk"
-import { EVM } from "@kimcalc/demosdk/xm-websdk"
+} from "@demosdk/demosdk/websdk"
+import { EVM } from "@demosdk/demosdk/xm-websdk"
 
 // 1. Create cross-chain payload (e.g., Ethereum Sepolia)
 const evm = await EVM.create("https://rpc.ankr.com/eth_sepolia")

@@ -1,8 +1,8 @@
 import { WrappedCrossChainTrade } from "rubic-sdk"
 
-import { RPCResponse } from "@kimcalc/types"
-import { BridgeTradePayload } from "@kimcalc/types"
-import type { Demos } from "@kimcalc/websdk"
+import { RPCResponse } from "@demosdk/types"
+import { BridgeTradePayload } from "@demosdk/types"
+import type { Demos } from "@demosdk/websdk"
 
 export default class RubicBridge {
     async getTrade(

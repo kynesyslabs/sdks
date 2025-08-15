@@ -12,13 +12,13 @@ import {
     InferFromSignaturePayload,
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
-} from "@kimcalc/types"
-import { PQCAlgorithm } from "@kimcalc/types"
-import { RPCResponseWithValidityData } from "@kimcalc/types"
+} from "@demosdk/types"
+import { PQCAlgorithm } from "@demosdk/types"
+import { RPCResponseWithValidityData } from "@demosdk/types"
 
-import { UnifiedCrypto } from "@kimcalc/encryption"
-import { uint8ArrayToHex, required } from "@kimcalc/utils"
-import { Demos, DemosTransactions } from "@kimcalc/websdk"
+import { UnifiedCrypto } from "@demosdk/encryption"
+import { uint8ArrayToHex, required } from "@demosdk/utils"
+import { Demos, DemosTransactions } from "@demosdk/websdk"
 
 export class Identities {
     formats = {

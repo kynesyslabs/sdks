@@ -11,7 +11,7 @@ import {
 } from "@ton/ton"
 import BigNumber from "bignumber.js"
 import { KeyPair, mnemonicToPrivateKey, sign, signVerify } from "@ton/crypto"
-import { required } from "@kimcalc/utils"
+import { required } from "@demosdk/utils"
 import { IPayOptions } from "."
 import { DefaultChain } from "./types/defaultChain"
 

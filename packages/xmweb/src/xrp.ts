@@ -1,1 +1,1 @@
-export { XRPL } from "@kimcalc/xmcore";
+export { XRPL } from "@demosdk/xmcore";

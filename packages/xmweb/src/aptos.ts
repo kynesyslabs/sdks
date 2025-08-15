@@ -1,4 +1,4 @@
-export { APTOS } from "@kimcalc/xmcore"
+export { APTOS } from "@demosdk/xmcore"
 
 // /**
 //  * Aptos WebSDK implementation for browser environments

@@ -1,10 +1,10 @@
 /* eslint-disable no-unused-vars */
 // @ts-ignore
 import forge from "node-forge"
-import { required } from "@kimcalc/utils"
+import { required } from "@demosdk/utils"
 import { RSA } from "./rsa"
 import { IKeyPair, IStringifiedKeyPair } from "./types/KeyPair"
-import { Cryptography } from "@kimcalc/encryption"
+import { Cryptography } from "@demosdk/encryption"
 
 // TODO Could this be an universal "Sign in with DEMOS" ? Maybe
 

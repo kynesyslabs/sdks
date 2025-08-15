@@ -28,7 +28,7 @@
         "resolveJsonModule": true,
         "sourceMap": true,
         "paths": {
-            "@kimcalc/*": ["packages/*/src"],
+            "@demosdk/*": ["packages/*/src"],
             "@/*": ["*"]
         }
     },

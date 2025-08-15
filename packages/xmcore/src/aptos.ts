@@ -12,9 +12,9 @@ import {
 
 import { DefaultChain } from "./types/defaultChain"
 import { IPayParams } from "./types/interfaces"
-import { required } from "@kimcalc/utils"
-import { XMScript } from "@kimcalc/types"
-import { hexToUint8Array, uint8ArrayToHex } from "@kimcalc/utils";
+import { required } from "@demosdk/utils"
+import { XMScript } from "@demosdk/types"
+import { hexToUint8Array, uint8ArrayToHex } from "@demosdk/utils";
 
 /* LICENSE
 

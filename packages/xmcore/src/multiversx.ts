@@ -13,7 +13,7 @@ import { ExtensionProvider } from "@multiversx/sdk-extension-provider"
 import { ApiNetworkProvider } from "@multiversx/sdk-network-providers"
 import { INetworkProvider } from "@multiversx/sdk-network-providers/out/interface"
 import { UserSigner } from "@multiversx/sdk-wallet"
-import { required } from "@kimcalc/utils"
+import { required } from "@demosdk/utils"
 import {
     DefaultChain,
     EGLDSignTxOptions,

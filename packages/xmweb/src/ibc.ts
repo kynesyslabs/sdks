@@ -1,1 +1,1 @@
-export { IBC } from "@kimcalc/xmcore";
+export { IBC } from "@demosdk/xmcore";

@@ -22,7 +22,7 @@ Use the [Near Testnet Faucet](https://near-faucet.io) to airdrop fund your testn
 Import the SDK and create a new instance:
 
 ```ts
-import { NEAR } from "@kimcalc/demosdk/xm-websdk"
+import { NEAR } from "@demosdk/demosdk/xm-websdk"
 
 const rpc_url = "https://rpc.testnet.near.org"
 const networkId = "testnet"

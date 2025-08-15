@@ -2,7 +2,7 @@ import * as web3 from "web3"
 import { toNumber, toWei } from "web3-utils"
 import { FeeMarketEIP1559TxData } from "web3-eth-accounts"
 
-import { required } from "@kimcalc/utils"
+import { required } from "@demosdk/utils"
 import { IPayParams } from "./types/interfaces"
 import { DefaultChain } from "./types/defaultChain"
 

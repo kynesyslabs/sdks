@@ -1,9 +1,9 @@
 // import * as web3 from "web3"
 
-// import { TEN as TENCore } from "@kimcalc/xmcore"
-// import { XmTransactionResult } from "@kimcalc/xmcore"
-// import { IDefaultChainLocal } from "@kimcalc/xmcore"
-// import { required } from "@kimcalc/utils"
+// import { TEN as TENCore } from "@demosdk/xmcore"
+// import { XmTransactionResult } from "@demosdk/xmcore"
+// import { IDefaultChainLocal } from "@demosdk/xmcore"
+// import { required } from "@demosdk/utils"
 
 // export class TEN extends TENCore implements IDefaultChainLocal {
 //     async sendTransaction(signedTx: string) {

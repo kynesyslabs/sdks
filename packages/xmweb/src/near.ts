@@ -1,1 +1,1 @@
-export { NEAR } from "@kimcalc/xmcore";
+export { NEAR } from "@demosdk/xmcore";

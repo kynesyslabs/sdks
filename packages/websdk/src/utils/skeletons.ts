@@ -1,5 +1,5 @@
-import type { IWeb2Request, Transaction } from "@kimcalc/types"
-import { EnumWeb2Actions } from "@kimcalc/types"
+import type { IWeb2Request, Transaction } from "@demosdk/types"
+import { EnumWeb2Actions } from "@demosdk/types"
 // TODO This should be a collection of classes now that we use TypeScript
 // FIXME ^
 

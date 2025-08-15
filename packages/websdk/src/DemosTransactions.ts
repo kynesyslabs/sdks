@@ -4,15 +4,15 @@ import { Demos } from "./demosclass"
 import { sha256 } from "./utils/sha256"
 import * as skeletons from "./utils/skeletons"
 
-import type { SigningAlgorithm, Transaction } from "@kimcalc/types"
-import type { L2PSHashPayload } from "@kimcalc/types"
+import type { SigningAlgorithm, Transaction } from "@demosdk/types"
+import type { L2PSHashPayload } from "@demosdk/types"
 import { IKeyPair } from "./types/KeyPair"
 import { GCRGeneration } from "./GCRGeneration"
-import { required } from "@kimcalc/utils"
-import { RPCResponseWithValidityData } from "@kimcalc/types"
-import { Cryptography } from "@kimcalc/encryption"
-import { uint8ArrayToHex } from "@kimcalc/utils"
-import { Enigma } from "@kimcalc/encryption"
+import { required } from "@demosdk/utils"
+import { RPCResponseWithValidityData } from "@demosdk/types"
+import { Cryptography } from "@demosdk/encryption"
+import { uint8ArrayToHex } from "@demosdk/utils"
+import { Enigma } from "@demosdk/encryption"
 
 export const DemosTransactions = {
     // REVIEW All this part

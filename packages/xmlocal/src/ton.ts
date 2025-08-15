@@ -1,9 +1,9 @@
 import { Cell } from "@ton/ton"
 import { mnemonicNew } from "@ton/crypto"
 
-import { TON as TONCore } from "@kimcalc/xmcore"
-import { XmTransactionResult } from "@kimcalc/xmcore"
-import { IDefaultChainLocal } from "@kimcalc/xmcore"
+import { TON as TONCore } from "@demosdk/xmcore"
+import { XmTransactionResult } from "@demosdk/xmcore"
+import { IDefaultChainLocal } from "@demosdk/xmcore"
 
 export class TON extends TONCore implements IDefaultChainLocal {
     async getInfo() {

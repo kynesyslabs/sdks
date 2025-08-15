@@ -1,6 +1,6 @@
 {
-    "name": "@kimcalc/encryption",
-    "version": "1.0.0",
+    "name": "@demosdk/encryption",
+    "version": "1.0.1",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
@@ -8,7 +8,7 @@
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kimcalc/utils": "workspace:*",
+        "@demosdk/utils": "workspace:*",
         "@noble/curves": "1.9.4",
         "@noble/hashes": "1.8.0",
         "@noble/post-quantum": "^0.4.0",

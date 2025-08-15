@@ -6,7 +6,7 @@ IBC is a blockchain interoperability protocol used by 110+ chains. It enables se
 I'll be using the Stargaze testnet for the examples.
 
 ```ts
-import { IBC } from "@kimcalc/demosdk/xm-websdk"
+import { IBC } from "@demosdk/demosdk/xm-websdk"
 
 const rpc_url = "https://rpc.elgafar-1.stargaze-apis.com"
 

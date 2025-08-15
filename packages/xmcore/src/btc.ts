@@ -4,7 +4,7 @@ import * as bitcoin from "bitcoinjs-lib"
 import ecc from "@bitcoinerlab/secp256k1"
 import { ECPairAPI, ECPairFactory, ECPairInterface } from "ecpair"
 
-import { required } from "@kimcalc/utils"
+import { required } from "@demosdk/utils"
 import { IPayParams } from "./types/interfaces"
 import { DefaultChain } from "./types/defaultChain"
 

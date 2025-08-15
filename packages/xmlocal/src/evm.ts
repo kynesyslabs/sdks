@@ -1,8 +1,8 @@
 import { TransactionRequest } from 'ethers'
 
-import { required } from '@kimcalc/utils'
-import { EVM as EVMCore, IDefaultChainLocal } from '@kimcalc/xmcore'
-import { XmTransactionResult, TransactionResponse } from '@kimcalc/xmcore'
+import { required } from '@demosdk/utils'
+import { EVM as EVMCore, IDefaultChainLocal } from '@demosdk/xmcore'
+import { XmTransactionResult, TransactionResponse } from '@demosdk/xmcore'
 
 export class EVM extends EVMCore implements IDefaultChainLocal {
     private static instances: Map<number, EVM> = new Map<number, EVM>()

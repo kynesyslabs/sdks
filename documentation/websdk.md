@@ -1,9 +1,9 @@
 # Using the websdk
 
-The SDK with the HTTP rewrite of the `demos` object is published at [@kimcalc/demosdk-http](https://www.npmjs.com/package/@kimcalc/demosdk-http) on NPM.
+The SDK with the HTTP rewrite of the `demos` object is published at [@demosdk/demosdk-http](https://www.npmjs.com/package/@demosdk/demosdk-http) on NPM.
 
 ```ts
-import { demos } from "@kimcalc/demosdk-http/websdk"
+import { demos } from "@demosdk/demosdk-http/websdk"
 ```
 
 ### Connecting to a node

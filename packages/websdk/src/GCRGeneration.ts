@@ -5,8 +5,8 @@ import {
     IdentityPayload, INativePayload,
     InferFromSignaturePayload,
     Web2CoreTargetIdentityPayload, Transaction, TransactionContent
-} from "@kimcalc/types"
-import { Hashing } from "@kimcalc/encryption"
+} from "@demosdk/types"
+import { Hashing } from "@demosdk/encryption"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used

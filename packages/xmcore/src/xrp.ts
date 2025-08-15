@@ -7,7 +7,7 @@ import {
     xrpToDrops,
 } from 'xrpl'
 
-import { required } from "@kimcalc/utils"
+import { required } from "@demosdk/utils"
 import { sign, verify } from 'ripple-keypairs'
 import { DefaultChain } from "./types/defaultChain"
 import { IPayParams } from './types/interfaces'

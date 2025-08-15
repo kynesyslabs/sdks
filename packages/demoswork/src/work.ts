@@ -1,7 +1,7 @@
-import { Transaction } from "@kimcalc/types"
+import { Transaction } from "@demosdk/types"
 import { DemoScript } from "./types"
 
-import { Demos, DemosTransactions } from "@kimcalc/websdk"
+import { Demos, DemosTransactions } from "@demosdk/websdk"
 import { DemosWorkOperation } from "./operations"
 import { runSanityChecks } from "./validator"
 

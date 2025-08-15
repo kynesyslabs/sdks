@@ -1,1 +1,1 @@
-export { TON } from "@kimcalc/xmcore";
+export { TON } from "@demosdk/xmcore";

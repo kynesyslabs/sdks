@@ -5,7 +5,7 @@
 You can create a web2 workstep to performa a `GET` request to `https://icanhazip.com` using the `prepareWeb2Step` function.
 
 ```ts
-import { prepareWeb2Step } from "@kimcalc/demosdk/demoswork"
+import { prepareWeb2Step } from "@demosdk/demosdk/demoswork"
 
 const getIP = prepareWeb2Step({
     action: "GET",
@@ -22,10 +22,10 @@ THe process of creating a cross chain workstep to send some ETH to an address ca
 3. Create an XM step with the `XMScript`
 
 ```ts
-import { XMScript } from "@kimcalc/demosdk/types"
-import { EVM } from "@kimcalc/demosdk/multichain/websdk"
-import { prepareXMStep } from "@kimcalc/demosdk/demoswork"
-import { prepareXMScript } from "@kimcalc/demosdk/websdk/XMTransactions"
+import { XMScript } from "@demosdk/demosdk/types"
+import { EVM } from "@demosdk/demosdk/multichain/websdk"
+import { prepareXMStep } from "@demosdk/demosdk/demoswork"
+import { prepareXMScript } from "@demosdk/demosdk/websdk/XMTransactions"
 
 // 1. Getting EVM payload
 const evm_rpc = "https://rpc.ankr.com/eth_sepolia"
@@ -63,14 +63,14 @@ There are two ways to go about creating a conditional operation.
 ### 1. Using the `if`, `then` and `else` methods
 
 ```ts
-import { EVM } from "@kimcalc/demosdk/multichain/websdk"
-import { prepareXMScript } from "@kimcalc/demosdk/websdk/XMTransactions"
+import { EVM } from "@demosdk/demosdk/multichain/websdk"
+import { prepareXMScript } from "@demosdk/demosdk/websdk/XMTransactions"
 import {
     DemosWork,
     prepareWeb2Step,
     prepareXMStep,
     ConditionalOperation,
-} from "@kimcalc/demosdk/demoswork"
+} from "@demosdk/demosdk/demoswork"
 
 const address = "0x8A6575025DE23CB2DcB0fE679E588da9fE62f3B6"
 const isMember = prepareWeb2Step({
@@ -119,7 +119,7 @@ The `Condition` class can be used to construct a conditional operation without u
 A condition looks is implemented as follows:
 
 ```ts
-import { operators } from "@kimcalc/demosdk/types"
+import { operators } from "@demosdk/demosdk/types"
 
 class Condition {
     value_a: any
@@ -140,15 +140,15 @@ The `value_a` and `value_b` fields can accept any of the following:
 You can create the same conditional operation as the previous example using the `Condition` class as follows:
 
 ```ts
-import { EVM } from "@kimcalc/demosdk/multichain/websdk"
-import { prepareXMScript } from "@kimcalc/demosdk/websdk/XMTransactions"
+import { EVM } from "@demosdk/demosdk/multichain/websdk"
+import { prepareXMScript } from "@demosdk/demosdk/websdk/XMTransactions"
 import {
     Condition,
     DemosWork,
     prepareWeb2Step,
     prepareXMStep,
     ConditionalOperation,
-} from "@kimcalc/demosdk/demoswork"
+} from "@demosdk/demosdk/demoswork"
 
 const address = "0x8A6575025DE23CB2DcB0fE679E588da9fE62f3B6"
 const isMember = prepareWeb2Step({
@@ -204,8 +204,8 @@ work.push(operation)
 To convert a Demoswork object to a transaction, use the `prepareDemosWorkPayload` function.
 
 ```ts
-import { DemosWebAuth } from "@kimcalc/demosdk/websdk"
-import { prepareDemosWorkPayload } from "@kimcalc/demosdk/demoswork"
+import { DemosWebAuth } from "@demosdk/demosdk/websdk"
+import { prepareDemosWorkPayload } from "@demosdk/demosdk/demoswork"
 
 // ...
 
@@ -222,7 +222,7 @@ const tx = await prepareDemosWorkPayload(work, identity.keypair)
 You can broadcast the transaction using the `confirm` and `broadcast` methods of the `demos` object.
 
 ```ts
-import { demos } from "@kimcalc/demosdk/websdk"
+import { demos } from "@demosdk/demosdk/websdk"
 
 // ...
 
@@ -281,7 +281,7 @@ const notCondition = new Condition({
 The base operation allow you to group work steps and operations for execution without any additional logic.
 
 ```ts
-import { BaseOperation, prepareXMStep } from "@kimcalc/demosdk/demoswork"
+import { BaseOperation, prepareXMStep } from "@demosdk/demosdk/demoswork"
 
 const base = new BaseOperation()
 const sendEth = prepareXMStep({

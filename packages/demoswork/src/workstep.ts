@@ -1,11 +1,11 @@
 import { getNewUID } from "./utils"
 
-import { skeletons } from "@kimcalc/websdk"
-import { Web2Method, IWeb2Request, XMScript } from "@kimcalc/types"
-import { INativePayload } from "@kimcalc/types"
+import { skeletons } from "@demosdk/websdk"
+import { Web2Method, IWeb2Request, XMScript } from "@demosdk/types"
+import { INativePayload } from "@demosdk/types"
 import { DataTypes } from "./types"
 import { StepOutputKey, WorkStepInput } from "./types"
-import { EnumWeb2Actions } from "@kimcalc/types"
+import { EnumWeb2Actions } from "@demosdk/types"
 
 export class WorkStep {
     id: string

@@ -1,6 +1,6 @@
 {
-    "name": "@kimcalc/bridge",
-    "version": "1.0.0",
+    "name": "@demosdk/bridge",
+    "version": "1.0.1",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
@@ -8,9 +8,9 @@
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kimcalc/encryption": "workspace:*",
-        "@kimcalc/types": "workspace:*",
-        "@kimcalc/websdk": "workspace:*",
+        "@demosdk/encryption": "workspace:*",
+        "@demosdk/types": "workspace:*",
+        "@demosdk/websdk": "workspace:*",
         "rubic-sdk": "^5.52.6"
     }
 }

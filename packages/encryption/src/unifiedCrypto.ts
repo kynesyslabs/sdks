@@ -5,7 +5,7 @@ import { randomBytes } from "@noble/hashes/utils"
 
 import { Enigma } from "./PQC/enigma"
 import { Cryptography } from "./Cryptography"
-// import { PQCAlgorithm } from '@kimcalc/types';
+// import { PQCAlgorithm } from '@demosdk/types';
 
 /* The two interfaces below are used to route the encrypted and signed data through the unified crypto system */
 export interface encryptedObject {

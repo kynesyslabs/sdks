@@ -1,1 +1,1 @@
-export { BTC } from "@kimcalc/xmcore";
+export { BTC } from "@demosdk/xmcore";

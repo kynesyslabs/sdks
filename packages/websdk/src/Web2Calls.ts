@@ -1,4 +1,4 @@
-import { EnumWeb2Actions } from "@kimcalc/types"
+import { EnumWeb2Actions } from "@demosdk/types"
 import { web2_request } from "./utils/skeletons"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"
@@ -7,7 +7,7 @@ import type {
     Transaction,
     IWeb2Payload,
     IWeb2Result,
-} from "@kimcalc/types"
+} from "@demosdk/types"
 
 export class Web2Proxy {
     private readonly _sessionId: string

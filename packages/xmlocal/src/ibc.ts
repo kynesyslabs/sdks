@@ -1,7 +1,7 @@
-import { required } from '@kimcalc/utils'
+import { required } from '@demosdk/utils'
 
-import { IBC as IBCCore, IDefaultChainLocal } from '@kimcalc/xmcore'
-import { XmTransactionResult, TransactionResponse } from '@kimcalc/xmcore'
+import { IBC as IBCCore, IDefaultChainLocal } from '@demosdk/xmcore'
+import { XmTransactionResult, TransactionResponse } from '@demosdk/xmcore'
 
 export class IBC extends IBCCore implements IDefaultChainLocal {
     constructor(rpc_url: string) {

@@ -1,10 +1,10 @@
 // INFO Use the src/features/multichain/chainscript/chainscript.chs for the specs
 // NOTE This module is meant to be used with the demos websdk
 
-import type { Transaction, XMScript } from "@kimcalc/types"
+import type { Transaction, XMScript } from "@demosdk/types"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"
-import { uint8ArrayToHex } from "@kimcalc/utils"
+import { uint8ArrayToHex } from "@demosdk/utils"
 
 // INFO Using the methods below to create, manage and send chainscript-like scripts
 const XMTransactions = {

@@ -1,5 +1,5 @@
-import { RPCResponse } from "@kimcalc/types"
-import { BridgeTradePayload } from "@kimcalc/types"
+import { RPCResponse } from "@demosdk/types"
+import { BridgeTradePayload } from "@demosdk/types"
 import { Demos } from "./demosclass"
 import { WrappedCrossChainTrade } from "rubic-sdk"
 

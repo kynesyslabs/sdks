@@ -2,14 +2,14 @@
 
 The crosschain SDKs provide methods for reading blockchain state, creating and signing transactions on supported blockchains.
 
-SDKs can be imported from `@kimcalc/demosdk/xm-websdk/` (browser) or `@kimcalc/demosdk/xm-localsdk` (node).
+SDKs can be imported from `@demosdk/demosdk/xm-websdk/` (browser) or `@demosdk/demosdk/xm-localsdk` (node).
 
 ```ts
-import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@kimcalc/demosdk/xm-websdk'
+import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@demosdk/demosdk/xm-websdk'
 
 // or
 
-import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@kimcalc/demosdk/xm-localsdk'
+import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@demosdk/demosdk/xm-localsdk'
 ```
 
 ### Creating an instance

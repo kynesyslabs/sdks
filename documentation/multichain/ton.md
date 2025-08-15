@@ -19,7 +19,7 @@ yarn add @orbs-network/ton-access
 Then create the SDK instance as follows:
 
 ```ts
-import { TON } from "@kimcalc/demosdk/xm-websdk"
+import { TON } from "@demosdk/demosdk/xm-websdk"
 import { getHttpEndpoint } from "@orbs-network/ton-access"
 
 // Get the rpc url
