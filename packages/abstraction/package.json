@@ -8,10 +8,10 @@
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kynesyslabs/types": "workspace:*",
-        "@kynesyslabs/websdk": "workspace:*",
         "@kynesyslabs/encryption": "workspace:*",
+        "@kynesyslabs/types": "workspace:*",
         "@kynesyslabs/utils": "workspace:*",
+        "@kynesyslabs/websdk": "workspace:*",
         "axios": "^1.7.9"
     }
 }

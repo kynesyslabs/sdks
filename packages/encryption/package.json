@@ -8,15 +8,15 @@
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kynesyslabs/utils": "workspace:*",
         "@kynesyslabs/types": "workspace:*",
-        "node-seal": "^5.1.3",
-        "falcon-js": "^1.0.0",
-        "falcon-sign": "^1.0.4",
+        "@kynesyslabs/utils": "workspace:*",
         "@noble/curves": "1.9.4",
         "@noble/hashes": "1.8.0",
         "@noble/post-quantum": "^0.4.0",
-        "node-forge": "^1.3.1"
+        "falcon-js": "^1.0.0",
+        "falcon-sign": "^1.0.4",
+        "node-forge": "^1.3.1",
+        "node-seal": "^5.1.3"
     },
     "devDependencies": {
         "@types/node-forge": "^1.3.11"

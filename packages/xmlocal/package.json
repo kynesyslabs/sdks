@@ -8,7 +8,7 @@
         "test": "echo \"No tests specified\""
     },
     "dependencies": {
-        "@kynesyslabs/xmcore": "workspace:*",
-        "@kynesyslabs/utils": "workspace:*"
+        "@kynesyslabs/utils": "workspace:*",
+        "@kynesyslabs/xmcore": "workspace:*"
     }
 }
