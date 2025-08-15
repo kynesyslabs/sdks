@@ -13,7 +13,7 @@
     ],
     "publishConfig": {
         "access": "public"
-      },
+    },
     "files": [
         "build/",
         "!build/tests"
@@ -59,33 +59,24 @@
     "dependencies": {
         "axios": "^1.7.4",
         "big-integer": "^1.6.52",
-
+        "buffer": "^6.0.3",
         "@metaplex-foundation/js": "^0.20.1",
-
         "@roamhq/wrtc": "^0.8.0",
         "@simplewebauthn/browser": "^11.0.0",
         "@simplewebauthn/server": "^11.0.0",
-
         "@types/simple-peer": "^9.11.8",
-        "bignumber.js": "^9.1.2",
-        "bip32": "^5.0.0-rc.0",
-        "bitcoinjs-lib": "^6.1.7",
         "bitcoinjs-message": "^2.2.0",
-        "buffer": "^6.0.3",
         "dotenv": "^16.4.7",
-        "ecpair": "^3.0.0",
         "js-sha3": "^0.9.3",
         "libsodium-wrappers-sumo": "^0.7.15",
         "lodash": "^4.17.21",
         "mlkem": "^2.3.1",
-
-        "ntru": "^4.0.4",
         "pqcrypto": "^1.0.1",
         "protobufjs": "^7.4.0",
         "simple-peer": "^9.11.1",
-        "socket.io-client": "^4.7.2",
         "sphincs": "^3.0.4",
-        "superdilithium": "^2.0.6"
+        "superdilithium": "^2.0.6",
+        "ntru": "^4.0.4"
     },
     "devDependencies": {
         "@orbs-network/ton-access": "^2.3.3",

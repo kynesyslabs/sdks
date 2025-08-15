@@ -9,7 +9,6 @@
     },
     "dependencies": {
         "@kynesyslabs/xmcore": "workspace:*",
-        "@kynesyslabs/utils": "workspace:*",
-        "axios": "^1.7.4"
+        "@kynesyslabs/utils": "workspace:*"
     }
 }
