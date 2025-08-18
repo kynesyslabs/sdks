@@ -4,9 +4,7 @@ BLOG.md
 TODO.md
 .trunk
 .yarn
-# yarn.lock
 package-lock.json
-yarn.lock
 docs
 *.pkl
 .setup_done
