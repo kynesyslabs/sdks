@@ -22,10 +22,12 @@ jobs:
               with:
                   node-version: '18'
                   registry-url: 'https://registry.npmjs.org'
-            - name: Setup Yarn
+            - name: Setup Yarn 4.x
               uses: actions/setup-node@v3
               with:
                   node-version: '18'
+            - name: Enable Corepack
+              run: corepack enable
             - name: Install dependencies
               run: yarn install
             - name: Build package
