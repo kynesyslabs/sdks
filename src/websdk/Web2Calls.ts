@@ -88,9 +88,14 @@ export class Web2Proxy {
 
         const signedWeb2Tx = await this._demos.sign(web2Tx)
         const validityData = await this._demos.confirm(signedWeb2Tx)
+        const txHash = validityData.response.data.transaction.hash
         await this._demos.broadcast(validityData)
 
-        return response
+        const result: IWeb2Result = {
+            ...response.response,
+            txHash,
+        }
+        return result
     }
 }
 

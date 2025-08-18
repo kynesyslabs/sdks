@@ -14,6 +14,7 @@ export interface IWeb2Result {
     data: any
     dataHash: string
     headersHash: string
+    txHash?: string
 }
 
 export interface IWeb2Request {
