@@ -16,22 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node 18
-        uses: actions/setup-node@v3
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: 18.x
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          bun-version: latest
       - name: Install dependencies
-        env:
-          YARN_ENABLE_IMMUTABLE_INSTALLS: false
-        run: |
-          yarn install
+        run: bun install
       - name: Run tests
-        run: |
-          yarn test:multichain
+        run: bun test:multichain

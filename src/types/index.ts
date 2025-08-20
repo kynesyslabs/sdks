@@ -26,10 +26,10 @@ export {
     IdentityTransaction,
     InstantMessagingTransaction,
     NativeBridgeTransaction,
-    SpecificTransaction
+    SpecificTransaction,
 } from "./blockchain/TransactionSubtypes"
 
-export { L2PSEncryptedPayload } from "@/l2ps"
+// L2PSEncryptedPayload removed to avoid circular dependency - import directly from @/l2ps
 
 // SECTION Payload types
 export { INativePayload } from "./native/INativePayload"
@@ -71,7 +71,6 @@ export { IPeerConfig, IPeer } from "./peers/Peer"
 export {
     IParam,
     IRawWeb2Request,
-    IWeb2Attestation,
     IWeb2Request,
     IWeb2Payload,
     IWeb2Result,
@@ -80,11 +79,19 @@ export {
     IAuthorizationConfig,
     IWeb2RequestOptions,
     IStartProxyParams,
-    IAttestationWithResponse,
     IDAHRStartProxyParams,
-    EnumWeb2Methods,
+    Web2Method,
     EnumWeb2Actions,
 } from "./web2"
+export { TweetSimplified, Tweet, TwitterTimelineResponse, TwitterProfile, TwitterFollowersResponse } from "./web2/twitter"
+export { 
+    TelegramChallengeRequest, 
+    TelegramChallengeResponse, 
+    TelegramVerificationResponse, 
+    TelegramUser, 
+    TelegramVerificationRequest 
+} from "./web2/telegram"
+export { EthTransactionResponse, EthTransaction, SolanaTransactionResponse, SolTransaction } from "./xm/apiTools"
 
 export { IOperation, ITask, XMScript } from "./xm"
 

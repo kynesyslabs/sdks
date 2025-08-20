@@ -1,6 +1,7 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.2.62",
+    "version": "2.3.19",
+    "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
@@ -26,16 +27,15 @@
     },
     "scripts": {
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
-        "publish": "yarn npm publish",
         "typedoc": "typedoc",
         "test": "jest",
+        "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",
         "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/{coin,evm}*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:tx": "rm -rf build && jest --testMatch '**/tests/multichain**/fulltx*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:demoswork": "rm -rf build && jest --testMatch '**/tests/**/demoswork*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:identities": "rm -rf build && jest --testMatch '**/tests/**/identities.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:identities:pqc": "rm -rf build && jest --testMatch '**/tests/**/identities.pqc.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:identities:web2": "rm -rf build && jest --testMatch '**/tests/**/identities.web2*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose --setupFiles dotenv/config",
-        "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",
         "test:native": "rm -rf build && jest --testMatch '**/tests/native*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:web2": "rm -rf build && jest --testMatch '**/tests/web2*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:demos": "rm -rf build && jest --testMatch '**/newdemos.spec.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
@@ -43,9 +43,14 @@
         "test:btc": "rm -rf build && jest --testMatch '**/tests/multichain**/bitcoin*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:pqc": "rm -rf build && jest --testMatch '**/tests/encryption/pqc*.ts' --verbose",
         "test:pcq": "yarn test:pqc",
-        "test:bridge": "rm -rf build && jest --testMatch '**/tests/bridge/native.spec.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose"
+        "test:bridge": "rm -rf build && jest --testMatch '**/tests/bridge/native.spec.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:referrals": "rm -rf build && jest --testMatch '**/tests/**/referrals.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:evm": "rm -rf build && jest --testMatch '**/tests/**/evm.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:aptos": "node --require ts-node/register --require tsconfig-paths/register --test src/tests/multichain/aptos.node.spec.ts",
+        "test:aptos:only": "node --require ts-node/register --require tsconfig-paths/register --test --test-only src/tests/multichain/aptos.node.spec.ts"
     },
     "dependencies": {
+        "@aptos-labs/ts-sdk": "^1.28.0",
         "@bitcoinerlab/secp256k1": "^1.2.0",
         "@cosmjs/proto-signing": "^0.32.3",
         "@cosmjs/stargate": "^0.32.3",
@@ -54,15 +59,15 @@
         "@multiversx/sdk-extension-provider": "^3.0.0",
         "@multiversx/sdk-network-providers": "^2.4.3",
         "@multiversx/sdk-wallet": "^4.4.0",
-        "@noble/hashes": "^1.8.0",
+        "@noble/curves": "1.9.4",
+        "@noble/hashes": "1.8.0",
         "@noble/post-quantum": "^0.4.0",
         "@project-serum/anchor": "^0.26.0",
         "@roamhq/wrtc": "^0.8.0",
         "@simplewebauthn/browser": "^11.0.0",
         "@simplewebauthn/server": "^11.0.0",
         "@solana/buffer-layout": "^4.0.1",
-        "@solana/web3.js": "^1.98.0",
-        "@the-convocation/twitter-scraper": "^0.16.6",
+        "@solana/web3.js": "1.98.0",
         "@ton/core": "^0.56.3",
         "@ton/crypto": "^3.2.0",
         "@ton/ton": "^13.11.2",
@@ -109,8 +114,8 @@
         "resolve-tspaths": "^0.8.18",
         "ts-jest": "^29.1.2",
         "ts-node": "^10.9.2",
+        "tsconfig-paths": "^4.2.0",
         "typedoc": "^0.26.6",
         "typescript": "^5.4.3"
-    },
-    "packageManager": "yarn@3.8.7"
+    }
 }

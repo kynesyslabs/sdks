@@ -1,7 +1,7 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
-import { RPCResponseWithValidityData, SigningAlgorithm } from "@/types"
+import axios from "axios"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
@@ -13,11 +13,11 @@ import {
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
 } from "@/types/abstraction"
-import { _required as required, DemosTransactions } from "@/websdk"
 import { Demos } from "@/websdk/demosclass"
-import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
-import axios from "axios"
 import { PQCAlgorithm } from "@/types/cryptography"
+import { RPCResponseWithValidityData } from "@/types"
+import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
+import { _required as required, DemosTransactions } from "@/websdk"
 
 export class Identities {
     formats = {
@@ -146,8 +146,8 @@ export class Identities {
      * @param payload The payload to infer the identity from.
      * @returns The validity data of the identity transaction.
      */
-    async inferXmIdentity(demos: Demos, payload: InferFromSignaturePayload) {
-        return await this.inferIdentity(demos, "xm", payload)
+    async inferXmIdentity(demos: Demos, payload: InferFromSignaturePayload, referralCode?: string) {
+        return await this.inferIdentity(demos, "xm", { ...payload, referralCode: referralCode })
     }
 
     /**
@@ -200,7 +200,7 @@ export class Identities {
      * @param payload The payload to add the identity to.
      * @returns The response from the RPC call.
      */
-    async addGithubIdentity(demos: Demos, payload: GithubProof) {
+    async addGithubIdentity(demos: Demos, payload: GithubProof, referralCode?: string) {
         const username = payload.split("/")[3]
         const ghUser = await axios.get(`https://api.github.com/users/${username}`)
 
@@ -213,6 +213,7 @@ export class Identities {
             proof: payload,
             username: ghUser.data.login,
             userId: ghUser.data.id,
+            referralCode: referralCode,
         }
 
         return await this.inferIdentity(demos, "web2", githubPayload)
@@ -225,11 +226,15 @@ export class Identities {
      * @param payload The payload to add the identity to.
      * @returns The response from the RPC call.
      */
-    async addTwitterIdentity(demos: Demos, payload: TwitterProof) {
+    async addTwitterIdentity(demos: Demos, payload: TwitterProof, referralCode?: string) {
         const data = await demos.web2.getTweet(payload)
 
         if (!data.success) {
             throw new Error(data.error)
+        }
+
+        if (!data.tweet.userId || !data.tweet.username) {
+            throw new Error("Unable to get twitter user info. Please try again.")
         }
 
         let twitterPayload: InferFromXPayload = {
@@ -237,6 +242,7 @@ export class Identities {
             proof: payload,
             username: data.tweet.username,
             userId: data.tweet.userId,
+            referralCode: referralCode,
         }
 
         return await this.inferIdentity(demos, "web2", twitterPayload)
@@ -377,6 +383,46 @@ export class Identities {
                     method: "getPoints",
                     params: [address],
                 },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Validate a referral code to check if it exists and is valid.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param referralCode The referral code to validate.
+     * @returns The validation result containing validity status, referrer public key, and message.
+     */
+    async validateReferralCode(demos: Demos, referralCode: string) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                { method: "validateReferralCode", params: [referralCode] },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Get referral information for an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param address The address to get referral info for. Defaults to the connected wallet's address.
+     * @returns The referral information associated with the address.
+     */
+    async getReferralInfo(demos: Demos, address?: string) {
+        if (!address) {
+            address = await demos.getEd25519Address()
+        }
+
+        const request = {
+            method: "gcr_routine",
+            params: [
+                { method: "getReferralInfo", params: [address] },
             ],
         }
 

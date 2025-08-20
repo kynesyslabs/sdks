@@ -161,7 +161,7 @@ interface prepareXMScriptParams {
     chain: string
     subchain: string
     signedPayloads: any[]
-    type: string
+    type: "pay" | "contract_write"
     rpc?: string
     is_evm?: boolean
     params?: any

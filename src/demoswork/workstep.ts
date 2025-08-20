@@ -1,7 +1,7 @@
 import { getNewUID } from "./utils"
 
 import { skeletons } from "@/websdk"
-import { EnumWeb2Methods, IWeb2Request, XMScript } from "@/types"
+import { Web2Method, IWeb2Request, XMScript } from "@/types"
 import { INativePayload } from "@/types/native"
 import { DataTypes } from "@/types/demoswork/datatypes"
 import { StepOutputKey, WorkStepInput } from "@/types/demoswork/steps"
@@ -78,11 +78,10 @@ export function prepareXMStep(xm_payload: XMScript) {
 }
 
 export function prepareWeb2Step({
-    method = EnumWeb2Methods.GET,
+    method = "GET" as Web2Method,
     url = "https://icanhazip.com",
     parameters = [],
     headers = null,
-    minAttestations = 2,
 }) {
     // Generating an empty request and filling it
     const web2_payload: IWeb2Request = structuredClone(skeletons.web2_request)
@@ -91,9 +90,7 @@ export function prepareWeb2Step({
     web2_payload.raw.url = url
     web2_payload.raw.parameters = parameters
     web2_payload.raw.headers = headers
-    web2_payload.raw.minAttestations = minAttestations
     // Ensuring content is a known property
-    web2_payload.attestations = new Map()
     web2_payload.hash = ""
     web2_payload.signature = {
         type: "ed25519",

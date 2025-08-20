@@ -1,15 +1,13 @@
 import { EnumWeb2Actions } from "@/types"
-import type {
-    IAttestationWithResponse,
-    IStartProxyParams,
-    Transaction,
-    IWeb2Payload,
-} from "@/types"
 import { web2_request } from "./utils/skeletons"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"
-
-const web2Request = { ...web2_request }
+import type {
+    IStartProxyParams,
+    Transaction,
+    IWeb2Payload,
+    IWeb2Result,
+} from "@/types"
 
 export class Web2Proxy {
     private readonly _sessionId: string
@@ -41,32 +39,63 @@ export class Web2Proxy {
             payload: {},
             authorization: "",
         },
-    }: IStartProxyParams): Promise<IAttestationWithResponse> {
-        web2Request.raw = {
-            ...web2Request.raw,
+    }: IStartProxyParams): Promise<IWeb2Result> {
+        // Create a fresh copy of web2Request for each call
+        const freshWeb2Request = { ...web2_request }
+
+        freshWeb2Request.raw = {
+            ...freshWeb2Request.raw,
             action: EnumWeb2Actions.START_PROXY,
             method,
             url,
             headers: options?.headers,
         }
 
-        return await this._demos.call("web2ProxyRequest", {
-            web2Request,
+        const response = await this._demos.call("web2ProxyRequest", {
+            web2Request: freshWeb2Request,
             sessionId: this._sessionId,
             payload: options?.payload,
             authorization: options?.authorization,
         })
-    }
 
-    /**
-     * Stop the proxy.
-     * @returns {Promise<void>}
-     */
-    async stopProxy(): Promise<void> {
-        await this._demos.call("web2ProxyRequest", {
-            sessionId: this.sessionId,
-            action: EnumWeb2Actions.STOP_PROXY,
-        })
+        const web2Payload: IWeb2Payload = {
+            message: {
+                sessionId: this._sessionId,
+                payload: "",
+                authorization: "",
+                web2Request: {
+                    ...freshWeb2Request,
+                    result: {
+                        sessionId: this._sessionId,
+                        targetUrl: freshWeb2Request.raw.url,
+                        timestamp: Date.now(),
+                        status: response.response.status,
+                        headers: response.response.headers,
+                        dataHash: response.response.dataHash,
+                        headersHash: response.response.headersHash,
+                        statusText: response.response.statusText,
+                    },
+                },
+            },
+        }
+
+        // Create a transaction to store the web2 payload in the blockchain.
+        const web2Tx: Transaction = DemosTransactions.empty()
+        web2Tx.content.to = await this._demos.getEd25519Address()
+        web2Tx.content.type = "web2Request"
+        web2Tx.content.data = ["web2Request", web2Payload]
+        web2Tx.content.timestamp = Date.now()
+
+        const signedWeb2Tx = await this._demos.sign(web2Tx)
+        const validityData = await this._demos.confirm(signedWeb2Tx)
+        const txHash = validityData.response.data.transaction.hash
+        await this._demos.broadcast(validityData)
+
+        const result: IWeb2Result = {
+            ...response.response,
+            txHash,
+        }
+        return result
     }
 }
 
@@ -86,14 +115,15 @@ export const web2Calls = {
             throw new Error("No keypair provided and no wallet connected")
         }
 
+        // Create a fresh copy of web2Request for creation
+        const freshWeb2Request = { ...web2_request }
+        freshWeb2Request.raw = {
+            ...freshWeb2Request.raw,
+            action: EnumWeb2Actions.CREATE,
+        }
+
         const response = await demos.call("web2ProxyRequest", {
-            web2Request: {
-                ...web2Request,
-                raw: {
-                    ...web2Request.raw,
-                    action: EnumWeb2Actions.CREATE,
-                },
-            },
+            web2Request: freshWeb2Request,
         })
 
         const sessionId = response.response?.dahr?.sessionId
@@ -101,28 +131,6 @@ export const web2Calls = {
             throw new Error("Failed to create proxy session")
         }
 
-        // Creating a web2 payload
-        const web2Payload: IWeb2Payload = {
-            message: {
-                sessionId: sessionId,
-                payload: "",
-                authorization: "",
-                web2Request: web2Request,
-            },
-        }
-
-        const web2Tx: Transaction = DemosTransactions.empty()
-        // From and To are the same in Web2 transactions
-        // web2Tx.content.from = usedKeyPair.publicKey as Uint8Array
-        web2Tx.content.to = web2Tx.content.from
-        web2Tx.content.type = "web2Request"
-        web2Tx.content.data = ["web2Request", web2Payload]
-        web2Tx.content.timestamp = Date.now()
-
-        // Signing and broadcasting the transaction
-        const signedWeb2Tx = await demos.sign(web2Tx)
-        const validityData = await demos.confirm(signedWeb2Tx)
-        await demos.broadcast(validityData)
         return new Web2Proxy(sessionId, demos)
     },
 }

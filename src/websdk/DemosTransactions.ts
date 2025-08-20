@@ -5,6 +5,7 @@ import { sha256 } from "./utils/sha256"
 import * as skeletons from "./utils/skeletons"
 
 import type { SigningAlgorithm, Transaction } from "@/types"
+import type { L2PSHashPayload } from "@/types/blockchain/TransactionSubtypes/L2PSHashTransaction"
 import { IKeyPair } from "./types/KeyPair"
 import { GCRGeneration } from "./GCRGeneration"
 import { _required as required } from "./utils/required"
@@ -237,5 +238,101 @@ export const DemosTransactions = {
             return res
         }
     },
+    
+    /**
+     * Create a signed DEMOS transaction to store binary data on the blockchain.
+     * Data is stored in the sender's account.
+     *
+     * @param bytes - The binary data to store (will be base64-encoded)
+     * @param demos - The demos instance (for getting the address nonce)
+     *
+     * @returns The signed storage transaction.
+     */
+    async store(bytes: Uint8Array, demos: Demos) {
+        required(demos.keypair, "Wallet not connected")
+
+        let tx = DemosTransactions.empty()
+
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
+
+        // Convert bytes to base64 for JSONB compatibility
+        const base64Bytes = Buffer.from(bytes).toString('base64')
+
+        tx.content.to = publicKeyHex // Storage is always to the sender's address
+        tx.content.nonce = nonce + 1
+        tx.content.amount = 0 // Storage transactions don't transfer native tokens
+        tx.content.type = "storage"
+        tx.content.timestamp = Date.now()
+        tx.content.data = [
+            "storage",
+            { bytes: base64Bytes },
+        ]
+
+        return await demos.sign(tx)
+    },
+    
+    /**
+     * Create a signed L2PS hash update transaction for DTR relay to validators.
+     * 
+     * L2PS hash updates are self-directed transactions that carry consolidated
+     * hash information representing multiple L2PS transactions. These transactions
+     * are automatically relayed to validators via DTR (Distributed Transaction Routing)
+     * to enable consensus on L2PS network activity without exposing transaction content.
+     * 
+     * @param l2psUid - The unique identifier of the L2PS network
+     * @param consolidatedHash - SHA-256 hash representing all L2PS transactions
+     * @param transactionCount - Number of transactions included in this hash update
+     * @param demos - The demos instance (for getting the address nonce)
+     * 
+     * @returns The signed L2PS hash update transaction
+     * 
+     * @example
+     * ```typescript
+     * const hashUpdateTx = await DemosTransactions.createL2PSHashUpdate(
+     *   "l2ps_network_123",
+     *   "0x1234567890abcdef...",
+     *   5,
+     *   demos
+     * )
+     * ```
+     */
+    async createL2PSHashUpdate(
+        l2psUid: string,
+        consolidatedHash: string,
+        transactionCount: number,
+        demos: Demos
+    ) {
+        required(demos.keypair, "Wallet not connected")
+        required(l2psUid, "L2PS UID is required")
+        required(consolidatedHash, "Consolidated hash is required")
+        required(transactionCount >= 0, "Transaction count must be non-negative")
+
+        let tx = DemosTransactions.empty()
+
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
+
+        // Self-directed transaction (from = to) triggers DTR routing
+        tx.content.to = publicKeyHex
+        tx.content.nonce = nonce + 1
+        tx.content.amount = 0 // No tokens transferred in hash updates
+        tx.content.type = "l2ps_hash_update"
+        tx.content.timestamp = Date.now()
+        tx.content.data = [
+            "l2ps_hash_update",
+            {
+                l2ps_uid: l2psUid,
+                consolidated_hash: consolidatedHash,
+                transaction_count: transactionCount,
+                timestamp: Date.now()
+            } as L2PSHashPayload
+        ]
+
+        return await demos.sign(tx)
+    },
+    
     // NOTE Subnet transactions methods are imported and exposed in demos.ts from the l2ps.ts file.
 }

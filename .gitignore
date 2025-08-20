@@ -17,3 +17,5 @@ mise.toml
 
 # Claude specific files
 CLAUDE.md
+.DS_Store
+.npmrc

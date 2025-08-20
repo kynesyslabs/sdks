@@ -30,7 +30,7 @@ import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
-import { Tweet } from "@the-convocation/twitter-scraper"
+import { TweetSimplified } from "@/types"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -155,12 +155,19 @@ export class Demos {
         let hashable: string | Uint8Array = null
 
         if (typeof masterSeed === "string") {
-            if (masterSeed.split(" ").length % 3 === 0) {
+            masterSeed = masterSeed.trim()
+
+            if (!bip39.validateMnemonic(masterSeed, wordlist)) {
                 hashable = bip39.mnemonicToSeedSync(masterSeed)
             } else {
                 hashable = masterSeed
             }
-        } else if (masterSeed.length !== 128) {
+        }
+
+        // NOTE: Reverted this bug to keep generating the same keypair
+        // with the same mnemonic for mnemonics added to testnet during the incentives campaign.
+        // TODO: Put back the "else" when we clear the testnet database.
+        /* else */  if (masterSeed.length !== 128) {
             hashable = masterSeed
         }
 
@@ -246,6 +253,19 @@ export class Demos {
     }
 
     /**
+     * Create a signed DEMOS transaction to store binary data on the blockchain.
+     * Data is stored in the sender's account.
+     *
+     * @param bytes - The binary data to store
+     * 
+     * @returns The signed storage transaction.
+     */
+    store(bytes: Uint8Array) {
+        required(this.keypair, "Wallet not connected")
+        return DemosTransactions.store(bytes, this)
+    }
+
+    /**
      * Confirms a transaction.
      *
      * @param transaction - The transaction to confirm
@@ -315,6 +335,16 @@ export class Demos {
         }
 
         raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
+
+        // We derive the network fee from GCR edits (sum of sender balance removals minus `amount`).
+        // This is a pragmatic interim approach; ideally the node should authoritatively return fees
+        // to avoid drift between SDK and node logic.
+        try {
+            raw_tx = this._calculateAndApplyGasFee(raw_tx)
+        } catch (e) {
+            // Non-fatal: if fee derivation fails, continue without modifying fees
+            console.warn("[demos] fee derivation skipped:", e)
+        }
 
         raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
         const signature = await this.crypto.sign(
@@ -402,6 +432,68 @@ export class Demos {
         })
 
         return verified
+    }
+
+    /**
+     * @private
+     * Calculates and applies the gas fee for a transaction (SDK-level fallback).
+     * NOTE: We infer the fee by analyzing the generated GCR (Gas Consumption Record) edits:
+     * - Sum all "balance" edits with operation "remove" for the sender
+     * - Subtract the declared transaction `amount`
+     * The remainder is treated as the network fee. If a fee already exists on the tx, we only raise
+     * `network_fee` if the newly inferred fee is higher (prevents double-charging on re-sign).
+     * This is an interim approach; the preferred design is for the node to return fees explicitly.
+     *
+     * @param raw_tx - The transaction for which to calculate the fee.
+     * @returns The updated transaction with the fee applied.
+     */
+    private _calculateAndApplyGasFee(raw_tx: Transaction): Transaction {
+        const edits = raw_tx.content.gcr_edits
+        if (!Array.isArray(edits)) {
+            // Fail silently: don’t block signing if GCR edits aren’t available
+            return raw_tx
+        }
+
+        // INFO: The gas fee is calculated by summing up all "remove" balance edits for the sender's account
+        // and then subtracting the actual transaction amount. This gives the value of the fee.
+        const sender = (raw_tx.content.from_ed25519_address ?? "").toLowerCase()
+        const totalRemoved = edits.reduce((sum, edit: any) => {
+            try {
+                if (
+                    edit.type === "balance" &&
+                    edit.operation === "remove" &&
+                    typeof edit.account === "string" &&
+                    edit.account.toLowerCase() === sender
+                ) {
+                    const amt = Number(edit.amount)
+                    return sum + (Number.isFinite(amt) ? amt : 0)
+                }
+            } catch {
+                // skip malformed entries
+            }
+            return sum
+        }, 0)
+
+        const txAmt = Number(raw_tx.content.amount ?? 0)
+        const calculatedFee = Math.max(totalRemoved - (Number.isFinite(txAmt) ? txAmt : 0), 0)
+
+        // INFO: This logic handles both initial fee creation and accumulation for re-signed transactions.
+        // To avoid fee accumulation, a new transaction object should be created for each signing.
+        const existing = raw_tx.content.transaction_fee ?? { network_fee: 0, rpc_fee: 0, additional_fee: 0 }
+        const totalExisting =
+            (Number(existing.network_fee) || 0) +
+            (Number(existing.rpc_fee) || 0) +
+            (Number(existing.additional_fee) || 0)
+
+        // Only set the fee if no fees are already applied
+        if (totalExisting === 0) {
+            raw_tx.content.transaction_fee = {
+                network_fee: calculatedFee,
+                rpc_fee: 0,
+                additional_fee: 0,
+            }
+        }
+        return raw_tx
     }
 
     // L2PS calls are defined here
@@ -637,6 +729,20 @@ export class Demos {
     }
 
     /**
+     * Get the transaction history of an address.
+     *
+     * @param address - The address
+     * @param type - The type of transaction. Defaults to "all".
+     * @param start - The start index. Defaults to 0.
+     * @param limit - The number of transactions to return. Defaults to 100.
+     *
+     * @returns A list of transaction ordered from the most recent to the oldest.
+     */
+    async getTransactionHistory(address: string, type: TransactionContent["type"] | "all" = "all", options: { start?: number, limit?: number } = {}): Promise<Transaction[]> {
+        return await this.nodeCall("getTransactionHistory", { address, type, ...options })
+    }
+
+    /**
      * Get all transactions.
      */
     async getTransactions(
@@ -729,7 +835,7 @@ export class Demos {
         createDahr: async () => {
             return await web2Calls.createDahr(this)
         },
-        getTweet: async (tweetUrl: string): Promise<{ success: boolean, tweet: Tweet, error?: string }> => {
+        getTweet: async (tweetUrl: string): Promise<{ success: boolean, tweet: TweetSimplified, error?: string }> => {
             return await this.nodeCall("getTweet", {
                 tweetUrl,
             })

@@ -38,6 +38,7 @@ export interface InferFromWritePayload {
      * The identity of the target address to bind to the Demos identity
      */
     target_identity: InferFromWriteTargetIdentityPayload
+    referralCode?: string
 }
 
 // Interface for the payload of the inferIdentityFromSignature method
@@ -47,6 +48,7 @@ export interface InferFromSignaturePayload {
      * The identity of the target address to bind to the Demos identity
      */
     target_identity: InferFromSignatureTargetIdentityPayload
+    referralCode?: string
 }
 
 
@@ -82,6 +84,7 @@ export interface Web2CoreTargetIdentityPayload {
     proof: string
     username: string
     userId: string
+    referralCode?: string
 }
 
 // ANCHOR Github Identities
@@ -111,6 +114,13 @@ export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
 
 export interface InferFromTwitterPayload extends InferFromXPayload { }
 
+// ANCHOR Telegram Identities
+export interface InferFromTelegramPayload extends Web2CoreTargetIdentityPayload {
+    context: "telegram"
+    username: string
+    userId: string
+}
+
 // SECTION Web2 Identities
 export interface BaseWeb2IdentityPayload {
     context: "web2"
@@ -120,7 +130,7 @@ export interface BaseWeb2IdentityPayload {
 
 export interface Web2IdentityAssignPayload extends BaseWeb2IdentityPayload {
     method: "web2_identity_assign"
-    payload: InferFromGithubPayload | InferFromTwitterPayload
+    payload: InferFromGithubPayload | InferFromTwitterPayload | InferFromTelegramPayload
 }
 
 export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
@@ -161,6 +171,7 @@ export type PqcIdentityPayload = PqcIdentityAssignPayload | PqcIdentityRemovePay
 export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload | PqcIdentityPayload
 export interface UserPoints {
     userId: string
+    referralCode: string
     totalPoints: number
     breakdown: {
         web3Wallets: { [chain: string]: number }
@@ -169,8 +180,12 @@ export interface UserPoints {
             github: number
             discord: number
         }
+        referrals: number
+        demosFollow: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
     lastUpdated: Date
+    flagged: boolean | null
+    flaggedReason: string | null
 }

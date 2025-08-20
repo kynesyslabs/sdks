@@ -1,11 +1,14 @@
-import { Transaction } from "ethers"
+import { Transaction, parseEther } from "ethers"
 
-import { EVM } from "@/multichain/core"
+import { EVM } from "@/multichain/localsdk"
 import { getSampleTranfers, verifyNumberOrder } from "../utils"
 import { wallets } from "../utils/wallets"
 import chainProviders from "./chainProviders"
+import { Demos, prepareXMPayload, prepareXMScript } from "@/websdk"
 
 describe("EVM CHAIN TESTS", () => {
+    const rpc = "http://localhost:53550"
+    const demos = new Demos()
     const instance = new EVM(chainProviders.eth.sepolia)
 
     beforeAll(async () => {
@@ -13,6 +16,9 @@ describe("EVM CHAIN TESTS", () => {
         await instance.connectWallet(wallets.evm.privateKey)
 
         expect(connected).toBe(true)
+
+        await demos.connect(rpc)
+        await demos.connectWallet("polar scale globe beauty stock employ rail exercise goat into sample embark")
     })
 
     test("preparePay returns a signed transaction", async () => {
@@ -86,7 +92,102 @@ describe("EVM CHAIN TESTS", () => {
             "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
             "0x500d9257fd8eb4583684E5BEbb65DC1Fa243DDF9",
         )
-        
+
         console.log(balance)
+    })
+
+    test("writeToContract generates valid signed transaction", async () => {
+        // REVIEW: Test the updated writeToContract method
+        const testERC20ABI = [
+            {
+                constant: false,
+                inputs: [
+                    { name: "dst", type: "address" },
+                    { name: "wad", type: "uint256" },
+                ],
+                name: "transfer",
+                outputs: [{ name: "", type: "bool" }],
+                payable: false,
+                stateMutability: "nonpayable",
+                type: "function",
+            },
+        ]
+
+        // Use a mock ERC20 contract address (doesn't need to exist for signing test)
+        const mockContractAddress = "0x1234567890123456789012345678901234567890"
+        const contract = await instance.getContractInstance(mockContractAddress, JSON.stringify(testERC20ABI))
+
+        const recipient = "0xa2f64eec3E69C0B2E9978AB371A16eaA3a1Cf793"
+        const amount = parseEther("1.0")
+
+        const signedTx = await instance.writeToContract(contract, "transfer", [recipient, amount])
+
+        // Verify it's a valid signed transaction
+        expect(typeof signedTx).toBe("string")
+        expect(signedTx.startsWith("0x")).toBe(true)
+        expect(signedTx.length).toBeGreaterThan(100) // Signed transactions are substantial in length
+
+        // Reconstruct transaction to verify structure
+        const tx = Transaction.from(signedTx)
+        expect(tx.to).toBe(mockContractAddress)
+        expect(tx.data).toBeDefined()
+        expect(tx.data.length).toBeGreaterThan(10) // Should contain encoded function call
+        expect(tx.signature).toBeDefined()
+        expect(tx.signature.r).toBeDefined()
+        expect(tx.signature.s).toBeDefined()
+        expect(tx.signature.v).toBeDefined()
+    })
+
+    test("writeToContract with custom gas and value options", async () => {
+        // REVIEW: Test custom options support
+        const payableABI = [
+            {
+                constant: false,
+                inputs: [],
+                name: "deposit",
+                outputs: [],
+                payable: true,
+                stateMutability: "payable",
+                type: "function",
+            },
+        ]
+
+        const mockContractAddress = "0x1234567890123456789012345678901234567890"
+        const contract = await instance.getContractInstance(mockContractAddress, JSON.stringify(payableABI))
+
+        const signedTx = await instance.writeToContract(
+            contract,
+            "deposit",
+            [],
+            {
+                gasLimit: 100000,
+                value: "1"
+            }
+        )
+
+        // Verify transaction structure
+        expect(typeof signedTx).toBe("string")
+        expect(signedTx.startsWith("0x")).toBe(true)
+
+        const tx = Transaction.from(signedTx)
+        expect(tx.to).toBe(mockContractAddress)
+        expect(tx.gasLimit).toBe(BigInt(100000))
+        expect(tx.value).toBe(parseEther("1"))
+
+        const xmscript = prepareXMScript({
+            chain: "eth",
+            signedPayloads: [signedTx],
+            subchain: "sepolia",
+            type: "contract_write",
+            is_evm: true,
+        })
+
+        const signedDemosTx = await prepareXMPayload(xmscript, demos)
+
+        const validityData = await demos.confirm(signedDemosTx)
+        console.log(validityData)
+
+        const res = await demos.broadcast(validityData)
+        console.log(res)
     })
 })
