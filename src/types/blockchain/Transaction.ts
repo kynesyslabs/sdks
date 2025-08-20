@@ -13,7 +13,8 @@ import { BridgeOperationCompiled } from "@/bridge/nativeBridgeTypes"
 import { L2PSEncryptedPayload } from "@/l2ps"
 import { StoragePayload } from "./TransactionSubtypes/StorageTransaction"
 import { L2PSHashPayload } from "./TransactionSubtypes/L2PSHashTransaction"
-import { SmartContractPayload } from "./TransactionSubtypes/SmartContractTransaction"
+import { ContractDeployPayload } from "./TransactionSubtypes/ContractDeployTransaction"
+import { ContractCallPayload } from "./TransactionSubtypes/ContractCallTransaction"
 
 // TODO Implement multisignature transactions
 
@@ -34,7 +35,8 @@ export type TransactionContentData =
     | ["nativeBridge", BridgeOperationCompiled]
     | ["storage", StoragePayload]
     | ["l2ps_hash_update", L2PSHashPayload]
-    | ["smartContract", SmartContractPayload]
+    | ["contractDeploy", ContractDeployPayload]
+    | ["contractCall", ContractCallPayload]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
@@ -53,7 +55,8 @@ export interface TransactionContent {
     | "l2psEncryptedTx"
     | "storage"
     | "l2ps_hash_update"
-    | "smartContract"
+    | "contractDeploy"
+    | "contractCall"
     from: string
     from_ed25519_address: string
     to: string

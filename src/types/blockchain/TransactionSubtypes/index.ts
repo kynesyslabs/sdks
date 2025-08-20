@@ -8,6 +8,8 @@ export * from './IdentityTransaction'
 export * from './InstantMessagingTransaction'
 export * from './NativeBridgeTransaction'
 export * from './StorageTransaction'
+export * from './ContractDeployTransaction'
+export * from './ContractCallTransaction'
 
 // Re-export all transaction types as a union
 import { L2PSTransaction } from './L2PSTransaction'
@@ -20,6 +22,8 @@ import { IdentityTransaction } from './IdentityTransaction'
 import { InstantMessagingTransaction } from './InstantMessagingTransaction'
 import { NativeBridgeTransaction } from './NativeBridgeTransaction'
 import { StorageTransaction } from './StorageTransaction'
+import { ContractDeployTransaction } from './ContractDeployTransaction'
+import { ContractCallTransaction } from './ContractCallTransaction'
 
 export type SpecificTransaction =
     | L2PSTransaction
@@ -31,4 +35,6 @@ export type SpecificTransaction =
     | IdentityTransaction
     | InstantMessagingTransaction
     | NativeBridgeTransaction
-    | StorageTransaction 
+    | StorageTransaction
+    | ContractDeployTransaction
+    | ContractCallTransaction 
