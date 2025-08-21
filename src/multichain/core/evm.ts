@@ -382,7 +382,6 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     // SECTION Not implemented methods
 
     async getContractInstance(address: string, abi: string): Promise<Contract> {
-        console.log(this)
         if (!this.provider) {
             throw new Error("Provider not connected")
         }
@@ -454,27 +453,21 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         event: string,
         contract: string,
         abi: any[],
+        callback: (data: any) => Promise<any>
     ): Promise<any> {
         if (!this.provider) {
             throw new Error("Provider not connected")
         }
         let contractInstance = new Contract(contract, abi, this.provider)
         // REVIEW THis could work
-        return contractInstance.on(event, (data: any) => {
-            ////console.log(data)
-            // TODO Do something with the data
-        })
+        return contractInstance.on(event, (data: any) => callback(data))
     }
 
-    async listenForAllEvents(contract: string, abi: any[]): Promise<any> {
+    async listenForAllEvents(contract: string, abi: any[], callback: (data: any) => Promise<any>): Promise<any> {
         if (!this.provider) {
             throw new Error("Provider not connected")
         }
         let contractInstance = new Contract(contract, abi, this.provider)
-        // REVIEW 99% Won't work
-        return contractInstance.on("*", (data: any) => {
-            ////console.log(data)
-            // TODO Do something with the data
-        })
+        return contractInstance.on("*", (data: any) => callback(data))
     }
 }

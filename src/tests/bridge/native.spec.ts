@@ -25,9 +25,9 @@ describe("Native bridge Playground", () => {
                 address: '0x5FbE74A283f7954f10AA04C2eDf55578811aeb03',
             },
             to: {
-                chain: "solana",
-                subchain: "devnet",
-                address: "J5UG6CP3iSCWVdUgMF51LUwY77tJaHWBRhgGzY546kKx",
+                chain: "evm.polygon",
+                subchain: "amoy",
+                address: "0x5FbE74A283f7954f10AA04C2eDf55578811aeb03",
             },
             token: {
                 amount: "10",
@@ -37,7 +37,7 @@ describe("Native bridge Playground", () => {
 
         // Validates the operation params (locally), then sends to the node
         const compiled = await bridge.validate(operation)
-        console.log(compiled)
+        console.log("compiled", JSON.stringify(compiled, null, 2))
 
         // Confirms the compiled operation's signature, creates a tx and sends it
         // to the node using demos.confirm

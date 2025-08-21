@@ -138,12 +138,6 @@ export {
     XmGCRData,
     XmGCRIdentityData,
 } from "./blockchain/GCREdit"
-export { BridgeTradePayload } from "./bridge/bridgeTradePayload"
-export {
-    ChainProviders,
-    SupportedChains,
-    SupportedTokens,
-} from "./bridge/constants"
 
 export { type SigningAlgorithm, type EncryptionAlgorithm } from "./cryptography"
 export {
@@ -160,3 +154,5 @@ export {
     isTransactionType,
     isTransactionDataType,
 } from "./blockchain/TransactionSubtypes/utils"
+
+export { BLOCKCHAIN_NAME, BridgeTradePayload, CROSS_CHAIN_TRADE_TYPE, ChainProviders, CompiledContent, CrossChainTrade, EVMTankData, NativeBridge, NativeBridgeOperation, NativeBridgeOperationCompiled, NativeBridgeSupportedChain, NativeBridgeSupportedChains, NativeBridgeSupportedEVMChain, NativeBridgeSupportedEVMChains, NativeBridgeSupportedStablecoin, NativeBridgeSupportedStablecoins, NativeBridgeUSDCAbi, NativeBridgeUSDCContracts, RubicBridge, RubicSdkError, SolanaTankData, SupportedChains, SupportedNonEVMChain, SupportedTokens, TankData, WrappedCrossChainTrade, providerUrls, supportedNonEVMChains } from "@/bridge"

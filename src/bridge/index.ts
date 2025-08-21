@@ -35,3 +35,4 @@ export {
     supportedNonEVMChains,
 } from "./nativeBridgeTypes"
 export { RubicBridge }
+export { validateChain } from "./utils"

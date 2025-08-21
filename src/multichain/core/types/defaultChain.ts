@@ -278,8 +278,9 @@ export interface IEVMDefaultChain {
         event: string,
         contract: string,
         abi: any[],
+        callback: (data: any) => Promise<any>
     ) => Promise<any>
-    listenForAllEvents: (contract: string, abi: any[]) => Promise<any>
+    listenForAllEvents: (contract: string, abi: any[], callback: (data: any) => Promise<any>) => Promise<any>
     waitForReceipt: (tx_hash: string) => Promise<TransactionReceipt>
 }
 
