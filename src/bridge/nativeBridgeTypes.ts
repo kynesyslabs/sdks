@@ -65,6 +65,11 @@ export type CompiledContent = {
     operation: BridgeOperation
     validUntil: number
     tankData: SolanaTankData | EVMTankData
+    /**
+     * The transaction hash for the user's crosschain deposit to tank transaction.
+     * This needs to be included when submitting the demos transaction.
+     */
+    txHash?: string
 }
 
 // Types compiled from the node

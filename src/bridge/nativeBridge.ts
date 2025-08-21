@@ -262,12 +262,15 @@ export class NativeBridge {
      * @param compiled The compiled operation
      * @returns RPC response with transaction validity data
      */
-    async confirm(compiled: RPCResponseWithBridgeOperationCompiled): Promise<RPCResponseWithValidityData> {
+    async confirm(compiled: RPCResponseWithBridgeOperationCompiled, txHash: string): Promise<RPCResponseWithValidityData> {
         required(this.demos, "Demos instance not connected")
         required(this.demos.walletConnected, "Wallet not connected to the Demos object")
+        required(txHash, "The crosschain deposit to tank transaction hash is missing")
 
         // INFO: Verify the RPC signature
         const operation = compiled.response
+        operation.content.txHash = txHash
+
         const hash = Hashing.sha256(JSON.stringify(operation.content))
 
         const verified = await this.demos.crypto.verify({
