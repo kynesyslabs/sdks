@@ -1,5 +1,6 @@
 import {
     Contract,
+    HDNodeWallet,
     JsonRpcProvider,
     TransactionRequest,
     Wallet,
@@ -12,6 +13,7 @@ import {
 import { DefaultChain, IEVMDefaultChain } from "./types/defaultChain"
 import { IPayParams } from "./types/interfaces"
 import { required } from "./utils"
+import * as bip39 from "bip39"
 
 const ERC20_ABI = [
     {
@@ -110,7 +112,7 @@ const ERC20_ABI = [
 
 export class EVM extends DefaultChain implements IEVMDefaultChain {
     declare provider: JsonRpcProvider
-    declare wallet: Wallet
+    declare wallet: Wallet | HDNodeWallet
 
     contracts: Map<string, Contract> = new Map()
     isEIP1559: boolean
@@ -161,18 +163,22 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     }
 
     // INFO Connecting a wallet through a private key (string)
-    // REVIEW should private key be a string or a Buffer?
     async connectWallet(privateKey: string) {
         if (!this.rpc_url) {
             console.warn(
                 "WARNING: No RPC URL set. Connecting wallet without provider",
             )
         }
+        privateKey = privateKey.trim()
 
-        this.wallet = new Wallet(
-            privateKey,
-            this.rpc_url ? this.provider : null,
-        )
+        if (bip39.validateMnemonic(privateKey)) {
+            this.wallet = Wallet.fromPhrase(privateKey)
+        } else {
+            this.wallet = new Wallet(
+                privateKey,
+                this.rpc_url ? this.provider : null,
+            )
+        }
 
         return this.wallet
     }

@@ -41,7 +41,7 @@ describe("Native bridge Playground", () => {
 
         // Confirms the compiled operation's signature, creates a tx and sends it
         // to the node using demos.confirm
-        const validityData = await bridge.confirm(compiled)
+        const validityData = await bridge.confirm(compiled, "")
         console.log(validityData)
 
         // Broadcasts the tx to the node (same as demos.broadcast)
