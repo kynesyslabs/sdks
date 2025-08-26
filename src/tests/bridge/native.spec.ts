@@ -122,10 +122,12 @@ describe("Native bridge Playground", () => {
             "generateProposalId",
             []
         )
-        const tx = await evm.sendSignedTransaction(proposalIdTx)
+        const { hash } = await evm.sendSignedTransaction(proposalIdTx)
+        console.log("Tx hash:", hash)
+        console.log("Waiting for confirmation ...")
 
         // Confirm tx execution
-        const receipt = await evm.provider.waitForTransaction("0x9137198cc70f7d8be7764b0938db747867d8c4459f795f5814eca49ead146b0a")
+        const receipt = await evm.provider.waitForTransaction(hash)
         console.log("Tx receipt:", receipt.toJSON())
 
         // INFO: Take a nap. Maybe the event is late?
