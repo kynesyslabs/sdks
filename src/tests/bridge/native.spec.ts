@@ -84,10 +84,6 @@ describe("Native bridge Playground", () => {
         const ws_rpc = "wss://ethereum-sepolia-rpc.publicnode.com"
         const contract = new Contract("0x11c1197798d3b1caB6970577361172C00e4C5F36", JSON.stringify(liquidityTankABI), new WebSocketProvider(ws_rpc))
 
-        contract.on("ProposalCreated", (proposalId: string, creator: string, deadline: number) => {
-            console.log("ProposalCreated", proposalId, creator, deadline)
-        })
-
         contract.addListener("*", (data: any) => {
             console.log("Event received", data)
         })
