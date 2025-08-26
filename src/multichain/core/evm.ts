@@ -9,6 +9,8 @@ import {
     parseEther,
     toNumber,
     verifyMessage,
+    parseUnits,
+    TransactionReceipt
 } from "ethers"
 import { DefaultChain, IEVMDefaultChain } from "./types/defaultChain"
 import { IPayParams } from "./types/interfaces"
@@ -295,7 +297,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         const isEIP1559 = this.isEIP1559 || feeData.maxFeePerGas !== null
 
         const baseTx = {
-            gasLimit: 21000,
+            gasLimit: 30000,
             chainId: this.chainId,
         }
 
@@ -382,8 +384,8 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         throw new Error("Not implemented")
     }
 
-    async waitForReceipt(tx_hash: string): Promise<any> {
-        return await this.provider.getTransactionReceipt(tx_hash)
+    async waitForReceipt(tx_hash: string): Promise<TransactionReceipt | null> {
+        return await this.provider.waitForTransaction(tx_hash)
     }
     // SECTION Not implemented methods
 
@@ -411,7 +413,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         contract_instance: Contract,
         function_name: string,
         args: any[],
-        options?: { gasLimit?: number; value?: string }
+        options?: { gasLimit?: number; value?: string, gasPrice?: number, maxFeePerGas?: number, maxPriorityFeePerGas?: number }
     ): Promise<string> {
         required(this.wallet, "Wallet not connected")
 
@@ -444,6 +446,9 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         // Merge base transaction data with populated transaction
         const finalTx = {
             nonce,
+            ...(options?.gasPrice && { gasPrice: options.gasPrice }),
+            ...(options?.maxFeePerGas && { maxFeePerGas: options.maxFeePerGas }),
+            ...(options?.maxPriorityFeePerGas && { maxPriorityFeePerGas: options.maxPriorityFeePerGas }),
             ...baseTx,
             ...populatedTx,
             // Override gasLimit if provided in options

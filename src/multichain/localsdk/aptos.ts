@@ -4,9 +4,13 @@ import {
 } from "@aptos-labs/ts-sdk"
 
 import {
-    IDefaultChainLocal,
     APTOS as AptosCore,
+} from "../core/aptos"
+
+import {
+    IDefaultChainLocal,
 } from "../core"
+
 import { XmTransactionResult, XmTransactionResponse } from "../core/types/interfaces"
 
 /**
@@ -27,10 +31,10 @@ export class APTOS extends AptosCore implements IDefaultChainLocal {
         try {
             // Convert Uint8Array back to transaction hash string
             const transactionHash = new TextDecoder().decode(signed_tx)
-            
+
             // Wait for the transaction to be confirmed
             const txResponse = await this.waitForTransaction(transactionHash)
-            
+
             return {
                 result: XmTransactionResult.success,
                 hash: transactionHash,
@@ -77,11 +81,11 @@ export class APTOS extends AptosCore implements IDefaultChainLocal {
         try {
             // Generate new account using official SDK method
             const newAccount = Account.generate()
-            
+
             // Store as the current wallet
             this.account = newAccount
             this.wallet = newAccount
-            
+
             return newAccount
         } catch (error) {
             throw new Error(`Failed to create wallet: ${error}`)
@@ -96,7 +100,7 @@ export class APTOS extends AptosCore implements IDefaultChainLocal {
         if (!this.account) {
             throw new Error("No wallet connected")
         }
-        
+
         // In Aptos SDK, Account doesn't expose privateKey directly
         // This would need to be stored separately when creating the account
         throw new Error("Private key access not supported through Account object")
@@ -111,16 +115,16 @@ export class APTOS extends AptosCore implements IDefaultChainLocal {
     async fundFromFaucet(address?: string, amount: number = 100_000_000): Promise<string> {
         try {
             const accountAddress = address || this.getAddress()
-            
+
             if (this.network === Network.MAINNET) {
                 throw new Error("Faucet not available on mainnet")
             }
-            
+
             const response = await this.aptos.fundAccount({
                 accountAddress,
                 amount
             })
-            
+
             return response.hash
         } catch (error) {
             throw new Error(`Failed to fund from faucet: ${error}`)
@@ -137,9 +141,9 @@ export class APTOS extends AptosCore implements IDefaultChainLocal {
             // For Aptos, we expect the transaction to already be submitted
             // This method is for compatibility with the existing multichain interface
             const transactionHash = new TextDecoder().decode(rawTransaction)
-            
+
             const txResponse = await this.waitForTransaction(transactionHash)
-            
+
             return {
                 result: XmTransactionResult.success,
                 hash: transactionHash,
@@ -176,8 +180,8 @@ export class APTOS extends AptosCore implements IDefaultChainLocal {
      * @returns Array of transactions
      */
     async getAccountTransactions(
-        address: string, 
-        start?: number, 
+        address: string,
+        start?: number,
         limit?: number
     ): Promise<any[]> {
         try {

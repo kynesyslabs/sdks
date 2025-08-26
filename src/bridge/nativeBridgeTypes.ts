@@ -65,11 +65,6 @@ export type CompiledContent = {
     operation: BridgeOperation
     validUntil: number
     tankData: SolanaTankData | EVMTankData
-    /**
-     * The transaction hash for the user's crosschain deposit to tank transaction.
-     * This needs to be included when submitting the demos transaction.
-     */
-    txHash?: string
 }
 
 // Types compiled from the node
@@ -78,6 +73,16 @@ export type BridgeOperationCompiled = {
     content: CompiledContent
     signature: ISignature // Signed hash of the content
     rpcPublicKey: string // public key of the node that sent us back the operation
+    /**
+     * The transaction hash for the user's crosschain deposit to tank transaction.
+     * This needs to be included when submitting the demos transaction.
+     */
+    txHash?: string
+}
+
+export type NativeBridgeTxPayload = {
+    operation: BridgeOperationCompiled
+    txHash: string
 }
 
 // Supported chains for EVM

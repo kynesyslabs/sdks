@@ -1,6 +1,6 @@
 import { Network } from "@aptos-labs/ts-sdk"
 
-import { APTOS } from "@/multichain/localsdk"
+import { APTOS } from "@/multichain/localsdk/aptos"
 import { getSampleTranfers } from "../utils"
 
 describe("APTOS CHAIN TESTS", () => {

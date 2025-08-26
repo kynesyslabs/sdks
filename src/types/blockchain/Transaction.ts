@@ -9,7 +9,7 @@ import { INativePayload } from "../native"
 // import { SubnetPayload } from "../../l2ps" // Obsolete - using new L2PS implementation
 import { IdentityPayload } from "../abstraction"
 import { InstantMessagingPayload } from "../instantMessaging"
-import { BridgeOperationCompiled } from "@/bridge/nativeBridgeTypes"
+import { BridgeOperationCompiled, NativeBridgeTxPayload } from "@/bridge/nativeBridgeTypes"
 import { L2PSEncryptedPayload } from "@/l2ps"
 import { StoragePayload } from "./TransactionSubtypes/StorageTransaction"
 import { L2PSHashPayload } from "./TransactionSubtypes/L2PSHashTransaction"
@@ -31,7 +31,7 @@ export type TransactionContentData =
     | ["l2psEncryptedTx", L2PSEncryptedPayload]
     | ["identity", IdentityPayload]
     | ["instantMessaging", InstantMessagingPayload]
-    | ["nativeBridge", BridgeOperationCompiled]
+    | ["nativeBridge", NativeBridgeTxPayload]
     | ["storage", StoragePayload]
     | ["l2ps_hash_update", L2PSHashPayload]
     | ["smartContract", SmartContractPayload]

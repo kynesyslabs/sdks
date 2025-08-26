@@ -1,4 +1,4 @@
-export { APTOS } from "../core"
+export { APTOS } from "../core/aptos"
 
 // /**
 //  * Aptos WebSDK implementation for browser environments

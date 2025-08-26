@@ -269,12 +269,11 @@ export class NativeBridge {
 
         // INFO: Verify the RPC signature
         const operation = compiled.response
-        operation.content.txHash = txHash
 
         const hash = Hashing.sha256(JSON.stringify(operation.content))
 
         const verified = await this.demos.crypto.verify({
-            algorithm: this.demos.algorithm,
+            algorithm: operation.signature.type,
             signature: hexToUint8Array(operation.signature.data),
             message: new TextEncoder().encode(hash),
             publicKey: hexToUint8Array(operation.rpcPublicKey),
@@ -290,7 +289,7 @@ export class NativeBridge {
             ...tx.content,
             to: await this.demos.getEd25519Address(),
             type: "nativeBridge",
-            data: ["nativeBridge", operation],
+            data: ["nativeBridge", {operation, txHash}],
         }
 
         // INFO: Sign and confirm the tx

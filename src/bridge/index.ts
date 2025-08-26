@@ -33,6 +33,7 @@ export {
     TankData,
     providerUrls,
     supportedNonEVMChains,
+    NativeBridgeTxPayload,
 } from "./nativeBridgeTypes"
 export { RubicBridge }
 export { validateChain } from "./utils"
