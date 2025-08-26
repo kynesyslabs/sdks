@@ -126,7 +126,7 @@ describe("Native bridge Playground", () => {
 
         // Confirm tx execution
         const receipt = await evm.provider.waitForTransaction("0x9137198cc70f7d8be7764b0938db747867d8c4459f795f5814eca49ead146b0a")
-        console.log(receipt.toJSON())
+        console.log("Tx receipt:", receipt.toJSON())
 
         // INFO: Take a nap. Maybe the event is late?
         await sleep(20000000)
