@@ -2,6 +2,7 @@ import { EnumWeb2Actions } from "@/types"
 import { web2_request } from "./utils/skeletons"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"
+import { canonicalJSONStringify } from "./utils/canonicalJson"
 import type {
     IStartProxyParams,
     Transaction,
@@ -51,10 +52,16 @@ export class Web2Proxy {
             headers: options?.headers,
         }
 
+        // If payload is provided and is an object, canonicalize to deterministic JSON
+        const canonicalPayload =
+            options?.payload != null && typeof options?.payload === "object"
+                ? canonicalJSONStringify(options?.payload)
+                : (options?.payload as any)
+
         const response = await this._demos.call("web2ProxyRequest", {
             web2Request: freshWeb2Request,
             sessionId: this._sessionId,
-            payload: options?.payload,
+            payload: canonicalPayload,
             authorization: options?.authorization,
         })
 
@@ -71,8 +78,12 @@ export class Web2Proxy {
                         timestamp: Date.now(),
                         status: response.response.status,
                         headers: response.response.headers,
-                        dataHash: response.response.dataHash,
-                        headersHash: response.response.headersHash,
+                        responseHash: response.response.responseHash,
+                        responseHeadersHash:
+                            response.response.responseHeadersHash,
+                        ...(response.response.requestHash
+                            ? { requestHash: response.response.requestHash }
+                            : {}),
                         statusText: response.response.statusText,
                     },
                 },
