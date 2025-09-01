@@ -41,27 +41,38 @@ export class Web2Proxy {
         method,
         options = {
             headers: {},
-            payload: {},
+            payload: undefined,
             authorization: "",
         },
     }: IStartProxyParams): Promise<IWeb2Result> {
         // Create a fresh copy of web2Request for each call
         const freshWeb2Request = { ...web2_request }
 
+        // Shallow-merge headers without mutating caller's object
+        const callerHeaders = options?.headers ? { ...options.headers } : {}
+
         freshWeb2Request.raw = {
             ...freshWeb2Request.raw,
             action: EnumWeb2Actions.START_PROXY,
             method,
             url,
-            headers: options?.headers,
+            headers: callerHeaders,
         }
 
         // Validate and canonicalize
-        let canonicalPayload: any = options?.payload as any
-        if (options?.payload != null) {
+        let canonicalPayload: any = undefined
+        if (options?.payload !== undefined) {
             if (typeof options.payload === "object") {
                 validatePureJson(options.payload)
                 canonicalPayload = canonicalJSONStringify(options.payload)
+                // Only set JSON content-type if not already set by caller
+                if (
+                    !Object.keys(callerHeaders).some(
+                        h => h.toLowerCase() === "content-type",
+                    )
+                ) {
+                    callerHeaders["Content-Type"] = "application/json"
+                }
             } else if (typeof options.payload === "string") {
                 // Heuristic warning for accidental double-stringify
                 if (looksLikeJsonString(options.payload)) {
@@ -70,13 +81,23 @@ export class Web2Proxy {
                     )
                 }
                 canonicalPayload = options.payload
+            } else {
+                // numbers/booleans/null are allowed by fetch/XHR as body. Use JSON.stringify semantics explicitly
+                canonicalPayload = JSON.stringify(options.payload)
+                if (
+                    !Object.keys(callerHeaders).some(
+                        h => h.toLowerCase() === "content-type",
+                    )
+                ) {
+                    callerHeaders["Content-Type"] = "application/json"
+                }
             }
         }
 
         const response = await this._demos.call("web2ProxyRequest", {
             web2Request: freshWeb2Request,
             sessionId: this._sessionId,
-            payload: canonicalPayload,
+            payload: canonicalPayload, // can be undefined ⇒ no body
             authorization: options?.authorization,
         })
 
