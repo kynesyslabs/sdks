@@ -2,7 +2,11 @@ import { EnumWeb2Actions } from "@/types"
 import { web2_request } from "./utils/skeletons"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"
-import { canonicalJSONStringify } from "./utils/canonicalJson"
+import {
+    canonicalJSONStringify,
+    validatePureJson,
+    looksLikeJsonString,
+} from "./utils/canonicalJson"
 import type {
     IStartProxyParams,
     Transaction,
@@ -52,11 +56,22 @@ export class Web2Proxy {
             headers: options?.headers,
         }
 
-        // If payload is provided and is an object, canonicalize to deterministic JSON
-        const canonicalPayload =
-            options?.payload != null && typeof options?.payload === "object"
-                ? canonicalJSONStringify(options?.payload)
-                : (options?.payload as any)
+        // Validate and canonicalize
+        let canonicalPayload: any = options?.payload as any
+        if (options?.payload != null) {
+            if (typeof options.payload === "object") {
+                validatePureJson(options.payload)
+                canonicalPayload = canonicalJSONStringify(options.payload)
+            } else if (typeof options.payload === "string") {
+                // Heuristic warning for accidental double-stringify
+                if (looksLikeJsonString(options.payload)) {
+                    console.warn(
+                        "[Web2Calls] String payload looks like JSON. It will be used as raw bytes; if you intended object canonicalization, pass the object instead.",
+                    )
+                }
+                canonicalPayload = options.payload
+            }
+        }
 
         const response = await this._demos.call("web2ProxyRequest", {
             web2Request: freshWeb2Request,
