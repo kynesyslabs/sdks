@@ -143,4 +143,346 @@ export const methods = {
         // to complete the transaction flow, following the same pattern as pay() transactions
         return signedTx
     },
+
+    /**
+     * Generates gasless bridge operation signature for meta-transaction
+     * @param userPrivateKey User's private key for signing gasless authorization
+     * @param userPublicKey User's public key (address)
+     * @param nonce User nonce for replay protection
+     * @param originChain Origin chain name
+     * @param destChain Destination chain name  
+     * @param token Token contract address
+     * @param recipient Recipient address
+     * @param amount Amount to bridge
+     * @param bridgeFeeBps Bridge fee in basis points (optional)
+     * @returns Signature for gasless bridge operation authorization
+     */
+    generateGaslessBridgeSignature(
+        userPrivateKey: string,
+        userPublicKey: string,
+        nonce: number,
+        originChain: string,
+        destChain: string,
+        token: string,
+        recipient: string,
+        amount: string,
+        bridgeFeeBps: number = 0
+    ): string {
+        // Create the same message format as used in smart contract and node validation
+        const messageData = {
+            action: "LIQUIDITY_TANK_BRIDGE",
+            user: userPublicKey,
+            nonce: nonce,
+            originChain: originChain,
+            destChain: destChain,
+            token: token,
+            recipient: recipient,
+            amount: amount,
+            bridgeFeeBps: bridgeFeeBps
+        }
+        
+        const messageHash = Hashing.sha256(JSON.stringify(messageData))
+        const signature = Cryptography.sign(messageHash, userPrivateKey)
+        return uint8ArrayToHex(signature)
+    },
+
+    /**
+     * Generates gasless deposit signature for USDC deposits
+     * @param userPrivateKey User's private key for signing gasless authorization
+     * @param userPublicKey User's public key (address) 
+     * @param nonce User nonce for replay protection
+     * @param usdcAddress USDC contract address
+     * @param amount Amount to deposit
+     * @param chainKey Chain key (e.g., "eth.sepolia")
+     * @returns Signature for gasless deposit authorization
+     */
+    generateGaslessDepositSignature(
+        userPrivateKey: string,
+        userPublicKey: string,
+        nonce: number,
+        usdcAddress: string,
+        amount: string,
+        chainKey: string
+    ): string {
+        // Create the same message format as used in smart contract and node validation
+        const messageData = {
+            action: "LIQUIDITY_TANK_DEPOSIT",
+            user: userPublicKey,
+            nonce: nonce,
+            usdcAddress: usdcAddress,
+            amount: amount,
+            chainKey: chainKey
+        }
+        
+        const messageHash = Hashing.sha256(JSON.stringify(messageData))
+        const signature = Cryptography.sign(messageHash, userPrivateKey)
+        return uint8ArrayToHex(signature)
+    },
+
+    /**
+     * Initiates a gasless bridge operation through Demos RPC
+     * @param userPublicKey User's public key (address)
+     * @param signature User's signature for gasless authorization
+     * @param nonce User nonce for replay protection
+     * @param originChain Origin chain name
+     * @param destChain Destination chain name
+     * @param token Token contract address
+     * @param recipient Recipient address
+     * @param amount Amount to bridge
+     * @param bridgeFeeBps Bridge fee in basis points (optional)
+     * @returns RPC request for gasless bridge initiation
+     */
+    generateGaslessBridgeOperation(
+        userPublicKey: string,
+        signature: string,
+        nonce: number,
+        originChain: string,
+        destChain: string,
+        token: string,
+        recipient: string,
+        amount: string,
+        bridgeFeeBps: number = 0
+    ): RPCRequest {
+        const nodeCallPayload: RPCRequest = {
+            method: "initiateGaslessBridge",
+            params: [{
+                user: userPublicKey,
+                signature: signature,
+                nonce: nonce,
+                originChain: originChain,
+                destChain: destChain,
+                token: token,
+                recipient: recipient,
+                amount: amount,
+                bridgeFeeBps: bridgeFeeBps
+            }]
+        }
+        return nodeCallPayload
+    },
+
+    /**
+     * Executes a gasless USDC deposit through Demos RPC
+     * @param userPublicKey User's public key (address)
+     * @param signature User's signature for gasless authorization
+     * @param nonce User nonce for replay protection
+     * @param chainKey Chain key (e.g., "eth.sepolia")
+     * @param usdcAddress USDC contract address
+     * @param amount Amount to deposit
+     * @returns RPC request for gasless deposit execution
+     */
+    generateGaslessDepositOperation(
+        userPublicKey: string,
+        signature: string,
+        nonce: number,
+        chainKey: string,
+        usdcAddress: string,
+        amount: string
+    ): RPCRequest {
+        const nodeCallPayload: RPCRequest = {
+            method: "executeGaslessDeposit",
+            params: [{
+                user: userPublicKey,
+                signature: signature,
+                nonce: nonce,
+                chainKey: chainKey,
+                usdcAddress: usdcAddress,
+                amount: amount
+            }]
+        }
+        return nodeCallPayload
+    },
+
+    /**
+     * Complete gasless bridge flow helper - combines signature generation and operation creation
+     * @param userPrivateKey User's private key for signing
+     * @param userPublicKey User's public key (address)
+     * @param nonce User nonce for replay protection
+     * @param originChain Origin chain name  
+     * @param destChain Destination chain name
+     * @param token Token contract address
+     * @param recipient Recipient address
+     * @param amount Amount to bridge
+     * @param bridgeFeeBps Bridge fee in basis points (optional)
+     * @returns Object with signature and RPC request for gasless bridge
+     */
+    generateCompleteGaslessBridge(
+        userPrivateKey: string,
+        userPublicKey: string,
+        nonce: number,
+        originChain: string,
+        destChain: string,
+        token: string,
+        recipient: string,
+        amount: string,
+        bridgeFeeBps: number = 0
+    ): {
+        signature: string
+        bridgeOperation: RPCRequest
+        depositOperation: RPCRequest
+    } {
+        // Generate signatures
+        const bridgeSignature = this.generateGaslessBridgeSignature(
+            userPrivateKey, userPublicKey, nonce, originChain, destChain,
+            token, recipient, amount, bridgeFeeBps
+        )
+        
+        const depositSignature = this.generateGaslessDepositSignature(
+            userPrivateKey, userPublicKey, nonce + 1, token, amount, 
+            `${originChain.toLowerCase()}.${process.env.NODE_ENV === 'production' ? 'mainnet' : 'sepolia'}`
+        )
+
+        // Generate operations
+        const bridgeOperation = this.generateGaslessBridgeOperation(
+            userPublicKey, bridgeSignature, nonce, originChain, destChain,
+            token, recipient, amount, bridgeFeeBps
+        )
+
+        const depositOperation = this.generateGaslessDepositOperation(
+            userPublicKey, depositSignature, nonce + 1,
+            `${originChain.toLowerCase()}.${process.env.NODE_ENV === 'production' ? 'mainnet' : 'sepolia'}`,
+            token, amount
+        )
+
+        return {
+            signature: bridgeSignature,
+            bridgeOperation,
+            depositOperation
+        }
+    },
+
+    /**
+     * Generates atomic deposit and bridge signature for the new combined method
+     * @param userPrivateKey User's private key for signing gasless authorization
+     * @param userPublicKey User's public key (address)
+     * @param nonce User nonce for replay protection
+     * @param tokenName Human-readable token name (e.g., "usdc", "eth")
+     * @param depositAmount Amount to deposit and bridge (must be equal)
+     * @param destChain Destination chain name
+     * @param recipient Recipient address
+     * @param bridgeFeeBps Bridge fee in basis points (optional)
+     * @param chainId Chain ID for signature verification
+     * @param contractAddress Contract address for signature verification
+     * @returns Signature for atomic deposit and bridge authorization
+     */
+    generateAtomicDepositAndBridgeSignature(
+        userPrivateKey: string,
+        userPublicKey: string,
+        nonce: number,
+        tokenName: string,
+        depositAmount: string,
+        destChain: string,
+        recipient: string,
+        bridgeFeeBps: number = 0,
+        chainId: number,
+        contractAddress: string
+    ): string {
+        // Create the same message format as used in smart contract verification
+        const messageData = {
+            action: "LIQUIDITY_TANK_DEPOSIT_AND_BRIDGE",
+            user: userPublicKey,
+            nonce: nonce,
+            tokenName: tokenName,
+            depositAmount: depositAmount,
+            originChain: chainId.toString(), // Automatically detected from block.chainid
+            destChain: destChain,
+            recipient: recipient,
+            bridgeFeeBps: bridgeFeeBps,
+            chainId: chainId,
+            contractAddress: contractAddress
+        }
+        
+        const messageHash = Hashing.sha256(JSON.stringify(messageData))
+        const signature = Cryptography.sign(messageHash, userPrivateKey)
+        return uint8ArrayToHex(signature)
+    },
+
+    /**
+     * Executes atomic gasless deposit and bridge through Demos RPC
+     * @param userPublicKey User's public key (address)
+     * @param signature User's signature for gasless authorization
+     * @param nonce User nonce for replay protection
+     * @param chainKey Chain key (e.g., "eth.sepolia")
+     * @param tokenName Human-readable token name (e.g., "usdc", "eth")
+     * @param depositAmount Amount to deposit and bridge
+     * @param destChain Destination chain name
+     * @param recipient Recipient address
+     * @param bridgeFeeBps Bridge fee in basis points
+     * @returns RPC request for atomic deposit and bridge execution
+     */
+    generateAtomicDepositAndBridgeOperation(
+        userPublicKey: string,
+        signature: string,
+        nonce: number,
+        chainKey: string,
+        tokenName: string,
+        depositAmount: string,
+        destChain: string,
+        recipient: string,
+        bridgeFeeBps: number = 0
+    ): RPCRequest {
+        const nodeCallPayload: RPCRequest = {
+            method: "executeAtomicDepositAndBridge",
+            params: [{
+                user: userPublicKey,
+                signature: signature,
+                nonce: nonce,
+                chainKey: chainKey,
+                tokenName: tokenName,
+                depositAmount: depositAmount,
+                destChain: destChain,
+                recipient: recipient,
+                bridgeFeeBps: bridgeFeeBps
+            }]
+        }
+        return nodeCallPayload
+    },
+
+    /**
+     * RECOMMENDED: Complete atomic deposit and bridge flow helper
+     * @param userPrivateKey User's private key for signing
+     * @param userPublicKey User's public key (address)
+     * @param nonce User nonce for replay protection
+     * @param tokenName Human-readable token name (e.g., "usdc", "eth")
+     * @param depositAmount Amount to deposit and bridge (equal values)
+     * @param destChain Destination chain name (origin chain is automatic)
+     * @param recipient Recipient address
+     * @param bridgeFeeBps Bridge fee in basis points (optional)
+     * @param chainId Chain ID (for signature verification)
+     * @param contractAddress Contract address (for signature verification)
+     * @param chainKey Chain key format (e.g., "eth.sepolia")
+     * @returns Object with signature and RPC request for atomic operation
+     */
+    generateAtomicDepositAndBridge(
+        userPrivateKey: string,
+        userPublicKey: string,
+        nonce: number,
+        tokenName: string,
+        depositAmount: string,
+        destChain: string,
+        recipient: string,
+        bridgeFeeBps: number = 0,
+        chainId: number = 11155111, // Default to Sepolia
+        contractAddress: string = "0x...", // Should be provided by caller
+        chainKey: string = "eth.sepolia"
+    ): {
+        signature: string
+        operation: RPCRequest
+    } {
+        // REVIEW: Generate signature for the atomic operation
+        const signature = this.generateAtomicDepositAndBridgeSignature(
+            userPrivateKey, userPublicKey, nonce, tokenName, depositAmount,
+            destChain, recipient, bridgeFeeBps, chainId, contractAddress
+        )
+        
+        // REVIEW: Generate the atomic operation RPC request
+        const operation = this.generateAtomicDepositAndBridgeOperation(
+            userPublicKey, signature, nonce, chainKey, tokenName,
+            depositAmount, destChain, recipient, bridgeFeeBps
+        )
+
+        return {
+            signature,
+            operation
+        }
+    }
 }

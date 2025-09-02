@@ -19,3 +19,5 @@ mise.toml
 CLAUDE.md
 .DS_Store
 .npmrc
+.serena
+*.sync-conflict*
