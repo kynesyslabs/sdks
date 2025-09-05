@@ -31,6 +31,7 @@ import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
 import { TweetSimplified } from "@/types"
+import { GetDiscordMessageResult } from "@/types/web2/discord"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -840,6 +841,11 @@ export class Demos {
                 tweetUrl,
             })
         },
+        getDiscordMessage: async (discordUrl: string): Promise<{ success: boolean, message: GetDiscordMessageResult, error?: string }> => {
+            return await this.nodeCall("getDiscordMessage", {
+                discordUrl,
+            })
+        }
     }
 
     xm = {
