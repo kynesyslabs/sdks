@@ -14,6 +14,15 @@ import type {
     IWeb2Result,
 } from "@/types"
 
+function isValidHttpUrl(targetUrl: string): boolean {
+    try {
+        const parsed = new URL(targetUrl)
+        return parsed.protocol === "http:" || parsed.protocol === "https:"
+    } catch {
+        return false
+    }
+}
+
 export class Web2Proxy {
     private readonly _sessionId: string
     private readonly _demos: Demos
@@ -45,6 +54,11 @@ export class Web2Proxy {
             authorization: "",
         },
     }: IStartProxyParams): Promise<IWeb2Result> {
+        if (!isValidHttpUrl(url)) {
+            throw new Error(
+                `Invalid URL provided to startProxy. Only http(s) URLs are allowed: ${url}`,
+            )
+        }
         // Create a fresh copy of web2Request for each call
         const freshWeb2Request = { ...web2_request }
 
