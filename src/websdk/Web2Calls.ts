@@ -71,7 +71,7 @@ export class Web2Proxy {
         }
         if (!isValidHttpUrl(normalizedUrl)) {
             throw new Web2InvalidUrlError(
-                `Invalid URL provided to startProxy. Only http(s) URLs are allowed: ${normalizedUrl}`,
+                "Invalid URL provided to startProxy. Only http(s) URLs are allowed.",
             )
         }
         // Create a fresh copy of web2Request for each call
