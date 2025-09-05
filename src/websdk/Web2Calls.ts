@@ -14,6 +14,15 @@ import type {
     IWeb2Result,
 } from "@/types"
 
+class Web2InvalidUrlError extends Error {
+    code: string
+    constructor(message: string) {
+        super(message)
+        this.name = "Web2InvalidUrlError"
+        this.code = "INVALID_URL_SCHEME"
+    }
+}
+
 function isValidHttpUrl(targetUrl: string): boolean {
     try {
         const parsed = new URL(targetUrl)
@@ -54,9 +63,15 @@ export class Web2Proxy {
             authorization: "",
         },
     }: IStartProxyParams): Promise<IWeb2Result> {
-        if (!isValidHttpUrl(url)) {
-            throw new Error(
-                `Invalid URL provided to startProxy. Only http(s) URLs are allowed: ${url}`,
+        const normalizedUrl = typeof url === "string" ? url.trim() : url
+        if (!normalizedUrl) {
+            throw new Web2InvalidUrlError(
+                "URL is required for startProxy and cannot be empty.",
+            )
+        }
+        if (!isValidHttpUrl(normalizedUrl)) {
+            throw new Web2InvalidUrlError(
+                `Invalid URL provided to startProxy. Only http(s) URLs are allowed: ${normalizedUrl}`,
             )
         }
         // Create a fresh copy of web2Request for each call
@@ -69,7 +84,7 @@ export class Web2Proxy {
             ...freshWeb2Request.raw,
             action: EnumWeb2Actions.START_PROXY,
             method,
-            url,
+            url: normalizedUrl,
             headers: callerHeaders,
         }
 
