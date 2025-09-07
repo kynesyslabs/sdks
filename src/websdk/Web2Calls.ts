@@ -58,6 +58,15 @@ function getCanonicalHttpUrlOrThrow(input: unknown): string {
             "INVALID_URL",
         )
     }
+    // Avoid persisting potential secrets in fragments (e.g., OAuth implicit flow tokens)
+    u.hash = ""
+    // Normalize default ports
+    if (
+        (u.protocol === "http:" && u.port === "80") ||
+        (u.protocol === "https:" && u.port === "443")
+    ) {
+        u.port = ""
+    }
     return u.toString() // canonical form
 }
 
