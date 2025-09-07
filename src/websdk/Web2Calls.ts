@@ -14,6 +14,62 @@ import type {
     IWeb2Result,
 } from "@/types"
 
+class Web2InvalidUrlError extends Error {
+    code: string
+    constructor(message: string, code: string) {
+        super(message)
+        this.name = "Web2InvalidUrlError"
+        this.code = code
+    }
+}
+
+function getCanonicalHttpUrlOrThrow(input: unknown): string {
+    if (typeof input !== "string") {
+        throw new Web2InvalidUrlError(
+            "URL must be a string",
+            "INVALID_URL_TYPE",
+        )
+    }
+    const trimmed = input.trim()
+    if (!trimmed) {
+        throw new Web2InvalidUrlError(
+            "URL is required for startProxy and cannot be empty.",
+            "EMPTY_URL",
+        )
+    }
+    let u: URL
+    try {
+        u = new URL(trimmed)
+    } catch {
+        throw new Web2InvalidUrlError(
+            "Invalid URL provided to startProxy. Only http(s) URLs are allowed.",
+            "INVALID_URL",
+        )
+    }
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+        throw new Web2InvalidUrlError(
+            "Invalid URL provided to startProxy. Only http(s) URLs are allowed.",
+            "INVALID_URL",
+        )
+    }
+    if (u.username || u.password || !u.hostname) {
+        throw new Web2InvalidUrlError(
+            "Invalid URL provided to startProxy. Only http(s) URLs without embedded credentials are allowed.",
+            "INVALID_URL",
+        )
+    }
+    // Avoid persisting potential secrets in fragments (e.g., OAuth implicit flow tokens)
+    u.hash = ""
+    // Normalize default ports
+    if (
+        (u.protocol === "http:" && u.port === "80") ||
+        (u.protocol === "https:" && u.port === "443")
+    ) {
+        u.port = ""
+    }
+    return u.toString() // canonical form
+}
+
 export class Web2Proxy {
     private readonly _sessionId: string
     private readonly _demos: Demos
@@ -45,6 +101,8 @@ export class Web2Proxy {
             authorization: "",
         },
     }: IStartProxyParams): Promise<IWeb2Result> {
+        const canonicalUrl = getCanonicalHttpUrlOrThrow(url)
+
         // Create a fresh copy of web2Request for each call
         const freshWeb2Request = { ...web2_request }
 
@@ -55,7 +113,7 @@ export class Web2Proxy {
             ...freshWeb2Request.raw,
             action: EnumWeb2Actions.START_PROXY,
             method,
-            url,
+            url: canonicalUrl,
             headers: callerHeaders,
         }
 
