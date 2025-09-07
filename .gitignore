@@ -20,4 +20,4 @@ CLAUDE.md
 .DS_Store
 .npmrc
 .serena
-*.sync-conflict*
+*.sync-conflict*.vscode
