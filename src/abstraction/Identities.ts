@@ -428,4 +428,22 @@ export class Identities {
 
         return await demos.rpcCall(request, true)
     }
+
+    /**
+     * Get an account by twitter username.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The username to get the account for.
+     * @returns The account associated with the username.
+     */
+    async getAccountByTwitterUsername(demos: Demos, username: string) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                { method: "getAccountByTwitterUsername", params: [username] },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
 }
