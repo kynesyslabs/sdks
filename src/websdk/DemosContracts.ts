@@ -11,6 +11,7 @@ import {
     ContractCallOptions,
     ContractCallResult
 } from '../contracts/types/ContractABI'
+import { TemplateRegistry } from '../contracts/templates/TemplateRegistry'
 
 export class DemosContracts {
     private factory: ContractFactory
@@ -125,10 +126,11 @@ export class DemosContracts {
      * 
      * @example
      * ```typescript
-     * const token = await demos.contracts.deployTemplate('ERC20', {
-     *   name: 'MyToken',
-     *   symbol: 'MTK',
-     *   totalSupply: 1000000
+     * const token = await demos.contracts.deployTemplate('Token', {
+     *   TOKEN_NAME: 'MyToken',
+     *   TOKEN_SYMBOL: 'MTK',
+     *   TOTAL_SUPPLY: 1000000,
+     *   DECIMALS: 18
      * })
      * ```
      */
@@ -136,70 +138,89 @@ export class DemosContracts {
         templateName: string,
         params: Record<string, any> = {}
     ): Promise<ContractInstance> {
-        // This will be implemented with standard contract templates
-        const templates: Record<string, string> = {
-            'Storage': `
-                class Storage extends DemosContract {
-                    constructor() {
-                        super()
-                    }
-                    
-                    store(key: string, value: any) {
-                        this.state.set(key, value)
-                    }
-                    
-                    retrieve(key: string) {
-                        return this.state.get(key)
-                    }
-                }
-            `,
-            'Token': `
-                class Token extends DemosContract {
-                    constructor(totalSupply: number) {
-                        super()
-                        this.state.set('totalSupply', totalSupply)
-                        this.state.set('balances', {})
-                        const creator = this.sender
-                        const balances = this.state.get('balances')
-                        balances[creator] = totalSupply
-                        this.state.set('balances', balances)
-                    }
-                    
-                    transfer(to: string, amount: number) {
-                        const from = this.sender
-                        const balances = this.state.get('balances')
-                        
-                        if (!balances[from] || balances[from] < amount) {
-                            this.revert('Insufficient balance')
-                        }
-                        
-                        balances[from] -= amount
-                        balances[to] = (balances[to] || 0) + amount
-                        this.state.set('balances', balances)
-                        
-                        this.emit('Transfer', { from, to, amount })
-                        return true
-                    }
-                    
-                    balanceOf(address: string) {
-                        const balances = this.state.get('balances')
-                        return balances[address] || 0
-                    }
-                }
-            `
+        if (!this.demos.walletConnected) {
+            throw new Error('Wallet not connected')
         }
 
-        const template = templates[templateName]
-        if (!template) {
-            throw new Error(`Unknown template: ${templateName}`)
+        // Generate contract source from template
+        const result = TemplateRegistry.generateContract(templateName, params)
+        
+        if (!result.success) {
+            const errorMessage = result.errors.join('; ')
+            throw new Error(`Template deployment failed: ${errorMessage}`)
         }
 
-        // Replace template parameters
-        let source = template
-        for (const [key, value] of Object.entries(params)) {
-            source = source.replace(new RegExp(`{{${key}}}`, 'g'), value)
-        }
+        // Extract constructor arguments based on template
+        const constructorArgs = this.extractConstructorArgs(templateName, params)
 
-        return await this.deploy(source, [params.totalSupply || 1000000])
+        // Deploy the generated contract
+        return await this.deploy(result.source!, constructorArgs)
+    }
+
+    /**
+     * Get available contract templates
+     * 
+     * @example
+     * ```typescript
+     * const templates = demos.contracts.getAvailableTemplates()
+     * // ['Token', 'Storage']
+     * ```
+     */
+    getAvailableTemplates(): string[] {
+        return TemplateRegistry.getAvailableTemplates()
+    }
+
+    /**
+     * Get template information and parameters
+     * 
+     * @example
+     * ```typescript
+     * const schema = demos.contracts.getTemplateSchema('Token')
+     * console.log(schema.parameters) // List of required/optional parameters
+     * ```
+     */
+    getTemplateSchema(templateName: string) {
+        return TemplateRegistry.getTemplateSchema(templateName)
+    }
+
+    /**
+     * Validate template parameters before deployment
+     * 
+     * @example
+     * ```typescript
+     * const validation = demos.contracts.validateTemplate('Token', {
+     *   TOKEN_NAME: 'MyToken',
+     *   TOTAL_SUPPLY: 1000000
+     * })
+     * 
+     * if (!validation.valid) {
+     *   console.error('Validation errors:', validation.errors)
+     * }
+     * ```
+     */
+    validateTemplate(templateName: string, params: Record<string, any>) {
+        return TemplateRegistry.validateParameters(templateName, params)
+    }
+
+    /**
+     * Get usage example for a template
+     * 
+     * @example
+     * ```typescript
+     * const example = demos.contracts.getTemplateExample('Token')
+     * console.log(example) // Shows deployment and usage example
+     * ```
+     */
+    getTemplateExample(templateName: string): string | null {
+        return TemplateRegistry.getTemplateExample(templateName)
+    }
+
+    /**
+     * Extract constructor arguments from template parameters
+     */
+    private extractConstructorArgs(_templateName: string, _params: Record<string, any>): any[] {
+        // Templates now have parameters embedded in constructor,
+        // so we don't need to pass separate constructor args
+        return []
     }
 }
