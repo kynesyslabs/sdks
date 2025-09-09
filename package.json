@@ -30,6 +30,8 @@
         "typedoc": "typedoc",
         "test": "jest",
         "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",
+        "setup:pre-commit": "cp .github/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo \"Pre-commit hook installed\"",
+        "setup:hooks": "bun run setup:pre-push && bun run setup:pre-commit",
         "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/{coin,evm}*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:tx": "rm -rf build && jest --testMatch '**/tests/multichain**/fulltx*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:demoswork": "rm -rf build && jest --testMatch '**/tests/**/demoswork*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
