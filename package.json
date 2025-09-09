@@ -26,6 +26,7 @@
         "./bridge": "./build/bridge/index.js"
     },
     "scripts": {
+        "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
         "typedoc": "typedoc",
         "test": "jest",

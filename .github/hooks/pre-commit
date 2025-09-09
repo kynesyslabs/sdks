@@ -24,14 +24,24 @@ fi
 
 echo "🔨 Running build check before commit..."
 
-# Check if bun is installed
-if ! command -v bun &> /dev/null; then
-    echo "❌ Bun is not installed. Please install bun first."
+# Detect which package manager to use
+if command -v bun &> /dev/null; then
+    PM="bun"
+    echo "📦 Using Bun..."
+elif command -v npm &> /dev/null; then
+    PM="npm"
+    echo "📦 Using npm..."
+elif command -v yarn &> /dev/null; then
+    PM="yarn"
+    echo "📦 Using Yarn..."
+else
+    echo "❌ No package manager found! Please install bun, npm, or yarn."
     exit 1
 fi
 
 # Run the build
-if bun run build; then
+echo "🔨 Running: $PM run build"
+if $PM run build; then
     echo "✅ Build successful! Proceeding with commit."
     exit 0
 else
