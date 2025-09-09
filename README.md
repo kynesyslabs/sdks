@@ -220,7 +220,7 @@ The SDK is automatically published to NPM when:
 
 Example:
 ```sh
-git commit -m "release v2.3.9"
+git commit -m "release v2.3.25"
 git push
 ```
 
