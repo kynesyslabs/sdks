@@ -1,3 +1,4 @@
+*.LOCAL.*
 node_modules
 build
 BLOG.md
