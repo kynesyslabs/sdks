@@ -12,6 +12,8 @@ import {
     InferFromSignaturePayload,
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
+    DiscordProof,
+    InferFromDiscordPayload,
 } from "@/types/abstraction"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
@@ -28,6 +30,10 @@ export class Identities {
                 "https://gist.githubusercontent.com",
             ],
             twitter: ["https://x.com", "https://twitter.com"],
+            discord: [
+                "https://discord.com/channels",
+                "https://ptb.discord.com/channels",
+            ],
         },
     }
 
@@ -44,7 +50,9 @@ export class Identities {
             new TextEncoder().encode(message),
         )
 
-        return `demos:${message}:${demos.algorithm}:${uint8ArrayToHex(signature.signature)}`
+        return `demos:${message}:${demos.algorithm}:${uint8ArrayToHex(
+            signature.signature,
+        )}`
     }
 
     /**
@@ -68,10 +76,11 @@ export class Identities {
                 )
             ) {
                 // construct informative error message
-                const errorMessage = `Invalid ${payload.context
-                    } proof format. Supported formats are: ${this.formats.web2[
-                        payload.context
-                    ].join(", ")}`
+                const errorMessage = `Invalid ${
+                    payload.context
+                } proof format. Supported formats are: ${this.formats.web2[
+                    payload.context
+                ].join(", ")}`
                 throw new Error(errorMessage)
             }
         }
@@ -146,8 +155,15 @@ export class Identities {
      * @param payload The payload to infer the identity from.
      * @returns The validity data of the identity transaction.
      */
-    async inferXmIdentity(demos: Demos, payload: InferFromSignaturePayload, referralCode?: string) {
-        return await this.inferIdentity(demos, "xm", { ...payload, referralCode: referralCode })
+    async inferXmIdentity(
+        demos: Demos,
+        payload: InferFromSignaturePayload,
+        referralCode?: string,
+    ) {
+        return await this.inferIdentity(demos, "xm", {
+            ...payload,
+            referralCode: referralCode,
+        })
     }
 
     /**
@@ -200,9 +216,15 @@ export class Identities {
      * @param payload The payload to add the identity to.
      * @returns The response from the RPC call.
      */
-    async addGithubIdentity(demos: Demos, payload: GithubProof, referralCode?: string) {
+    async addGithubIdentity(
+        demos: Demos,
+        payload: GithubProof,
+        referralCode?: string,
+    ) {
         const username = payload.split("/")[3]
-        const ghUser = await axios.get(`https://api.github.com/users/${username}`)
+        const ghUser = await axios.get(
+            `https://api.github.com/users/${username}`,
+        )
 
         if (!ghUser.data.login) {
             throw new Error("Failed to get github user")
@@ -226,7 +248,11 @@ export class Identities {
      * @param payload The payload to add the identity to.
      * @returns The response from the RPC call.
      */
-    async addTwitterIdentity(demos: Demos, payload: TwitterProof, referralCode?: string) {
+    async addTwitterIdentity(
+        demos: Demos,
+        payload: TwitterProof,
+        referralCode?: string,
+    ) {
         const data = await demos.web2.getTweet(payload)
 
         if (!data.success) {
@@ -234,7 +260,9 @@ export class Identities {
         }
 
         if (!data.tweet.userId || !data.tweet.username) {
-            throw new Error("Unable to get twitter user info. Please try again.")
+            throw new Error(
+                "Unable to get twitter user info. Please try again.",
+            )
         }
 
         let twitterPayload: InferFromXPayload = {
@@ -248,8 +276,49 @@ export class Identities {
         return await this.inferIdentity(demos, "web2", twitterPayload)
     }
 
+    /**
+     * Add a discord identity to the GCR.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to add the identity to.
+     * @returns The response from the RPC call.
+     */
+    async addDiscordIdentity(
+        demos: Demos,
+        payload: DiscordProof,
+        referralCode?: string,
+    ) {
+        const data = await demos.web2.getDiscordMessage(payload)
+
+        if (!data.success) {
+            throw new Error(data.error)
+        }
+
+        const msg = data.message
+        if (!msg.authorId || !msg.authorUsername) {
+            throw new Error(
+                "Unable to get discord user info. Please try again.",
+            )
+        }
+
+        const discordPayload: InferFromDiscordPayload & {
+            referralCode?: string
+        } = {
+            context: "discord",
+            proof: payload,
+            username: msg.authorUsername,
+            userId: msg.authorId,
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "web2", discordPayload)
+    }
+
     // SECTION: PQC Identities
-    async bindPqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+    async bindPqcIdentity(
+        demos: Demos,
+        algorithms: "all" | PQCAlgorithm[] = "all",
+    ) {
         let addressTypes: PQCAlgorithm[] = []
 
         // Create the address types to bind
@@ -270,7 +339,10 @@ export class Identities {
             // INFO: Create an ed25519 signature for each address type
             const keypair = await demos.crypto.getIdentity(addressType)
             const address = uint8ArrayToHex(keypair.publicKey as Uint8Array)
-            const signature = await demos.crypto.sign("ed25519", new TextEncoder().encode(address))
+            const signature = await demos.crypto.sign(
+                "ed25519",
+                new TextEncoder().encode(address),
+            )
 
             payloads.push({
                 algorithm: addressType,
@@ -282,7 +354,10 @@ export class Identities {
         return await this.inferIdentity(demos, "pqc", payloads)
     }
 
-    async removePqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+    async removePqcIdentity(
+        demos: Demos,
+        algorithms: "all" | PQCAlgorithm[] = "all",
+    ) {
         let addressTypes: PQCAlgorithm[] = []
 
         // Create the address types to remove
@@ -369,8 +444,14 @@ export class Identities {
      * @param address The address to get points for. Defaults to the connected wallet's address.
      * @returns The points data for the identity
      */
-    async getUserPoints(demos: Demos, address?: string): Promise<RPCResponseWithValidityData> {
-        required(address || demos.walletConnected, "No address provided and no wallet connected")
+    async getUserPoints(
+        demos: Demos,
+        address?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        required(
+            address || demos.walletConnected,
+            "No address provided and no wallet connected",
+        )
 
         if (!address) {
             address = await demos.getEd25519Address()
@@ -421,9 +502,7 @@ export class Identities {
 
         const request = {
             method: "gcr_routine",
-            params: [
-                { method: "getReferralInfo", params: [address] },
-            ],
+            params: [{ method: "getReferralInfo", params: [address] }],
         }
 
         return await demos.rpcCall(request, true)

@@ -51,7 +51,6 @@ export interface InferFromSignaturePayload {
     referralCode?: string
 }
 
-
 export interface BaseXmIdentityPayload {
     context: "xm"
 }
@@ -66,7 +65,9 @@ export interface XmIdentityRemovePayload extends BaseXmIdentityPayload {
     payload: XMCoreTargetIdentityPayload
 }
 
-export type XmIdentityPayload = XmIdentityAssignPayload | XmIdentityRemovePayload
+export type XmIdentityPayload =
+    | XmIdentityAssignPayload
+    | XmIdentityRemovePayload
 
 // SECTION Web2 Identities
 /**
@@ -105,6 +106,11 @@ export interface InferFromGithubPayload extends Web2CoreTargetIdentityPayload {
 // ANCHOR X Identities (aka Twitter Identities)
 export type XProof = `https://x.com/${string}/${string}` // TODO Better scope for X posts
 export type TwitterProof = XProof
+export type DiscordProof =
+    | `https://discord.com/channels/${string}/${string}/${string}`
+    | `https://ptb.discord.com/channels/${string}/${string}/${string}`
+    | `https://canary.discord.com/channels/${string}/${string}/${string}`
+    | `https://discordapp.com/channels/${string}/${string}/${string}`
 
 export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
     context: "twitter"
@@ -112,11 +118,18 @@ export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
     userId: string
 }
 
-export interface InferFromTwitterPayload extends InferFromXPayload { }
+export interface InferFromTwitterPayload extends InferFromXPayload {}
 
 // ANCHOR Telegram Identities
-export interface InferFromTelegramPayload extends Web2CoreTargetIdentityPayload {
+export interface InferFromTelegramPayload
+    extends Web2CoreTargetIdentityPayload {
     context: "telegram"
+    username: string
+    userId: string
+}
+
+export interface InferFromDiscordPayload extends Web2CoreTargetIdentityPayload {
+    context: "discord"
     username: string
     userId: string
 }
@@ -130,7 +143,11 @@ export interface BaseWeb2IdentityPayload {
 
 export interface Web2IdentityAssignPayload extends BaseWeb2IdentityPayload {
     method: "web2_identity_assign"
-    payload: InferFromGithubPayload | InferFromTwitterPayload | InferFromTelegramPayload
+    payload:
+        | InferFromGithubPayload
+        | InferFromTwitterPayload
+        | InferFromTelegramPayload
+        | InferFromDiscordPayload
 }
 
 export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
@@ -141,7 +158,9 @@ export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
     }
 }
 
-export type Web2IdentityPayload = Web2IdentityAssignPayload | Web2IdentityRemovePayload
+export type Web2IdentityPayload =
+    | Web2IdentityAssignPayload
+    | Web2IdentityRemovePayload
 
 // SECTION PQC Identities
 export interface BasePqcIdentityPayload {
@@ -165,10 +184,15 @@ export interface PqcIdentityRemovePayload extends BasePqcIdentityPayload {
     }[]
 }
 
-export type PqcIdentityPayload = PqcIdentityAssignPayload | PqcIdentityRemovePayload
+export type PqcIdentityPayload =
+    | PqcIdentityAssignPayload
+    | PqcIdentityRemovePayload
 
 // SECTION Final payload type
-export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload | PqcIdentityPayload
+export type IdentityPayload =
+    | XmIdentityPayload
+    | Web2IdentityPayload
+    | PqcIdentityPayload
 export interface UserPoints {
     userId: string
     referralCode: string
