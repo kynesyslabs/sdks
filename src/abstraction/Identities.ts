@@ -19,7 +19,7 @@ import {
 } from "@/types/abstraction"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
-import { RPCResponseWithValidityData } from "@/types"
+import { Account, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
 
@@ -516,7 +516,7 @@ export class Identities {
      * @param identity The identity to get the account for.
      * @returns The account associated with the identity.
      */
-    async getAccountByIdentity(demos: Demos, identity: FindAccountByWeb2IdentityQuery | FindAccountByWeb3IdentityQuery) {
+    async getAccountByIdentity(demos: Demos, identity: FindAccountByWeb2IdentityQuery | FindAccountByWeb3IdentityQuery): Promise<Account> {
         const request = {
             method: "gcr_routine",
             params: [
@@ -532,7 +532,7 @@ export class Identities {
         }
 
         // INFO: If the response is not 200, return full response
-        return response
+        return response as any
     }
 
     /**
