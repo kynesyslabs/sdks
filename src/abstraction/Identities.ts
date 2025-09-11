@@ -277,7 +277,7 @@ export class Identities {
     }
 
     /**
-     * Add a twitter identity to the GCR.
+     * Add a discord identity to the GCR.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param payload The payload to add the identity to.

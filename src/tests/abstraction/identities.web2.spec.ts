@@ -129,7 +129,7 @@ describe("Web2 Identities", () => {
         expect(res.response["discord"][0].username).toBe("hak666")
     })
 
-    test.only("Remove Discord Identity", async () => {
+    test("Remove Discord Identity", async () => {
         const payload = {
             context: "discord",
             username: "hak666",

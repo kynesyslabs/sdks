@@ -107,7 +107,10 @@ export interface InferFromGithubPayload extends Web2CoreTargetIdentityPayload {
 export type XProof = `https://x.com/${string}/${string}` // TODO Better scope for X posts
 export type TwitterProof = XProof
 export type DiscordProof =
-    `https://discord.com/channels/${string}/${string}/${string}`
+    | `https://discord.com/channels/${string}/${string}/${string}`
+    | `https://ptb.discord.com/channels/${string}/${string}/${string}`
+    | `https://canary.discord.com/channels/${string}/${string}/${string}`
+    | `https://discordapp.com/channels/${string}/${string}/${string}`
 
 export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
     context: "twitter"
