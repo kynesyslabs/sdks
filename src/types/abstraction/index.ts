@@ -213,3 +213,16 @@ export interface UserPoints {
     flagged: boolean | null
     flaggedReason: string | null
 }
+
+export interface FindAccountByWeb2IdentityQuery {
+    type: "web2"
+    context: "twitter" | "telegram" | "github" | "discord"
+    username: string
+    userId?: string
+}
+
+export interface FindAccountByWeb3IdentityQuery {
+    type: "xm"
+    chain: string // eg. "eth.mainnet" | "solana.mainnet", etc.
+    address: string
+}

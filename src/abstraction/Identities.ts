@@ -14,6 +14,8 @@ import {
     PqcIdentityRemovePayload,
     DiscordProof,
     InferFromDiscordPayload,
+    FindAccountByWeb2IdentityQuery,
+    FindAccountByWeb3IdentityQuery,
 } from "@/types/abstraction"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
@@ -76,11 +78,10 @@ export class Identities {
                 )
             ) {
                 // construct informative error message
-                const errorMessage = `Invalid ${
-                    payload.context
-                } proof format. Supported formats are: ${this.formats.web2[
-                    payload.context
-                ].join(", ")}`
+                const errorMessage = `Invalid ${payload.context
+                    } proof format. Supported formats are: ${this.formats.web2[
+                        payload.context
+                    ].join(", ")}`
                 throw new Error(errorMessage)
             }
         }
@@ -509,20 +510,109 @@ export class Identities {
     }
 
     /**
-     * Get an account by twitter username.
+     * Get an account by identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param identity The identity to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getAccountByIdentity(demos: Demos, identity: FindAccountByWeb2IdentityQuery | FindAccountByWeb3IdentityQuery) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                { method: "getAccountByIdentity", params: [identity] },
+            ],
+        }
+
+        const response = await demos.rpcCall(request, true)
+
+        // INFO: If the response is 200, return the inner gcr object in response key
+        if (response.result == 200) {
+            return response.response
+        }
+
+        // INFO: If the response is not 200, return full response
+        return response
+    }
+
+    /**
+     * Get an account by web2 identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param context The context of the identity to get the account for.
+     * @param username The username to get the account for.
+     * @param userId The user id to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getAccountByWeb2Identity(demos: Demos, context: "twitter" | "github" | "discord" | "telegram", username: string, userId?: string) {
+        return await this.getAccountByIdentity(demos, {
+            type: "web2",
+            context: context,
+            username: username,
+            userId: userId,
+        })
+    }
+
+    /**
+     * Get an account by web3 identity.
+     * 
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param chain The chain as a string containing the chain and subchain separated by a period (eg. "eth.mainnet" | "solana.mainnet", etc.)
+     * @param address The address to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getAccountByWeb3Identity(demos: Demos, chain: `${string}.${string}`, address: string) {
+        return await this.getAccountByIdentity(demos, {
+            type: "xm",
+            chain: chain,
+            address: address,
+        })
+    }
+
+    /**
+     * Get an account by twitter identity. 
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param username The username to get the account for.
      * @returns The account associated with the username.
      */
-    async getAccountByTwitterUsername(demos: Demos, username: string) {
-        const request = {
-            method: "gcr_routine",
-            params: [
-                { method: "getAccountByTwitterUsername", params: [username] },
-            ],
-        }
+    async getAccountByTwitterIdentity(demos: Demos, username: string, userId?: string) {
+        return await this.getAccountByWeb2Identity(demos, "twitter", username, userId)
+    }
 
-        return await demos.rpcCall(request, true)
+    /**
+     * Get an account by github identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The username to get the account for.
+     * @param userId The user id to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getAccountByGithubIdentity(demos: Demos, username: string, userId?: string) {
+        return await this.getAccountByWeb2Identity(demos, "github", username, userId)
+    }
+
+    /**
+     * Get an account by discord identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The username to get the account for.
+     * @param userId The user id to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getAccountByDiscordIdentity(demos: Demos, username: string, userId?: string) {
+        return await this.getAccountByWeb2Identity(demos, "discord", username, userId)
+    }
+
+    /**
+     * Get an account by telegram identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The username to get the account for.
+     * @param userId The user id to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getAccountByTelegramIdentity(demos: Demos, username: string, userId?: string) {
+        return await this.getAccountByWeb2Identity(demos, "telegram", username, userId)
     }
 }
