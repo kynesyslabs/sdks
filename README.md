@@ -1,6 +1,11 @@
 # Demos SDK
 
+![npm version](https://img.shields.io/npm/v/@kynesyslabs/demosdk)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+
 A JavaScript/TypeScript SDK providing a unified interface for interacting with the Demos network and cross-chain operations.
+
+***IMPORTANT*** This SDK is built with bun and performs the best with bun
 
 ## Requirements
 
@@ -10,8 +15,18 @@ A JavaScript/TypeScript SDK providing a unified interface for interacting with t
 ## Installation
 
 ```sh
+bun install @kynesyslabs/demosdk
+```
+
+or
+
+```sh
 npm install @kynesyslabs/demosdk
-# or
+```
+
+or
+
+```sh
 yarn add @kynesyslabs/demosdk
 ```
 
@@ -139,7 +154,11 @@ const result = await demos.broadcast(validityData)
 ### Building from Source
 
 ```sh
-yarn build
+# Install dependencies first
+bun install  # or npm install, or yarn install
+
+# Then build
+bun run build  # or npm run build, or yarn build
 ```
 
 ### Local Development
@@ -148,36 +167,48 @@ To use the SDK from a local source:
 
 ```sh
 # Build the SDK
-yarn build
+bun run build  # or yarn build, or npm run build
 
 # In your project
-yarn add file:../path/to/sdks
+bun add file:../path/to/sdks  # or yarn/npm add file:../path/to/sdks
 ```
 
 ### Testing
 
-Run specific test suites:
+Run specific test suites (works with both bun and yarn):
 
 ```sh
-yarn test:multichain    # Cross-chain SDK payload generation
-yarn test:tx           # Cross-chain transaction tests
-yarn test:demoswork    # DemosWork operations
-yarn test:native       # Native payment transactions
-yarn test:identities   # Identity management
-yarn test:web2         # Web2 proxy functionality
-yarn test:bridge       # Bridge service tests
-yarn test:btc          # Bitcoin-specific tests
-yarn test:evm          # EVM chain tests
-yarn test:pqc          # Post-quantum cryptography
+bun test:multichain    # Cross-chain SDK payload generation
+bun test:tx           # Cross-chain transaction tests
+bun test:demoswork    # DemosWork operations
+bun test:native       # Native payment transactions
+bun test:identities   # Identity management
+bun test:web2         # Web2 proxy functionality
+bun test:bridge       # Bridge service tests
+bun test:btc          # Bitcoin-specific tests
+bun test:evm          # EVM chain tests
+bun test:pqc          # Post-quantum cryptography
+
+# Or with yarn/npm:
+yarn test:multichain
+npm run test:multichain
 ```
 
-### Pre-push Hook Setup
+### Automatic Build Validation
 
-Ensure code quality before pushing:
+The repository includes a pre-commit hook that automatically validates the build before allowing commits. This hook is installed automatically when you run `bun install` (or npm/yarn install).
 
-```sh
-yarn setup:pre-push
-```
+#### Features
+- Automatically runs `build` command before each commit
+- Works with bun, npm, or yarn (auto-detects available package manager)
+- Prevents commits if the build fails
+- Installs automatically on `bun/npm/yarn install`
+
+#### Bypassing the Check
+For debugging or temporary commits, you can skip the build check:
+1. Start your commit message with 'DEBUG' or 'TEMP'
+2. Use `git commit --no-verify`
+3. Use `GIT_SKIP_BUILD=true git commit`
 
 ## Publishing
 
@@ -189,9 +220,11 @@ The SDK is automatically published to NPM when:
 
 Example:
 ```sh
-git commit -m "release v2.3.9"
+git commit -m "release v2.3.25"
 git push
 ```
+
+For simplicity, a `publish.sh` script is included. By default it will ask to forward the version, but you can re-publish the same version number with `./publish.sh -r`.
 
 ## Documentation
 

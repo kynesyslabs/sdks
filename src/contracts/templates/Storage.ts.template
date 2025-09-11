@@ -1,0 +1,363 @@
+/**
+ * Standard Storage Contract Template
+ * 
+ * A simple key-value storage contract with access control.
+ * Allows storing and retrieving arbitrary data with ownership management.
+ */
+
+class Storage extends DemosContract {
+    constructor(
+        isPublic: boolean = {{IS_PUBLIC}},
+        maxKeys: number = {{MAX_KEYS}}
+    ) {
+        super()
+        
+        // Initialize storage metadata
+        this.state.set('owner', this.sender)
+        this.state.set('isPublic', isPublic)
+        this.state.set('maxKeys', maxKeys)
+        this.state.set('keyCount', 0)
+        
+        // Initialize storage and access control
+        this.state.set('data', {})
+        this.state.set('authorizedUsers', {})
+        
+        // Owner is always authorized
+        const authorizedUsers = {}
+        authorizedUsers[this.sender] = true
+        this.state.set('authorizedUsers', authorizedUsers)
+        
+        // Emit creation event
+        this.emit('StorageCreated', { 
+            owner: this.sender, 
+            isPublic, 
+            maxKeys 
+        })
+    }
+    
+    /**
+     * Get the contract owner
+     */
+    owner(): string {
+        return this.state.get('owner')
+    }
+    
+    /**
+     * Check if storage is public
+     */
+    isPublic(): boolean {
+        return this.state.get('isPublic')
+    }
+    
+    /**
+     * Get maximum number of keys allowed
+     */
+    maxKeys(): number {
+        return this.state.get('maxKeys')
+    }
+    
+    /**
+     * Get current number of keys stored
+     */
+    keyCount(): number {
+        return this.state.get('keyCount')
+    }
+    
+    /**
+     * Store a value with the given key
+     */
+    store(key: string, value: any): boolean {
+        this._requireWriteAccess()
+        this._validateKey(key)
+        
+        const data = this.state.get('data')
+        const isNewKey = !(key in data)
+        
+        // Check key limit for new keys
+        if (isNewKey) {
+            const currentKeyCount = this.state.get('keyCount')
+            const maxKeys = this.state.get('maxKeys')
+            
+            if (currentKeyCount >= maxKeys) {
+                this.revert('Maximum key limit reached')
+            }
+            
+            // Increment key count
+            this.state.set('keyCount', currentKeyCount + 1)
+        }
+        
+        // Store the value
+        data[key] = {
+            value,
+            timestamp: this.blockHeight,
+            author: this.sender
+        }
+        this.state.set('data', data)
+        
+        // Emit storage event
+        this.emit('ValueStored', { 
+            key, 
+            value, 
+            author: this.sender,
+            isNewKey
+        })
+        
+        return true
+    }
+    
+    /**
+     * Retrieve a value by key
+     */
+    retrieve(key: string): any {
+        this._requireReadAccess()
+        this._validateKey(key)
+        
+        const data = this.state.get('data')
+        const entry = data[key]
+        
+        if (!entry) {
+            return null
+        }
+        
+        // Emit retrieval event
+        this.emit('ValueRetrieved', { 
+            key, 
+            value: entry.value,
+            requester: this.sender 
+        })
+        
+        return entry.value
+    }
+    
+    /**
+     * Get detailed information about a stored value
+     */
+    getInfo(key: string): any {
+        this._requireReadAccess()
+        this._validateKey(key)
+        
+        const data = this.state.get('data')
+        const entry = data[key]
+        
+        if (!entry) {
+            return null
+        }
+        
+        return {
+            value: entry.value,
+            timestamp: entry.timestamp,
+            author: entry.author,
+            key
+        }
+    }
+    
+    /**
+     * Check if a key exists
+     */
+    has(key: string): boolean {
+        this._requireReadAccess()
+        this._validateKey(key)
+        
+        const data = this.state.get('data')
+        return key in data
+    }
+    
+    /**
+     * Delete a value by key
+     */
+    remove(key: string): boolean {
+        this._requireWriteAccess()
+        this._validateKey(key)
+        
+        const data = this.state.get('data')
+        
+        if (!(key in data)) {
+            this.revert('Key does not exist')
+        }
+        
+        const oldValue = data[key].value
+        delete data[key]
+        this.state.set('data', data)
+        
+        // Decrement key count
+        const currentKeyCount = this.state.get('keyCount')
+        this.state.set('keyCount', currentKeyCount - 1)
+        
+        // Emit removal event
+        this.emit('ValueRemoved', { 
+            key, 
+            oldValue,
+            remover: this.sender 
+        })
+        
+        return true
+    }
+    
+    /**
+     * Get all keys (read access required)
+     */
+    keys(): string[] {
+        this._requireReadAccess()
+        
+        const data = this.state.get('data')
+        return Object.keys(data)
+    }
+    
+    /**
+     * Authorize a user for read/write access
+     */
+    authorize(user: string): boolean {
+        this._requireOwner()
+        
+        const authorizedUsers = this.state.get('authorizedUsers')
+        authorizedUsers[user] = true
+        this.state.set('authorizedUsers', authorizedUsers)
+        
+        // Emit authorization event
+        this.emit('UserAuthorized', { user, authorizer: this.sender })
+        
+        return true
+    }
+    
+    /**
+     * Revoke user authorization
+     */
+    revoke(user: string): boolean {
+        this._requireOwner()
+        
+        if (user === this.state.get('owner')) {
+            this.revert('Cannot revoke owner access')
+        }
+        
+        const authorizedUsers = this.state.get('authorizedUsers')
+        delete authorizedUsers[user]
+        this.state.set('authorizedUsers', authorizedUsers)
+        
+        // Emit revocation event
+        this.emit('UserRevoked', { user, revoker: this.sender })
+        
+        return true
+    }
+    
+    /**
+     * Check if a user is authorized
+     */
+    isAuthorized(user: string): boolean {
+        const isPublic = this.state.get('isPublic')
+        
+        // Public storage allows read access to anyone
+        if (isPublic) {
+            return true
+        }
+        
+        // Check explicit authorization
+        const authorizedUsers = this.state.get('authorizedUsers')
+        return authorizedUsers[user] === true
+    }
+    
+    /**
+     * Transfer ownership to another user
+     */
+    transferOwnership(newOwner: string): boolean {
+        this._requireOwner()
+        
+        if (!newOwner || newOwner === '0x0') {
+            this.revert('Invalid new owner address')
+        }
+        
+        const oldOwner = this.state.get('owner')
+        this.state.set('owner', newOwner)
+        
+        // Ensure new owner is authorized
+        const authorizedUsers = this.state.get('authorizedUsers')
+        authorizedUsers[newOwner] = true
+        this.state.set('authorizedUsers', authorizedUsers)
+        
+        // Emit ownership transfer event
+        this.emit('OwnershipTransferred', { 
+            oldOwner, 
+            newOwner 
+        })
+        
+        return true
+    }
+    
+    /**
+     * Clear all data (owner only)
+     */
+    clear(): boolean {
+        this._requireOwner()
+        
+        this.state.set('data', {})
+        this.state.set('keyCount', 0)
+        
+        // Emit clear event
+        this.emit('StorageCleared', { clearer: this.sender })
+        
+        return true
+    }
+    
+    /**
+     * Get storage statistics
+     */
+    getStats(): any {
+        this._requireReadAccess()
+        
+        return {
+            owner: this.state.get('owner'),
+            isPublic: this.state.get('isPublic'),
+            maxKeys: this.state.get('maxKeys'),
+            keyCount: this.state.get('keyCount'),
+            availableKeys: this.state.get('maxKeys') - this.state.get('keyCount')
+        }
+    }
+    
+    /**
+     * Require owner access
+     */
+    private _requireOwner(): void {
+        const owner = this.state.get('owner')
+        if (this.sender !== owner) {
+            this.revert('Only owner can perform this action')
+        }
+    }
+    
+    /**
+     * Require read access
+     */
+    private _requireReadAccess(): void {
+        if (!this.isAuthorized(this.sender)) {
+            this.revert('Read access denied')
+        }
+    }
+    
+    /**
+     * Require write access (stricter than read access)
+     */
+    private _requireWriteAccess(): void {
+        const authorizedUsers = this.state.get('authorizedUsers')
+        
+        // Write access requires explicit authorization (not just public read)
+        if (authorizedUsers[this.sender] !== true) {
+            this.revert('Write access denied')
+        }
+    }
+    
+    /**
+     * Validate key format
+     */
+    private _validateKey(key: string): void {
+        if (!key || typeof key !== 'string') {
+            this.revert('Invalid key: must be non-empty string')
+        }
+        
+        if (key.length > 64) {
+            this.revert('Key too long: maximum 64 characters')
+        }
+        
+        // Prevent keys that could cause issues
+        if (key.startsWith('_') || key.includes('\0')) {
+            this.revert('Invalid key format')
+        }
+    }
+}

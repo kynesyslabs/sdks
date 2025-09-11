@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Get the commit message from the staged commit message file (if it exists)
+# or from the command line arguments
+COMMIT_MSG_FILE=".git/COMMIT_EDITMSG"
+if [ -f "$COMMIT_MSG_FILE" ]; then
+    COMMIT_MSG=$(head -n 1 "$COMMIT_MSG_FILE")
+else
+    # Try to get from git log (for amend commits)
+    COMMIT_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+fi
+
+# Check if we should skip the build based on --no-verify flag
+if [ "$GIT_SKIP_BUILD" = "true" ]; then
+    echo "⚠️  Skipping build check (GIT_SKIP_BUILD=true)"
+    exit 0
+fi
+
+# Check if commit message starts with DEBUG or TEMP (case insensitive)
+if [[ "$COMMIT_MSG" =~ ^(DEBUG|TEMP|debug|temp) ]]; then
+    echo "⚠️  Skipping build check - commit message starts with DEBUG or TEMP"
+    exit 0
+fi
+
+echo "🔨 Running build check before commit..."
+
+# Detect which package manager to use
+if command -v bun &> /dev/null; then
+    PM="bun"
+    echo "📦 Using Bun..."
+elif command -v npm &> /dev/null; then
+    PM="npm"
+    echo "📦 Using npm..."
+elif command -v yarn &> /dev/null; then
+    PM="yarn"
+    echo "📦 Using Yarn..."
+else
+    echo "❌ No package manager found! Please install bun, npm, or yarn."
+    exit 1
+fi
+
+# Run the build
+echo "🔨 Running: $PM run build"
+if $PM run build; then
+    echo "✅ Build successful! Proceeding with commit."
+    exit 0
+else
+    echo "❌ Build failed! Commit aborted."
+    echo ""
+    echo "To skip this check, you can:"
+    echo "  1. Start your commit message with DEBUG or TEMP"
+    echo "  2. Use: git commit --no-verify"
+    echo "  3. Use: GIT_SKIP_BUILD=true git commit"
+    exit 1
+fi
