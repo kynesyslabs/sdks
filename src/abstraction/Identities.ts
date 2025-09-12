@@ -14,8 +14,8 @@ import {
     PqcIdentityRemovePayload,
     DiscordProof,
     InferFromDiscordPayload,
-    FindAccountByWeb2IdentityQuery,
-    FindAccountByWeb3IdentityQuery,
+    FindDemosIdByWeb2IdentityQuery,
+    FindDemosIdByWeb3IdentityQuery,
 } from "@/types/abstraction"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
@@ -510,13 +510,13 @@ export class Identities {
     }
 
     /**
-     * Get an account by identity.
+     * Get demos accounts by linked web2 or web3 identity.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param identity The identity to get the account for.
      * @returns The account associated with the identity.
      */
-    async getAccountByIdentity(demos: Demos, identity: FindAccountByWeb2IdentityQuery | FindAccountByWeb3IdentityQuery): Promise<Account> {
+    async getDemosIdsByIdentity(demos: Demos, identity: FindDemosIdByWeb2IdentityQuery | FindDemosIdByWeb3IdentityQuery): Promise<Account[]> {
         const request = {
             method: "gcr_routine",
             params: [
@@ -536,7 +536,7 @@ export class Identities {
     }
 
     /**
-     * Get an account by web2 identity.
+     * Get demos accounts by linked web2 identity.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param context The context of the identity to get the account for.
@@ -544,8 +544,8 @@ export class Identities {
      * @param userId The user id to get the account for.
      * @returns The account associated with the identity.
      */
-    async getAccountByWeb2Identity(demos: Demos, context: "twitter" | "github" | "discord" | "telegram", username: string, userId?: string) {
-        return await this.getAccountByIdentity(demos, {
+    async getDemosIdsByWeb2Identity(demos: Demos, context: "twitter" | "github" | "discord" | "telegram", username: string, userId?: string) {
+        return await this.getDemosIdsByIdentity(demos, {
             type: "web2",
             context: context,
             username: username,
@@ -554,15 +554,15 @@ export class Identities {
     }
 
     /**
-     * Get an account by web3 identity.
+    * Get demos accounts by linked web3 identity.
      * 
      * @param demos A Demos instance to communicate with the RPC.
      * @param chain The chain as a string containing the chain and subchain separated by a period (eg. "eth.mainnet" | "solana.mainnet", etc.)
      * @param address The address to get the account for.
      * @returns The account associated with the identity.
      */
-    async getAccountByWeb3Identity(demos: Demos, chain: `${string}.${string}`, address: string) {
-        return await this.getAccountByIdentity(demos, {
+    async getDemosIdsByWeb3Identity(demos: Demos, chain: `${string}.${string}`, address: string) {
+        return await this.getDemosIdsByIdentity(demos, {
             type: "xm",
             chain: chain,
             address: address,
@@ -570,49 +570,49 @@ export class Identities {
     }
 
     /**
-     * Get an account by twitter identity. 
+     * Get demos accounts by linked twitter identity. 
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param username The username to get the account for.
      * @returns The account associated with the username.
      */
-    async getAccountByTwitterIdentity(demos: Demos, username: string, userId?: string) {
-        return await this.getAccountByWeb2Identity(demos, "twitter", username, userId)
+    async getDemosIdsByTwitter(demos: Demos, username: string, userId?: string) {
+        return await this.getDemosIdsByWeb2Identity(demos, "twitter", username, userId)
     }
 
     /**
-     * Get an account by github identity.
+     * Get demos accounts by linked github identity.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param username The username to get the account for.
      * @param userId The user id to get the account for.
      * @returns The account associated with the identity.
      */
-    async getAccountByGithubIdentity(demos: Demos, username: string, userId?: string) {
-        return await this.getAccountByWeb2Identity(demos, "github", username, userId)
+    async getDemosIdsByGithub(demos: Demos, username: string, userId?: string) {
+        return await this.getDemosIdsByWeb2Identity(demos, "github", username, userId)
     }
 
     /**
-     * Get an account by discord identity.
+     * Get demos accounts by linked discord identity.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param username The username to get the account for.
      * @param userId The user id to get the account for.
      * @returns The account associated with the identity.
      */
-    async getAccountByDiscordIdentity(demos: Demos, username: string, userId?: string) {
-        return await this.getAccountByWeb2Identity(demos, "discord", username, userId)
+    async getDemosIdsByDiscord(demos: Demos, username: string, userId?: string) {
+        return await this.getDemosIdsByWeb2Identity(demos, "discord", username, userId)
     }
 
     /**
-     * Get an account by telegram identity.
+     * Get demos accounts by linked telegram identity.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param username The username to get the account for.
      * @param userId The user id to get the account for.
      * @returns The account associated with the identity.
      */
-    async getAccountByTelegramIdentity(demos: Demos, username: string, userId?: string) {
-        return await this.getAccountByWeb2Identity(demos, "telegram", username, userId)
+    async getDemosIdsByTelegram(demos: Demos, username: string, userId?: string) {
+        return await this.getDemosIdsByWeb2Identity(demos, "telegram", username, userId)
     }
 }

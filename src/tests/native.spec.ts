@@ -114,14 +114,20 @@ describe("Native transactions", () => {
 
     test.only("Get account by web2 identity", async () => {
         const identities = new Identities()
-        const identity = await identities.getAccountByTwitterIdentity(demos, "gokusonwae")
+        const identity = await identities.getDemosIdsByIdentity(demos, {
+            type: "web2",
+            // @ts-ignore
+            context: "unknown",
+            username: "gokusonwae",
+            userId: undefined,
+        })
 
         console.log("identity: ", identity)
     })
 
     test.only("Get account by web3 identity", async () => {
         const identities = new Identities()
-        const identity = await identities.getAccountByWeb3Identity(demos, "eth.mainnet", "0x4e32e615f6a01affda8ba038fe2df911f15dcfc7")
+        const identity = await identities.getDemosIdsByWeb3Identity(demos, "eth.mainnet", "0x4e32e615f6a01affda8ba038fe2df911f15dcfc7")
 
         console.log("identity: ", identity)
     })

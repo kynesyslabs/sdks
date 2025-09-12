@@ -214,14 +214,14 @@ export interface UserPoints {
     flaggedReason: string | null
 }
 
-export interface FindAccountByWeb2IdentityQuery {
+export interface FindDemosIdByWeb2IdentityQuery {
     type: "web2"
     context: "twitter" | "telegram" | "github" | "discord"
     username: string
     userId?: string
 }
 
-export interface FindAccountByWeb3IdentityQuery {
+export interface FindDemosIdByWeb3IdentityQuery {
     type: "xm"
     chain: string // eg. "eth.mainnet" | "solana.mainnet", etc.
     address: string

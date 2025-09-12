@@ -77,3 +77,4 @@ export interface ReferralInfo {
     referralCode: string;
     totalReferrals: number;
 }
+
