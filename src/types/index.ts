@@ -55,6 +55,20 @@ export {
     OperationResult,
 } from "./gls/Operation"
 export { StateChange } from "./gls/StateChange"
+export {
+    Account,
+    AccountIdentities,
+    XMIdentities,
+    ChainIdentities,
+    IdentityLink,
+    Web2Identities,
+    TwitterIdentity,
+    AccountPoints,
+    PointsBreakdown,
+    Web3WalletPoints,
+    SocialAccountPoints,
+    ReferralInfo,
+} from "./gls/account"
 
 // network
 

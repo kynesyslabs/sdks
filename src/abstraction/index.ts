@@ -22,6 +22,8 @@ import {
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
     UserPoints,
+    FindDemosIdByWeb2IdentityQuery,
+    FindDemosIdByWeb3IdentityQuery
 } from "@/types/abstraction"
 
 export {
@@ -41,4 +43,6 @@ export {
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
     UserPoints,
+    FindDemosIdByWeb2IdentityQuery,
+    FindDemosIdByWeb3IdentityQuery
 }

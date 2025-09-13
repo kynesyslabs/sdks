@@ -242,3 +242,16 @@ export interface UserPoints {
     flagged: boolean | null
     flaggedReason: string | null
 }
+
+export interface FindDemosIdByWeb2IdentityQuery {
+    type: "web2"
+    context: "twitter" | "telegram" | "github" | "discord"
+    username: string
+    userId?: string
+}
+
+export interface FindDemosIdByWeb3IdentityQuery {
+    type: "xm"
+    chain: string // eg. "eth.mainnet" | "solana.mainnet", etc.
+    address: string
+}

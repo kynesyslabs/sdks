@@ -1,4 +1,5 @@
 import pprint from "@/utils/pprint"
+import { Identities } from "@/abstraction"
 import { Demos, DemosWebAuth } from "@/websdk"
 
 describe("Native transactions", () => {
@@ -26,7 +27,7 @@ describe("Native transactions", () => {
         )
     })
 
-    test.only("Pay", async () => {
+    test.skip("Pay", async () => {
         const tx = await demos.pay(
             "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
             100,
@@ -110,4 +111,24 @@ describe("Native transactions", () => {
 
         // 4. Broadcast the transaction
     }, 10000000)
+
+    test.only("Get account by web2 identity", async () => {
+        const identities = new Identities()
+        const identity = await identities.getDemosIdsByIdentity(demos, {
+            type: "web2",
+            // @ts-ignore
+            context: "unknown",
+            username: "gokusonwae",
+            userId: undefined,
+        })
+
+        console.log("identity: ", identity)
+    })
+
+    test.only("Get account by web3 identity", async () => {
+        const identities = new Identities()
+        const identity = await identities.getDemosIdsByWeb3Identity(demos, "eth.mainnet", "0x4e32e615f6a01affda8ba038fe2df911f15dcfc7")
+
+        console.log("identity: ", identity)
+    })
 })
