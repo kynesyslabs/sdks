@@ -272,13 +272,17 @@ export class HandleIdentityOperations {
                 const payload =
                     identityPayload.payload as Web2CoreTargetIdentityPayload
 
+                const proofString = typeof payload.proof === 'string' 
+                                    ? payload.proof 
+                                    : JSON.stringify(payload.proof);
+
                 edit.data = {
                     context: payload.context,
                     data: {
                         username: payload.username,
                         userId: payload.userId,
                         proof: payload.proof,
-                        proofHash: Hashing.sha256(payload.proof),
+                        proofHash: Hashing.sha256(proofString),
                         timestamp: tx.content.timestamp,
                     },
                 } as Web2GCRData

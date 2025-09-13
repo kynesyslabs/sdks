@@ -82,7 +82,7 @@ export type XmIdentityPayload =
  */
 export interface Web2CoreTargetIdentityPayload {
     context: string
-    proof: string
+    proof: string | TelegramProof
     username: string
     userId: string
     referralCode?: string
@@ -121,11 +121,40 @@ export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
 export interface InferFromTwitterPayload extends InferFromXPayload {}
 
 // ANCHOR Telegram Identities
+
+/**
+ * Telegram bot attestation payload structure
+ */
+export interface TelegramAttestationPayload {
+    telegram_id: string
+    username: string | null
+    public_key: string
+    timestamp: number
+    bot_address: string
+}
+
+/**
+ * Signed attestation from Telegram bot containing dual signatures
+ */
+export interface TelegramSignedAttestation {
+    payload: TelegramAttestationPayload
+    signature: {
+        type: SigningAlgorithm
+        data: string
+    }
+}
+
+/**
+ * Telegram proof is a stringified signed attestation with dual signatures
+ */
+export type TelegramProof = TelegramSignedAttestation // JSON.stringify(TelegramSignedAttestation)
+
 export interface InferFromTelegramPayload
     extends Web2CoreTargetIdentityPayload {
     context: "telegram"
     username: string
     userId: string
+    proof: TelegramProof
 }
 
 export interface InferFromDiscordPayload extends Web2CoreTargetIdentityPayload {

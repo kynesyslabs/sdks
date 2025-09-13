@@ -14,6 +14,10 @@ import {
     PqcIdentityRemovePayload,
     DiscordProof,
     InferFromDiscordPayload,
+    InferFromTelegramPayload,
+    TelegramProof,
+    TelegramSignedAttestation,
+    TelegramAttestationPayload,
 } from "@/types/abstraction"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
@@ -70,18 +74,21 @@ export class Identities {
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
-            if (
-                !this.formats.web2[payload.context].some((format: string) =>
-                    payload.proof.startsWith(format),
-                )
-            ) {
-                // construct informative error message
-                const errorMessage = `Invalid ${
-                    payload.context
-                } proof format. Supported formats are: ${this.formats.web2[
-                    payload.context
-                ].join(", ")}`
-                throw new Error(errorMessage)
+            // Skip validation for telegram as it uses custom attestation format, not URL proofs
+            if (payload.context !== "telegram" && this.formats.web2[payload.context]) {
+                if (
+                    !this.formats.web2[payload.context].some((format: string) =>
+                        payload.proof.startsWith(format),
+                    )
+                ) {
+                    // construct informative error message
+                    const errorMessage = `Invalid ${
+                        payload.context
+                    } proof format. Supported formats are: ${this.formats.web2[
+                        payload.context
+                    ].join(", ")}`
+                    throw new Error(errorMessage)
+                }
             }
         }
 
@@ -314,6 +321,33 @@ export class Identities {
         return await this.inferIdentity(demos, "web2", discordPayload)
     }
 
+    /**
+     * Add a telegram identity to the GCR.
+     * This method is designed to work with telegram bot attestations.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The telegram identity payload containing user and bot signatures.
+     * @param referralCode Optional referral code for incentive points.
+     * @returns The response from the RPC call.
+     */
+    async addTelegramIdentity(
+        demos: Demos,
+        payload: TelegramSignedAttestation,
+        referralCode?: string,
+    ) {
+        const telegramPayload: InferFromTelegramPayload & {
+            referralCode?: string
+        } = {
+            context: "telegram",
+            proof: payload,
+            username: payload.payload.username,
+            userId: payload.payload.telegram_id,
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "web2", telegramPayload)
+    }
+
     // SECTION: PQC Identities
     async bindPqcIdentity(
         demos: Demos,
@@ -520,6 +554,24 @@ export class Identities {
             method: "gcr_routine",
             params: [
                 { method: "getAccountByTwitterUsername", params: [username] },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Get an account by telegram username.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The username to get the account for.
+     * @returns The account associated with the username.
+     */
+    async getAccountByTelegramUsername(demos: Demos, username: string) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                { method: "getAccountByTelegramUsername", params: [username] },
             ],
         }
 
