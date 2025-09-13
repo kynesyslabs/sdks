@@ -232,6 +232,7 @@ export interface UserPoints {
             twitter: number
             github: number
             discord: number
+            telegram: number
         }
         referrals: number
         demosFollow: number
