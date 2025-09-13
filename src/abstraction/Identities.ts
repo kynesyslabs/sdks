@@ -577,4 +577,41 @@ export class Identities {
 
         return await demos.rpcCall(request, true)
     }
+
+    /**
+     * Get demos accounts by web2 or web3 identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param identity The identity query to search for.
+     * @returns The accounts associated with the identity.
+     */
+    async getDemosIdsByIdentity(
+        demos: Demos,
+        identity: any
+    ) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                { method: "getDemosIdsByIdentity", params: [identity] },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Get demos accounts by web3 identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param chain The blockchain chain identifier.
+     * @param address The web3 address to search for.
+     * @returns The accounts associated with the web3 identity.
+     */
+    async getDemosIdsByWeb3Identity(demos: Demos, chain: string, address: string) {
+        return await this.getDemosIdsByIdentity(demos, {
+            type: "web3",
+            chain: chain,
+            address: address
+        })
+    }
 }
