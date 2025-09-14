@@ -12,6 +12,7 @@ KyneSys Labs: https://www.kynesys.xyz/
 import { pki } from "node-forge"
 import { EncryptedTransaction } from "@/types/blockchain/encryptedTransaction"
 import { IPeer } from "@/types/peers/Peer"
+import { StandardGenesis } from "@/types/blockchain/genesisTypes"
 
 // ? This will be probably improved for performance reasons
 export interface NativeTablesHashes {
@@ -50,4 +51,17 @@ export interface Block {
     proposer: pki.PublicKey | pki.ed25519.BinaryBuffer
     next_proposer?: pki.PublicKey | pki.ed25519.BinaryBuffer
     validation_data: any
+}
+
+// REVIEW: Genesis block extends Block with typed extra field containing genesis data
+export interface GenesisBlockExtra {
+    genesisData: StandardGenesis
+}
+
+export interface GenesisBlockContent extends BlockContent {
+    extra: GenesisBlockExtra
+}
+
+export interface GenesisBlock extends Block {
+    content: GenesisBlockContent
 }
