@@ -23,7 +23,9 @@ import {
     PqcIdentityRemovePayload,
     UserPoints,
     FindDemosIdByWeb2IdentityQuery,
-    FindDemosIdByWeb3IdentityQuery
+    FindDemosIdByWeb3IdentityQuery,
+    TelegramAttestationPayload,
+    TelegramSignedAttestation
 } from "@/types/abstraction"
 
 export {
@@ -44,5 +46,7 @@ export {
     PqcIdentityRemovePayload,
     UserPoints,
     FindDemosIdByWeb2IdentityQuery,
-    FindDemosIdByWeb3IdentityQuery
+    FindDemosIdByWeb3IdentityQuery,
+    TelegramAttestationPayload,
+    TelegramSignedAttestation
 }
