@@ -25,6 +25,7 @@ export {
     CompiledContent,
     EVMTankData,
     SolanaTankData,
+    NativeBridgeTxPayload,
     SupportedChain as NativeBridgeSupportedChain,
     SupportedStablecoin as NativeBridgeSupportedStablecoin,
     SupportedEVMChain as NativeBridgeSupportedEVMChain,

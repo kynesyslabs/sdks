@@ -2,6 +2,7 @@ import { Cryptography, Hashing, uint8ArrayToHex } from "@/encryption"
 import {
     BridgeOperation,
     BridgeOperationCompiled,
+    NativeBridgeTxPayload,
     SupportedChain,
     SupportedEVMChain,
     SupportedStablecoin,
@@ -108,11 +109,16 @@ export const methods = {
         // Get proper nonce from demos instance
         const nonce = await demos.getAddressNonce(from_ed25519_address)
         
-        // Prepare the transaction structure
+        // Prepare the transaction structure with bridge ID
+        const txPayload: NativeBridgeTxPayload = {
+            operation: compiled,
+            bridgeId: compiled.content.bridgeId
+        }
+
         const tx: Transaction = {
             content: {
                 type: "nativeBridge",
-                data: ["nativeBridge", compiled],
+                data: ["nativeBridge", txPayload],
                 from: from,
                 to: to,
                 from_ed25519_address: from_ed25519_address,
