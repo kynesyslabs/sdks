@@ -1,4 +1,4 @@
-import { SupportedEVMChain, supportedEVMChains, SupportedNonEVMChain, supportedNonEVMChains } from "./nativeBridgeTypes"
+import { SupportedChain, supportedChains, supportedNonEVMChains } from "./nativeBridgeTypes"
 
 /**
 * Validates the chain
@@ -6,26 +6,11 @@ import { SupportedEVMChain, supportedEVMChains, SupportedNonEVMChain, supportedN
 * @param isOrigin (useful for error messages)
 */
 export function validateChain(
-    chain: SupportedEVMChain | SupportedNonEVMChain,
-    isOrigin: boolean,
+    chain: SupportedChain,
 ) {
-    const chainTypeStr = isOrigin ? "origin" : "destination"
-
-    if (chain.startsWith("evm")) {
-        if (!supportedEVMChains.includes(chain as SupportedEVMChain)) {
-            throw new Error(
-                `Invalid ${chainTypeStr} chain: ${chain} is not a supported EVM`,
-            )
-        }
-    } else {
-        if (
-            !supportedNonEVMChains.includes(
-                chain as SupportedNonEVMChain,
-            )
-        ) {
-            throw new Error(
-                `Invalid ${chainTypeStr} chain: ${chain} is not a supported chain`,
-            )
-        }
+    if (!supportedChains.includes(chain)) {
+        throw new Error(
+            `Invalid chain: ${chain} is not a supported chain`,
+        )
     }
 }

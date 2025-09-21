@@ -4,6 +4,8 @@ import { BridgeOperation } from "@/bridge/nativeBridgeTypes"
 import { EVM } from "@/multichain/localsdk/"
 import { Contract, WebSocketProvider } from "ethers"
 import { sleep } from "@/utils"
+import chainProviders from "../multichain/chainProviders"
+import { wallets } from "../utils/wallets"
 
 const liquidityTankABI = [
     // View functions
@@ -32,16 +34,24 @@ const liquidityTankABI = [
 ]
 
 describe("Native bridge Playground", () => {
-    const rpc_url = "https://dev.node2.demos.sh"
-    // const rpc_url = "http://localhost:53550"
+    // const rpc_url = "https://node2.demos.sh"
+    const rpc_url = "http://localhost:53550"
     const demos = new Demos()
-    const mnemonic = "green comfort mother science city film option length total alone laptop donor"
-
+    const mnemonic =
+        "green comfort mother science city film option length total alone laptop donor"
+    let evm: EVM
     let bridge: NativeBridge
 
     beforeAll(async () => {
         await demos.connect(rpc_url)
         await demos.connectWallet(mnemonic)
+
+        evm = new EVM(chainProviders.eth.sepolia)
+        await evm.connect()
+        await evm.connectWallet(wallets.evm.privateKey)
+
+        console.log("connected evm wallet:", evm.getAddress())
+        console.log("evm balance:", await evm.getBalance(evm.getAddress()))
 
         bridge = new NativeBridge(demos)
     })
@@ -50,39 +60,60 @@ describe("Native bridge Playground", () => {
         const operation: BridgeOperation = {
             address: await demos.getEd25519Address(),
             from: {
-                chain: "evm.eth",
-                subchain: "sepolia",
-                address: '0x5FbE74A283f7954f10AA04C2eDf55578811aeb03',
+                chain: "evm.eth.sepolia",
+                address: evm.getAddress(),
             },
             to: {
-                chain: "evm.polygon",
-                subchain: "amoy",
+                chain: "evm.polygon.amoy",
                 address: "0x5FbE74A283f7954f10AA04C2eDf55578811aeb03",
             },
             token: {
-                amount: "10",
-                type: "usdc"
-            }
+                amount: "2",
+                name: "usdc",
+            },
         }
 
         // Validates the operation params (locally), then sends to the node
         const compiled = await bridge.validate(operation)
-        console.log("compiled", JSON.stringify(compiled, null, 2))
+        console.log("compiled", compiled)
+
+        // const allowanceTx = await bridge.authorizeAllowance(demos, evm, compiled)
+        // console.log("allowanceTx", allowanceTx)
+
+        // const allowanceTxBroadcastRes = await demos.broadcast(allowanceTx)
+        // console.log("allowanceTxBroadcastRes", JSON.stringify(allowanceTxBroadcastRes, null, 2))
+
+        const allowanceTxHash =
+            "0x22f1638923cd202fa7b59793ca82ee7093f8fcbdfc21d49a3c82e40b690887d3"
+        const depositTx = await bridge.createDepositTx(
+            demos,
+            evm,
+            compiled,
+            allowanceTxHash,
+        )
+        console.log("depositTx", depositTx)
+
+        const depostitTxBroadcastRes = await demos.broadcast(depositTx)
+        console.log("depostitTxBroadcastRes", JSON.stringify(depostitTxBroadcastRes, null, 2))
 
         // Confirms the compiled operation's signature, creates a tx and sends it
         // to the node using demos.confirm
-        const validityData = await bridge.confirm(compiled, "!")
-        console.log(validityData)
+        // const validityData = await bridge.confirm(compiled, "!")
+        // console.log(validityData)
 
-        // Broadcasts the tx to the node (same as demos.broadcast)
-        const res = await bridge.broadcast(validityData)
-        console.log(res)
+        // // Broadcasts the tx to the node (same as demos.broadcast)
+        // const res = await bridge.broadcast(validityData)
+        // console.log(res)
     })
 
     function waitForEvent() {
         console.log("Listening to contract events ...")
         const ws_rpc = "wss://ethereum-sepolia-rpc.publicnode.com"
-        const contract = new Contract("0x11c1197798d3b1caB6970577361172C00e4C5F36", JSON.stringify(liquidityTankABI), new WebSocketProvider(ws_rpc))
+        const contract = new Contract(
+            "0x11c1197798d3b1caB6970577361172C00e4C5F36",
+            JSON.stringify(liquidityTankABI),
+            new WebSocketProvider(ws_rpc),
+        )
 
         contract.addListener("*", (data: any) => {
             console.log("Event received", data)
@@ -102,21 +133,26 @@ describe("Native bridge Playground", () => {
         // })
     }
 
-    test.only("Test Contract write GenerateProposalId", async () => {
+    test.skip("Test Contract write GenerateProposalId", async () => {
         waitForEvent()
 
         // INFO: Connect funded key
         const evm_rpc = "https://ethereum-sepolia-rpc.publicnode.com"
         const evm = new EVM(evm_rpc)
         await evm.connect()
-        await evm.connectWallet("hello library whisper end hurry impact wealth skin future virtual soup iron")
+        await evm.connectWallet(
+            "hello library whisper end hurry impact wealth skin future virtual soup iron",
+        )
 
         // INFO: Write to contract and send tx
-        const contract = await evm.getContractInstance("0x11c1197798d3b1caB6970577361172C00e4C5F36", JSON.stringify(liquidityTankABI))
+        const contract = await evm.getContractInstance(
+            "0x11c1197798d3b1caB6970577361172C00e4C5F36",
+            JSON.stringify(liquidityTankABI),
+        )
         const proposalIdTx = await evm.writeToContract(
             contract,
             "generateProposalId",
-            []
+            [],
         )
         const { hash } = await evm.sendSignedTransaction(proposalIdTx)
         console.log("Tx hash:", hash)

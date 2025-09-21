@@ -4,6 +4,7 @@ export {
     SupportedChains,
     SupportedTokens,
 } from "@/types/bridge/constants"
+import { StableCoinContracts } from "./nativeBridgeTypes"
 import RubicBridge from "./rubicBridge"
 export {
     BLOCKCHAIN_NAME,
@@ -20,16 +21,14 @@ export {
     BridgeOperationCompiled as NativeBridgeOperationCompiled,
     SupportedChain as NativeBridgeSupportedChain,
     SupportedStablecoin as NativeBridgeSupportedStablecoin,
-    SupportedEVMChain as NativeBridgeSupportedEVMChain,
     supportedChains as NativeBridgeSupportedChains,
     supportedStablecoins as NativeBridgeSupportedStablecoins,
-    supportedEVMChains as NativeBridgeSupportedEVMChains,
-    usdcContracts as NativeBridgeUSDCContracts,
+    supportedChains as NativeBridgeSupportedEVMChains,
+    StableCoinContracts as NativeBridgeStableCoinContracts,
     usdcAbi as NativeBridgeUSDCAbi,
     CompiledContent,
     EVMTankData,
     SolanaTankData,
-    SupportedNonEVMChain,
     TankData,
     providerUrls,
     supportedNonEVMChains,
@@ -37,3 +36,5 @@ export {
 } from "./nativeBridgeTypes"
 export { RubicBridge }
 export { validateChain } from "./utils"
+
+export const NativeBridgeUSDCContracts = StableCoinContracts['usdc']

@@ -446,9 +446,9 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         // Merge base transaction data with populated transaction
         const finalTx = {
             nonce,
-            ...(options?.gasPrice && { gasPrice: options.gasPrice }),
-            ...(options?.maxFeePerGas && { maxFeePerGas: options.maxFeePerGas }),
-            ...(options?.maxPriorityFeePerGas && { maxPriorityFeePerGas: options.maxPriorityFeePerGas }),
+            ...(options?.gasPrice && { gasPrice: parseUnits(options.gasPrice.toString(), "gwei") }),
+            ...(options?.maxFeePerGas && { maxFeePerGas: parseUnits(options.maxFeePerGas.toString(), "gwei") }),
+            ...(options?.maxPriorityFeePerGas && { maxPriorityFeePerGas: parseUnits(options.maxPriorityFeePerGas.toString(), "gwei") }),
             ...baseTx,
             ...populatedTx,
             // Override gasLimit if provided in options
