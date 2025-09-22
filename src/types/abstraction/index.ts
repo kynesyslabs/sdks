@@ -126,8 +126,10 @@ export interface InferFromTwitterPayload extends InferFromXPayload {}
  * Telegram bot attestation payload structure
  */
 export interface TelegramAttestationPayload {
-    telegram_id: string
-    username: string | null
+    telegram_user_id: string
+    challenge: string
+    signature: string
+    username: string
     public_key: string
     timestamp: number
     bot_address: string

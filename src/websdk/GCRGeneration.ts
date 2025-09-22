@@ -6,6 +6,7 @@ import {
 import {
     IdentityPayload,
     InferFromSignaturePayload,
+    TelegramSignedAttestation,
     Web2CoreTargetIdentityPayload,
 } from "@/types/abstraction"
 import { Hashing } from "@/encryption/Hashing"
@@ -272,9 +273,10 @@ export class HandleIdentityOperations {
                 const payload =
                     identityPayload.payload as Web2CoreTargetIdentityPayload
 
-                const proofString = typeof payload.proof === 'string' 
-                                    ? payload.proof 
-                                    : JSON.stringify(payload.proof);
+                const proofString =
+                    typeof payload.proof === "string"
+                        ? payload.proof
+                        : JSON.stringify(payload.proof)
 
                 edit.data = {
                     context: payload.context,
@@ -287,6 +289,13 @@ export class HandleIdentityOperations {
                     },
                 } as Web2GCRData
                 edit.referralCode = identityPayload.payload.referralCode
+
+                // INFO: Telegram payload is sent by bot, replace edit account
+                if (payload.context === "telegram") {
+                    edit.account = (
+                        payload.proof as TelegramSignedAttestation
+                    ).payload.public_key
+                }
 
                 break
             }

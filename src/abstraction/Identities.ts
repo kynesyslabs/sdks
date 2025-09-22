@@ -346,7 +346,7 @@ export class Identities {
             context: "telegram",
             proof: payload,
             username: payload.payload.username,
-            userId: payload.payload.telegram_id,
+            userId: payload.payload.telegram_user_id,
             referralCode: referralCode,
         }
 
