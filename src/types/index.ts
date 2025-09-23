@@ -93,7 +93,7 @@ export {
 } from "./web2/telegram"
 export { EthTransactionResponse, EthTransaction, SolanaTransactionResponse, SolTransaction } from "./xm/apiTools"
 
-export { IOperation, ITask, XMScript } from "./xm"
+export { IOperation, ITask, XMScript, EVMGasOptions } from "./xm"
 
 // DemosWork
 export { DemoScript } from "./demoswork"

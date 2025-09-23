@@ -1,4 +1,3 @@
-
 export interface ITask {
     type: string
     params: any // TODO Define a decent type for this and use it everywhere
@@ -16,6 +15,16 @@ export interface IOperation {
 }
 
 export interface XMScript {
-    operations: { [key: string]: IOperation },
+    operations: { [key: string]: IOperation }
     operations_order: string[]
+}
+
+/**
+ * NOTE: All values should will be parsed into gwei
+ */
+export interface EVMGasOptions {
+    gasLimit?: number
+    gasPrice?: number
+    maxFeePerGas?: number
+    maxPriorityFeePerGas?: number
 }

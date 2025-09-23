@@ -75,26 +75,45 @@ describe("Native bridge Playground", () => {
 
         // Validates the operation params (locally), then sends to the node
         const compiled = await bridge.validate(operation)
-        console.log("compiled", compiled)
+        // console.log("compiled", compiled)
 
-        // const allowanceTx = await bridge.authorizeAllowance(demos, evm, compiled)
+        // SECTION: ALlowance transaction
+        // const allowanceTx = await bridge.authorizeAllowance(
+        //     demos,
+        //     evm,
+        //     compiled,
+        //     {
+        //         gasLimit: 60000,
+        //         maxFeePerGas: 1.8,
+        //         maxPriorityFeePerGas: 1.8,
+        //     },
+        // )
         // console.log("allowanceTx", allowanceTx)
 
         // const allowanceTxBroadcastRes = await demos.broadcast(allowanceTx)
         // console.log("allowanceTxBroadcastRes", JSON.stringify(allowanceTxBroadcastRes, null, 2))
 
+        // SECTION: Deposit transaction
         const allowanceTxHash =
-            "0x22f1638923cd202fa7b59793ca82ee7093f8fcbdfc21d49a3c82e40b690887d3"
+            "0x91cc07f11dfa4a5ed7859e4cb6a0918946bb3e9a63d2a3fb25ed94b81ae80f5f"
         const depositTx = await bridge.createDepositTx(
             demos,
             evm,
             compiled,
             allowanceTxHash,
+            {
+                gasLimit: 260000,
+                maxFeePerGas: 1.8,
+                maxPriorityFeePerGas: 1.8,
+            },
         )
         console.log("depositTx", depositTx)
 
         const depostitTxBroadcastRes = await demos.broadcast(depositTx)
-        console.log("depostitTxBroadcastRes", JSON.stringify(depostitTxBroadcastRes, null, 2))
+        console.log(
+            "depostitTxBroadcastRes",
+            JSON.stringify(depostitTxBroadcastRes, null, 2),
+        )
 
         // Confirms the compiled operation's signature, creates a tx and sends it
         // to the node using demos.confirm

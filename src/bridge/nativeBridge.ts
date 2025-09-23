@@ -21,7 +21,7 @@ import {
 } from "ethers"
 import { EVM } from "@/multichain/core"
 import { Demos } from "@/websdk/demosclass"
-import { RPCRequest, RPCResponse } from "@/types"
+import { EVMGasOptions, RPCRequest, RPCResponse } from "@/types"
 import { Connection, PublicKey } from "@solana/web3.js"
 import { Hashing, hexToUint8Array, uint8ArrayToHex } from "@/encryption"
 import {
@@ -386,6 +386,7 @@ export class NativeBridge {
         demos: Demos,
         evm: EVM,
         payload: RPCResponseWithBridgeOperationCompiled,
+        gasOptions?: EVMGasOptions,
     ): Promise<RPCResponseWithValidityData> {
         required(demos, "Demos instance not connected")
         required(demos.walletConnected, "Demos wallet not connected")
@@ -425,11 +426,7 @@ export class NativeBridge {
             contract,
             "approve",
             [tankData.tankAddress, tankData.amountToDeposit],
-            {
-                gasLimit: 60000,
-                maxFeePerGas: 1.8,
-                maxPriorityFeePerGas: 1.8,
-            },
+            gasOptions,
         )
         const [_, chain, subchain] = operation.operation.from.chain.split(".")
 
@@ -602,41 +599,41 @@ export class NativeBridge {
     }> {
         const permit = await this.createPermit(evm, payload)
 
-        const messageHash = keccak256(
-            solidityPacked(
-                [
-                    "string",
-                    "address",
-                    "uint256",
-                    "address",
-                    "uint256",
-                    "string",
-                    "string",
-                    "address",
-                    "uint256",
-                    "uint256",
-                    "uint256",
-                    "address",
-                ],
-                [
-                    "LIQUIDITY_TANK_PERMIT_DEPOSIT_BRIDGE",
-                    payload.response.content.operation.from.address,
-                    0n,
-                    payload.response.content.operation.token.address,
-                    BigInt(payload.response.content.tankData.amountToDeposit),
-                    payload.response.content.operation.to.chain,
-                    payload.response.content.operation.to.address,
-                    payload.response.content.operation.to.address,
-                    BigInt(payload.response.content.tankData.feeBps),
-                    BigInt(permit.permitDeadline),
-                    BigInt(evm.chainId),
-                    payload.response.content.tankData.tankAddress,
-                ],
-            ),
+        const messageHash = ethers.solidityPackedKeccak256(
+            [
+                "string",
+                "address",
+                "uint256",
+                "address",
+                "uint256",
+                "string",
+                "string",
+                "address",
+                "uint256",
+                "uint256",
+                // "uint256",
+                "address",
+            ],
+            [
+                "LIQUIDITY_TANK_PERMIT_DEPOSIT_BRIDGE",
+                payload.response.content.operation.from.address,
+                0,
+                payload.response.content.operation.token.address,
+                payload.response.content.tankData.amountToDeposit,
+                evm.chainId.toString(),
+                payload.response.content.operation.to.chain,
+                payload.response.content.operation.to.address,
+                payload.response.content.tankData.feeBps,
+                permit.permitDeadline,
+                // evm.chainId,
+                payload.response.content.tankData.tankAddress,
+            ],
         )
 
         return {
-            signature: await evm.wallet.signMessage(messageHash),
+            signature: await evm.wallet.signMessage(
+                ethers.getBytes(messageHash),
+            ),
             permit,
         }
     }
@@ -646,6 +643,7 @@ export class NativeBridge {
         evm: EVM,
         payload: RPCResponseWithBridgeOperationCompiled,
         allowanceTxHash: string,
+        gasOptions?: EVMGasOptions,
     ): Promise<any> {
         required(demos, "Demos instance not connected")
         required(demos.walletConnected, "Demos wallet not connected")
@@ -673,7 +671,7 @@ export class NativeBridge {
         })
 
         const contract = await evm.getContractInstance(
-            token.address,
+            tankData.tankAddress,
             tankData.abi,
         )
 
@@ -699,6 +697,7 @@ export class NativeBridge {
                 message.permit.r,
                 message.permit.s,
             ],
+            gasOptions,
         )
         const [_, chain, subchain] = operation.operation.from.chain.split(".")
 
