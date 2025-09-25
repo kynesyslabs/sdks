@@ -53,7 +53,7 @@ describe("Native bridge Playground", () => {
         console.log("connected evm wallet:", evm.getAddress())
         console.log("evm balance:", await evm.getBalance(evm.getAddress()))
 
-        bridge = new NativeBridge(demos)
+        bridge = new NativeBridge(demos, evm)
     })
 
     test("Validate native bridge operation", async () => {
@@ -64,8 +64,8 @@ describe("Native bridge Playground", () => {
                 address: evm.getAddress(),
             },
             to: {
-                chain: "evm.polygon.amoy",
-                address: "0x5FbE74A283f7954f10AA04C2eDf55578811aeb03",
+                chain: "evm.eth.sepolia",
+                address: "0xc0A48d7f7653eEF78F212B235A8814bdD17e8174",
             },
             token: {
                 amount: "2",
@@ -75,55 +75,58 @@ describe("Native bridge Playground", () => {
 
         // Validates the operation params (locally), then sends to the node
         const compiled = await bridge.validate(operation)
+        console.log(
+            "compiled token amount",
+            JSON.stringify(compiled.response, null, 2),
+        )
         // console.log("compiled", compiled)
 
-        // SECTION: ALlowance transaction
-        // const allowanceTx = await bridge.authorizeAllowance(
-        //     demos,
-        //     evm,
-        //     compiled,
-        //     {
-        //         gasLimit: 60000,
-        //         maxFeePerGas: 1.8,
-        //         maxPriorityFeePerGas: 1.8,
-        //     },
-        // )
-        // console.log("allowanceTx", allowanceTx)
-
-        // const allowanceTxBroadcastRes = await demos.broadcast(allowanceTx)
-        // console.log("allowanceTxBroadcastRes", JSON.stringify(allowanceTxBroadcastRes, null, 2))
-
         // SECTION: Deposit transaction
-        const allowanceTxHash =
-            "0x91cc07f11dfa4a5ed7859e4cb6a0918946bb3e9a63d2a3fb25ed94b81ae80f5f"
-        const depositTx = await bridge.createDepositTx(
-            demos,
-            evm,
-            compiled,
-            allowanceTxHash,
-            {
-                gasLimit: 260000,
-                maxFeePerGas: 1.8,
-                maxPriorityFeePerGas: 1.8,
-            },
-        )
+        const depositTx = await bridge.createDepositTx(compiled, {
+            gasLimit: 260000,
+            maxFeePerGas: 1.8,
+            maxPriorityFeePerGas: 1.8,
+        })
         console.log("depositTx", depositTx)
 
-        const depostitTxBroadcastRes = await demos.broadcast(depositTx)
+        interface BroadcastTxRes {
+            result: number
+            response: {
+                [operationId: string]: {
+                    result: string
+                    hash: string
+                }
+            }
+        }
+        const depositTxBroadcastRes = (await demos.broadcast(
+            depositTx,
+        )) as BroadcastTxRes
         console.log(
-            "depostitTxBroadcastRes",
-            JSON.stringify(depostitTxBroadcastRes, null, 2),
+            "depositTxBroadcastRes",
+            JSON.stringify(depositTxBroadcastRes, null, 2),
         )
+
+        const depositTxHash = Object.values(depositTxBroadcastRes.response)[0]
+            .hash
+        console.log("depositTxHash", depositTxHash)
+
+        const receipt = await evm.provider.waitForTransaction(depositTxHash)
+        console.log("receipt", receipt)
+
+        // SECTION: Broadcast bridging transaction
+        // TODO: Update validateDepositTx to confirm brigde_id
+        // const depositTxHash =
+        //     "0xcb4138f3a0a894b415d0f757ad26a148ece478f655303ccde9bff8ddd2ef5822"
 
         // Confirms the compiled operation's signature, creates a tx and sends it
         // to the node using demos.confirm
-        // const validityData = await bridge.confirm(compiled, "!")
-        // console.log(validityData)
+        const validityData = await bridge.confirm(compiled, depositTxHash)
+        console.log(validityData)
 
-        // // Broadcasts the tx to the node (same as demos.broadcast)
-        // const res = await bridge.broadcast(validityData)
-        // console.log(res)
-    })
+        // Broadcasts the tx to the node (same as demos.broadcast)
+        const res = await bridge.broadcast(validityData)
+        console.log(res)
+    }, 2000000)
 
     function waitForEvent() {
         console.log("Listening to contract events ...")

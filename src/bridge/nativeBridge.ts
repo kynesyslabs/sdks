@@ -19,7 +19,7 @@ import {
     solidityPacked,
     TransactionReceipt,
 } from "ethers"
-import { EVM } from "@/multichain/core"
+import { DefaultChain, EVM } from "@/multichain/core"
 import { Demos } from "@/websdk/demosclass"
 import { EVMGasOptions, RPCRequest, RPCResponse } from "@/types"
 import { Connection, PublicKey } from "@solana/web3.js"
@@ -37,11 +37,19 @@ import {
 
 export class NativeBridge {
     private demos: Demos
+    private xm: EVM
     private MIN_BRIDGE_AMOUNT: number = 1 // $1 minimum
     private MAX_BRIDGE_AMOUNT: number = 10_000 // $10k maximum
 
-    constructor(demos: Demos) {
+    /**
+     * Constructor for the NativeBridge class
+     *
+     * @param demos The demos instance for communicating with the demos network
+     * @param xm The crosschain sdk instance (e.g. EVM) with the wallet and provider connected for communicating with the xm network
+     */
+    constructor(demos: Demos, xm: EVM) {
         this.demos = demos
+        this.xm = xm as EVM
     }
 
     /**
@@ -71,11 +79,12 @@ export class NativeBridge {
      * @throws Error if any chain is not supported
      */
     private validateChainSupport(operation: BridgeOperation): void {
-        if (operation.from.chain === operation.to.chain) {
-            throw new Error(
-                `Invalid bridge operation: cannot bridge from ${operation.from.chain} to the same chain`,
-            )
-        }
+        // TODO: Put this back in production
+        // if (operation.from.chain === operation.to.chain) {
+        //     throw new Error(
+        //         `Invalid bridge operation: cannot bridge from ${operation.from.chain} to the same chain`,
+        //     )
+        // }
 
         if (!supportedStablecoins.includes(operation.token.name)) {
             throw new Error(`Unsupported token: ${operation.token.name}`)
@@ -176,8 +185,6 @@ export class NativeBridge {
     private async validateFromBalance(
         operation: BridgeOperation,
     ): Promise<void> {
-        return
-        // @ts-ignore
         const requiredAmount = parseFloat(operation.token.amount)
         const fromChain = operation.from.chain
         const fromAddress = operation.from.address
@@ -212,7 +219,7 @@ export class NativeBridge {
      * @param walletAddress The wallet address
      * @returns The token balance
      */
-    private async getEVMTokenBalance(
+    public async getEVMTokenBalance(
         operation: BridgeOperation,
     ): Promise<number> {
         const chain = operation.from.chain
@@ -229,6 +236,7 @@ export class NativeBridge {
             )
             const balance = await contract.balanceOf(walletAddress)
             const decimals = await contract.decimals()
+
             return parseFloat(ethers.formatUnits(balance, decimals))
         } catch (error) {
             throw new Error(`Failed to get EVM token balance: ${error}`)
@@ -323,6 +331,7 @@ export class NativeBridge {
      * and sending it back to the RPC for validation.
      *
      * @param compiled The compiled operation
+     * @param txHash The txhash for depositing the bridge amount to the tank
      * @returns RPC response with transaction validity data
      */
     async confirm(
@@ -338,6 +347,13 @@ export class NativeBridge {
             txHash,
             "The crosschain deposit to tank transaction hash is missing",
         )
+
+        const depositTx = await this.xm.provider.getTransactionReceipt(txHash)
+        if (!depositTx) {
+            throw new Error("Transaction receipt not found")
+        }
+
+        this.verifyDepositTx(depositTx, compiled)
 
         // INFO: Verify the RPC signature
         const operation = compiled.response
@@ -372,6 +388,233 @@ export class NativeBridge {
     }
 
     /**
+     * Decodes event data using ABI decoder
+     *
+     * @param data The event data hex string
+     * @param types Array of ABI types for decoding
+     * @returns Decoded data array
+     */
+    private decodeEventData(data: string, types: string[]): any[] {
+        if (!data || data === "0x") {
+            throw new Error("Event data is empty")
+        }
+
+        try {
+            return ethers.AbiCoder.defaultAbiCoder().decode(types, data)
+        } catch (error) {
+            throw new Error(`Failed to decode event data: ${error}`)
+        }
+    }
+
+    /**
+     * Verifies the deposit transaction
+     *
+     * @param tx The transaction receipt
+     * @param compiled The compiled operation
+     */
+    verifyDepositTx(
+        tx: TransactionReceipt,
+        compiled: RPCResponseWithBridgeOperationCompiled,
+    ) {
+        required(
+            tx,
+            "The transaction receipt for depositing the bridge amount to the tank is required",
+        )
+        required(compiled, "The compiled operation is required")
+
+        if (tx.status !== 1) {
+            throw new Error(
+                "Invalid deposit tx: transaction status: " + tx.status,
+            )
+        }
+
+        if (!tx.logs || tx.logs.length === 0) {
+            throw new Error("Invalid deposit tx: no logs found")
+        }
+
+        const operation = compiled.response.content
+        const userAddress = operation.operation.from.address
+        const tankData = operation.tankData as EVMTankData
+        const tokenAddress = operation.operation.token.address
+        const tankAddress = tankData.tankAddress
+
+        const normalizedAddress = (addr: string): string => addr.toLowerCase()
+        const topicAddress = (addr: string): string =>
+            "0x" + addr.replace(/^0x/i, "").toLowerCase().padStart(64, "0")
+
+        // 1. Verify Transfer log (ERC20 transfer from user to tank)
+        const transferTopic =
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+        const expectedFromTopic = topicAddress(userAddress)
+        const expectedToTopic = topicAddress(tankAddress)
+
+        const transferLog = tx.logs.find(log => {
+            return (
+                normalizedAddress(log.address) ===
+                    normalizedAddress(tokenAddress) &&
+                Array.isArray(log.topics) &&
+                log.topics.length === 3 &&
+                log.topics[0].toLowerCase() === transferTopic &&
+                log.topics[1].toLowerCase() === expectedFromTopic &&
+                log.topics[2].toLowerCase() === expectedToTopic
+            )
+        })
+
+        if (!transferLog) {
+            throw new Error(
+                "Invalid deposit tx: Transfer event from user to tank not found",
+            )
+        }
+
+        const transferAmount = BigInt(transferLog.data)
+        const expectedDepositAmount = BigInt(tankData.amountToDeposit)
+
+        if (transferAmount !== expectedDepositAmount) {
+            throw new Error(
+                "Invalid deposit tx: transfer amount mismatch. Expected: " +
+                    expectedDepositAmount.toString() +
+                    ", Got: " +
+                    transferAmount.toString(),
+            )
+        }
+
+        // 2. Verify TokenDeposited log
+        const tokenDepositedTopic =
+            "0xf1444b5cad7ce70cb018d1b8edc8618fe303f3c7f034d8d572a6e27facbf2bef"
+        const expectedTokenTopic = topicAddress(tokenAddress)
+        const expectedUserTopic = topicAddress(userAddress)
+
+        const tokenDepositedLog = tx.logs.find(log => {
+            return (
+                normalizedAddress(log.address) ===
+                    normalizedAddress(tankAddress) &&
+                Array.isArray(log.topics) &&
+                log.topics.length === 3 &&
+                log.topics[0].toLowerCase() === tokenDepositedTopic &&
+                log.topics[1].toLowerCase() === expectedTokenTopic &&
+                log.topics[2].toLowerCase() === expectedUserTopic
+            )
+        })
+
+        if (!tokenDepositedLog) {
+            throw new Error(
+                "Invalid deposit tx: TokenDeposited event not found",
+            )
+        }
+
+        const [depositedAmount] = this.decodeEventData(tokenDepositedLog.data, [
+            "uint256",
+        ])
+        if (BigInt(depositedAmount) !== expectedDepositAmount) {
+            throw new Error(
+                "Invalid deposit tx: TokenDeposited amount mismatch. Expected: " +
+                    expectedDepositAmount.toString() +
+                    ", Got: " +
+                    depositedAmount.toString(),
+            )
+        }
+
+        // 3. Verify DepositAndBridgeExecuted log
+        const depositAndBridgeTopic =
+            "0x73db2af167b5ea544c7998b0761f723f3fec150d84f2f8bc3f7dd250e31bf83e"
+        const expectedTokenTopicForBridge = topicAddress(tokenAddress)
+
+        const depositAndBridgeLog = tx.logs.find(log => {
+            return (
+                normalizedAddress(log.address) ===
+                    normalizedAddress(tankAddress) &&
+                Array.isArray(log.topics) &&
+                log.topics.length === 4 &&
+                log.topics[0].toLowerCase() === depositAndBridgeTopic &&
+                log.topics[1].toLowerCase() === expectedUserTopic &&
+                log.topics[2].toLowerCase() === expectedTokenTopicForBridge &&
+                log.topics[3].toLowerCase() === expectedUserTopic
+            )
+        })
+
+        if (!depositAndBridgeLog) {
+            throw new Error(
+                "Invalid deposit tx: DepositAndBridgeExecuted event not found",
+            )
+        }
+
+        // Parse the data field for DepositAndBridgeExecuted event
+        const [
+            logDepositAmount,
+            logBridgeAmount,
+            logDestChain,
+            logRecipient,
+            logNonce,
+        ] = this.decodeEventData(depositAndBridgeLog.data, [
+            "uint256",
+            "uint256",
+            "bytes",
+            "address",
+            "uint256",
+        ])
+
+        // Verify deposit amount matches
+        if (BigInt(logDepositAmount) !== expectedDepositAmount) {
+            throw new Error(
+                "Invalid deposit tx: DepositAndBridgeExecuted depositAmount mismatch. Expected: " +
+                    expectedDepositAmount.toString() +
+                    ", Got: " +
+                    logDepositAmount.toString(),
+            )
+        }
+
+        // Verify bridge amount matches deposit amount (should be same for this transaction)
+        if (BigInt(logBridgeAmount) !== expectedDepositAmount) {
+            throw new Error(
+                "Invalid deposit tx: DepositAndBridgeExecuted bridgeAmount mismatch. Expected: " +
+                    expectedDepositAmount.toString() +
+                    ", Got: " +
+                    logBridgeAmount.toString(),
+            )
+        }
+
+        // Verify destination chain
+        const destChainString = ethers.toUtf8String(logDestChain)
+        if (destChainString !== operation.operation.to.chain) {
+            throw new Error(
+                "Invalid deposit tx: DepositAndBridgeExecuted destination chain mismatch. Expected: " +
+                    operation.operation.to.chain +
+                    ", Got: " +
+                    destChainString,
+            )
+        }
+
+        // Verify recipient address
+        if (
+            normalizedAddress(logRecipient) !==
+            normalizedAddress(operation.operation.to.address)
+        ) {
+            throw new Error(
+                "Invalid deposit tx: DepositAndBridgeExecuted recipient mismatch. Expected: " +
+                    operation.operation.to.address +
+                    ", Got: " +
+                    logRecipient,
+            )
+        }
+
+        const data = {
+            valid: true,
+            bridgeId: "",
+            depositAmount: BigInt(logDepositAmount.toString()),
+            bridgeAmount: BigInt(logBridgeAmount.toString()),
+            from: userAddress,
+            to: {
+                chain: destChainString,
+                address: logRecipient,
+            },
+            nonce: BigInt(logNonce.toString()),
+        }
+
+        console.log("Deposit transaction verification successful:", data)
+        return data
+    }
+
+    /**
      * Broadcasts the bridge transaction to the network (same as calling demos.broadcast)
      *
      * @param validityData The validity data of the bridge transaction
@@ -382,24 +625,32 @@ export class NativeBridge {
         return await this.demos.broadcast(validityData)
     }
 
+    /**
+     * Creates the allowance transaction for the bridge transaction
+     *
+     *
+     *
+     * @param demos The demos instance
+     * @param evm The EVM instance
+     * @param payload The payload of the bridge transaction
+     * @param gasOptions The gas options for the allowance transaction
+     */
     async authorizeAllowance(
-        demos: Demos,
-        evm: EVM,
         payload: RPCResponseWithBridgeOperationCompiled,
         gasOptions?: EVMGasOptions,
     ): Promise<RPCResponseWithValidityData> {
-        required(demos, "Demos instance not connected")
-        required(demos.walletConnected, "Demos wallet not connected")
-        required(evm.wallet, "EVM wallet not connected")
+        required(this.demos, "Demos instance not connected")
+        required(this.demos.walletConnected, "Demos wallet not connected")
+        required(this.xm.wallet, "EVM wallet not connected")
 
         const operation = payload.response.content
 
-        if (evm.getAddress() !== operation.operation.from.address) {
+        if (this.xm.getAddress() !== operation.operation.from.address) {
             throw new Error(
                 "EVM wallet address address mismatch. Expected: " +
                     operation.operation.from.address +
                     ", Got: " +
-                    evm.getAddress(),
+                    this.xm.getAddress(),
             )
         }
 
@@ -407,14 +658,14 @@ export class NativeBridge {
         const tankData = operation.tankData as EVMTankData
         const token = operation.operation.token
 
-        const contract = await evm.getContractInstance(
+        const contract = await this.xm.getContractInstance(
             token.address,
             abis[token.name],
         )
 
         // check if the user has enough balance to approve the allowance
-        const balance = await evm.readFromContract(contract, "balanceOf", [
-            evm.getAddress(),
+        const balance = await this.xm.readFromContract(contract, "balanceOf", [
+            this.xm.getAddress(),
         ])
         console.log("balance", balance)
         console.log("tankData.amountExpected", tankData.amountToDeposit)
@@ -422,7 +673,7 @@ export class NativeBridge {
             throw new Error("Insufficient balance to approve allowance")
         }
 
-        const allowanceTx = await evm.writeToContract(
+        const allowanceTx = await this.xm.writeToContract(
             contract,
             "approve",
             [tankData.tankAddress, tankData.amountToDeposit],
@@ -438,8 +689,8 @@ export class NativeBridge {
             is_evm: true,
         })
 
-        const signedDemosTx = await prepareXMPayload(xmscript, demos)
-        return await demos.confirm(signedDemosTx)
+        const signedDemosTx = await prepareXMPayload(xmscript, this.demos)
+        return await this.demos.confirm(signedDemosTx)
     }
 
     /**
@@ -538,21 +789,32 @@ export class NativeBridge {
         }
     }
 
-    async createPermit(
-        evm: EVM,
-        payload: RPCResponseWithBridgeOperationCompiled,
-    ) {
+    /**
+     * Creates the permit signature for the bridge transaction
+     *
+     * @param payload The payload of the bridge transaction
+     * @returns The permit signature
+     */
+    async createPermit(payload: RPCResponseWithBridgeOperationCompiled) {
         const compiled = payload.response.content
         const token = compiled.operation.token
         const tankData = compiled.tankData as EVMTankData
         // Get permit signature components
         const permitDeadline = Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
 
+        const contract = await this.xm.getContractInstance(
+            token.address,
+            abis[token.name],
+        )
+
+        const version = await this.xm.readFromContract(contract, "version", [])
+        const name = await this.xm.readFromContract(contract, "name", [])
+
         // Create permit signature (EIP-2612)
         const domain = {
-            name: token.name,
-            version: "1",
-            chainId: evm.chainId,
+            name: name,
+            version: version,
+            chainId: this.xm.chainId,
             verifyingContract: token.address,
         }
 
@@ -566,15 +828,29 @@ export class NativeBridge {
             ],
         }
 
+        // Get the actual nonce from the token contract
+
+        // get address nonce
+        // const nonce = await this.xm.provider.getTransactionCount(compiled.operation.from.address)
+        const nonce = await this.xm.readFromContract(contract, "nonces", [
+            compiled.operation.from.address,
+        ])
+
         const values = {
             owner: compiled.operation.from.address,
             spender: tankData.tankAddress,
             value: tankData.amountToDeposit,
-            nonce: permitDeadline,
+            nonce: nonce, // ✅ Use actual nonce from contract
             deadline: permitDeadline,
         }
 
-        const permitSig = await evm.wallet.signTypedData(domain, types, values)
+        console.log("Permit values with actual nonce:", values)
+
+        const permitSig = await this.xm.wallet.signTypedData(
+            domain,
+            types,
+            values,
+        )
         const signature = Signature.from(permitSig)
 
         return {
@@ -586,7 +862,6 @@ export class NativeBridge {
     }
 
     async signDepositMessage(
-        evm: EVM,
         payload: RPCResponseWithBridgeOperationCompiled,
     ): Promise<{
         signature: string
@@ -597,13 +872,12 @@ export class NativeBridge {
             s: string
         }
     }> {
-        const permit = await this.createPermit(evm, payload)
-
+        const permit = await this.createPermit(payload)
         const messageHash = ethers.solidityPackedKeccak256(
             [
                 "string",
                 "address",
-                "uint256",
+                "string",
                 "address",
                 "uint256",
                 "string",
@@ -617,10 +891,10 @@ export class NativeBridge {
             [
                 "LIQUIDITY_TANK_PERMIT_DEPOSIT_BRIDGE",
                 payload.response.content.operation.from.address,
-                0,
+                payload.response.content.bridgeId,
                 payload.response.content.operation.token.address,
                 payload.response.content.tankData.amountToDeposit,
-                evm.chainId.toString(),
+                this.xm.chainId.toString(),
                 payload.response.content.operation.to.chain,
                 payload.response.content.operation.to.address,
                 payload.response.content.tankData.feeBps,
@@ -631,7 +905,7 @@ export class NativeBridge {
         )
 
         return {
-            signature: await evm.wallet.signMessage(
+            signature: await this.xm.wallet.signMessage(
                 ethers.getBytes(messageHash),
             ),
             permit,
@@ -639,54 +913,33 @@ export class NativeBridge {
     }
 
     async createDepositTx(
-        demos: Demos,
-        evm: EVM,
         payload: RPCResponseWithBridgeOperationCompiled,
-        allowanceTxHash: string,
         gasOptions?: EVMGasOptions,
     ): Promise<any> {
-        required(demos, "Demos instance not connected")
-        required(demos.walletConnected, "Demos wallet not connected")
-        required(evm.wallet, "EVM wallet not connected")
-        required(allowanceTxHash, "Allowance tx hash not provided")
-
-        // INFO: Verify allowance tx
-        const allowanceTx = await evm.provider.getTransactionReceipt(
-            allowanceTxHash,
-        )
-        console.log("allowanceTx", JSON.stringify(allowanceTx, null, 2))
-        if (!allowanceTx) {
-            throw new Error("Allowance tx not found")
-        }
+        required(this.demos, "Demos instance not connected")
+        required(this.demos.walletConnected, "Demos wallet not connected")
+        required(this.xm.wallet, "EVM wallet not connected")
 
         const operation = payload.response.content
         const tankData = operation.tankData as EVMTankData
         const token = operation.operation.token
 
-        this.verifyAllowanceTx(allowanceTx, {
-            approvedBy: operation.operation.from.address,
-            approvedAmount: tankData.amountToDeposit,
-            spender: tankData.tankAddress,
-            erc20ContractAddress: token.address,
-        })
-
-        const contract = await evm.getContractInstance(
+        const contract = await this.xm.getContractInstance(
             tankData.tankAddress,
             tankData.abi,
         )
 
-        const message = await this.signDepositMessage(evm, payload)
-        const nonce = 0
+        const message = await this.signDepositMessage(payload)
 
         // Create the tx to deposit the bridge amount via the tank contract
-        const tx = await evm.writeToContract(
+        const tx = await this.xm.writeToContract(
             contract,
             "depositAndBridgeWithPermit",
             [
                 operation.bridgeId,
                 operation.operation.from.address,
                 message.signature,
-                nonce,
+                // nonce,
                 token.address,
                 tankData.amountToDeposit,
                 operation.operation.to.chain,
@@ -709,138 +962,7 @@ export class NativeBridge {
             is_evm: true,
         })
 
-        const signedDemosTx = await prepareXMPayload(xmscript, demos)
-        return await demos.confirm(signedDemosTx)
+        const signedDemosTx = await prepareXMPayload(xmscript, this.demos)
+        return await this.demos.confirm(signedDemosTx)
     }
 }
-
-// export const methods = {
-//     /**
-//      * Validates the chain
-//      * @param chain
-//      * @param chainType
-//      * @param isOrigin (useful for error messages)
-//      */
-//     validateChain(
-//         chain: string,
-//         chainType: string,
-//         isOrigin: boolean,
-//     ) {
-//         const chainTypeStr = isOrigin ? "origin" : "destination"
-//         if (chainType === "EVM") {
-//             if (!supportedEVMChains.includes(chain as SupportedEVMChain)) {
-//                 throw new Error(
-//                     `Invalid ${chainTypeStr} chain: ${chain} is not a supported EVM`,
-//                 )
-//             }
-//         } else {
-//             if (
-//                 !supportedNonEVMChains.includes(
-//                     chain as SupportedNonEVMChain,
-//                 )
-//             ) {
-//                 throw new Error(
-//                     `Invalid ${chainTypeStr} chain: ${chain} is not a supported chain`,
-//                 )
-//             }
-//         }
-//     },
-//     /**
-//      * Generates a new operation, ready to be sent to the node as a RPCRequest
-//      * TODO Implement the params
-//      * REVIEW Should we use the identity somehow or we keep using the private key?
-//      */
-//     generateOperation(
-//         privateKey: string,
-//         publicKey: string,
-//         originChainType: SupportedChain,
-//         originChain: SupportedEVMChain | SupportedNonEVMChain,
-//         destinationChainType: SupportedChain,
-//         destinationChain: SupportedEVMChain | SupportedNonEVMChain,
-//         originAddress: string,
-//         destinationAddress: string,
-//         amount: string,
-//         token: SupportedStablecoin,
-//     ): RPCRequest {
-//         // Ensuring the chains are valid: throw an error if not
-//         this.validateChain(originChain, originChainType, true)
-//         this.validateChain(destinationChain, destinationChainType, false)
-//         // Defining the operation
-//         const operation: BridgeOperation = {
-//             demoAddress: publicKey,
-//             originChainType: originChainType,
-//             originChain: originChain,
-//             destinationChainType: destinationChainType,
-//             destinationChain: destinationChain,
-//             originAddress: originAddress,
-//             destinationAddress: destinationAddress,
-//             amount: amount,
-//             // @ts-ignore
-//             token: token,
-//             txHash: "",
-//             status: "empty",
-//         }
-//         // REVIEW Sign the operation
-//         let opHash = Hashing.sha256(JSON.stringify(operation))
-//         let signature = Cryptography.sign(opHash, privateKey)
-//         let hexSignature = new TextDecoder().decode(signature)
-//         let nodeCallPayload: RPCRequest = {
-//             method: "nativeBridge",
-//             params: [operation, hexSignature],
-//         }
-//         return nodeCallPayload
-//     },
-
-//     /**
-//      * Generates a bridge transaction ready for client confirmation and broadcasting.
-//      *
-//      * @param compiled - The compiled bridge operation from RPC
-//      * @param demos - Demos instance for signing (provides wallet and nonce)
-//      * @returns Signed transaction ready for demos.confirm() and demos.broadcast()
-//      */
-//     async generateOperationTx(compiled: BridgeOperationCompiled, demos: Demos): Promise<Transaction> {
-//         // Extract addresses from the compiled operation
-//         const operation = compiled.content.operation
-//         const from = operation.originAddress      // Source chain address
-//         const to = operation.originAddress        // Same as from (reflexive transaction)
-//         const from_ed25519_address = operation.demoAddress  // Demos address that started operation
-
-//         // Get proper nonce from demos instance
-//         const nonce = await demos.getAddressNonce(from_ed25519_address)
-
-//         // Prepare the transaction structure
-//         const tx: Transaction = {
-//             content: {
-//                 type: "nativeBridge",
-//                 data: ["nativeBridge", compiled],
-//                 from: from,
-//                 to: to,
-//                 from_ed25519_address: from_ed25519_address,
-//                 amount: 0,  // Always 0 for bridge operations
-//                 gcr_edits: [],  // Will be generated by demos.sign()
-//                 nonce: nonce + 1,
-//                 timestamp: Date.now(),
-//                 transaction_fee: {
-//                     network_fee: 0,
-//                     rpc_fee: 0,
-//                     additional_fee: 0,
-//                 },
-//             },
-//             signature: {
-//                 type: "ed25519",
-//                 data: "",
-//             },
-//             hash: "",
-//             status: "empty",
-//             blockNumber: 0,
-//             ed25519_signature: ""
-//         }
-
-//         // Use demos.sign() which handles GCR generation, hashing, and signing
-//         const signedTx = await demos.sign(tx)
-
-//         // NOTE: Client must call demos.confirm(signedTx) then demos.broadcast(validationData)
-//         // to complete the transaction flow, following the same pattern as pay() transactions
-//         return signedTx
-//     },
-// }

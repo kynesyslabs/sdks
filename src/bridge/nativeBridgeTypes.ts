@@ -136,7 +136,7 @@ export const StableCoinContracts = {
 export const supportedChains = Object.keys(StableCoinContracts["usdc"])
 
 export const providerUrls = {
-    "evm.eth.sepolia": "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID",
+    "evm.eth.sepolia": "https://ethereum-sepolia-rpc.publicnode.com",
     "evm.eth.mainnet": "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID",
     "evm.polygon.mumbai":
         "https://polygon-mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID",
@@ -166,9 +166,13 @@ export const providerUrls = {
 
 // USDC ABI for balance checking
 export const usdcAbi = JSON.stringify([
-    "function balanceOf(address owner) view returns (uint256)",
+    "function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)",
+    "function allowance(address owner, address spender) view returns (uint256)",
+    "function nonces(address owner) view returns (uint256)",
+    "function name() view returns (string)",
+    "function version() view returns (string)",
     "function decimals() view returns (uint8)",
-    "function approve(address spender, uint256 amount) returns (bool)",
+    "function balanceOf(address owner) view returns (uint256)",
 ])
 
 export const tokenAddresses = {
