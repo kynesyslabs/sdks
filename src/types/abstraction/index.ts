@@ -238,6 +238,7 @@ export interface UserPoints {
         }
         referrals: number
         demosFollow: number
+        firstWalletTransaction: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
