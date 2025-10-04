@@ -2,6 +2,7 @@
 // This should be able to query and set the GCR identities for a Demos address
 
 import axios from "axios"
+import { ethers } from "ethers"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
@@ -20,6 +21,8 @@ import {
     TelegramAttestationPayload,
     FindDemosIdByWeb2IdentityQuery,
     FindDemosIdByWeb3IdentityQuery,
+    UDIdentityPayload,
+    UDIdentityAssignPayload,
 } from "@/types/abstraction"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
@@ -72,7 +75,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc",
+        context: "xm" | "web2" | "pqc" | "ud",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -131,7 +134,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc",
+        context: "xm" | "web2" | "pqc" | "ud",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -696,5 +699,133 @@ export class Identities {
             username,
             userId,
         )
+    }
+
+    // SECTION: Unstoppable Domains Identities
+
+    /**
+     * Resolve an Unstoppable Domain to its owner's Ethereum address.
+     *
+     * @param domain The UD domain (e.g., "brad.crypto")
+     * @returns The Ethereum address that owns the domain
+     */
+    private async resolveUDDomain(domain: string): Promise<string> {
+        // REVIEW: Using public RPC. In production, consider using configured Ethereum RPC
+        const provider = new ethers.JsonRpcProvider(
+            "https://eth.llamarpc.com",
+        )
+        const tokenId = ethers.namehash(domain)
+
+        const registryAbi = [
+            "function ownerOf(uint256 tokenId) external view returns (address)",
+        ]
+
+        // UNS Registry (newer standard)
+        const UNS_REGISTRY = "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
+        // CNS Registry (legacy)
+        const CNS_REGISTRY = "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
+
+        try {
+            // Try UNS first
+            const unsRegistry = new ethers.Contract(
+                UNS_REGISTRY,
+                registryAbi,
+                provider,
+            )
+            return await unsRegistry.ownerOf(tokenId)
+        } catch {
+            // Fallback to CNS (legacy)
+            const cnsRegistry = new ethers.Contract(
+                CNS_REGISTRY,
+                registryAbi,
+                provider,
+            )
+            return await cnsRegistry.ownerOf(tokenId)
+        }
+    }
+
+    /**
+     * Generate a challenge message for Unstoppable Domain ownership verification.
+     *
+     * The user must sign this challenge with their domain's resolved Ethereum address
+     * using MetaMask or another Ethereum wallet.
+     *
+     * @param demosPublicKey The user's Demos public key (hex string)
+     * @returns Challenge message to be signed
+     */
+    generateUDChallenge(demosPublicKey: string): string {
+        const timestamp = Date.now()
+        const nonce = Math.random().toString(36).substring(7)
+
+        return (
+            `Link Unstoppable Domain to Demos Network\n` +
+            `Demos Key: ${demosPublicKey}\n` +
+            `Timestamp: ${timestamp}\n` +
+            `Nonce: ${nonce}`
+        )
+    }
+
+    /**
+     * Add an Unstoppable Domain identity to the GCR.
+     *
+     * Flow:
+     * 1. Resolve domain to get owner's Ethereum address
+     * 2. User signs challenge with Ethereum wallet (MetaMask)
+     * 3. Submit domain + signature for verification
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param domain The UD domain (e.g., "brad.crypto")
+     * @param signature Signature from domain's resolved Ethereum address
+     * @param signedData The challenge message that was signed
+     * @param referralCode Optional referral code
+     * @returns The response from the RPC call
+     *
+     * @example
+     * ```typescript
+     * const identities = new Identities()
+     * const challenge = identities.generateUDChallenge(demos.publicKey)
+     * // User signs challenge with MetaMask
+     * const signature = await ethereum.request({
+     *     method: 'personal_sign',
+     *     params: [challenge, ethereumAddress]
+     * })
+     * await identities.addUnstoppableDomainIdentity(
+     *     demos,
+     *     "brad.crypto",
+     *     signature,
+     *     challenge
+     * )
+     * ```
+     */
+    async addUnstoppableDomainIdentity(
+        demos: Demos,
+        domain: string,
+        signature: string,
+        signedData: string,
+        referralCode?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        // Resolve domain to get Ethereum address
+        const resolvedAddress = await this.resolveUDDomain(domain)
+
+        // For UD, publicKey is the resolved Ethereum address
+        // (Ethereum uses address recovery from signature)
+        const publicKey = resolvedAddress
+
+        const udPayload: UDIdentityPayload = {
+            domain,
+            resolvedAddress,
+            signature,
+            publicKey,
+            signedData,
+        }
+
+        const payload: UDIdentityAssignPayload & { referralCode?: string } = {
+            context: "ud",
+            method: "ud_identity_assign",
+            payload: udPayload,
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "ud" as any, payload)
     }
 }
