@@ -219,11 +219,48 @@ export type PqcIdentityPayload =
     | PqcIdentityAssignPayload
     | PqcIdentityRemovePayload
 
+// SECTION Unstoppable Domains Identities
+export interface BaseUdIdentityPayload {
+    context: "ud"
+}
+
+/**
+ * Unstoppable Domains identity payload
+ *
+ * Follows signature-based verification pattern (like XM identities)
+ * User signs challenge with domain's resolved Ethereum address
+ */
+export interface UDIdentityPayload {
+    domain: string              // e.g., "brad.crypto"
+    resolvedAddress: string     // Ethereum address domain resolves to
+    signature: string           // Signature from resolvedAddress
+    publicKey: string           // Public key of resolvedAddress
+    signedData: string          // Challenge message that was signed
+}
+
+export interface UDIdentityAssignPayload extends BaseUdIdentityPayload {
+    method: "ud_identity_assign"
+    payload: UDIdentityPayload
+    referralCode?: string
+}
+
+export interface UDIdentityRemovePayload extends BaseUdIdentityPayload {
+    method: "ud_identity_remove"
+    payload: {
+        domain: string
+    }
+}
+
+export type UdIdentityPayload =
+    | UDIdentityAssignPayload
+    | UDIdentityRemovePayload
+
 // SECTION Final payload type
 export type IdentityPayload =
     | XmIdentityPayload
     | Web2IdentityPayload
     | PqcIdentityPayload
+    | UdIdentityPayload
 export interface UserPoints {
     userId: string
     referralCode: string

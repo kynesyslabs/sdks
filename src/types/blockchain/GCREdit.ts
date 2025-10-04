@@ -79,11 +79,20 @@ export interface PQCIdentityGCREditData {
     timestamp: number
 }
 
+export interface UdGCRData {
+    domain: string
+    resolvedAddress: string
+    signature: string
+    publicKey: string
+    timestamp: number
+    registryType: "UNS" | "CNS"
+}
+
 export interface GCREditIdentity {
     type: "identity"
     isRollback: boolean
     account: string
-    context: "xm" | "web2" | "pqc"
+    context: "xm" | "web2" | "pqc" | "ud"
     operation: "add" | "remove"
     data:
     | Web2GCRData // web2 add or remove identity
@@ -91,6 +100,8 @@ export interface GCREditIdentity {
     | XMCoreTargetIdentityPayload // xm remove identity
     | PQCIdentityGCREditData[] // pqc add identity
     | PqcIdentityRemovePayload["payload"] // pqc remove identity
+    | UdGCRData // ud add identity
+    | { domain: string } // ud remove identity
     txhash: string
     referralCode?: string
 }
