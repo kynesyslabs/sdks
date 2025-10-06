@@ -90,11 +90,10 @@ export class Identities {
                     )
                 ) {
                     // construct informative error message
-                    const errorMessage = `Invalid ${
-                        payload.context
-                    } proof format. Supported formats are: ${this.formats.web2[
-                        payload.context
-                    ].join(", ")}`
+                    const errorMessage = `Invalid ${payload.context
+                        } proof format. Supported formats are: ${this.formats.web2[
+                            payload.context
+                        ].join(", ")}`
                     throw new Error(errorMessage)
                 }
             }
@@ -710,10 +709,33 @@ export class Identities {
      * @returns The Ethereum address that owns the domain
      */
     private async resolveUDDomain(domain: string): Promise<string> {
-        // REVIEW: Using public RPC. In production, consider using configured Ethereum RPC
-        const provider = new ethers.JsonRpcProvider(
+        // Multiple RPC providers for better reliability
+        const rpcUrls = [
             "https://eth.llamarpc.com",
-        )
+            "https://rpc.ankr.com/eth",
+            "https://cloudflare-eth.com",
+            "https://ethereum.publicnode.com"
+        ]
+
+        // Try providers until one works
+        let provider: ethers.JsonRpcProvider | null = null
+        for (const rpcUrl of rpcUrls) {
+            try {
+                const testProvider = new ethers.JsonRpcProvider(rpcUrl)
+                // Test the provider with a simple call
+                await testProvider.getNetwork()
+                provider = testProvider
+                break
+            } catch (error) {
+                console.log(`RPC ${rpcUrl} unavailable, trying next...`)
+                continue
+            }
+        }
+
+        if (!provider) {
+            throw new Error("All Ethereum RPC providers are unavailable")
+        }
+
         const tokenId = ethers.namehash(domain)
 
         const registryAbi = [
@@ -725,23 +747,61 @@ export class Identities {
         // CNS Registry (legacy)
         const CNS_REGISTRY = "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
 
+        // Helper function to add timeout to promises
+        const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
+            })
+
+            return Promise.race([promise, timeoutPromise])
+        }
+
+        let lastError: Error | null = null
+
         try {
-            // Try UNS first
+            // Try UNS first with timeout
+            console.log(`Resolving ${domain} via UNS registry...`)
             const unsRegistry = new ethers.Contract(
                 UNS_REGISTRY,
                 registryAbi,
                 provider,
             )
-            return await unsRegistry.ownerOf(tokenId)
-        } catch {
-            // Fallback to CNS (legacy)
+            const address = await withTimeout(unsRegistry.ownerOf(tokenId), 3000)
+
+            console.log(`Successfully resolved ${domain} to ${address} via UNS`)
+
+            return address
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.log(`UNS resolution failed for ${domain}:`, errorMessage)
+            lastError = error instanceof Error ? error : new Error(String(error))
+        }
+
+        try {
+            // Fallback to CNS (legacy) with timeout
+            console.log(`Trying CNS registry for ${domain}...`)
             const cnsRegistry = new ethers.Contract(
                 CNS_REGISTRY,
                 registryAbi,
                 provider,
             )
-            return await cnsRegistry.ownerOf(tokenId)
+            const address = await withTimeout(cnsRegistry.ownerOf(tokenId), 3000)
+
+            console.log(`Successfully resolved ${domain} to ${address} via CNS`)
+
+            return address
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.log(`CNS resolution also failed for ${domain}:`, errorMessage)
+            lastError = error instanceof Error ? error : new Error(String(error))
         }
+
+        // If both registries fail, throw a descriptive error
+        throw new Error(
+            `Failed to resolve Unstoppable Domain "${domain}". ` +
+            `Domain may not exist, be unregistered, or there may be network issues. ` +
+            `Last error: ${lastError?.message || 'Unknown error'}`
+        )
     }
 
     /**
