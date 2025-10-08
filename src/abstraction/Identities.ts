@@ -706,41 +706,74 @@ export class Identities {
     /**
      * Resolve an Unstoppable Domain to its owner's Ethereum address.
      *
+     * Multi-chain resolution strategy (per UD docs):
+     * 1. Try Polygon L2 UNS first (most new domains, cheaper gas)
+     * 2. Fallback to Ethereum L1 UNS (legacy domains)
+     * 3. Fallback to Ethereum L1 CNS (oldest legacy domains)
+     *
      * @param domain The UD domain (e.g., "brad.crypto")
-     * @returns The Ethereum address that owns the domain
+     * @returns Object with owner address, network, and registry type
      */
-    private async resolveUDDomain(domain: string): Promise<string> {
-        // REVIEW: Using public RPC. In production, consider using configured Ethereum RPC
-        const provider = new ethers.JsonRpcProvider(
-            "https://eth.llamarpc.com",
-        )
+    private async resolveUDDomain(
+        domain: string,
+    ): Promise<{
+        owner: string
+        network: "polygon" | "ethereum"
+        registryType: "UNS" | "CNS"
+    }> {
         const tokenId = ethers.namehash(domain)
 
         const registryAbi = [
             "function ownerOf(uint256 tokenId) external view returns (address)",
         ]
 
-        // UNS Registry (newer standard)
-        const UNS_REGISTRY = "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
-        // CNS Registry (legacy)
-        const CNS_REGISTRY = "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
+        // Polygon L2 UNS Registry (primary - most new domains)
+        const polygonUnsRegistry = "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f"
+        // Ethereum L1 UNS Registry (fallback)
+        const ethereumUnsRegistry =
+            "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
+        // Ethereum L1 CNS Registry (legacy fallback)
+        const ethereumCnsRegistry =
+            "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
 
+        // Try Polygon UNS first (L2 - cheaper, faster, most new domains)
         try {
-            // Try UNS first
-            const unsRegistry = new ethers.Contract(
-                UNS_REGISTRY,
-                registryAbi,
-                provider,
+            const polygonProvider = new ethers.JsonRpcProvider(
+                "https://polygon-rpc.com",
             )
-            return await unsRegistry.ownerOf(tokenId)
-        } catch {
-            // Fallback to CNS (legacy)
-            const cnsRegistry = new ethers.Contract(
-                CNS_REGISTRY,
+            const contract = new ethers.Contract(
+                polygonUnsRegistry,
                 registryAbi,
-                provider,
+                polygonProvider,
             )
-            return await cnsRegistry.ownerOf(tokenId)
+            const owner = await contract.ownerOf(tokenId)
+            return { owner, network: "polygon", registryType: "UNS" }
+        } catch (polygonError) {
+            // Polygon failed, try Ethereum UNS
+            try {
+                const ethereumProvider = new ethers.JsonRpcProvider(
+                    "https://eth.llamarpc.com",
+                )
+                const contract = new ethers.Contract(
+                    ethereumUnsRegistry,
+                    registryAbi,
+                    ethereumProvider,
+                )
+                const owner = await contract.ownerOf(tokenId)
+                return { owner, network: "ethereum", registryType: "UNS" }
+            } catch (ethereumUnsError) {
+                // Ethereum UNS failed, try Ethereum CNS (legacy)
+                const ethereumProvider = new ethers.JsonRpcProvider(
+                    "https://eth.llamarpc.com",
+                )
+                const contract = new ethers.Contract(
+                    ethereumCnsRegistry,
+                    registryAbi,
+                    ethereumProvider,
+                )
+                const owner = await contract.ownerOf(tokenId)
+                return { owner, network: "ethereum", registryType: "CNS" }
+            }
         }
     }
 
@@ -804,19 +837,22 @@ export class Identities {
         signedData: string,
         referralCode?: string,
     ): Promise<RPCResponseWithValidityData> {
-        // Resolve domain to get Ethereum address
-        const resolvedAddress = await this.resolveUDDomain(domain)
+        // Resolve domain to get Ethereum address and network info
+        const { owner, network, registryType } =
+            await this.resolveUDDomain(domain)
 
         // For UD, publicKey is the resolved Ethereum address
         // (Ethereum uses address recovery from signature)
-        const publicKey = resolvedAddress
+        const publicKey = owner
 
         const udPayload: UDIdentityPayload = {
             domain,
-            resolvedAddress,
+            resolvedAddress: owner,
             signature,
             publicKey,
             signedData,
+            network,
+            registryType,
         }
 
         const payload: UDIdentityAssignPayload & { referralCode?: string } = {

@@ -85,6 +85,7 @@ export interface UdGCRData {
     signature: string
     publicKey: string
     timestamp: number
+    network: "polygon" | "ethereum" // Network where domain is registered
     registryType: "UNS" | "CNS"
 }
 
