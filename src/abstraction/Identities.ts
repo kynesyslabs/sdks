@@ -705,103 +705,75 @@ export class Identities {
     /**
      * Resolve an Unstoppable Domain to its owner's Ethereum address.
      *
+     * Multi-chain resolution strategy (per UD docs):
+     * 1. Try Polygon L2 UNS first (most new domains, cheaper gas)
+     * 2. Fallback to Ethereum L1 UNS (legacy domains)
+     * 3. Fallback to Ethereum L1 CNS (oldest legacy domains)
+     *
      * @param domain The UD domain (e.g., "brad.crypto")
-     * @returns The Ethereum address that owns the domain
+     * @returns Object with owner address, network, and registry type
      */
-    private async resolveUDDomain(domain: string): Promise<string> {
-        // Multiple RPC providers for better reliability
-        const rpcUrls = [
-            "https://eth.llamarpc.com",
-            "https://rpc.ankr.com/eth",
-            "https://cloudflare-eth.com",
-            "https://ethereum.publicnode.com"
-        ]
-
-        // Try providers until one works
-        let provider: ethers.JsonRpcProvider | null = null
-        for (const rpcUrl of rpcUrls) {
-            try {
-                const testProvider = new ethers.JsonRpcProvider(rpcUrl)
-                // Test the provider with a simple call
-                await testProvider.getNetwork()
-                provider = testProvider
-                break
-            } catch (error) {
-                console.log(`RPC ${rpcUrl} unavailable, trying next...`)
-                continue
-            }
-        }
-
-        if (!provider) {
-            throw new Error("All Ethereum RPC providers are unavailable")
-        }
-
+    private async resolveUDDomain(
+        domain: string,
+    ): Promise<{
+        owner: string
+        network: "polygon" | "ethereum"
+        registryType: "UNS" | "CNS"
+    }> {
         const tokenId = ethers.namehash(domain)
 
         const registryAbi = [
             "function ownerOf(uint256 tokenId) external view returns (address)",
         ]
 
-        // UNS Registry (newer standard)
-        const UNS_REGISTRY = "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
-        // CNS Registry (legacy)
-        const CNS_REGISTRY = "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
+        // Polygon L2 UNS Registry (primary - most new domains)
+        const polygonUnsRegistry = "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f"
+        // Ethereum L1 UNS Registry (fallback)
+        const ethereumUnsRegistry =
+            "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
+        // Ethereum L1 CNS Registry (legacy fallback)
+        const ethereumCnsRegistry =
+            "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
 
-        // Helper function to add timeout to promises
-        const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
-            const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
-            })
-
-            return Promise.race([promise, timeoutPromise])
-        }
-
-        let lastError: Error | null = null
-
+        // Try Polygon UNS first (L2 - cheaper, faster, most new domains)
         try {
-            // Try UNS first with timeout
-            console.log(`Resolving ${domain} via UNS registry...`)
-            const unsRegistry = new ethers.Contract(
-                UNS_REGISTRY,
-                registryAbi,
-                provider,
+            const polygonProvider = new ethers.JsonRpcProvider(
+                "https://polygon-rpc.com",
             )
-            const address = await withTimeout(unsRegistry.ownerOf(tokenId), 3000)
-
-            console.log(`Successfully resolved ${domain} to ${address} via UNS`)
-
-            return address
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            console.log(`UNS resolution failed for ${domain}:`, errorMessage)
-            lastError = error instanceof Error ? error : new Error(String(error))
-        }
-
-        try {
-            // Fallback to CNS (legacy) with timeout
-            console.log(`Trying CNS registry for ${domain}...`)
-            const cnsRegistry = new ethers.Contract(
-                CNS_REGISTRY,
+            const contract = new ethers.Contract(
+                polygonUnsRegistry,
                 registryAbi,
-                provider,
+                polygonProvider,
             )
-            const address = await withTimeout(cnsRegistry.ownerOf(tokenId), 3000)
-
-            console.log(`Successfully resolved ${domain} to ${address} via CNS`)
-
-            return address
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            console.log(`CNS resolution also failed for ${domain}:`, errorMessage)
-            lastError = error instanceof Error ? error : new Error(String(error))
+            const owner = await contract.ownerOf(tokenId)
+            return { owner, network: "polygon", registryType: "UNS" }
+        } catch (polygonError) {
+            // Polygon failed, try Ethereum UNS
+            try {
+                const ethereumProvider = new ethers.JsonRpcProvider(
+                    "https://eth.llamarpc.com",
+                )
+                const contract = new ethers.Contract(
+                    ethereumUnsRegistry,
+                    registryAbi,
+                    ethereumProvider,
+                )
+                const owner = await contract.ownerOf(tokenId)
+                return { owner, network: "ethereum", registryType: "UNS" }
+            } catch (ethereumUnsError) {
+                // Ethereum UNS failed, try Ethereum CNS (legacy)
+                const ethereumProvider = new ethers.JsonRpcProvider(
+                    "https://eth.llamarpc.com",
+                )
+                const contract = new ethers.Contract(
+                    ethereumCnsRegistry,
+                    registryAbi,
+                    ethereumProvider,
+                )
+                const owner = await contract.ownerOf(tokenId)
+                return { owner, network: "ethereum", registryType: "CNS" }
+            }
         }
-
-        // If both registries fail, throw a descriptive error
-        throw new Error(
-            `Failed to resolve Unstoppable Domain "${domain}". ` +
-            `Domain may not exist, be unregistered, or there may be network issues. ` +
-            `Last error: ${lastError?.message || 'Unknown error'}`
-        )
     }
 
     /**
@@ -864,19 +836,22 @@ export class Identities {
         signedData: string,
         referralCode?: string,
     ): Promise<RPCResponseWithValidityData> {
-        // Resolve domain to get Ethereum address
-        const resolvedAddress = await this.resolveUDDomain(domain)
+        // Resolve domain to get Ethereum address and network info
+        const { owner, network, registryType } =
+            await this.resolveUDDomain(domain)
 
         // For UD, publicKey is the resolved Ethereum address
         // (Ethereum uses address recovery from signature)
-        const publicKey = resolvedAddress
+        const publicKey = owner
 
         const udPayload: UDIdentityPayload = {
             domain,
-            resolvedAddress,
+            resolvedAddress: owner,
             signature,
             publicKey,
             signedData,
+            network,
+            registryType,
         }
 
         const payload: UDIdentityAssignPayload & { referralCode?: string } = {
