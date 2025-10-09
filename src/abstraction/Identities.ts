@@ -90,10 +90,11 @@ export class Identities {
                     )
                 ) {
                     // construct informative error message
-                    const errorMessage = `Invalid ${payload.context
-                        } proof format. Supported formats are: ${this.formats.web2[
-                            payload.context
-                        ].join(", ")}`
+                    const errorMessage = `Invalid ${
+                        payload.context
+                    } proof format. Supported formats are: ${this.formats.web2[
+                        payload.context
+                    ].join(", ")}`
                     throw new Error(errorMessage)
                 }
             }
