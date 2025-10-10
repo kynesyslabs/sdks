@@ -231,7 +231,7 @@ export interface BaseUdIdentityPayload {
  * Follows signature-based verification pattern (like XM identities)
  * User signs challenge with domain's resolved Ethereum address
  *
- * Multi-chain support: Polygon L2 (primary) and Ethereum L1 (fallback)
+ * Multi-chain support: Polygon L2, Base L2, Sonic, and Ethereum L1
  */
 export interface UDIdentityPayload {
     domain: string              // e.g., "brad.crypto"
@@ -239,7 +239,7 @@ export interface UDIdentityPayload {
     signature: string           // Signature from resolvedAddress
     publicKey: string           // Public key of resolvedAddress
     signedData: string          // Challenge message that was signed
-    network: "polygon" | "ethereum" // Network where domain is registered
+    network: "polygon" | "ethereum" | "base" | "sonic" // Network where domain is registered
     registryType: "UNS" | "CNS" // Registry type (UNS newer, CNS legacy)
 }
 
