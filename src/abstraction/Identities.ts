@@ -708,8 +708,10 @@ export class Identities {
      *
      * Multi-chain resolution strategy (per UD docs):
      * 1. Try Polygon L2 UNS first (most new domains, cheaper gas)
-     * 2. Fallback to Ethereum L1 UNS (legacy domains)
-     * 3. Fallback to Ethereum L1 CNS (oldest legacy domains)
+     * 2. Try Base L2 UNS (new L2 option - growing adoption)
+     * 3. Try Sonic (emerging network support)
+     * 4. Fallback to Ethereum L1 UNS (legacy domains)
+     * 5. Fallback to Ethereum L1 CNS (oldest legacy domains)
      *
      * @param domain The UD domain (e.g., "brad.crypto")
      * @returns Object with owner address, network, and registry type
@@ -718,7 +720,7 @@ export class Identities {
         domain: string,
     ): Promise<{
         owner: string
-        network: "polygon" | "ethereum"
+        network: "polygon" | "ethereum" | "base" | "sonic"
         registryType: "UNS" | "CNS"
     }> {
         const tokenId = ethers.namehash(domain)
@@ -729,6 +731,10 @@ export class Identities {
 
         // Polygon L2 UNS Registry (primary - most new domains)
         const polygonUnsRegistry = "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f"
+        // Base L2 UNS Registry (new L2 option - growing adoption)
+        const baseUnsRegistry = "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498"
+        // Sonic UNS Registry (emerging network support)
+        const sonicUnsRegistry = "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4"
         // Ethereum L1 UNS Registry (fallback)
         const ethereumUnsRegistry =
             "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
@@ -749,30 +755,58 @@ export class Identities {
             const owner = await contract.ownerOf(tokenId)
             return { owner, network: "polygon", registryType: "UNS" }
         } catch (polygonError) {
-            // Polygon failed, try Ethereum UNS
+            // Polygon failed, try Base L2 UNS
             try {
-                const ethereumProvider = new ethers.JsonRpcProvider(
-                    "https://eth.llamarpc.com",
+                const baseProvider = new ethers.JsonRpcProvider(
+                    "https://mainnet.base.org",
                 )
                 const contract = new ethers.Contract(
-                    ethereumUnsRegistry,
+                    baseUnsRegistry,
                     registryAbi,
-                    ethereumProvider,
+                    baseProvider,
                 )
                 const owner = await contract.ownerOf(tokenId)
-                return { owner, network: "ethereum", registryType: "UNS" }
-            } catch (ethereumUnsError) {
-                // Ethereum UNS failed, try Ethereum CNS (legacy)
-                const ethereumProvider = new ethers.JsonRpcProvider(
-                    "https://eth.llamarpc.com",
-                )
-                const contract = new ethers.Contract(
-                    ethereumCnsRegistry,
-                    registryAbi,
-                    ethereumProvider,
-                )
-                const owner = await contract.ownerOf(tokenId)
-                return { owner, network: "ethereum", registryType: "CNS" }
+                return { owner, network: "base", registryType: "UNS" }
+            } catch (baseError) {
+                // Base failed, try Sonic
+                try {
+                    const sonicProvider = new ethers.JsonRpcProvider(
+                        "https://rpc.soniclabs.com",
+                    )
+                    const contract = new ethers.Contract(
+                        sonicUnsRegistry,
+                        registryAbi,
+                        sonicProvider,
+                    )
+                    const owner = await contract.ownerOf(tokenId)
+                    return { owner, network: "sonic", registryType: "UNS" }
+                } catch (sonicError) {
+                    // Sonic failed, try Ethereum UNS
+                    try {
+                        const ethereumProvider = new ethers.JsonRpcProvider(
+                            "https://eth.llamarpc.com",
+                        )
+                        const contract = new ethers.Contract(
+                            ethereumUnsRegistry,
+                            registryAbi,
+                            ethereumProvider,
+                        )
+                        const owner = await contract.ownerOf(tokenId)
+                        return { owner, network: "ethereum", registryType: "UNS" }
+                    } catch (ethereumUnsError) {
+                        // Ethereum UNS failed, try Ethereum CNS (legacy)
+                        const ethereumProvider = new ethers.JsonRpcProvider(
+                            "https://eth.llamarpc.com",
+                        )
+                        const contract = new ethers.Contract(
+                            ethereumCnsRegistry,
+                            registryAbi,
+                            ethereumProvider,
+                        )
+                        const owner = await contract.ownerOf(tokenId)
+                        return { owner, network: "ethereum", registryType: "CNS" }
+                    }
+                }
             }
         }
     }
