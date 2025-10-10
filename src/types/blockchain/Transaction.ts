@@ -12,6 +12,7 @@ import { InstantMessagingPayload } from "../instantMessaging"
 import { BridgeOperationCompiled, NativeBridgeTxPayload } from "@/bridge/nativeBridgeTypes"
 import { L2PSEncryptedPayload } from "@/l2ps"
 import { StoragePayload } from "./TransactionSubtypes/StorageTransaction"
+import { StorageProgramPayload } from "./TransactionSubtypes/StorageProgramTransaction"
 import { L2PSHashPayload } from "./TransactionSubtypes/L2PSHashTransaction"
 import { ContractDeployPayload } from "./TransactionSubtypes/ContractDeployTransaction"
 import { ContractCallPayload } from "./TransactionSubtypes/ContractCallTransaction"
@@ -34,6 +35,7 @@ export type TransactionContentData =
     | ["instantMessaging", InstantMessagingPayload]
     | ["nativeBridge", NativeBridgeTxPayload]
     | ["storage", StoragePayload]
+    | ["storageProgram", StorageProgramPayload]
     | ["l2ps_hash_update", L2PSHashPayload]
     | ["contractDeploy", ContractDeployPayload]
     | ["contractCall", ContractCallPayload]
@@ -54,6 +56,7 @@ export interface TransactionContent {
     | "nativeBridge"
     | "l2psEncryptedTx"
     | "storage"
+    | "storageProgram"
     | "l2ps_hash_update"
     | "contractDeploy"
     | "contractCall"

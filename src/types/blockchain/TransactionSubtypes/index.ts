@@ -8,6 +8,7 @@ export * from './IdentityTransaction'
 export * from './InstantMessagingTransaction'
 export * from './NativeBridgeTransaction'
 export * from './StorageTransaction'
+export * from './StorageProgramTransaction'
 export * from './ContractDeployTransaction'
 export * from './ContractCallTransaction'
 
@@ -22,6 +23,7 @@ import { IdentityTransaction } from './IdentityTransaction'
 import { InstantMessagingTransaction } from './InstantMessagingTransaction'
 import { NativeBridgeTransaction } from './NativeBridgeTransaction'
 import { StorageTransaction } from './StorageTransaction'
+import { StorageProgramTransaction } from './StorageProgramTransaction'
 import { ContractDeployTransaction } from './ContractDeployTransaction'
 import { ContractCallTransaction } from './ContractCallTransaction'
 
@@ -36,5 +38,6 @@ export type SpecificTransaction =
     | InstantMessagingTransaction
     | NativeBridgeTransaction
     | StorageTransaction
+    | StorageProgramTransaction
     | ContractDeployTransaction
     | ContractCallTransaction 
