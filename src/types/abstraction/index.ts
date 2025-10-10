@@ -133,6 +133,7 @@ export interface TelegramAttestationPayload {
     public_key: string
     timestamp: number
     bot_address: string
+    group_membership: boolean
 }
 
 /**
