@@ -113,22 +113,35 @@ export interface GCREditSmartContract {
     account: string           // Contract address
     txhash: string
     isRollback: boolean
-    
+
     // Deploy-specific fields
     code?: string
     deployer?: string
-    
+
     // Call-specific fields
     method?: string
     args?: any[]
-    
+
     // State-specific fields
     key?: string
     value?: any
-    
+
     // Results
     result?: any
     gasUsed?: number
+}
+
+export interface GCREditStorageProgram {
+    type: "storageProgram"
+    target: string              // Storage program address
+    context: {
+        operation: string       // CREATE, WRITE, DELETE, UPDATE_ACCESS_CONTROL
+        sender: string          // Transaction sender
+        data?: {                // Optional for DELETE operations
+            variables: any      // Key-value storage data
+            metadata: any       // Program metadata (deployer, accessControl, etc.)
+        }
+    }
 }
 
 export type GCREdit =
@@ -139,3 +152,4 @@ export type GCREdit =
     | GCREditSubnetsTx
     | GCREditIdentity
     | GCREditSmartContract
+    | GCREditStorageProgram

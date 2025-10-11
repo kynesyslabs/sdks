@@ -32,7 +32,8 @@
         "./l2ps": "./build/l2ps/index.js",
         "./utils": "./build/utils/index.js",
         "./encryption": "./build/encryption/index.js",
-        "./bridge": "./build/bridge/index.js"
+        "./bridge": "./build/bridge/index.js",
+        "./storage": "./build/storage/index.js"
     },
     "scripts": {
         "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",
