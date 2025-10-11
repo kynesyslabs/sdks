@@ -134,6 +134,8 @@ export interface GCREditSmartContract {
 export interface GCREditStorageProgram {
     type: "storageProgram"
     target: string              // Storage program address
+    isRollback: boolean
+    txhash: string
     context: {
         operation: string       // CREATE, WRITE, DELETE, UPDATE_ACCESS_CONTROL
         sender: string          // Transaction sender
