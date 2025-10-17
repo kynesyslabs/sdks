@@ -82,7 +82,12 @@ export class GCRGeneration {
         )
 
         for (const edit of gcrEdits) {
-            if (!edit.account.startsWith("0x")) {
+            // Storage programs use 'target' instead of 'account'
+            if (edit.type === "storageProgram") {
+                if (!edit.target.startsWith("0x")) {
+                    edit.target = "0x" + edit.target
+                }
+            } else if ("account" in edit && !edit.account.startsWith("0x")) {
                 edit.account = "0x" + edit.account
             }
         }
