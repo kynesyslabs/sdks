@@ -1,3 +1,4 @@
+import { Identities } from "@/abstraction/Identities"
 import pprint from "@/utils/pprint"
 import { Demos, DemosWebAuth } from "@/websdk"
 
@@ -21,12 +22,12 @@ describe("Native transactions", () => {
         await demos.connectWallet(
             senderWebAuth.keypair.privateKey as Uint8Array,
             {
-                algorithm: "falcon"
-            }
+                algorithm: "falcon",
+            },
         )
     })
 
-    test.only("Pay", async () => {
+    test.skip("Pay", async () => {
         const tx = await demos.pay(
             "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
             100,
@@ -44,7 +45,7 @@ describe("Native transactions", () => {
     })
 
     test.skip("Node transaction Spam test", async () => {
-        // NOTE: To increase the number of concurrent transactions, 
+        // NOTE: To increase the number of concurrent transactions,
         // run multiple instances of this test at the same time.
 
         // INFO: Local testnet RPCs
@@ -110,4 +111,12 @@ describe("Native transactions", () => {
 
         // 4. Broadcast the transaction
     }, 10000000)
+
+    test.only("Get top accounts by points", async () => {
+        console.log("Getting top accounts by points")
+        const identities = new Identities()
+
+        const res = await identities.getTopAccountsByPoints(demos)
+        console.log(JSON.stringify(res.response.accounts, null, 2))
+    })
 })

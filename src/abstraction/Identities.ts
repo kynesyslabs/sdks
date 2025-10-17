@@ -44,7 +44,9 @@ export class Identities {
             new TextEncoder().encode(message),
         )
 
-        return `demos:${message}:${demos.algorithm}:${uint8ArrayToHex(signature.signature)}`
+        return `demos:${message}:${demos.algorithm}:${uint8ArrayToHex(
+            signature.signature,
+        )}`
     }
 
     /**
@@ -68,10 +70,11 @@ export class Identities {
                 )
             ) {
                 // construct informative error message
-                const errorMessage = `Invalid ${payload.context
-                    } proof format. Supported formats are: ${this.formats.web2[
-                        payload.context
-                    ].join(", ")}`
+                const errorMessage = `Invalid ${
+                    payload.context
+                } proof format. Supported formats are: ${this.formats.web2[
+                    payload.context
+                ].join(", ")}`
                 throw new Error(errorMessage)
             }
         }
@@ -146,8 +149,15 @@ export class Identities {
      * @param payload The payload to infer the identity from.
      * @returns The validity data of the identity transaction.
      */
-    async inferXmIdentity(demos: Demos, payload: InferFromSignaturePayload, referralCode?: string) {
-        return await this.inferIdentity(demos, "xm", { ...payload, referralCode: referralCode })
+    async inferXmIdentity(
+        demos: Demos,
+        payload: InferFromSignaturePayload,
+        referralCode?: string,
+    ) {
+        return await this.inferIdentity(demos, "xm", {
+            ...payload,
+            referralCode: referralCode,
+        })
     }
 
     /**
@@ -200,9 +210,15 @@ export class Identities {
      * @param payload The payload to add the identity to.
      * @returns The response from the RPC call.
      */
-    async addGithubIdentity(demos: Demos, payload: GithubProof, referralCode?: string) {
+    async addGithubIdentity(
+        demos: Demos,
+        payload: GithubProof,
+        referralCode?: string,
+    ) {
         const username = payload.split("/")[3]
-        const ghUser = await axios.get(`https://api.github.com/users/${username}`)
+        const ghUser = await axios.get(
+            `https://api.github.com/users/${username}`,
+        )
 
         if (!ghUser.data.login) {
             throw new Error("Failed to get github user")
@@ -226,7 +242,11 @@ export class Identities {
      * @param payload The payload to add the identity to.
      * @returns The response from the RPC call.
      */
-    async addTwitterIdentity(demos: Demos, payload: TwitterProof, referralCode?: string) {
+    async addTwitterIdentity(
+        demos: Demos,
+        payload: TwitterProof,
+        referralCode?: string,
+    ) {
         const data = await demos.web2.getTweet(payload)
 
         if (!data.success) {
@@ -234,7 +254,9 @@ export class Identities {
         }
 
         if (!data.tweet.userId || !data.tweet.username) {
-            throw new Error("Unable to get twitter user info. Please try again.")
+            throw new Error(
+                "Unable to get twitter user info. Please try again.",
+            )
         }
 
         let twitterPayload: InferFromXPayload = {
@@ -249,7 +271,10 @@ export class Identities {
     }
 
     // SECTION: PQC Identities
-    async bindPqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+    async bindPqcIdentity(
+        demos: Demos,
+        algorithms: "all" | PQCAlgorithm[] = "all",
+    ) {
         let addressTypes: PQCAlgorithm[] = []
 
         // Create the address types to bind
@@ -270,7 +295,10 @@ export class Identities {
             // INFO: Create an ed25519 signature for each address type
             const keypair = await demos.crypto.getIdentity(addressType)
             const address = uint8ArrayToHex(keypair.publicKey as Uint8Array)
-            const signature = await demos.crypto.sign("ed25519", new TextEncoder().encode(address))
+            const signature = await demos.crypto.sign(
+                "ed25519",
+                new TextEncoder().encode(address),
+            )
 
             payloads.push({
                 algorithm: addressType,
@@ -282,7 +310,10 @@ export class Identities {
         return await this.inferIdentity(demos, "pqc", payloads)
     }
 
-    async removePqcIdentity(demos: Demos, algorithms: "all" | PQCAlgorithm[] = "all") {
+    async removePqcIdentity(
+        demos: Demos,
+        algorithms: "all" | PQCAlgorithm[] = "all",
+    ) {
         let addressTypes: PQCAlgorithm[] = []
 
         // Create the address types to remove
@@ -369,8 +400,14 @@ export class Identities {
      * @param address The address to get points for. Defaults to the connected wallet's address.
      * @returns The points data for the identity
      */
-    async getUserPoints(demos: Demos, address?: string): Promise<RPCResponseWithValidityData> {
-        required(address || demos.walletConnected, "No address provided and no wallet connected")
+    async getUserPoints(
+        demos: Demos,
+        address?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        required(
+            address || demos.walletConnected,
+            "No address provided and no wallet connected",
+        )
 
         if (!address) {
             address = await demos.getEd25519Address()
@@ -421,9 +458,7 @@ export class Identities {
 
         const request = {
             method: "gcr_routine",
-            params: [
-                { method: "getReferralInfo", params: [address] },
-            ],
+            params: [{ method: "getReferralInfo", params: [address] }],
         }
 
         return await demos.rpcCall(request, true)
@@ -444,6 +479,20 @@ export class Identities {
             ],
         }
 
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Get the top accounts by points
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @returns The top accounts by points.
+     */
+    async getTopAccountsByPoints(demos: Demos) {
+        const request = {
+            method: "gcr_routine",
+            params: [{ method: "getTopAccountsByPoints", params: [] }],
+        }
         return await demos.rpcCall(request, true)
     }
 }

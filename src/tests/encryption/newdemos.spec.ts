@@ -7,32 +7,32 @@ import { wordlist } from "@scure/bip39/wordlists/english"
 describe("New Demos", () => {
     test.skip("Send Native tokens", async () => {
         // const rpc = "http://localhost:53550"
-        const rpc = "http://node2.demos.sh:53560"
+        const rpc = "http://node3.demos.sh:60001"
         // const rpc = "https://node2.demos.sh"
 
-        const demos = new Demos()
-        await demos.connect(rpc)
-        const mnemonic = demos.newMnemonic()
-        console.log("mnemonic: ", mnemonic)
+        for (let i = 0; i < 100; i++) {
+            const demos = new Demos()
+            await demos.connect(rpc)
+            const mnemonic = demos.newMnemonic()
+            console.log("mnemonic: ", mnemonic)
 
-        await demos.connectWallet("null",
-            {
+            await demos.connectWallet(mnemonic, {
                 algorithm: "falcon",
-                dual_sign: true
-            }
-        )
+                dual_sign: true,
+            })
 
-        const tx = await demos.pay(
-            "0xcb54f467d4c13f84bd4ab956e1bb3738bdd30956d2d2718e5b5ff28c40475db5",
-            100,
-        )
+            const tx = await demos.pay(
+                "0xcb54f467d4c13f84bd4ab956e1bb3738bdd30956d2d2718e5b5ff28c40475db5",
+                100,
+            )
 
-        const validityData = await demos.confirm(tx)
-        expect(validityData.result).toBe(200)
+            const validityData = await demos.confirm(tx)
+            expect(validityData.result).toBe(200)
 
-        const result = await demos.broadcast(validityData)
-        console.log(result)
-        expect(result.result).toBe(200)
+            const result = await demos.broadcast(validityData)
+            console.log(result)
+            expect(result.result).toBe(200)
+        }
     })
 
     test.skip("Master seed generation", async () => {
@@ -48,14 +48,16 @@ describe("New Demos", () => {
         console.log(demos.getAddress())
     })
 
-
     test.skip("Mnemonic to keypair", async () => {
-        const mnemonic = "symbol crew island order tumble document grocery art lake olive wall obvious"
+        const mnemonic =
+            "symbol crew island order tumble document grocery art lake olive wall obvious"
         const demos = new Demos()
         await demos.connectWallet(mnemonic)
 
         const pubkey = await demos.getEd25519Address()
-        expect(pubkey).toBe("0x6d43826dfb8b61c4276a33a94539e3cd27250435918336f56fe8de7e4c2e3534")
+        expect(pubkey).toBe(
+            "0x6d43826dfb8b61c4276a33a94539e3cd27250435918336f56fe8de7e4c2e3534",
+        )
     })
 
     test.skip("Generate 6 new mnemonics", async () => {
@@ -76,7 +78,9 @@ describe("New Demos", () => {
     test.skip("get address balance", async () => {
         const demos = new Demos()
         await demos.connect("https://node2.demos.sh")
-        await demos.connectWallet("valve female novel job because banana abuse divorce host travel own jewel gauge raw girl stumble judge silent target tonight ability ordinary acoustic series")
+        await demos.connectWallet(
+            "valve female novel job because banana abuse divorce host travel own jewel gauge raw girl stumble judge silent target tonight ability ordinary acoustic series",
+        )
 
         // const pubkey = "0x10bf4da38f753d53d811bcad22e0d6daa99a82f0ba0dbbee59830383ace2420c"
         const pubkey = await demos.getEd25519Address()
@@ -85,7 +89,8 @@ describe("New Demos", () => {
     })
 
     test.skip("get campaign data", async () => {
-        const mnemonic = "clock coffee open foam tell price urban deposit stadium motor since cover cushion recall chat master fabric arrange embrace zebra kind congress scene dutch"
+        const mnemonic =
+            "cushion recall chat master fabric arrange embrace zebra kind congress scene dutch"
         const demos = new Demos()
         await demos.connectWallet(mnemonic)
         // await demos.connect("https://demosnode.discus.sh")
@@ -140,21 +145,24 @@ describe("New Demos", () => {
     test.skip("rate limit unblock", async () => {
         const demos = new Demos()
         await demos.connect("http://localhost:53550")
-        await demos.connectWallet("clock coffee open foam tell price urban deposit stadium motor since cover cushion recall chat master fabric arrange embrace zebra kind congress scene dutch")
+        await demos.connectWallet(
+            "cushion recall chat master fabric arrange embrace zebra kind congress scene dutch",
+        )
 
-        const unblocked = await demos.call("rate-limit/unblock", [
-            "127.0.0.1",
-        ])
+        const unblocked = await demos.call("rate-limit/unblock", ["127.0.0.1"])
         console.log(unblocked)
     })
 
     test.skip("get address info", async () => {
         const demos = new Demos()
         await demos.connect("http://localhost:53550")
-        await demos.connectWallet("clock coffee open foam tell price urban deposit stadium motor since cover cushion recall chat master fabric arrange embrace zebra kind congress scene dutch")
+        await demos.connectWallet(
+            "cushion recall chat master fabric arrange embrace zebra kind congress scene dutch",
+        )
 
         const addressInfo = await demos.nodeCall("getAddressInfo", {
-            address: "0xcb54f467d4c13f84bd4ab956e1bb3738bdd30956d2d2718e5b5ff28c40475db5",
+            address:
+                "0xcb54f467d4c13f84bd4ab956e1bb3738bdd30956d2d2718e5b5ff28c40475db5",
         })
         console.log(addressInfo)
     })
@@ -165,10 +173,81 @@ describe("New Demos", () => {
         await demos.connect("https://node2.demos.sh")
         // await demos.connectWallet("clock coffee recall chat master fabric arrange embrace zebra kind congress scene dutch")
 
-        const transactionHistory = await demos.getTransactionHistory("0xf70270e8664000d392141d6281a652b23704097dbdbc5a4239cee7f4a701f2d1", "all", {
-            start: 1,
-            limit: 2
-        })
+        const transactionHistory = await demos.getTransactionHistory(
+            "0xf70270e8664000d392141d6281a652b23704097dbdbc5a4239cee7f4a701f2d1",
+            "all",
+            {
+                start: 1,
+                limit: 2,
+            },
+        )
         console.log(transactionHistory)
+    })
+
+    test.only("sign message", async () => {
+        const demos = new Demos()
+        // await demos.connect("http://localhost:53550")
+        await demos.connectWallet(
+            "cushion recall chat master fabric arrange embrace zebra kind congress scene dutch",
+        )
+
+        const message =
+            "demos-verify-1760108617992-1bdab233afd0533067234dfd812c9d2237bdd4adaa9222fd02d8a62ba4873109"
+        const signature = await demos.signMessage(message)
+        console.log(signature.data, demos.getAddress())
+    })
+
+    test.only("get web2 identities", async () => {
+        const demos = new Demos()
+        await demos.connect("http://localhost:53550")
+        await demos.connectWallet(
+            "cushion recall chat master fabric arrange embrace zebra kind congress scene dutch",
+        )
+
+        const identities = new Identities()
+        const res = await identities.getWeb2Identities(demos)
+        console.log(JSON.stringify(res, null, 2))
+
+        const points = await identities.getUserPoints(demos)
+        console.log(JSON.stringify(points, null, 2))
+    })
+
+    test.skip("remove tg identity", async () => {
+        const demos = new Demos()
+        await demos.connect("https://node2.demos.sh")
+        await demos.connectWallet(
+            "cushion recall chat master fabric arrange embrace zebra kind congress scene dutch",
+        )
+
+        const identities = new Identities()
+
+        const validityData = await identities.removeWeb2Identity(demos, {
+            context: "telegram",
+            username: "cwilvx",
+        })
+        console.log(validityData)
+
+        const res = await demos.broadcast(validityData)
+        console.log(JSON.stringify(res, null, 2))
+    })
+
+    test.skip("connect twitter identity", async () => {
+        const demos = new Demos()
+        await demos.connect("http://localhost:53550")
+        await demos.connectWallet(
+            "cushion recall chat master fabric arrange embrace zebra kind congress scene dutch",
+        )
+
+        const identities = new Identities()
+        const payload = await identities.createWeb2ProofPayload(demos)
+        console.log(payload)
+        const validityData = await identities.addTwitterIdentity(
+            demos,
+            "https://x.com/cwilvxi/status/1975941730596962758",
+        )
+        console.log(validityData)
+
+        const res = await demos.broadcast(validityData)
+        console.log(JSON.stringify(res, null, 2))
     })
 })

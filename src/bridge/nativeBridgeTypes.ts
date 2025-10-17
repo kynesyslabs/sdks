@@ -82,7 +82,6 @@ export type CompiledContent = {
     operation: BridgeOperation
     validUntil: number
     tankData: SolanaTankData | EVMTankData
-    bridgeId: string
 }
 
 // Types compiled from the node
@@ -100,6 +99,11 @@ export type NativeBridgeTxPayload = {
      * This needs to be included when submitting the demos transaction.
      */
     txHash: string
+
+    /**
+     * The derived bridgeId for this bridging operation
+     */
+    bridgeId: string
 }
 
 // Supported chains for EVM

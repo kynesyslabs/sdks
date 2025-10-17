@@ -21,7 +21,12 @@ import {
 } from "ethers"
 import { DefaultChain, EVM } from "@/multichain/core"
 import { Demos } from "@/websdk/demosclass"
-import { EVMGasOptions, RPCRequest, RPCResponse } from "@/types"
+import {
+    EVMGasOptions,
+    NativeBridgeOperation,
+    RPCRequest,
+    RPCResponse,
+} from "@/types"
 import { Connection, PublicKey } from "@solana/web3.js"
 import { Hashing, hexToUint8Array, uint8ArrayToHex } from "@/encryption"
 import {
@@ -279,6 +284,29 @@ export class NativeBridge {
     }
 
     /**
+     * Generates a unique bridge ID for the native bridge operation
+     *
+     * @param operation Native bridge operation
+     * @param depositTxHash Deposit to tank transaction hash
+     *
+     * @returns bridge ID string
+     */
+    generateBridgeId(
+        operation: NativeBridgeOperation,
+        depositTxHash: string,
+    ): string {
+        // Create deterministic but unique bridge ID using operation data + timestamp + random bytes
+        const operationData = `${operation.from.chain}->${operation.to.chain}:${operation.token.amount}:${operation.address}:${operation.to.address}`
+
+        // const timestamp = Date.now().toString()
+        // const randomSuffix = randomBytes(8).toString("hex")
+
+        // Hash to create clean, fixed-length bridge ID
+        const bridgeData = `${operationData}:${depositTxHash}`
+        return `bridge_${Hashing.sha256(bridgeData).substring(0, 16)}`
+    }
+
+    /**
      * Locally validates the bridge operation parameters, then sends it to the RPC to be validated
      *
      * @param operation The operation to validate
@@ -373,13 +401,18 @@ export class NativeBridge {
             )
         }
 
+        const bridgeId = this.generateBridgeId(
+            operation.content.operation,
+            txHash,
+        )
+
         // INFO: Convert the operation to a bridge tx
         const tx = structuredClone(skeletons.transaction)
         tx.content = {
             ...tx.content,
             to: await this.demos.getEd25519Address(),
             type: "nativeBridge",
-            data: ["nativeBridge", { operation, txHash }],
+            data: ["nativeBridge", { operation, txHash, bridgeId }],
         }
 
         // INFO: Sign and confirm the tx

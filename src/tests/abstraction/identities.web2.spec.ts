@@ -21,7 +21,7 @@ describe("Web2 Identities", () => {
         console.log(payload)
     })
 
-    test.only("Infer Twitter Identity", async () => {
+    test.skip("Infer Twitter Identity", async () => {
         const proof = "https://x.com/cwilvxi/status/1929985172293701751"
         const validityData = await identities.addTwitterIdentity(demos, proof)
         const res = await demos.broadcast(validityData)
@@ -70,7 +70,7 @@ describe("Web2 Identities", () => {
         expect(res.response["github"][0].username).toBe("cwilvx")
     })
 
-    test.skip("Remove Github Identity", async () => {
+    test.only("Remove Github Identity", async () => {
         const identities = new Identities()
         const payload = {
             context: "github",

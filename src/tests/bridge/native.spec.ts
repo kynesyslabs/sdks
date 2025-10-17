@@ -56,78 +56,6 @@ describe("Native bridge Playground", () => {
         bridge = new NativeBridge(demos, evm)
     })
 
-    test("Validate native bridge operation", async () => {
-        const operation: BridgeOperation = {
-            address: await demos.getEd25519Address(),
-            from: {
-                chain: "evm.eth.sepolia",
-                address: evm.getAddress(),
-            },
-            to: {
-                chain: "evm.eth.sepolia",
-                address: "0xc0A48d7f7653eEF78F212B235A8814bdD17e8174",
-            },
-            token: {
-                amount: "2",
-                name: "usdc",
-            },
-        }
-
-        // Validates the operation params (locally), then sends to the node
-        const compiled = await bridge.validate(operation)
-        console.log(
-            "compiled token amount",
-            JSON.stringify(compiled.response, null, 2),
-        )
-        // console.log("compiled", compiled)
-
-        // SECTION: Deposit transaction
-        const depositTx = await bridge.createDepositTx(compiled, {
-            gasLimit: 260000,
-            maxFeePerGas: 1.8,
-            maxPriorityFeePerGas: 1.8,
-        })
-        console.log("depositTx", depositTx)
-
-        interface BroadcastTxRes {
-            result: number
-            response: {
-                [operationId: string]: {
-                    result: string
-                    hash: string
-                }
-            }
-        }
-        const depositTxBroadcastRes = (await demos.broadcast(
-            depositTx,
-        )) as BroadcastTxRes
-        console.log(
-            "depositTxBroadcastRes",
-            JSON.stringify(depositTxBroadcastRes, null, 2),
-        )
-
-        const depositTxHash = Object.values(depositTxBroadcastRes.response)[0]
-            .hash
-        console.log("depositTxHash", depositTxHash)
-
-        const receipt = await evm.provider.waitForTransaction(depositTxHash)
-        console.log("receipt", receipt)
-
-        // SECTION: Broadcast bridging transaction
-        // TODO: Update validateDepositTx to confirm brigde_id
-        // const depositTxHash =
-        //     "0xcb4138f3a0a894b415d0f757ad26a148ece478f655303ccde9bff8ddd2ef5822"
-
-        // Confirms the compiled operation's signature, creates a tx and sends it
-        // to the node using demos.confirm
-        const validityData = await bridge.confirm(compiled, depositTxHash)
-        console.log(validityData)
-
-        // Broadcasts the tx to the node (same as demos.broadcast)
-        const res = await bridge.broadcast(validityData)
-        console.log(res)
-    }, 2000000)
-
     function waitForEvent() {
         console.log("Listening to contract events ...")
         const ws_rpc = "wss://ethereum-sepolia-rpc.publicnode.com"
@@ -187,4 +115,87 @@ describe("Native bridge Playground", () => {
         // INFO: Take a nap. Maybe the event is late?
         await sleep(20000000)
     }, 2000000)
+
+    test("Validate native bridge operation", async () => {
+        const operation: BridgeOperation = {
+            address: await demos.getEd25519Address(),
+            from: {
+                chain: "evm.eth.sepolia",
+                address: evm.getAddress(),
+            },
+            to: {
+                chain: "evm.polygon.amoy",
+                address: evm.getAddress(),
+            },
+            token: {
+                amount: "2",
+                name: "usdc",
+            },
+        }
+
+        // Validates the operation params (locally), then sends to the node
+        const compiled = await bridge.validate(operation)
+
+        if (compiled.result !== 200) {
+            console.log("compiled", JSON.stringify(compiled, null, 2))
+            throw new Error("Failed to validate native bridge operation")
+        }
+
+        console.log("compiled", JSON.stringify(compiled, null, 2))
+        // console.log("compiled", compiled)
+
+        // SECTION: Deposit transaction
+        // const depositTx = await bridge.createDepositTx(compiled, {
+        //     gasLimit: 260000,
+        //     maxFeePerGas: 1.8,
+        //     maxPriorityFeePerGas: 1.8,
+        // })
+        // console.log("depositTx", depositTx)
+
+        // interface BroadcastTxRes {
+        //     result: number
+        //     response: {
+        //         [operationId: string]: {
+        //             result: string
+        //             hash: string
+        //         }
+        //     }
+        // }
+        // const depositTxBroadcastRes = (await demos.broadcast(
+        //     depositTx,
+        // )) as BroadcastTxRes
+        // console.log(
+        //     "depositTxBroadcastRes",
+        //     JSON.stringify(depositTxBroadcastRes, null, 2),
+        // )
+
+        // const depositTxHash = Object.values(depositTxBroadcastRes.response)[0]
+        //     .hash
+        // console.log("depositTxHash", depositTxHash)
+
+        // const receipt = await evm.provider.waitForTransaction(depositTxHash)
+        // console.log("receipt", receipt)
+
+        // SECTION: Broadcast bridging transaction
+        // TODO: Update validateDepositTx to confirm brigde_id
+        const depositTxHash =
+            "0x8bc2302d8441618fef0942cc3b2310ec20edb50c78517e2f65ab64703fd47925"
+
+        // Confirms the compiled operation's signature, creates a tx and sends it
+        // to the node using demos.confirm
+        const validityData = await bridge.confirm(compiled, depositTxHash)
+        console.log(validityData)
+
+        // Broadcasts the tx to the node (same as demos.broadcast)
+        const res = await bridge.broadcast(validityData)
+        console.log(res)
+    }, 2000000)
+
+    test.skip("test tx receipt", async () => {
+        const txhash = "0xa29e624c160b24db67bfea43559936b5c4740f5df454bddbc77cac5b027fba54"
+        const evm = new EVM("https://polygon-amoy-bor-rpc.publicnode.com")
+        const tx = await evm.provider.getTransactionReceipt(txhash)
+
+        console.log("tx", tx.toJSON())
+    })
 })
