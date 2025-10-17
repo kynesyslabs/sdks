@@ -175,3 +175,20 @@ export {
     isTransactionType,
     isTransactionDataType,
 } from "./blockchain/TransactionSubtypes/utils"
+
+// Export Unstoppable Domains multi-chain resolution types
+export {
+    type SignatureType,
+    type UDNetwork,
+    type UDRegistryType,
+    type UDRecordKey,
+    type SolanaRecordResult,
+    type SolanaDomainResolution,
+    type EVMDomainResolution,
+    type SignableAddress,
+    type UnifiedDomainResolution,
+    type UDIdentityAssignPayload,
+    type UDIdentityPayload,
+    type UDResolutionConfig,
+    type AddressTypeInfo,
+} from "../abstraction/types/UDResolution"
