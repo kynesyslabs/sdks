@@ -27,7 +27,8 @@ import {
     FindDemosIdByWeb2IdentityQuery,
     FindDemosIdByWeb3IdentityQuery,
     TelegramAttestationPayload,
-    TelegramSignedAttestation
+    TelegramSignedAttestation,
+    DiscordProof
 } from "@/types/abstraction"
 
 export {
@@ -52,5 +53,6 @@ export {
     FindDemosIdByWeb2IdentityQuery,
     FindDemosIdByWeb3IdentityQuery,
     TelegramAttestationPayload,
-    TelegramSignedAttestation
+    TelegramSignedAttestation,
+    DiscordProof
 }
