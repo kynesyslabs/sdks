@@ -179,7 +179,7 @@ describe("Native bridge Playground", () => {
         // SECTION: Broadcast bridging transaction
         // TODO: Update validateDepositTx to confirm brigde_id
         const depositTxHash =
-            "0x8bc2302d8441618fef0942cc3b2310ec20edb50c78517e2f65ab64703fd47925"
+            "0xc445d7041ea9dc018876063b355fd59b95148a98d2d602da3a7256270e9dd721"
 
         // Confirms the compiled operation's signature, creates a tx and sends it
         // to the node using demos.confirm

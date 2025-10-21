@@ -303,7 +303,7 @@ export class NativeBridge {
 
         // Hash to create clean, fixed-length bridge ID
         const bridgeData = `${operationData}:${depositTxHash}`
-        return `bridge_${Hashing.sha256(bridgeData).substring(0, 16)}`
+        return `bridge_${Hashing.sha256(bridgeData)}`
     }
 
     /**
@@ -910,7 +910,7 @@ export class NativeBridge {
             [
                 "string",
                 "address",
-                "string",
+                // "string",
                 "address",
                 "uint256",
                 "string",
@@ -924,7 +924,7 @@ export class NativeBridge {
             [
                 "LIQUIDITY_TANK_PERMIT_DEPOSIT_BRIDGE",
                 payload.response.content.operation.from.address,
-                payload.response.content.bridgeId,
+                // payload.response.content.bridgeId,
                 payload.response.content.operation.token.address,
                 payload.response.content.tankData.amountToDeposit,
                 this.xm.chainId.toString(),
@@ -969,7 +969,7 @@ export class NativeBridge {
             contract,
             "depositAndBridgeWithPermit",
             [
-                operation.bridgeId,
+                // operation.bridgeId,
                 operation.operation.from.address,
                 message.signature,
                 // nonce,
