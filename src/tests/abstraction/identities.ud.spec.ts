@@ -36,13 +36,14 @@ describe("UNSTOPPABLE DOMAINS IDENTITIES", () => {
     test("Generate UD challenge", async () => {
         const ed25519 = await demos.crypto.getIdentity("ed25519")
         const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+        const signingAddress = "0x1234567890123456789012345678901234567890" // Example EVM address
 
-        const challenge = identities.generateUDChallenge(ed25519_address)
+        const challenge = identities.generateUDChallenge(ed25519_address, signingAddress)
 
         console.log("Generated challenge:", challenge)
 
         // Verify challenge contains required components
-        expect(challenge).toContain("Link Unstoppable Domain to Demos Network")
+        expect(challenge).toContain("Link " + signingAddress + " to Demos identity")
         expect(challenge).toContain(ed25519_address)
         expect(challenge).toContain("Timestamp:")
         expect(challenge).toContain("Nonce:")
@@ -346,9 +347,10 @@ describe("UNSTOPPABLE DOMAINS IDENTITIES", () => {
             // Test challenge generation (this should work without network calls)
             const ed25519 = await demos.crypto.getIdentity("ed25519")
             const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
-            const challenge = identities.generateUDChallenge(ed25519_address)
+            const signingAddress = "0x1234567890123456789012345678901234567890" // Example EVM address
+            const challenge = identities.generateUDChallenge(ed25519_address, signingAddress)
 
-            expect(challenge).toContain("Link Unstoppable Domain to Demos Network")
+            expect(challenge).toContain("Link " + signingAddress + " to Demos identity")
             console.log("✓ Challenge generation works (supports UD identity flow)")
 
             console.log("🚀 Multi-network support infrastructure is fully functional")
@@ -395,15 +397,15 @@ describe("UNSTOPPABLE DOMAINS IDENTITIES", () => {
 
         console.log("🚀 Starting automated UD identity test with multi-network support...")
 
-        // Step 1: Generate challenge
-        const challenge = identities.generateUDChallenge(ed25519_address)
+        // Step 1: Create wallet and generate challenge
+        const wallet = new ethers.Wallet(ETH_PRIVATE_KEY)
+        const challenge = identities.generateUDChallenge(ed25519_address, wallet.address)
         console.log("📝 Challenge generated:", challenge)
+        console.log("👤 Signing address:", wallet.address)
 
         // Step 2: Sign challenge with Ethereum wallet
-        const wallet = new ethers.Wallet(ETH_PRIVATE_KEY)
         const signature = await wallet.signMessage(challenge)
         console.log("✍️ Challenge signed:", signature)
-        console.log("👤 Signer address:", wallet.address)
 
         // Step 3: Verify signature locally before submitting
         const recoveredAddress = ethers.verifyMessage(challenge, signature)
@@ -435,6 +437,7 @@ describe("UNSTOPPABLE DOMAINS IDENTITIES", () => {
         const validityData = await identities.addUnstoppableDomainIdentity(
             demos,
             DOMAIN,
+            wallet.address,
             signature,
             challenge
         )
@@ -456,15 +459,16 @@ describe("UNSTOPPABLE DOMAINS IDENTITIES", () => {
     test("Validate challenge format and uniqueness", async () => {
         const ed25519 = await demos.crypto.getIdentity("ed25519")
         const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+        const signingAddress = "0x1234567890123456789012345678901234567890" // Example EVM address
 
         console.log("🔍 Testing challenge generation...")
 
-        const challenge1 = identities.generateUDChallenge(ed25519_address)
+        const challenge1 = identities.generateUDChallenge(ed25519_address, signingAddress)
         console.log("📝 Challenge 1 generated")
 
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        const challenge2 = identities.generateUDChallenge(ed25519_address)
+        const challenge2 = identities.generateUDChallenge(ed25519_address, signingAddress)
         console.log("📝 Challenge 2 generated")
 
         // Each challenge should be unique (different nonce/timestamp)

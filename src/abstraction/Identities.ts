@@ -24,6 +24,7 @@ import {
     UDIdentityPayload,
     UDIdentityAssignPayload,
 } from "@/types/abstraction"
+import { SignableAddress } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
 import { Account, RPCResponseWithValidityData } from "@/types"
@@ -812,21 +813,145 @@ export class Identities {
     }
 
     /**
+     * Get all signable addresses for a UD domain.
+     *
+     * This method resolves the domain and extracts all addresses from domain records
+     * that can be used to sign challenges (EVM and Solana addresses).
+     *
+     * @param domain The UD domain (e.g., "brad.crypto")
+     * @returns Array of signable addresses with their types
+     *
+     * @example
+     * ```typescript
+     * const identities = new Identities()
+     * const addresses = await identities.getUDSignableAddresses("brad.crypto")
+     * console.log(addresses)
+     * // [
+     * //   { address: "0x1234...", recordKey: "crypto.ETH.address", signatureType: "evm" },
+     * //   { address: "ABC123...", recordKey: "crypto.SOL.address", signatureType: "solana" }
+     * // ]
+     * ```
+     */
+    async getUDSignableAddresses(domain: string): Promise<SignableAddress[]> {
+        // Common UD record keys for crypto addresses
+        const UD_RECORD_KEYS = [
+            "crypto.ETH.address",
+            "crypto.SOL.address",
+            "crypto.BTC.address",
+            "crypto.MATIC.address",
+            "token.EVM.ETH.ETH.address",
+            "token.EVM.MATIC.MATIC.address",
+            "token.SOL.SOL.SOL.address",
+            "token.SOL.SOL.USDC.address",
+        ]
+
+        const tokenId = ethers.namehash(domain)
+        const resolverAbi = [
+            "function ownerOf(uint256 tokenId) external view returns (address)",
+            "function get(string calldata key, uint256 tokenId) external view returns (string memory)",
+        ]
+
+        // Try networks in order: Polygon → Base → Sonic → Ethereum UNS → Ethereum CNS
+        const networks = [
+            { name: "polygon", registry: "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f", rpc: "https://polygon-rpc.com" },
+            { name: "base", registry: "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498", rpc: "https://mainnet.base.org" },
+            { name: "sonic", registry: "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4", rpc: "https://rpc.soniclabs.com" },
+            { name: "ethereum", registry: "0x049aba7510f45BA5b64ea9E658E342F904DB358D", rpc: "https://eth.llamarpc.com" },
+        ]
+
+        for (const network of networks) {
+            try {
+                const provider = new ethers.JsonRpcProvider(network.rpc)
+                const contract = new ethers.Contract(network.registry, resolverAbi, provider)
+
+                // Verify domain exists on this network
+                await contract.ownerOf(tokenId)
+
+                // Fetch all record values
+                const records: Record<string, string | null> = {}
+                for (const key of UD_RECORD_KEYS) {
+                    try {
+                        const value = await contract.get(key, tokenId)
+                        records[key] = value || null
+                    } catch {
+                        records[key] = null
+                    }
+                }
+
+                // Extract signable addresses
+                const signableAddresses: SignableAddress[] = []
+                for (const [key, value] of Object.entries(records)) {
+                    if (!value || value === "") continue
+
+                    try {
+                        const signatureType = this.detectSignatureType(value)
+                        signableAddresses.push({
+                            address: value,
+                            recordKey: key,
+                            signatureType,
+                        })
+                    } catch {
+                        // Skip addresses that don't match EVM or Solana format
+                        continue
+                    }
+                }
+
+                return signableAddresses
+            } catch {
+                // Try next network
+                continue
+            }
+        }
+
+        throw new Error(`Domain ${domain} not found on any supported network`)
+    }
+
+    /**
+     * Detect signature type from address format
+     *
+     * @param address The blockchain address to analyze
+     * @returns "evm" for Ethereum-compatible addresses, "solana" for Solana addresses
+     * @throws Error if address format is not recognized
+     *
+     * @private
+     */
+    private detectSignatureType(address: string): "evm" | "solana" {
+        // EVM addresses: 0x + 40 hex characters (secp256k1)
+        const evmPattern = /^0x[0-9a-fA-F]{40}$/
+
+        // Solana addresses: base58 encoded, 32-44 characters (ed25519)
+        const solanaPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
+
+        if (evmPattern.test(address)) {
+            return "evm"
+        }
+
+        if (solanaPattern.test(address)) {
+            return "solana"
+        }
+
+        throw new Error(
+            `Unrecognized address format: ${address}. ` +
+            `Expected EVM (0x...) or Solana (base58) address.`
+        )
+    }
+
+    /**
      * Generate a challenge message for Unstoppable Domain ownership verification.
      *
-     * The user must sign this challenge with their domain's resolved Ethereum address
-     * using MetaMask or another Ethereum wallet.
+     * The user must sign this challenge with one of their domain's authorized addresses
+     * using MetaMask (EVM) or Phantom (Solana) wallet.
      *
      * @param demosPublicKey The user's Demos public key (hex string)
+     * @param signingAddress The address that will sign the challenge (from domain's authorized addresses)
      * @returns Challenge message to be signed
      */
-    generateUDChallenge(demosPublicKey: string): string {
+    generateUDChallenge(demosPublicKey: string, signingAddress: string): string {
         const timestamp = Date.now()
         const nonce = Math.random().toString(36).substring(7)
 
         return (
-            `Link Unstoppable Domain to Demos Network\n` +
-            `Demos Key: ${demosPublicKey}\n` +
+            `Link ${signingAddress} to Demos identity ${demosPublicKey}\n` +
             `Timestamp: ${timestamp}\n` +
             `Nonce: ${nonce}`
         )
@@ -836,13 +961,14 @@ export class Identities {
      * Add an Unstoppable Domain identity to the GCR.
      *
      * Flow:
-     * 1. Resolve domain to get owner's Ethereum address
-     * 2. User signs challenge with Ethereum wallet (MetaMask)
+     * 1. User selects an authorized address from their domain records
+     * 2. User signs challenge with their wallet (MetaMask for EVM, Phantom for Solana)
      * 3. Submit domain + signature for verification
      *
      * @param demos A Demos instance to communicate with the RPC
      * @param domain The UD domain (e.g., "brad.crypto")
-     * @param signature Signature from domain's resolved Ethereum address
+     * @param signingAddress The address used to sign (from domain's authorized addresses)
+     * @param signature Signature from the signing address
      * @param signedData The challenge message that was signed
      * @param referralCode Optional referral code
      * @returns The response from the RPC call
@@ -850,15 +976,23 @@ export class Identities {
      * @example
      * ```typescript
      * const identities = new Identities()
-     * const challenge = identities.generateUDChallenge(demos.publicKey)
-     * // User signs challenge with MetaMask
+     * // Get signable addresses for the domain
+     * const addresses = await identities.getUDSignableAddresses("brad.crypto")
+     * const signingAddress = addresses[0].address // User selects address
+     *
+     * // Generate challenge with selected address
+     * const challenge = identities.generateUDChallenge(demos.publicKey, signingAddress)
+     *
+     * // User signs challenge (EVM example with MetaMask)
      * const signature = await ethereum.request({
      *     method: 'personal_sign',
-     *     params: [challenge, ethereumAddress]
+     *     params: [challenge, signingAddress]
      * })
+     *
      * await identities.addUnstoppableDomainIdentity(
      *     demos,
      *     "brad.crypto",
+     *     signingAddress,
      *     signature,
      *     challenge
      * )
@@ -867,26 +1001,25 @@ export class Identities {
     async addUnstoppableDomainIdentity(
         demos: Demos,
         domain: string,
+        signingAddress: string,
         signature: string,
         signedData: string,
         referralCode?: string,
     ): Promise<RPCResponseWithValidityData> {
-        // Resolve domain to get Ethereum address and network info
-        const { owner, network, registryType } =
-            await this.resolveUDDomain(domain)
+        // Detect signature type from address format
+        const signatureType = this.detectSignatureType(signingAddress)
 
-        // For UD, publicKey is the resolved Ethereum address
-        // (Ethereum uses address recovery from signature)
-        const publicKey = owner
+        // Get Demos public key
+        const ed25519 = await demos.crypto.getIdentity("ed25519")
+        const publicKey = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
         const udPayload: UDIdentityPayload = {
             domain,
-            resolvedAddress: owner,
+            signingAddress,
+            signatureType,
             signature,
             publicKey,
             signedData,
-            network,
-            registryType,
         }
 
         const payload: UDIdentityAssignPayload & { referralCode?: string } = {

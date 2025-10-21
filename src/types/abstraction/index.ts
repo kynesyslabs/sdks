@@ -229,18 +229,20 @@ export interface BaseUdIdentityPayload {
  * Unstoppable Domains identity payload
  *
  * Follows signature-based verification pattern (like XM identities)
- * User signs challenge with domain's resolved Ethereum address
+ * User signs challenge with any authorized address from domain records
  *
- * Multi-chain support: Polygon L2, Base L2, Sonic, and Ethereum L1
+ * Multi-chain support: Polygon L2, Base L2, Sonic, Ethereum L1, and Solana
+ * Multi-signature support: EVM (secp256k1) and Solana (ed25519)
  */
 export interface UDIdentityPayload {
     domain: string              // e.g., "brad.crypto"
-    resolvedAddress: string     // Ethereum address domain resolves to
-    signature: string           // Signature from resolvedAddress
-    publicKey: string           // Public key of resolvedAddress
+    signingAddress: string      // Address used to sign (from domain's authorized addresses)
+    signatureType: "evm" | "solana" // Signature type: EVM (secp256k1) or Solana (ed25519)
+    signature: string           // Signature from signingAddress
+    publicKey: string           // Public key of Demos identity
     signedData: string          // Challenge message that was signed
-    network: "polygon" | "ethereum" | "base" | "sonic" // Network where domain is registered
-    registryType: "UNS" | "CNS" // Registry type (UNS newer, CNS legacy)
+    network?: "polygon" | "ethereum" | "base" | "sonic" | "solana" // Network where domain is registered (optional, auto-detected)
+    registryType?: "UNS" | "CNS" // Registry type (optional, auto-detected: UNS newer, CNS legacy)
 }
 
 export interface UDIdentityAssignPayload extends BaseUdIdentityPayload {
