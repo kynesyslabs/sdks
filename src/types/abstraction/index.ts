@@ -278,8 +278,9 @@ export interface UserPoints {
             twitter: number
             github: number
             discord: number
-            telegram: number
+            telegram?: number
         }
+        udDomains?: { [domain: string]: number }
         referrals: number
         demosFollow: number
     }
