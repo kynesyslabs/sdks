@@ -33,7 +33,10 @@
         "./utils": "./build/utils/index.js",
         "./encryption": "./build/encryption/index.js",
         "./bridge": "./build/bridge/index.js",
-        "./storage": "./build/storage/index.js"
+        "./storage": "./build/storage/index.js",
+        "./d402": "./build/d402/index.js",
+        "./d402/server": "./build/d402/server/index.js",
+        "./d402/client": "./build/d402/client/index.js"
     },
     "scripts": {
         "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",
