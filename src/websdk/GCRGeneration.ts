@@ -51,14 +51,22 @@ export class GCRGeneration {
                 var identityEdits = await HandleIdentityOperations.handle(tx)
                 gcrEdits.push(...identityEdits)
                 break
+            case "d402_payment": {
+                var d402Edits = await HandleD402Operations.handle(
+                    tx,
+                    isRollback,
+                )
+                gcrEdits.push(...d402Edits)
+                break
+            }
         }
 
         // SECTION Operations valid for all tx types
 
         // Add gas operation edit with check for availability of gas amount in the sender's balance
         nonceEdits: try {
-            // INFO: Skip gas for identity
-            if (content.type === "identity") {
+            // INFO: Skip gas for identity and D402 payments (gasless/sponsored transactions)
+            if (content.type === "identity" || content.type === "d402_payment") {
                 break nonceEdits
             }
 
@@ -323,6 +331,53 @@ export class HandleIdentityOperations {
         }
 
         edits.push(edit)
+
+        return edits
+    }
+}
+
+/**
+ * This class is responsible for handling D402 payment operations when generating the GCREdit
+ * for a transaction.
+ * D402 payments are gasless (sponsored) and transfer DEM from buyer to seller.
+ */
+export class HandleD402Operations {
+    static async handle(
+        tx: Transaction,
+        isRollback: boolean = false,
+    ): Promise<GCREdit[]> {
+        const edits: GCREdit[] = []
+
+        // Import the D402PaymentPayload type at runtime
+        const d402PayloadData: ["d402_payment", any] = tx.content.data as [
+            "d402_payment",
+            any,
+        ]
+        const d402Payload = d402PayloadData[1]
+
+        const { to, amount } = d402Payload
+
+        // Remove amount from sender's balance
+        const subtractEdit: GCREdit = {
+            type: "balance",
+            operation: "remove",
+            isRollback: isRollback,
+            account: tx.content.from_ed25519_address,
+            txhash: tx.hash,
+            amount: amount,
+        }
+        edits.push(subtractEdit)
+
+        // Add amount to recipient's balance
+        const addEdit: GCREdit = {
+            type: "balance",
+            operation: "add",
+            isRollback: isRollback,
+            account: to,
+            txhash: tx.hash,
+            amount: amount,
+        }
+        edits.push(addEdit)
 
         return edits
     }

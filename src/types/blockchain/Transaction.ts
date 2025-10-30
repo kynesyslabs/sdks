@@ -16,6 +16,7 @@ import { StorageProgramPayload } from "./TransactionSubtypes/StorageProgramTrans
 import { L2PSHashPayload } from "./TransactionSubtypes/L2PSHashTransaction"
 import { ContractDeployPayload } from "./TransactionSubtypes/ContractDeployTransaction"
 import { ContractCallPayload } from "./TransactionSubtypes/ContractCallTransaction"
+import { D402PaymentPayload } from "./TransactionSubtypes/D402PaymentTransaction"
 
 // TODO Implement multisignature transactions
 
@@ -39,6 +40,7 @@ export type TransactionContentData =
     | ["l2ps_hash_update", L2PSHashPayload]
     | ["contractDeploy", ContractDeployPayload]
     | ["contractCall", ContractCallPayload]
+    | ["d402_payment", D402PaymentPayload]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
@@ -60,6 +62,7 @@ export interface TransactionContent {
     | "l2ps_hash_update"
     | "contractDeploy"
     | "contractCall"
+    | "d402_payment"
     from: string
     from_ed25519_address: string
     to: string
