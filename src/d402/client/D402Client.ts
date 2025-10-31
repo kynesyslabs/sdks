@@ -13,7 +13,7 @@ import * as skeletons from '../../websdk/utils/skeletons'
 export class D402Client {
     private demos: Demos
 
-    constructor(demos: Demos) {
+    constructor(demos: Demos) {``
         this.demos = demos
     }
 
