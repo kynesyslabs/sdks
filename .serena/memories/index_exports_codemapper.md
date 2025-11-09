@@ -1,0 +1,2 @@
+# Top-Level Exports
+- `src/index.ts` re-exports the primary SDK entry points: `types`, `encryption`, `utils`, multichain (`xmlocalsdk`, `xmwebsdk`, `xmcore`), `wallet`, `demoswork`, `l2ps`, `websdk`, `abstraction`, web2 helpers, `bridge`, `instantMessaging`, and `storage`. Use this file to trace public surface modules.

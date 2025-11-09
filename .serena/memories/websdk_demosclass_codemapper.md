@@ -1,0 +1,4 @@
+# Demos Browser Client
+- `src/websdk/demosclass.ts` defines the main `Demos` class: singleton `instance()` around connection state, wallet binding, and crypto helpers.
+- Core RPC flow: `connect`/`connectWallet` (lines ~108-190), state queries (`getLastBlockNumber`, `getTransactions`, etc. ~663-816), transaction lifecycle (`pay`/`transfer`/`store` ~237-266, `sign` ~295-372, `confirm`/`broadcast` ~274-286), and generic `rpcCall`/`call` wrappers (~501-642).
+- Includes utilities for keypairs and identity (`keypair`, `getEd25519Address`), fee calculation (`_calculateAndApplyGasFee`), and delegates to `web2`, `xm`, `transactions`, `contracts`, and `webAuth` sub-modules.
