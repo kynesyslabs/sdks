@@ -2,10 +2,14 @@
  * ProofGenerator - Client-side ZK-SNARK proof generation
  *
  * REVIEW: Phase 9 - SDK Integration
+ * REVIEW: Phase 10.1 - Production Implementation (Real snarkjs proof generation)
  *
  * Generates Groth16 ZK-SNARK proofs for identity attestations using snarkjs.
  * Requires the circuit's proving key (WASM) and witness calculator.
  */
+
+// REVIEW: Phase 10.1 - Production cryptographic implementation
+import * as snarkjs from 'snarkjs'
 
 export interface ZKProof {
     pi_a: string[]
@@ -73,39 +77,49 @@ export async function generateIdentityProof(
         merkle_root: merkleRoot,
     }
 
-    // TODO: Load proving key (WASM) from CDN or local storage
-    // const wasmPath = '/zk/identity_with_merkle.wasm'
-    // const zkeyPath = '/zk/proving_key_merkle.zkey'
+    // REVIEW: Phase 10.1 - Real snarkjs proof generation
+    // TODO (Phase 10.4): Load WASM and proving key from CDN URLs provided by user
+    // Once CDN is ready, these paths will be configured
+    const wasmPath = undefined // Will be set to CDN URL in Phase 10.4
+    const zkeyPath = undefined // Will be set to CDN URL in Phase 10.4
 
-    // TODO: Generate witness using snarkjs
-    // const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-    //     circuitInputs,
-    //     wasmPath,
-    //     zkeyPath
-    // )
+    if (!wasmPath || !zkeyPath) {
+        throw new Error(
+            'ZK proof generation not yet configured. WASM and proving key URLs need to be set. ' +
+                'This will be completed in Phase 10.4 once CDN is ready.',
+        )
+    }
 
-    // TEMPORARY: Return mock proof for testing
-    console.warn('WARNING: ProofGenerator not yet implemented - using mock proof')
-    const mockProof: ZKProof = {
-        pi_a: ['1', '2', '1'],
-        pi_b: [
-            ['1', '2'],
-            ['3', '4'],
-            ['1', '0'],
+    // REVIEW: Phase 10.1 - Production-ready proof generation using snarkjs
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+        circuitInputs,
+        wasmPath,
+        zkeyPath,
+    )
+
+    // Convert proof to our ZKProof format
+    const zkProof: ZKProof = {
+        pi_a: [
+            proof.pi_a[0].toString(),
+            proof.pi_a[1].toString(),
+            proof.pi_a[2].toString(),
         ],
-        pi_c: ['1', '2', '1'],
+        pi_b: [
+            [proof.pi_b[0][0].toString(), proof.pi_b[0][1].toString()],
+            [proof.pi_b[1][0].toString(), proof.pi_b[1][1].toString()],
+            [proof.pi_b[2][0].toString(), proof.pi_b[2][1].toString()],
+        ],
+        pi_c: [
+            proof.pi_c[0].toString(),
+            proof.pi_c[1].toString(),
+            proof.pi_c[2].toString(),
+        ],
         protocol: 'groth16',
     }
 
-    const mockPublicSignals = [
-        computeNullifier(providerId, context),
-        merkleRoot,
-        contextBigInt.toString(),
-    ]
-
     return {
-        proof: mockProof,
-        publicSignals: mockPublicSignals,
+        proof: zkProof,
+        publicSignals: publicSignals.map((s: any) => s.toString()),
     }
 }
 
@@ -117,19 +131,33 @@ export async function generateIdentityProof(
  * @returns True if proof is valid
  *
  * NOTE: Node RPC will do the actual verification, this is mainly for debugging
+ * REVIEW: Phase 10.1 - Production verification implementation
  */
 export async function verifyProof(
     proof: ZKProof,
     publicSignals: string[],
 ): Promise<boolean> {
-    // TODO: Load verification key
-    // const vkey = await loadVerificationKey()
+    // TODO (Phase 10.4): Load verification key from CDN or node
+    // Verification key is public and can be loaded from node RPC or CDN
+    const vkey = undefined // Will be set to CDN URL or loaded from node in Phase 10.4
 
-    // TODO: Verify using snarkjs
-    // return await snarkjs.groth16.verify(vkey, publicSignals, proof)
+    if (!vkey) {
+        throw new Error(
+            'ZK proof verification not yet configured. Verification key URL needs to be set. ' +
+                'This will be completed in Phase 10.4 once CDN is ready.',
+        )
+    }
 
-    console.warn('WARNING: Local proof verification not yet implemented')
-    return true
+    // REVIEW: Phase 10.1 - Production-ready verification using snarkjs
+    // Convert our ZKProof format to snarkjs format
+    const snarkjsProof = {
+        pi_a: proof.pi_a,
+        pi_b: proof.pi_b,
+        pi_c: proof.pi_c,
+        protocol: proof.protocol,
+    }
+
+    return await snarkjs.groth16.verify(vkey, publicSignals, snarkjsProof)
 }
 
 // ============================================================================
@@ -137,21 +165,10 @@ export async function verifyProof(
 // ============================================================================
 
 /**
- * Compute nullifier from provider ID and context
- * (Same logic as CommitmentService.generateNullifier)
- */
-function computeNullifier(providerId: string, context: string): string {
-    const providerHash = stringToBigInt(providerId)
-    const contextHash = stringToBigInt(context)
-
-    // TODO: Use real Poseidon hash
-    const nullifier = providerHash ^ contextHash
-
-    return (nullifier > BigInt(0) ? nullifier : -nullifier).toString()
-}
-
-/**
  * Convert string to BigInt using simple hashing
+ *
+ * @param str - Input string to convert
+ * @returns BigInt representation of the string
  */
 function stringToBigInt(str: string): bigint {
     const encoder = new TextEncoder()
@@ -160,34 +177,4 @@ function stringToBigInt(str: string): bigint {
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     return BigInt('0x' + hex)
-}
-
-/**
- * Load circuit WASM file
- *
- * TODO: Implement loading from CDN or local storage
- */
-async function loadCircuitWasm(url: string): Promise<ArrayBuffer> {
-    const response = await fetch(url)
-    return await response.arrayBuffer()
-}
-
-/**
- * Load proving key
- *
- * TODO: Implement loading from CDN or local storage
- */
-async function loadProvingKey(url: string): Promise<ArrayBuffer> {
-    const response = await fetch(url)
-    return await response.arrayBuffer()
-}
-
-/**
- * Load verification key for local verification
- *
- * TODO: Implement loading verification key
- */
-async function loadVerificationKey(): Promise<any> {
-    // Load from CDN or local storage
-    throw new Error('Not implemented')
 }

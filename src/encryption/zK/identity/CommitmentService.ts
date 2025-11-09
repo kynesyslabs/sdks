@@ -2,10 +2,14 @@
  * CommitmentService - Generate identity commitments and nullifiers
  *
  * REVIEW: Phase 9 - SDK Integration
+ * REVIEW: Phase 10.1 - Production Implementation (Real Poseidon hash)
  *
  * Provides methods for generating cryptographic commitments and nullifiers
  * for the ZK identity system using Poseidon hash.
  */
+
+// REVIEW: Phase 10.1 - Production cryptographic implementation
+import { poseidon2 } from 'poseidon-lite'
 
 /**
  * Generate a Poseidon hash commitment from provider ID and secret
@@ -109,21 +113,17 @@ function uint8ArrayToHex(array: Uint8Array): string {
 }
 
 /**
- * Poseidon hash implementation
+ * Poseidon hash implementation using poseidon-lite
  *
- * TODO: Replace with actual poseidon-lite or circomlibjs implementation
- * This is a placeholder for testing purposes
+ * Poseidon is a ZK-friendly hash function optimized for use in
+ * zero-knowledge proof circuits. We use poseidon2 for hashing 2 inputs.
+ *
+ * @param inputs - Array of exactly 2 BigInt values to hash
+ * @returns Poseidon hash output as BigInt
  */
 function poseidonHash(inputs: bigint[]): bigint {
-    // TEMPORARY: Simple XOR-based hash for testing
-    // MUST be replaced with real Poseidon hash from poseidon-lite
-    console.warn('WARNING: Using placeholder hash - replace with real Poseidon')
-
-    let result = BigInt(0)
-    for (const input of inputs) {
-        result ^= input
+    if (inputs.length !== 2) {
+        throw new Error('poseidonHash expects exactly 2 inputs')
     }
-
-    // Ensure positive result
-    return result > 0 ? result : -result
+    return poseidon2(inputs)
 }
