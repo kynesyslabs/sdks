@@ -3,9 +3,10 @@
  *
  * REVIEW: Phase 9 - SDK Integration
  * REVIEW: Phase 10.1 - Production Implementation (Real snarkjs proof generation)
+ * REVIEW: Phase 10.4 - CDN Integration (Production-ready with CDN URLs)
  *
  * Generates Groth16 ZK-SNARK proofs for identity attestations using snarkjs.
- * Requires the circuit's proving key (WASM) and witness calculator.
+ * Circuit artifacts (WASM, proving key, verification key) are loaded from CDN.
  */
 
 // REVIEW: Phase 10.1 - Production cryptographic implementation
@@ -77,18 +78,9 @@ export async function generateIdentityProof(
         merkle_root: merkleRoot,
     }
 
-    // REVIEW: Phase 10.1 - Real snarkjs proof generation
-    // TODO (Phase 10.4): Load WASM and proving key from CDN URLs provided by user
-    // Once CDN is ready, these paths will be configured
-    const wasmPath = undefined // Will be set to CDN URL in Phase 10.4
-    const zkeyPath = undefined // Will be set to CDN URL in Phase 10.4
-
-    if (!wasmPath || !zkeyPath) {
-        throw new Error(
-            'ZK proof generation not yet configured. WASM and proving key URLs need to be set. ' +
-                'This will be completed in Phase 10.4 once CDN is ready.',
-        )
-    }
+    // REVIEW: Phase 10.4 - Production CDN URLs for circuit artifacts
+    const wasmPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle.wasm'
+    const zkeyPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle_0000.zkey'
 
     // REVIEW: Phase 10.1 - Production-ready proof generation using snarkjs
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
@@ -131,33 +123,37 @@ export async function generateIdentityProof(
  * @returns True if proof is valid
  *
  * NOTE: Node RPC will do the actual verification, this is mainly for debugging
- * REVIEW: Phase 10.1 - Production verification implementation
+ * REVIEW: Phase 10.4 - Production verification implementation with CDN
  */
 export async function verifyProof(
     proof: ZKProof,
     publicSignals: string[],
 ): Promise<boolean> {
-    // TODO (Phase 10.4): Load verification key from CDN or node
-    // Verification key is public and can be loaded from node RPC or CDN
-    const vkey = undefined // Will be set to CDN URL or loaded from node in Phase 10.4
+    // REVIEW: Phase 10.4 - Load verification key from CDN
+    const vkeyUrl = 'https://files.demos.sh/zk-circuits/v1/verification_key_merkle.json'
 
-    if (!vkey) {
+    try {
+        const response = await fetch(vkeyUrl)
+        if (!response.ok) {
+            throw new Error(`Failed to load verification key: ${response.status} ${response.statusText}`)
+        }
+        const vkey = await response.json()
+
+        // REVIEW: Phase 10.1 - Production-ready verification using snarkjs
+        // Convert our ZKProof format to snarkjs format
+        const snarkjsProof = {
+            pi_a: proof.pi_a,
+            pi_b: proof.pi_b,
+            pi_c: proof.pi_c,
+            protocol: proof.protocol,
+        }
+
+        return await snarkjs.groth16.verify(vkey, publicSignals, snarkjsProof)
+    } catch (error) {
         throw new Error(
-            'ZK proof verification not yet configured. Verification key URL needs to be set. ' +
-                'This will be completed in Phase 10.4 once CDN is ready.',
+            `ZK proof verification failed: ${error instanceof Error ? error.message : String(error)}`,
         )
     }
-
-    // REVIEW: Phase 10.1 - Production-ready verification using snarkjs
-    // Convert our ZKProof format to snarkjs format
-    const snarkjsProof = {
-        pi_a: proof.pi_a,
-        pi_b: proof.pi_b,
-        pi_c: proof.pi_c,
-        protocol: proof.protocol,
-    }
-
-    return await snarkjs.groth16.verify(vkey, publicSignals, snarkjsProof)
 }
 
 // ============================================================================
