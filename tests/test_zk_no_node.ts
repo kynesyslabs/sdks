@@ -12,7 +12,7 @@ import {
     generateCommitment,
     generateNullifier,
     generateSecret,
-} from './src/encryption/zK/identity/CommitmentService'
+} from '../src/encryption/zK/identity/CommitmentService'
 
 console.log('🧪 Testing ZK Identity System (No Node Required)\n')
 
