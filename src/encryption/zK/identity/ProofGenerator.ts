@@ -80,7 +80,7 @@ export async function generateIdentityProof(
 
     // REVIEW: Phase 10.4 - Production CDN URLs for circuit artifacts
     const wasmPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle.wasm'
-    const zkeyPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle_0000.zkey'
+    const zkeyPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle_final.zkey'
 
     // REVIEW: Phase 10.1 - Production-ready proof generation using snarkjs
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
