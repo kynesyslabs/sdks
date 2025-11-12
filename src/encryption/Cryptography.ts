@@ -33,14 +33,15 @@ export class Cryptography {
             throw new Error('Invalid file path: null byte detected')
         }
 
-        // Resolve to absolute path and normalize to remove any ".." or "." segments
-        const resolvedPath = path.resolve(filePath)
+        const safeBaseDir = path.resolve(process.cwd())
+        const resolvedPath = path.resolve(safeBaseDir, filePath)
 
-        // Verify the resolved path doesn't escape the filesystem root
-        // by checking if after resolution, the path still makes sense
-        const normalized = path.normalize(resolvedPath)
+        // Verify the resolved path is within the safe base directory
+        if (!resolvedPath.startsWith(safeBaseDir + path.sep) && resolvedPath !== safeBaseDir) {
+            throw new Error('Path traversal attempt detected. Access is restricted.')
+        }
 
-        return normalized
+        return resolvedPath
     }
     static new() {
         const seed = forge.random.getBytesSync(32)
