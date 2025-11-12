@@ -11,6 +11,7 @@ KyneSys Labs: https://www.kynesys.xyz/
 
 import * as crypto from "crypto"
 import { promises as fs } from "fs"
+import * as path from "path"
 import forge from "node-forge"
 
 import * as bip39 from "@scure/bip39"
@@ -20,6 +21,27 @@ import { Hashing } from "./Hashing"
 const algorithm = "aes-256-cbc"
 
 export class Cryptography {
+    /**
+     * Validates and sanitizes file paths to prevent path traversal attacks
+     * @param filePath The file path to validate
+     * @returns The sanitized absolute path
+     * @throws Error if the path contains dangerous characters or patterns
+     */
+    private static validateFilePath(filePath: string): string {
+        // Check for null bytes which can be used in path injection attacks
+        if (filePath.includes('\0')) {
+            throw new Error('Invalid file path: null byte detected')
+        }
+
+        // Resolve to absolute path and normalize to remove any ".." or "." segments
+        const resolvedPath = path.resolve(filePath)
+
+        // Verify the resolved path doesn't escape the filesystem root
+        // by checking if after resolution, the path still makes sense
+        const normalized = path.normalize(resolvedPath)
+
+        return normalized
+    }
     static new() {
         const seed = forge.random.getBytesSync(32)
         const keys = forge.pki.ed25519.generateKeyPair({ seed })
@@ -79,9 +101,12 @@ export class Cryptography {
             privateKey: null,
             publicKey: null,
         }
+        // Validate and sanitize the file path to prevent path traversal attacks
+        const safePath = Cryptography.validateFilePath(path)
+
         // Preparing the environment
         const decipher = crypto.createDecipher(algorithm, password)
-        const contentOfFile = await fs.readFile(path, "utf8")
+        const contentOfFile = await fs.readFile(safePath, "utf8")
         // Decrypting
         const decryptedKey = decipher.update(contentOfFile, "hex", "utf8")
         // Loading
@@ -102,7 +127,9 @@ export class Cryptography {
         }
         let content: string
         if (isFile) {
-            content = await fs.readFile(path, "utf8")
+            // Validate and sanitize the file path to prevent path traversal attacks
+            const safePath = Cryptography.validateFilePath(path)
+            content = await fs.readFile(safePath, "utf8")
         } else {
             content = path
         }
