@@ -12,6 +12,7 @@ export * from './StorageProgramTransaction'
 export * from './ContractDeployTransaction'
 export * from './ContractCallTransaction'
 export * from './D402PaymentTransaction'
+export * from './EscrowTransaction'
 
 // Re-export all transaction types as a union
 import { L2PSTransaction } from './L2PSTransaction'
@@ -28,6 +29,7 @@ import { StorageProgramTransaction } from './StorageProgramTransaction'
 import { ContractDeployTransaction } from './ContractDeployTransaction'
 import { ContractCallTransaction } from './ContractCallTransaction'
 import { D402PaymentTransaction } from './D402PaymentTransaction'
+import { EscrowTransaction } from './EscrowTransaction'
 
 export type SpecificTransaction =
     | L2PSTransaction
@@ -43,4 +45,5 @@ export type SpecificTransaction =
     | StorageProgramTransaction
     | ContractDeployTransaction
     | ContractCallTransaction
-    | D402PaymentTransaction 
+    | D402PaymentTransaction
+    | EscrowTransaction 

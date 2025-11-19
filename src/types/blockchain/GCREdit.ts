@@ -146,6 +146,33 @@ export interface GCREditStorageProgram {
     }
 }
 
+/**
+ * Escrow GCR edit operation
+ * Enables trustless escrow to social identities (Twitter, GitHub, Telegram)
+ */
+export interface GCREditEscrow {
+    type: "escrow"
+    operation: "deposit" | "claim" | "refund"
+    account: string  // Escrow address (for deposit/claim) or refunder address
+    data: {
+        // Deposit fields
+        sender?: string           // Ed25519 pubkey of sender
+        platform?: "twitter" | "github" | "telegram"
+        username?: string         // Social username (e.g., "@bob")
+        amount?: number
+        expiryDays?: number       // Optional, default 30
+        message?: string          // Optional memo
+
+        // Claim fields
+        claimant?: string         // Ed25519 pubkey of claimant
+
+        // Refund fields
+        refunder?: string         // Ed25519 pubkey of refunder
+    }
+    txhash: string
+    isRollback: boolean
+}
+
 export type GCREdit =
     | GCREditBalance
     | GCREditNonce
@@ -155,3 +182,4 @@ export type GCREdit =
     | GCREditIdentity
     | GCREditSmartContract
     | GCREditStorageProgram
+    | GCREditEscrow
