@@ -165,6 +165,9 @@ export interface GCREditEscrow {
 
         // Claim fields
         claimant?: string         // Ed25519 pubkey of claimant
+        claimed?: boolean         // Whether escrow has been claimed
+        claimedBy?: string        // Address that claimed the escrow
+        claimedAt?: number        // Timestamp when claimed
 
         // Refund fields
         refunder?: string         // Ed25519 pubkey of refunder
