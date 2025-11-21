@@ -76,7 +76,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud",
+        context: "xm" | "web2" | "pqc" | "nomis",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -1030,5 +1030,50 @@ export class Identities {
         }
 
         return await this.inferIdentity(demos, "ud" as any, payload)
+    }
+
+      /**
+     * Add a Nomis identity to the GCR.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param walletAddress The wallet address to get the score for.
+     * @param options Optional parameters for the Nomis score request.
+     * @returns The response from the RPC call.
+     */
+    async addNomisIdentity(
+        demos: Demos,
+        walletAddress: string,
+        options: {
+            chain?: string
+            subchain?: string
+            scoreType?: number
+            nonce?: number
+            deadline?: number
+            forceRefresh?: boolean
+        } = {},
+    ) {
+        // 1. Get the score data from the node (read-only)
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getNomisScore",
+                    params: [{ walletAddress, ...options }],
+                },
+            ],
+        }
+
+        const response = await demos.rpcCall(request, true)
+
+        if (response.result !== 200) {
+            throw new Error(
+                response.extra?.error || "Failed to fetch Nomis score",
+            )
+        }
+
+        const nomisData = response.response
+
+        // 2. Create and sign the identity transaction
+        return await this.inferIdentity(demos, "nomis", nomisData)
     }
 }

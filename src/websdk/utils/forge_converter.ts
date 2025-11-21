@@ -1,4 +1,4 @@
-import { Buffer } from "buffer/"
+import { Buffer } from "buffer"
 
 function forgeToString(forgeBuffer: any, isHex = true) {
     if (isHex) return ForgeToHex(forgeBuffer)

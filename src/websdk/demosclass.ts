@@ -5,7 +5,7 @@ This library contains all the functions that are used to interact with the demos
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 import axios from "axios"
-import { Buffer } from "buffer/"
+import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
 
 // NOTE Including custom libraries from Demos
