@@ -16,15 +16,14 @@ import {
     DiscordProof,
     InferFromDiscordPayload,
     InferFromTelegramPayload,
-    TelegramProof,
     TelegramSignedAttestation,
-    TelegramAttestationPayload,
     FindDemosIdByWeb2IdentityQuery,
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
-    UDIdentityAssignPayload,
 } from "@/types/abstraction"
-import { SignableAddress } from "@/abstraction/types/UDResolution"
+import {
+    UnifiedDomainResolution,
+} from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
 import { Account, RPCResponseWithValidityData } from "@/types"
@@ -704,236 +703,235 @@ export class Identities {
     }
 
     // SECTION: Unstoppable Domains Identities
+    // /**
+    //  * Resolve an Unstoppable Domain to its owner's Ethereum address.
+    //  *
+    //  * Multi-chain resolution strategy (per UD docs):
+    //  * 1. Try Polygon L2 UNS first (most new domains, cheaper gas)
+    //  * 2. Try Base L2 UNS (new L2 option - growing adoption)
+    //  * 3. Try Sonic (emerging network support)
+    //  * 4. Fallback to Ethereum L1 UNS (legacy domains)
+    //  * 5. Fallback to Ethereum L1 CNS (oldest legacy domains)
+    //  *
+    //  * @param domain The UD domain (e.g., "brad.crypto")
+    //  * @returns Object with owner address, network, and registry type
+    //  */
+    // private async resolveUDDomain(domain: string): Promise<{
+    //     owner: string
+    //     network: "polygon" | "ethereum" | "base" | "sonic"
+    //     registryType: "UNS" | "CNS"
+    // }> {
+    //     const tokenId = ethers.namehash(domain)
 
-    /**
-     * Resolve an Unstoppable Domain to its owner's Ethereum address.
-     *
-     * Multi-chain resolution strategy (per UD docs):
-     * 1. Try Polygon L2 UNS first (most new domains, cheaper gas)
-     * 2. Try Base L2 UNS (new L2 option - growing adoption)
-     * 3. Try Sonic (emerging network support)
-     * 4. Fallback to Ethereum L1 UNS (legacy domains)
-     * 5. Fallback to Ethereum L1 CNS (oldest legacy domains)
-     *
-     * @param domain The UD domain (e.g., "brad.crypto")
-     * @returns Object with owner address, network, and registry type
-     */
-    private async resolveUDDomain(domain: string): Promise<{
-        owner: string
-        network: "polygon" | "ethereum" | "base" | "sonic"
-        registryType: "UNS" | "CNS"
-    }> {
-        const tokenId = ethers.namehash(domain)
+    //     const registryAbi = [
+    //         "function ownerOf(uint256 tokenId) external view returns (address)",
+    //     ]
 
-        const registryAbi = [
-            "function ownerOf(uint256 tokenId) external view returns (address)",
-        ]
+    //     // Polygon L2 UNS Registry (primary - most new domains)
+    //     const polygonUnsRegistry = "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f"
+    //     // Base L2 UNS Registry (new L2 option - growing adoption)
+    //     const baseUnsRegistry = "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498"
+    //     // Sonic UNS Registry (emerging network support)
+    //     const sonicUnsRegistry = "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4"
+    //     // Ethereum L1 UNS Registry (fallback)
+    //     const ethereumUnsRegistry = "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
+    //     // Ethereum L1 CNS Registry (legacy fallback)
+    //     const ethereumCnsRegistry = "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
 
-        // Polygon L2 UNS Registry (primary - most new domains)
-        const polygonUnsRegistry = "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f"
-        // Base L2 UNS Registry (new L2 option - growing adoption)
-        const baseUnsRegistry = "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498"
-        // Sonic UNS Registry (emerging network support)
-        const sonicUnsRegistry = "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4"
-        // Ethereum L1 UNS Registry (fallback)
-        const ethereumUnsRegistry = "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
-        // Ethereum L1 CNS Registry (legacy fallback)
-        const ethereumCnsRegistry = "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
+    //     // Try Polygon UNS first (L2 - cheaper, faster, most new domains)
+    //     try {
+    //         const polygonProvider = new ethers.JsonRpcProvider(
+    //             "https://polygon-rpc.com",
+    //         )
+    //         const contract = new ethers.Contract(
+    //             polygonUnsRegistry,
+    //             registryAbi,
+    //             polygonProvider,
+    //         )
+    //         const owner = await contract.ownerOf(tokenId)
+    //         return { owner, network: "polygon", registryType: "UNS" }
+    //     } catch (polygonError) {
+    //         console.log("Polygon failed, trying Base L2 UNS")
+    //         // Polygon failed, try Base L2 UNS
+    //         try {
+    //             const baseProvider = new ethers.JsonRpcProvider(
+    //                 "https://mainnet.base.org",
+    //             )
+    //             const contract = new ethers.Contract(
+    //                 baseUnsRegistry,
+    //                 registryAbi,
+    //                 baseProvider,
+    //             )
+    //             const owner = await contract.ownerOf(tokenId)
+    //             return { owner, network: "base", registryType: "UNS" }
+    //         } catch (baseError) {
+    //             console.log("Base failed, trying Sonic")
+    //             // Base failed, try Sonic
+    //             try {
+    //                 const sonicProvider = new ethers.JsonRpcProvider(
+    //                     "https://rpc.soniclabs.com",
+    //                 )
+    //                 const contract = new ethers.Contract(
+    //                     sonicUnsRegistry,
+    //                     registryAbi,
+    //                     sonicProvider,
+    //                 )
+    //                 const owner = await contract.ownerOf(tokenId)
+    //                 return { owner, network: "sonic", registryType: "UNS" }
+    //             } catch (sonicError) {
+    //                 console.log("Sonic failed, trying Ethereum UNS")
+    //                 // Sonic failed, try Ethereum UNS
+    //                 try {
+    //                     const ethereumProvider = new ethers.JsonRpcProvider(
+    //                         "https://eth.llamarpc.com",
+    //                     )
+    //                     const contract = new ethers.Contract(
+    //                         ethereumUnsRegistry,
+    //                         registryAbi,
+    //                         ethereumProvider,
+    //                     )
+    //                     const owner = await contract.ownerOf(tokenId)
+    //                     return {
+    //                         owner,
+    //                         network: "ethereum",
+    //                         registryType: "UNS",
+    //                     }
+    //                 } catch (ethereumUnsError) {
+    //                     console.log("Ethereum UNS failed, trying Ethereum CNS")
+    //                     // Ethereum UNS failed, try Ethereum CNS (legacy)
+    //                     const ethereumProvider = new ethers.JsonRpcProvider(
+    //                         "https://eth.llamarpc.com",
+    //                     )
+    //                     const contract = new ethers.Contract(
+    //                         ethereumCnsRegistry,
+    //                         registryAbi,
+    //                         ethereumProvider,
+    //                     )
+    //                     const owner = await contract.ownerOf(tokenId)
+    //                     return {
+    //                         owner,
+    //                         network: "ethereum",
+    //                         registryType: "CNS",
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-        // Try Polygon UNS first (L2 - cheaper, faster, most new domains)
-        try {
-            const polygonProvider = new ethers.JsonRpcProvider(
-                "https://polygon-rpc.com",
-            )
-            const contract = new ethers.Contract(
-                polygonUnsRegistry,
-                registryAbi,
-                polygonProvider,
-            )
-            const owner = await contract.ownerOf(tokenId)
-            return { owner, network: "polygon", registryType: "UNS" }
-        } catch (polygonError) {
-            console.log("Polygon failed, trying Base L2 UNS")
-            // Polygon failed, try Base L2 UNS
-            try {
-                const baseProvider = new ethers.JsonRpcProvider(
-                    "https://mainnet.base.org",
-                )
-                const contract = new ethers.Contract(
-                    baseUnsRegistry,
-                    registryAbi,
-                    baseProvider,
-                )
-                const owner = await contract.ownerOf(tokenId)
-                return { owner, network: "base", registryType: "UNS" }
-            } catch (baseError) {
-                console.log("Base failed, trying Sonic")
-                // Base failed, try Sonic
-                try {
-                    const sonicProvider = new ethers.JsonRpcProvider(
-                        "https://rpc.soniclabs.com",
-                    )
-                    const contract = new ethers.Contract(
-                        sonicUnsRegistry,
-                        registryAbi,
-                        sonicProvider,
-                    )
-                    const owner = await contract.ownerOf(tokenId)
-                    return { owner, network: "sonic", registryType: "UNS" }
-                } catch (sonicError) {
-                    console.log("Sonic failed, trying Ethereum UNS")
-                    // Sonic failed, try Ethereum UNS
-                    try {
-                        const ethereumProvider = new ethers.JsonRpcProvider(
-                            "https://eth.llamarpc.com",
-                        )
-                        const contract = new ethers.Contract(
-                            ethereumUnsRegistry,
-                            registryAbi,
-                            ethereumProvider,
-                        )
-                        const owner = await contract.ownerOf(tokenId)
-                        return {
-                            owner,
-                            network: "ethereum",
-                            registryType: "UNS",
-                        }
-                    } catch (ethereumUnsError) {
-                        console.log("Ethereum UNS failed, trying Ethereum CNS")
-                        // Ethereum UNS failed, try Ethereum CNS (legacy)
-                        const ethereumProvider = new ethers.JsonRpcProvider(
-                            "https://eth.llamarpc.com",
-                        )
-                        const contract = new ethers.Contract(
-                            ethereumCnsRegistry,
-                            registryAbi,
-                            ethereumProvider,
-                        )
-                        const owner = await contract.ownerOf(tokenId)
-                        return {
-                            owner,
-                            network: "ethereum",
-                            registryType: "CNS",
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // /**
+    //  * Get all signable addresses for a UD domain.
+    //  *
+    //  * This method resolves the domain and extracts all addresses from domain records
+    //  * that can be used to sign challenges (EVM and Solana addresses).
+    //  *
+    //  * @param domain The UD domain (e.g., "brad.crypto")
+    //  * @returns Array of signable addresses with their types
+    //  *
+    //  * @example
+    //  * ```typescript
+    //  * const identities = new Identities()
+    //  * const addresses = await identities.getUDSignableAddresses("brad.crypto")
+    //  * console.log(addresses)
+    //  * // [
+    //  * //   { address: "0x1234...", recordKey: "crypto.ETH.address", signatureType: "evm" },
+    //  * //   { address: "ABC123...", recordKey: "crypto.SOL.address", signatureType: "solana" }
+    //  * // ]
+    //  * ```
+    //  */
+    // async getUDSignableAddresses(domain: string): Promise<SignableAddress[]> {
+    //     // Common UD record keys for crypto addresses
+    //     const UD_RECORD_KEYS = [
+    //         "crypto.ETH.address",
+    //         "crypto.SOL.address",
+    //         "crypto.BTC.address",
+    //         "crypto.MATIC.address",
+    //         "token.EVM.ETH.ETH.address",
+    //         "token.EVM.MATIC.MATIC.address",
+    //         "token.SOL.SOL.SOL.address",
+    //         "token.SOL.SOL.USDC.address",
+    //     ]
 
-    /**
-     * Get all signable addresses for a UD domain.
-     *
-     * This method resolves the domain and extracts all addresses from domain records
-     * that can be used to sign challenges (EVM and Solana addresses).
-     *
-     * @param domain The UD domain (e.g., "brad.crypto")
-     * @returns Array of signable addresses with their types
-     *
-     * @example
-     * ```typescript
-     * const identities = new Identities()
-     * const addresses = await identities.getUDSignableAddresses("brad.crypto")
-     * console.log(addresses)
-     * // [
-     * //   { address: "0x1234...", recordKey: "crypto.ETH.address", signatureType: "evm" },
-     * //   { address: "ABC123...", recordKey: "crypto.SOL.address", signatureType: "solana" }
-     * // ]
-     * ```
-     */
-    async getUDSignableAddresses(domain: string): Promise<SignableAddress[]> {
-        // Common UD record keys for crypto addresses
-        const UD_RECORD_KEYS = [
-            "crypto.ETH.address",
-            "crypto.SOL.address",
-            "crypto.BTC.address",
-            "crypto.MATIC.address",
-            "token.EVM.ETH.ETH.address",
-            "token.EVM.MATIC.MATIC.address",
-            "token.SOL.SOL.SOL.address",
-            "token.SOL.SOL.USDC.address",
-        ]
+    //     const tokenId = ethers.namehash(domain)
+    //     const resolverAbi = [
+    //         "function ownerOf(uint256 tokenId) external view returns (address)",
+    //         "function get(string calldata key, uint256 tokenId) external view returns (string memory)",
+    //     ]
 
-        const tokenId = ethers.namehash(domain)
-        const resolverAbi = [
-            "function ownerOf(uint256 tokenId) external view returns (address)",
-            "function get(string calldata key, uint256 tokenId) external view returns (string memory)",
-        ]
+    //     // Try networks in order: Polygon → Base → Sonic → Ethereum UNS → Ethereum CNS
+    //     const networks = [
+    //         {
+    //             name: "polygon",
+    //             registry: "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f",
+    //             rpc: "https://polygon-rpc.com",
+    //         },
+    //         {
+    //             name: "base",
+    //             registry: "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498",
+    //             rpc: "https://mainnet.base.org",
+    //         },
+    //         {
+    //             name: "sonic",
+    //             registry: "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4",
+    //             rpc: "https://rpc.soniclabs.com",
+    //         },
+    //         {
+    //             name: "ethereum",
+    //             registry: "0x049aba7510f45BA5b64ea9E658E342F904DB358D",
+    //             rpc: "https://eth.llamarpc.com",
+    //         },
+    //     ]
 
-        // Try networks in order: Polygon → Base → Sonic → Ethereum UNS → Ethereum CNS
-        const networks = [
-            {
-                name: "polygon",
-                registry: "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f",
-                rpc: "https://polygon-rpc.com",
-            },
-            {
-                name: "base",
-                registry: "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498",
-                rpc: "https://mainnet.base.org",
-            },
-            {
-                name: "sonic",
-                registry: "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4",
-                rpc: "https://rpc.soniclabs.com",
-            },
-            {
-                name: "ethereum",
-                registry: "0x049aba7510f45BA5b64ea9E658E342F904DB358D",
-                rpc: "https://eth.llamarpc.com",
-            },
-        ]
+    //     for (const network of networks) {
+    //         try {
+    //             const provider = new ethers.JsonRpcProvider(network.rpc)
+    //             const contract = new ethers.Contract(
+    //                 network.registry,
+    //                 resolverAbi,
+    //                 provider,
+    //             )
 
-        for (const network of networks) {
-            try {
-                const provider = new ethers.JsonRpcProvider(network.rpc)
-                const contract = new ethers.Contract(
-                    network.registry,
-                    resolverAbi,
-                    provider,
-                )
+    //             // Verify domain exists on this network
+    //             await contract.ownerOf(tokenId)
 
-                // Verify domain exists on this network
-                await contract.ownerOf(tokenId)
+    //             // Fetch all record values
+    //             const records: Record<string, string | null> = {}
+    //             for (const key of UD_RECORD_KEYS) {
+    //                 try {
+    //                     const value = await contract.get(key, tokenId)
+    //                     records[key] = value || null
+    //                 } catch {
+    //                     records[key] = null
+    //                 }
+    //             }
 
-                // Fetch all record values
-                const records: Record<string, string | null> = {}
-                for (const key of UD_RECORD_KEYS) {
-                    try {
-                        const value = await contract.get(key, tokenId)
-                        records[key] = value || null
-                    } catch {
-                        records[key] = null
-                    }
-                }
+    //             // Extract signable addresses
+    //             const signableAddresses: SignableAddress[] = []
+    //             for (const [key, value] of Object.entries(records)) {
+    //                 if (!value || value === "") continue
 
-                // Extract signable addresses
-                const signableAddresses: SignableAddress[] = []
-                for (const [key, value] of Object.entries(records)) {
-                    if (!value || value === "") continue
+    //                 try {
+    //                     const signatureType = this.detectSignatureType(value)
+    //                     signableAddresses.push({
+    //                         address: value,
+    //                         recordKey: key,
+    //                         signatureType,
+    //                     })
+    //                 } catch {
+    //                     // Skip addresses that don't match EVM or Solana format
+    //                     continue
+    //                 }
+    //             }
 
-                    try {
-                        const signatureType = this.detectSignatureType(value)
-                        signableAddresses.push({
-                            address: value,
-                            recordKey: key,
-                            signatureType,
-                        })
-                    } catch {
-                        // Skip addresses that don't match EVM or Solana format
-                        continue
-                    }
-                }
+    //             return signableAddresses
+    //         } catch {
+    //             // Try next network
+    //             continue
+    //         }
+    //     }
 
-                return signableAddresses
-            } catch {
-                // Try next network
-                continue
-            }
-        }
-
-        throw new Error(`Domain ${domain} not found on any supported network`)
-    }
+    //     throw new Error(`Domain ${domain} not found on any supported network`)
+    // }
 
     /**
      * Detect signature type from address format
@@ -987,6 +985,22 @@ export class Identities {
             `Timestamp: ${timestamp}\n` +
             `Nonce: ${nonce}`
         )
+    }
+
+    /**
+     * Resolve a domain to its owner's address and other metadata.
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param domain The UD domain (e.g., "brad.crypto")
+     * @returns The unified domain resolution result
+     */
+    async resolveUDDomain(
+        demos: Demos,
+        domain: string,
+    ): Promise<UnifiedDomainResolution> {
+        return (await demos.nodeCall("resolveUdDomain", {
+            domain: domain,
+        })) as UnifiedDomainResolution
     }
 
     /**
