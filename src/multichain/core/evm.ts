@@ -1,5 +1,6 @@
 import {
     Contract,
+    HDNodeWallet,
     JsonRpcProvider,
     TransactionRequest,
     Wallet,
@@ -9,6 +10,7 @@ import {
     toNumber,
     verifyMessage,
 } from "ethers"
+import * as bip39 from "bip39"
 import { DefaultChain, IEVMDefaultChain } from "./types/defaultChain"
 import { IPayParams } from "./types/interfaces"
 import { required } from "./utils"
@@ -160,19 +162,39 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         return this.connected
     }
 
-    // INFO Connecting a wallet through a private key (string)
+    // INFO Connecting a wallet through a private key (string) or mnemonic phrase
     // REVIEW should private key be a string or a Buffer?
-    async connectWallet(privateKey: string) {
+    async connectWallet(privateKey: string, accountIndex: number = 0) {
         if (!this.rpc_url) {
             console.warn(
                 "WARNING: No RPC URL set. Connecting wallet without provider",
             )
         }
 
-        this.wallet = new Wallet(
-            privateKey,
-            this.rpc_url ? this.provider : null,
-        )
+        privateKey = privateKey.trim()
+
+        // INFO: Check if the input is a mnemonic phrase (contains spaces)
+        const isMnemonic = privateKey.includes(" ")
+
+        if (isMnemonic) {
+            // INFO: Validate mnemonic
+            if (!bip39.validateMnemonic(privateKey)) {
+                throw new Error("Invalid mnemonic phrase")
+            }
+
+            // INFO: Create HD wallet from mnemonic using BIP44 path for Ethereum: m/44'/60'/0'/0/{accountIndex}
+            const hdNode = HDNodeWallet.fromPhrase(privateKey, "", `m/44'/60'/0'/0/${accountIndex}`)
+            this.wallet = new Wallet(
+                hdNode.privateKey,
+                this.rpc_url ? this.provider : null,
+            )
+        } else {
+            // INFO: Treat as private key hex
+            this.wallet = new Wallet(
+                privateKey,
+                this.rpc_url ? this.provider : null,
+            )
+        }
 
         return this.wallet
     }

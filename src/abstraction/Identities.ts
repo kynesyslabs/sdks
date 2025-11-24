@@ -30,6 +30,7 @@ import { PQCAlgorithm } from "@/types/cryptography"
 import { Account, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
+import { EVM, SOLANA } from "@/multichain/core"
 
 export class Identities {
     formats = {
@@ -717,9 +718,7 @@ export class Identities {
      * @param domain The UD domain (e.g., "brad.crypto")
      * @returns Object with owner address, network, and registry type
      */
-    private async resolveUDDomain(
-        domain: string,
-    ): Promise<{
+    private async resolveUDDomain(domain: string): Promise<{
         owner: string
         network: "polygon" | "ethereum" | "base" | "sonic"
         registryType: "UNS" | "CNS"
@@ -737,11 +736,9 @@ export class Identities {
         // Sonic UNS Registry (emerging network support)
         const sonicUnsRegistry = "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4"
         // Ethereum L1 UNS Registry (fallback)
-        const ethereumUnsRegistry =
-            "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
+        const ethereumUnsRegistry = "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
         // Ethereum L1 CNS Registry (legacy fallback)
-        const ethereumCnsRegistry =
-            "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
+        const ethereumCnsRegistry = "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
 
         // Try Polygon UNS first (L2 - cheaper, faster, most new domains)
         try {
@@ -756,6 +753,7 @@ export class Identities {
             const owner = await contract.ownerOf(tokenId)
             return { owner, network: "polygon", registryType: "UNS" }
         } catch (polygonError) {
+            console.log("Polygon failed, trying Base L2 UNS")
             // Polygon failed, try Base L2 UNS
             try {
                 const baseProvider = new ethers.JsonRpcProvider(
@@ -769,6 +767,7 @@ export class Identities {
                 const owner = await contract.ownerOf(tokenId)
                 return { owner, network: "base", registryType: "UNS" }
             } catch (baseError) {
+                console.log("Base failed, trying Sonic")
                 // Base failed, try Sonic
                 try {
                     const sonicProvider = new ethers.JsonRpcProvider(
@@ -782,6 +781,7 @@ export class Identities {
                     const owner = await contract.ownerOf(tokenId)
                     return { owner, network: "sonic", registryType: "UNS" }
                 } catch (sonicError) {
+                    console.log("Sonic failed, trying Ethereum UNS")
                     // Sonic failed, try Ethereum UNS
                     try {
                         const ethereumProvider = new ethers.JsonRpcProvider(
@@ -793,8 +793,13 @@ export class Identities {
                             ethereumProvider,
                         )
                         const owner = await contract.ownerOf(tokenId)
-                        return { owner, network: "ethereum", registryType: "UNS" }
+                        return {
+                            owner,
+                            network: "ethereum",
+                            registryType: "UNS",
+                        }
                     } catch (ethereumUnsError) {
+                        console.log("Ethereum UNS failed, trying Ethereum CNS")
                         // Ethereum UNS failed, try Ethereum CNS (legacy)
                         const ethereumProvider = new ethers.JsonRpcProvider(
                             "https://eth.llamarpc.com",
@@ -805,7 +810,11 @@ export class Identities {
                             ethereumProvider,
                         )
                         const owner = await contract.ownerOf(tokenId)
-                        return { owner, network: "ethereum", registryType: "CNS" }
+                        return {
+                            owner,
+                            network: "ethereum",
+                            registryType: "CNS",
+                        }
                     }
                 }
             }
@@ -853,16 +862,36 @@ export class Identities {
 
         // Try networks in order: Polygon → Base → Sonic → Ethereum UNS → Ethereum CNS
         const networks = [
-            { name: "polygon", registry: "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f", rpc: "https://polygon-rpc.com" },
-            { name: "base", registry: "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498", rpc: "https://mainnet.base.org" },
-            { name: "sonic", registry: "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4", rpc: "https://rpc.soniclabs.com" },
-            { name: "ethereum", registry: "0x049aba7510f45BA5b64ea9E658E342F904DB358D", rpc: "https://eth.llamarpc.com" },
+            {
+                name: "polygon",
+                registry: "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f",
+                rpc: "https://polygon-rpc.com",
+            },
+            {
+                name: "base",
+                registry: "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498",
+                rpc: "https://mainnet.base.org",
+            },
+            {
+                name: "sonic",
+                registry: "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4",
+                rpc: "https://rpc.soniclabs.com",
+            },
+            {
+                name: "ethereum",
+                registry: "0x049aba7510f45BA5b64ea9E658E342F904DB358D",
+                rpc: "https://eth.llamarpc.com",
+            },
         ]
 
         for (const network of networks) {
             try {
                 const provider = new ethers.JsonRpcProvider(network.rpc)
-                const contract = new ethers.Contract(network.registry, resolverAbi, provider)
+                const contract = new ethers.Contract(
+                    network.registry,
+                    resolverAbi,
+                    provider,
+                )
 
                 // Verify domain exists on this network
                 await contract.ownerOf(tokenId)
@@ -932,7 +961,7 @@ export class Identities {
 
         throw new Error(
             `Unrecognized address format: ${address}. ` +
-            `Expected EVM (0x...) or Solana (base58) address.`
+                `Expected EVM (0x...) or Solana (base58) address.`,
         )
     }
 
@@ -946,7 +975,10 @@ export class Identities {
      * @param signingAddress The address that will sign the challenge (from domain's authorized addresses)
      * @returns Challenge message to be signed
      */
-    generateUDChallenge(demosPublicKey: string, signingAddress: string): string {
+    generateUDChallenge(
+        demosPublicKey: string,
+        signingAddress: string,
+    ): string {
         const timestamp = Date.now()
         const nonce = Math.random().toString(36).substring(7)
 
@@ -1000,35 +1032,46 @@ export class Identities {
      */
     async addUnstoppableDomainIdentity(
         demos: Demos,
-        domain: string,
-        signingAddress: string,
-        signature: string,
-        signedData: string,
+        xm: EVM | SOLANA,
+        resolutionData: any, // TODO: type this
         referralCode?: string,
     ): Promise<RPCResponseWithValidityData> {
-        // Detect signature type from address format
+        const publicKey = await demos.getEd25519Address()
+        const signingAddress = xm.getAddress()
         const signatureType = this.detectSignatureType(signingAddress)
+        const challenge = this.generateUDChallenge(publicKey, signingAddress)
+        const signature = await xm.signMessage(challenge)
 
         // Get Demos public key
-        const ed25519 = await demos.crypto.getIdentity("ed25519")
-        const publicKey = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
-
         const udPayload: UDIdentityPayload = {
-            domain,
+            domain: resolutionData.domain,
             signingAddress,
             signatureType,
             signature,
             publicKey,
-            signedData,
+            signedData: challenge,
+            network: resolutionData.network,
+            registryType: resolutionData.registryType,
         }
 
-        const payload: UDIdentityAssignPayload & { referralCode?: string } = {
-            context: "ud",
-            method: "ud_identity_assign",
-            payload: udPayload,
-            referralCode: referralCode,
-        }
+        return await this.inferIdentity(demos, "ud" as any, {
+            ...udPayload,
+            referralCode,
+        })
+    }
 
-        return await this.inferIdentity(demos, "ud" as any, payload)
+    /**
+     * Remove an Unstoppable Domain identity from the GCR.
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param domain The UD domain (e.g., "brad.crypto")
+     *
+     * @returns The validity data response from the RPC
+     */
+    async removeUnstoppableDomainIdentity(
+        demos: Demos,
+        domain: string,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "ud", { domain })
     }
 }

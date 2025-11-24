@@ -1,7 +1,7 @@
 // TODO See handleGCR.ts for the execution of the GCREdit
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
-import { PqcIdentityAssignPayload, PqcIdentityRemovePayload, XMCoreTargetIdentityPayload } from "../abstraction"
+import { PqcIdentityRemovePayload, UDIdentityPayload, XMCoreTargetIdentityPayload } from "../abstraction"
 import { SigningAlgorithm } from "../cryptography"
 
 export interface GCREditBalance {
@@ -79,15 +79,7 @@ export interface PQCIdentityGCREditData {
     timestamp: number
 }
 
-export interface UdGCRData {
-    domain: string
-    resolvedAddress: string
-    signature: string
-    publicKey: string
-    timestamp: number
-    network: "polygon" | "ethereum" // Network where domain is registered
-    registryType: "UNS" | "CNS"
-}
+export type UdGCRData = UDIdentityPayload
 
 export interface GCREditIdentity {
     type: "identity"
