@@ -118,6 +118,7 @@
         "ripple-keypairs": "^2.0.0",
         "rubic-sdk": "^5.57.4",
         "simple-peer": "^9.11.1",
+        "snarkjs": "^0.7.5",
         "socket.io-client": "^4.8.1",
         "sphincs": "^3.0.4",
         "superdilithium": "^2.0.6",
