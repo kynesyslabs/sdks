@@ -280,15 +280,18 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
      * @returns Amount in SUN as bigint
      */
     static trxToSun(trx: string | number): bigint {
-        const trxNum = typeof trx === "string" ? parseFloat(trx.trim() || "0") : trx
+        if (typeof trx === "string") {
+            trx = trx.trim() || "0"
+        }
 
-        if (!Number.isFinite(trxNum)) {
+        const trxAmount = new BigNumber(trx)
+        if (!trxAmount.isFinite()) {
             throw new Error(`Invalid TRX amount: ${trx}`)
         }
 
-        const sun = Math.round(trxNum * TRON.SUN_PER_TRX)
+        const sun = trxAmount.times(TRON.SUN_PER_TRX).integerValue(BigNumber.ROUND_FLOOR)
 
-        return BigInt(sun)
+        return BigInt(sun.toString())
     }
 
     /**
