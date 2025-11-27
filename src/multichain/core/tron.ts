@@ -115,17 +115,10 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
         return signedMessage
     }
 
-    /**
-     * Verifies a signed message by recovering the signer's address
-     * @param message The original message that was signed
-     * @param signature The signature to verify
-     * @param address The expected signer's TRON address (base58 format)
-     * @returns True if the recovered address matches the provided address
-     */
     async verifyMessage(
         message: string,
         signature: string,
-        address: string
+        publicKey: string
     ): Promise<boolean> {
         try {
             const hexMessage = TronWeb.toHex(message)
@@ -134,7 +127,7 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
             })
             const recoveredAddress = await tronWeb.trx.verifyMessageV2(hexMessage, signature)
 
-            return recoveredAddress === address
+            return recoveredAddress.toLowerCase() === publicKey.toLowerCase()
         } catch (error) {
             console.error("[TRON] Message verification failed:", error)
 
