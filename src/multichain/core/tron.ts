@@ -28,11 +28,7 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
 
     async connect(): Promise<boolean> {
         try {
-            if (!this.provider || !this.provider.trx) {
-                console.error("[TRON] Connection failed: Provider not initialized. Call setRpc first.")
-                this.connected = false
-                return false
-            }
+            required(this.provider, "Provider not initialized. Call setRpc first.")
 
             // Test connection by getting latest block
             const block = await this.provider.trx.getCurrentBlock()
