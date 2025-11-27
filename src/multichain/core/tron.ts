@@ -46,9 +46,11 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
     async connectWallet(privateKey: string): Promise<TronWebInstance> {
         required(this.provider, "Provider not initialized. Call setRpc first.")
 
-        const cleanPrivateKey = privateKey.startsWith("0x")
-            ? privateKey.slice(2)
-            : privateKey
+        // Trim whitespace from private key before processing
+        const trimmedKey = privateKey.trim()
+        const cleanPrivateKey = trimmedKey.startsWith("0x")
+            ? trimmedKey.slice(2)
+            : trimmedKey
 
         this.wallet = new TronWeb({
             fullHost: this.rpc_url,
@@ -66,7 +68,14 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
             throw new Error("Wallet address not available")
         }
 
-        return String(address)
+        const addressStr = String(address)
+
+        // Validate the address format
+        if (!TronWeb.isAddress(addressStr)) {
+            throw new Error(`Invalid TRON address: ${addressStr}`)
+        }
+
+        return addressStr
     }
 
     async getBalance(address: string): Promise<string> {
@@ -215,9 +224,10 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
             // Validate amount doesn't exceed JavaScript's safe integer limit
             // TronWeb API requires a JavaScript Number, so we must ensure precision is preserved
             if (amountIntBN.isGreaterThan(Number.MAX_SAFE_INTEGER)) {
+                const maxTrx = Math.floor(Number.MAX_SAFE_INTEGER / TRON.SUN_PER_TRX)
                 throw new Error(
                     `Payment amount ${payment.amount} SUN exceeds maximum safe integer (${Number.MAX_SAFE_INTEGER}). ` +
-                    `Maximum supported amount is ~9,007,199 TRX.`
+                    `Maximum supported amount is ~${maxTrx.toLocaleString()} TRX.`
                 )
             }
             const amountInSun = amountIntBN.toNumber()
@@ -305,23 +315,23 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
      */
     static sunToTrx(sun: bigint): string {
         const sunPerTrx = BigInt(TRON.SUN_PER_TRX)
-        const integerPart = sun / sunPerTrx
-        const remainder = sun % sunPerTrx
-
-        // Handle negative values
         const isNegative = sun < 0n
-        const absRemainder = isNegative ? -remainder : remainder
+        const absSun = isNegative ? -sun : sun
+
+        const integerPart = absSun / sunPerTrx
+        const remainder = absSun % sunPerTrx
 
         // Pad remainder to 6 decimal places (TRON has 6 decimals)
-        const fractionalStr = absRemainder.toString().padStart(6, "0")
+        const fractionalStr = remainder.toString().padStart(6, "0")
 
-        // Remove trailing zeros for cleaner output, but keep at least one decimal
+        // Remove trailing zeros for cleaner output
         const trimmedFractional = fractionalStr.replace(/0+$/, "") || "0"
 
-        if (trimmedFractional === "0") {
-            return integerPart.toString()
-        }
+        const base =
+            trimmedFractional === "0"
+                ? integerPart.toString()
+                : `${integerPart}.${trimmedFractional}`
 
-        return `${integerPart}.${trimmedFractional}`
+        return isNegative ? `-${base}` : base
     }
 }
