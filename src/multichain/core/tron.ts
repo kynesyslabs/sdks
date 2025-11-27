@@ -90,9 +90,18 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
         return await this.provider.trx.getCurrentBlock()
     }
 
-    async createWallet(): Promise<{ address: string; privateKey: string }> {
+    /**
+     * Creates a new TRON wallet
+     * @param _password Password parameter (reserved for future encryption support)
+     * @returns Object containing the wallet address and private key
+     * @note Currently returns unencrypted private key. Password parameter is accepted
+     *       for interface compatibility but not yet used for encryption.
+     */
+    async createWallet(_password: string): Promise<{ address: string; privateKey: string }> {
         const account = await TronWeb.createAccount()
 
+        // TODO: Implement password-based encryption of privateKey
+        // For now, return unencrypted to match other chain implementations
         return {
             address: account.address.base58,
             privateKey: account.privateKey,
