@@ -28,6 +28,12 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
 
     async connect(): Promise<boolean> {
         try {
+            if (!this.provider || !this.provider.trx) {
+                console.error("[TRON] Connection failed: Provider not initialized. Call setRpc first.")
+                this.connected = false
+                return false
+            }
+
             // Test connection by getting latest block
             const block = await this.provider.trx.getCurrentBlock()
             this.connected = !!block?.block_header
@@ -194,9 +200,12 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
         const signedTxs: any[] = []
 
         for (const payment of payments) {
-            const amountInSun = typeof payment.amount === 'string'
-                ? parseInt(payment.amount, 10)
-                : payment.amount
+            const amountBN = new BigNumber(payment.amount)
+            if (!amountBN.isFinite() || amountBN.isNegative()) {
+                throw new Error(`Invalid payment amount: ${payment.amount}`)
+            }
+            // Convert to integer (SUN should be whole numbers) and then to number for TronWeb API
+            const amountInSun = amountBN.integerValue(BigNumber.ROUND_FLOOR).toNumber()
 
             const fromAddress = wallet.defaultAddress.base58
             if (!fromAddress) {
