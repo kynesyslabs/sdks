@@ -284,6 +284,7 @@ export interface UserPoints {
         udDomains?: { [domain: string]: number }
         referrals: number
         demosFollow: number
+        firstWalletTransaction: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
