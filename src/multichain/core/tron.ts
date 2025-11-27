@@ -115,10 +115,17 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
         return signedMessage
     }
 
+    /**
+     * Verifies a signed message by recovering the signer's address
+     * @param message The original message that was signed
+     * @param signature The signature to verify
+     * @param address The expected signer's TRON address (base58 format)
+     * @returns True if the recovered address matches the provided address
+     */
     async verifyMessage(
         message: string,
         signature: string,
-        publicKey: string
+        address: string
     ): Promise<boolean> {
         try {
             const hexMessage = TronWeb.toHex(message)
@@ -127,7 +134,7 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
             })
             const recoveredAddress = await tronWeb.trx.verifyMessageV2(hexMessage, signature)
 
-            return recoveredAddress.toLowerCase() === publicKey.toLowerCase()
+            return recoveredAddress === address
         } catch (error) {
             console.error("[TRON] Message verification failed:", error)
 
@@ -200,8 +207,18 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
             if (!amountBN.isFinite() || amountBN.isNegative()) {
                 throw new Error(`Invalid payment amount: ${payment.amount}`)
             }
-            // Convert to integer (SUN should be whole numbers) and then to number for TronWeb API
-            const amountInSun = amountBN.integerValue(BigNumber.ROUND_FLOOR).toNumber()
+            // Convert to integer (SUN should be whole numbers)
+            const amountIntBN = amountBN.integerValue(BigNumber.ROUND_FLOOR)
+
+            // Validate amount doesn't exceed JavaScript's safe integer limit
+            // TronWeb API requires a JavaScript Number, so we must ensure precision is preserved
+            if (amountIntBN.isGreaterThan(Number.MAX_SAFE_INTEGER)) {
+                throw new Error(
+                    `Payment amount ${payment.amount} SUN exceeds maximum safe integer (${Number.MAX_SAFE_INTEGER}). ` +
+                    `Maximum supported amount is ~9,007,199 TRX.`
+                )
+            }
+            const amountInSun = amountIntBN.toNumber()
 
             const fromAddress = wallet.defaultAddress.base58
             if (!fromAddress) {
@@ -275,11 +292,31 @@ export class TRON extends DefaultChain implements IDefaultChainLocal {
     }
 
     /**
-     * Convert SUN to TRX
+     * Convert SUN to TRX with full precision preservation
      * @param sun Amount in SUN as bigint
-     * @returns Amount in TRX as number
+     * @returns Amount in TRX as a decimal string (e.g., "123.456789")
+     * @note This method returns a string to preserve precision for large values.
+     *       For display purposes, you may want to parse this with a BigNumber library.
      */
-    static sunToTrx(sun: bigint): number {
-        return Number(sun) / TRON.SUN_PER_TRX
+    static sunToTrx(sun: bigint): string {
+        const sunPerTrx = BigInt(TRON.SUN_PER_TRX)
+        const integerPart = sun / sunPerTrx
+        const remainder = sun % sunPerTrx
+
+        // Handle negative values
+        const isNegative = sun < 0n
+        const absRemainder = isNegative ? -remainder : remainder
+
+        // Pad remainder to 6 decimal places (TRON has 6 decimals)
+        const fractionalStr = absRemainder.toString().padStart(6, "0")
+
+        // Remove trailing zeros for cleaner output, but keep at least one decimal
+        const trimmedFractional = fractionalStr.replace(/0+$/, "") || "0"
+
+        if (trimmedFractional === "0") {
+            return integerPart.toString()
+        }
+
+        return `${integerPart}.${trimmedFractional}`
     }
 }

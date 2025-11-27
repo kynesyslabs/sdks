@@ -190,15 +190,16 @@ export abstract class DefaultChain {
     ): Promise<string | Uint8Array>
 
     /**
-     * Verifies a message using the connected wallet
-     * @param message The message to verify
+     * Verifies a signed message by recovering the signer's address/public key
+     * @param message The original message that was signed
      * @param signature The signature to verify
-     * @returns A boolean indicating if the message was verified
+     * @param address The expected signer's address or public key (format depends on chain)
+     * @returns True if the recovered address/public key matches the provided one
      */
     abstract verifyMessage(
         message: string,
         signature: string | Uint8Array,
-        publicKey: string | Uint8Array,
+        address: string | Uint8Array,
     ): Promise<boolean>
 
     /**
