@@ -21,9 +21,7 @@ import {
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
 } from "@/types/abstraction"
-import {
-    UnifiedDomainResolution,
-} from "@/abstraction/types/UDResolution"
+import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
 import { Account, RPCResponseWithValidityData } from "@/types"
@@ -1044,10 +1042,10 @@ export class Identities {
      * )
      * ```
      */
-    async addUnstoppableDomainIdentity(
+    async addUnstoppableDomainIdentity<T extends EVM | SOLANA>(
         demos: Demos,
-        xm: EVM | SOLANA,
-        resolutionData: any, // TODO: type this
+        xm: T,
+        resolutionData: UnifiedDomainResolution,
         referralCode?: string,
     ): Promise<RPCResponseWithValidityData> {
         const publicKey = await demos.getEd25519Address()
@@ -1055,6 +1053,22 @@ export class Identities {
         const signatureType = this.detectSignatureType(signingAddress)
         const challenge = this.generateUDChallenge(publicKey, signingAddress)
         const signature = await xm.signMessage(challenge)
+
+        // INFO: Prevent signing with non-owner address
+        const isOwner =
+            resolutionData.metadata?.[signatureType]?.owner === signingAddress
+
+        if (!isOwner) {
+            const isAuthorized = resolutionData.authorizedAddresses.some(
+                auth => auth.address === signingAddress,
+            )
+
+            if (!isAuthorized) {
+                throw new Error(
+                    `Can't sign payload. Signing address (${signingAddress} on ${signatureType}) is not the owner or an authorized address`,
+                )
+            }
+        }
 
         // Get Demos public key
         const udPayload: UDIdentityPayload = {
@@ -1087,5 +1101,17 @@ export class Identities {
         domain: string,
     ): Promise<RPCResponseWithValidityData> {
         return await this.removeIdentity(demos, "ud", { domain })
+    }
+
+    /**
+     * Get the Unstoppable Domain identities associated with an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param address The address to get identities for. Defaults to the connected wallet's address.
+     *
+     * @returns The identities associated with the address.
+     */
+    async getUDIdentities(demos: Demos, address?: string) {
+        return await this.getIdentities(demos, "getUDIdentities", address)
     }
 }

@@ -35,7 +35,7 @@ export default {
         testnet: "https://rpc.elgafar-1.stargaze-apis.com",
     },
     solana: {
-        mainnet: clusterApiUrl("mainnet-beta"),
+        mainnet: "https://britta-qyzo1g-fast-mainnet.helius-rpc.com",
         //TODO: Change to testnet when we have a testnet faucet
         // using devnet as testnet faucet is broken 👇
         testnet: clusterApiUrl("devnet"),
