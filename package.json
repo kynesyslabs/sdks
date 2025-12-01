@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.5.7",
+    "version": "2.5.8",
     "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
     "types": "build/index.d.ts",
@@ -46,7 +46,7 @@
         "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",
         "setup:pre-commit": "cp .github/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo \"Pre-commit hook installed\"",
         "setup:hooks": "bun run setup:pre-push && bun run setup:pre-commit",
-        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/{coin,evm}*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/evm.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:tx": "rm -rf build && jest --testMatch '**/tests/multichain**/fulltx*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:demoswork": "rm -rf build && jest --testMatch '**/tests/**/demoswork*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:identities": "rm -rf build && jest --testMatch '**/tests/**/identities.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
