@@ -140,7 +140,12 @@ export class TON extends DefaultChain {
             /**
              * A private key mnemonic to use for signing the transaction(s) instead of the connected wallet
              */
-            privateKey: string
+            privateKey?: string
+            /**
+             * Custom send mode for the transaction
+             * @default SendMode.PAY_GAS_SEPARATELY
+             */
+            sendMode?: number
         },
     ) {
         const txs = await this.preparePays(
@@ -156,7 +161,12 @@ export class TON extends DefaultChain {
             /**
              * A private key mnemonic to use for signing the transaction(s) instead of the connected wallet
              */
-            privateKey: string
+            privateKey?: string
+            /**
+             * Custom send mode for the transaction
+             * @default SendMode.PAY_GAS_SEPARATELY
+             */
+            sendMode?: number
         },
     ) {
         required(this.signer || options?.privateKey, "Wallet not connected")
@@ -167,6 +177,8 @@ export class TON extends DefaultChain {
             signer = await mnemonicToPrivateKey(options.privateKey.split(" "))
         }
 
+        const sendMode = options?.sendMode ?? SendMode.PAY_GAS_SEPARATELY
+
         const contract = this.provider.open(this.wallet)
         let seqNo = await contract.getSeqno()
 
@@ -174,11 +186,12 @@ export class TON extends DefaultChain {
             const cell = contract.createTransfer({
                 seqno: seqNo,
                 secretKey: signer.secretKey,
-                sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+                sendMode: sendMode,
                 messages: [
                     internal({
                         value: toNano(payment.amount),
                         to: payment.address,
+                        bounce: true,
                     }),
                 ],
             })
@@ -246,12 +259,12 @@ export class TON extends DefaultChain {
         const transfer = contract.createTransfer({
             seqno: seqNo,
             secretKey: this.signer.secretKey,
-            sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
             messages: [
                 internal({
                     value: toNano(amount),
                     to: receiver,
-                    bounce: false,
+                    bounce: true,
                 }),
             ],
         })
@@ -261,11 +274,10 @@ export class TON extends DefaultChain {
             { body: transfer, initCode: null, initData: null, ignoreSignature: true }
         )
 
-        // Sum all fee components
+        // Sum fee components
         const totalFee = BigInt(estimate.source_fees.in_fwd_fee) +
             BigInt(estimate.source_fees.storage_fee) +
-            BigInt(estimate.source_fees.gas_fee) +
-            BigInt(estimate.source_fees.fwd_fee)
+            BigInt(estimate.source_fees.gas_fee)
 
         // Add 10% buffer for safety margin
         return (totalFee * 110n) / 100n
