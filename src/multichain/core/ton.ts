@@ -262,10 +262,11 @@ export class TON extends DefaultChain {
             { body: transfer, initCode: null, initData: null, ignoreSignature: true }
         )
 
-        // Sum fee components
+        // Sum all fee components
         const totalFee = BigInt(estimate.source_fees.in_fwd_fee) +
             BigInt(estimate.source_fees.storage_fee) +
-            BigInt(estimate.source_fees.gas_fee)
+            BigInt(estimate.source_fees.gas_fee) +
+            BigInt(estimate.source_fees.fwd_fee)
 
         // Add 10% buffer for safety margin
         return (totalFee * 110n) / 100n
