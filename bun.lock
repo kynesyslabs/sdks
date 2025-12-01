@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "@kynesyslabs/demosdk",
@@ -23,14 +22,15 @@
         "@simplewebauthn/server": "^11.0.0",
         "@solana/buffer-layout": "^4.0.1",
         "@solana/web3.js": "1.98.0",
-        "@ton/core": "^0.56.3",
+        "@ton/core": "^0.62.0",
         "@ton/crypto": "^3.3.0",
-        "@ton/ton": "^13.11.2",
+        "@ton/ton": "^16.0.0",
         "@types/simple-peer": "^9.11.8",
         "axios": "^1.11.0",
         "big-integer": "^1.6.52",
         "bignumber.js": "^9.3.1",
         "bip32": "^5.0.0-rc.0",
+        "bip39": "^3.1.0",
         "bitcoinjs-lib": "^6.1.7",
         "bitcoinjs-message": "^2.2.0",
         "bs58": "^5.0.0",
@@ -43,6 +43,7 @@
         "js-sha3": "^0.9.3",
         "libsodium-wrappers-sumo": "^0.7.15",
         "lodash": "^4.17.21",
+        "micro-ed25519-hdkey": "^0.1.2",
         "mlkem": "^2.5.0",
         "near-api-js": "^4.0.4",
         "node-forge": "^1.3.1",
@@ -784,13 +785,13 @@
 
     "@teleportdao/teleswap-sdk": ["@teleportdao/teleswap-sdk@2.2.8", "", { "dependencies": { "@teleportdao/bitcoin": "^2.2.8-beta.1", "@teleportdao/configs": "^2.2.3", "@teleportdao/contracts-helper": "^2.2.8-beta.1", "@teleportdao/providers": "^2.2.5", "bignumber.js": "^9.1.2" } }, "sha512-zn/UkGWmco3oUuBmfjTe8uPSZB8695Ktf2Mpl2q1ahL2cgmBgIzef9FwjUZs//79Aaz01swWznsc2EcscjJLTA=="],
 
-    "@ton/core": ["@ton/core@0.56.3", "", { "dependencies": { "symbol.inspect": "1.0.1" }, "peerDependencies": { "@ton/crypto": ">=3.2.0" } }, "sha512-HVkalfqw8zqLLPehtq0CNhu5KjVzc7IrbDwDHPjGoOSXmnqSobiWj8a5F+YuWnZnEbQKtrnMGNOOjVw4LG37rg=="],
+    "@ton/core": ["@ton/core@0.62.0", "", { "dependencies": { "symbol.inspect": "1.0.1" }, "peerDependencies": { "@ton/crypto": ">=3.2.0" } }, "sha512-GCYlzzx11rSESKkiHvNy9tL8zWth+ZtUbvV29WH478FvBp8xTw24AyoigwXWNV+OLCAcnwlGhZpTpxjD3wzCwA=="],
 
     "@ton/crypto": ["@ton/crypto@3.3.0", "", { "dependencies": { "@ton/crypto-primitives": "2.1.0", "jssha": "3.2.0", "tweetnacl": "1.0.3" } }, "sha512-/A6CYGgA/H36OZ9BbTaGerKtzWp50rg67ZCH2oIjV1NcrBaCK9Z343M+CxedvM7Haf3f/Ee9EhxyeTp0GKMUpA=="],
 
     "@ton/crypto-primitives": ["@ton/crypto-primitives@2.1.0", "", { "dependencies": { "jssha": "3.2.0" } }, "sha512-PQesoyPgqyI6vzYtCXw4/ZzevePc4VGcJtFwf08v10OevVJHVfW238KBdpj1kEDQkxWLeuNHEpTECNFKnP6tow=="],
 
-    "@ton/ton": ["@ton/ton@13.11.2", "", { "dependencies": { "axios": "^1.6.7", "dataloader": "^2.0.0", "symbol.inspect": "1.0.1", "teslabot": "^1.3.0", "zod": "^3.21.4" }, "peerDependencies": { "@ton/core": ">=0.56.0", "@ton/crypto": ">=3.2.0" } }, "sha512-EPqW+ZTe0MmfqguJEIGMuAqTAFRKMEce95HlDx8h6CGn2y3jiMgV1/oO+WpDIOiX+1wnTu+xtajk8JTWr8nKRQ=="],
+    "@ton/ton": ["@ton/ton@16.0.0", "", { "dependencies": { "axios": "^1.6.7", "dataloader": "^2.0.0", "symbol.inspect": "1.0.1", "teslabot": "^1.3.0", "zod": "^3.21.4" }, "peerDependencies": { "@ton/core": ">=0.62.0 <1.0.0", "@ton/crypto": ">=3.2.0" } }, "sha512-Y5xtPtn0x6iNIEFqOaX8GjPFvDDyCG4YOnJ7WUnP9YQ4MYxANm7gOZZifMcxQcQ5KazxiIWqqyctp4PPVhOgPA=="],
 
     "@toncodex/sdk": ["@toncodex/sdk@1.0.26", "", { "dependencies": { "@ton/core": "^0.59.0", "@ton/crypto": "^3.3.0", "@ton/ton": "^15.1.0", "big.js": "^6.2.1", "crc": "^4.3.2", "decimal.js-light": "^2.5.1", "jsbi": "^3.2.5", "numeral": "^2.0.6", "tiny-invariant": "^1.3.1", "tiny-warning": "^1.0.3", "toformat": "^2.0.0", "tonapi-sdk-js": "^1.0.11" } }, "sha512-DX++TcyuY+W9/cJUmCbX+odcFGTdg+v4U51Y/lElDJpghn6roHUREoCaQxtSMo5IZJ0wQKO5N16+3lq5O7tE1w=="],
 
@@ -1865,6 +1866,8 @@
     "merkletreejs": ["merkletreejs@0.3.11", "", { "dependencies": { "bignumber.js": "^9.0.1", "buffer-reverse": "^1.0.1", "crypto-js": "^4.2.0", "treeify": "^1.1.0", "web3-utils": "^1.3.4" } }, "sha512-LJKTl4iVNTndhL+3Uz/tfkjD0klIWsHlUzgtuNnNrsf7bAlXR30m+xYB7lHr5Z/l6e/yAIsr26Dabx6Buo4VGQ=="],
 
     "methods": ["methods@1.1.2", "", {}, "sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w=="],
+
+    "micro-ed25519-hdkey": ["micro-ed25519-hdkey@0.1.2", "", { "dependencies": { "@noble/ed25519": "~1.7.1", "@noble/hashes": "~1.1.1" } }, "sha512-oHEvmBntX3vVAQ3NenKnu9K4pv6cYGgu0EP8i3ThORg7TedWMR7zFqBAznsK02xQZjMatgjn2UFpSpK4jBzMng=="],
 
     "micro-ftch": ["micro-ftch@0.3.1", "", {}, "sha512-/0LLxhzP0tfiR5hcQebtudP56gUurs2CLkGarnCiB/OqEyUFQ6U3paQi/tgLv0hBJYt2rnr9MNpxz4fiiugstg=="],
 
@@ -3237,6 +3240,8 @@
     "js-yaml/esprima": ["esprima@4.0.1", "", { "bin": { "esparse": "./bin/esparse.js", "esvalidate": "./bin/esvalidate.js" } }, "sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A=="],
 
     "lower-case/tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
+
+    "micro-ed25519-hdkey/@noble/hashes": ["@noble/hashes@1.1.3", "", {}, "sha512-CE0FCR57H2acVI5UOzIGSSIYxZ6v/HOhDR0Ro9VLyhnzLwx0o8W1mmgaqlEUx4049qJDlIBRztv5k+MM8vbO3A=="],
 
     "multibase/base-x": ["base-x@3.0.11", "", { "dependencies": { "safe-buffer": "^5.0.1" } }, "sha512-xz7wQ8xDhdyP7tQxwdteLYeFfS68tSMNCZ/Y37WJ4bhGfKPpqEIlmIyueQHqOyoPhE6xNUqjzRr8ra0eF9VRvA=="],
 

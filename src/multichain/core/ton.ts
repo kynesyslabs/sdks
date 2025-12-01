@@ -1,8 +1,9 @@
 import {
     Address,
     Cell,
+    SendMode,
     TonClient,
-    WalletContractV4,
+    WalletContractV5R1,
     beginCell,
     external,
     internal,
@@ -10,7 +11,7 @@ import {
     toNano,
 } from "@ton/ton"
 import BigNumber from "bignumber.js"
-import { KeyPair, mnemonicToPrivateKey, sign, signVerify } from "@ton/crypto"
+import { KeyPair, mnemonicToPrivateKey, mnemonicValidate, sign, signVerify } from "@ton/crypto"
 
 import { IPayOptions, required } from "."
 import { DefaultChain } from "./types/defaultChain"
@@ -18,7 +19,7 @@ import { DefaultChain } from "./types/defaultChain"
 export class TON extends DefaultChain {
     declare provider: TonClient
     declare signer: KeyPair
-    declare wallet: WalletContractV4
+    declare wallet: WalletContractV5R1
 
     constructor(rpc_url: string) {
         super(rpc_url)
@@ -45,18 +46,45 @@ export class TON extends DefaultChain {
     }
 
     async connectWallet(mnemonics: string) {
-        this.signer = await mnemonicToPrivateKey(mnemonics.split(" "))
-        this.wallet = WalletContractV4.create({
-            publicKey: this.signer.publicKey,
-            workchain: 0,
-        })
+        const mnemonicArray = mnemonics.trim().split(/\s+/)
 
-        return this.wallet
+        // Validate mnemonic - must be exactly 24 words and valid TON mnemonic
+        if (mnemonicArray.length !== 24) {
+            throw new Error(`Invalid mnemonic: expected 24 words, got ${mnemonicArray.length}`)
+        }
+
+        const isValid = await mnemonicValidate(mnemonicArray)
+        if (!isValid) {
+            throw new Error("Invalid TON mnemonic: validation failed")
+        }
+
+        try {
+            this.signer = await mnemonicToPrivateKey(mnemonicArray)
+
+            this.wallet = WalletContractV5R1.create({
+                publicKey: this.signer.publicKey,
+                workchain: 0,
+            })
+
+            return this.wallet
+        } catch (error) {
+            console.error("[TON SDK] connectWallet error:", error)
+
+            throw error
+        }
     }
 
     // SECTION: Information
     getAddress() {
-        return this.wallet.address.toString()
+        return this.wallet.address.toString({ urlSafe: true, bounceable: false })
+    }
+
+    override getPublicKey(): string | undefined {
+        if (!this.signer?.publicKey) {
+            return undefined
+        }
+
+        return this.signer.publicKey.toString('hex')
     }
 
     async getBalance(address: string) {
@@ -73,7 +101,7 @@ export class TON extends DefaultChain {
         const secretKey = this.signer.secretKey;
         const signatureBuffer = sign(messageBuffer, secretKey);
         const signedMessage = signatureBuffer.toString('base64');
-        
+
         return signedMessage;
     }
 
@@ -82,7 +110,7 @@ export class TON extends DefaultChain {
         const signatureBuffer = Buffer.from(signature, 'base64');
         const publicKeyBuffer = Buffer.from(publicKey, 'hex');
         const isVerified = signVerify(messageBuffer, signatureBuffer, publicKeyBuffer);
-        
+
         return isVerified;
     }
 
@@ -146,10 +174,12 @@ export class TON extends DefaultChain {
             const cell = contract.createTransfer({
                 seqno: seqNo,
                 secretKey: signer.secretKey,
+                sendMode: SendMode.PAY_GAS_SEPARATELY,
                 messages: [
                     internal({
                         value: toNano(payment.amount),
                         to: payment.address,
+                        bounce: true,
                     }),
                 ],
             })
@@ -200,5 +230,45 @@ export class TON extends DefaultChain {
 
     async getEmptyTransaction() {
         return beginCell()
+    }
+
+    /**
+     * Estimate the transaction fee for a transfer
+     * @param receiver The recipient address
+     * @param amount The amount in TON (not nanotons)
+     * @returns Fee estimate in nanotons as bigint
+     */
+    async estimateFee(receiver: string, amount: string): Promise<bigint> {
+        required(this.signer, "Wallet not connected")
+
+        const contract = this.provider.open(this.wallet)
+        const seqNo = await contract.getSeqno()
+
+        const transfer = contract.createTransfer({
+            seqno: seqNo,
+            secretKey: this.signer.secretKey,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            messages: [
+                internal({
+                    value: toNano(amount),
+                    to: receiver,
+                    bounce: true,
+                }),
+            ],
+        })
+
+        const estimate = await this.provider.estimateExternalMessageFee(
+            this.wallet.address,
+            { body: transfer, initCode: null, initData: null, ignoreSignature: true }
+        )
+
+        // Sum all fee components
+        const totalFee = BigInt(estimate.source_fees.in_fwd_fee) +
+            BigInt(estimate.source_fees.storage_fee) +
+            BigInt(estimate.source_fees.gas_fee) +
+            BigInt(estimate.source_fees.fwd_fee)
+
+        // Add 10% buffer for safety margin
+        return (totalFee * 110n) / 100n
     }
 }

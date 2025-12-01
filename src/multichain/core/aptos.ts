@@ -380,7 +380,7 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
      * 
      * @returns The public key as hex string
      */
-    getPublicKey(): string {
+    override getPublicKey(): string {
         if (!this.account) {
             throw new Error("No wallet connected")
         }

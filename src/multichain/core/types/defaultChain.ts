@@ -179,6 +179,14 @@ export abstract class DefaultChain {
     abstract getAddress(): string
 
     /**
+     * Returns the public key of the connected wallet (if available).
+     * @returns The public key as a hex string, or undefined if not available
+     */
+    getPublicKey(): string | undefined {
+        return undefined
+    }
+
+    /**
      * Signs a message using the connected wallet
      * @param message The message to sign
      * @param options Options
