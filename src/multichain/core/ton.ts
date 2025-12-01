@@ -140,12 +140,7 @@ export class TON extends DefaultChain {
             /**
              * A private key mnemonic to use for signing the transaction(s) instead of the connected wallet
              */
-            privateKey?: string
-            /**
-             * Custom send mode for the transaction
-             * @default SendMode.PAY_GAS_SEPARATELY
-             */
-            sendMode?: number
+            privateKey: string
         },
     ) {
         const txs = await this.preparePays(
@@ -161,12 +156,7 @@ export class TON extends DefaultChain {
             /**
              * A private key mnemonic to use for signing the transaction(s) instead of the connected wallet
              */
-            privateKey?: string
-            /**
-             * Custom send mode for the transaction
-             * @default SendMode.PAY_GAS_SEPARATELY
-             */
-            sendMode?: number
+            privateKey: string
         },
     ) {
         required(this.signer || options?.privateKey, "Wallet not connected")
@@ -177,8 +167,6 @@ export class TON extends DefaultChain {
             signer = await mnemonicToPrivateKey(options.privateKey.split(" "))
         }
 
-        const sendMode = options?.sendMode ?? SendMode.PAY_GAS_SEPARATELY
-
         const contract = this.provider.open(this.wallet)
         let seqNo = await contract.getSeqno()
 
@@ -186,7 +174,7 @@ export class TON extends DefaultChain {
             const cell = contract.createTransfer({
                 seqno: seqNo,
                 secretKey: signer.secretKey,
-                sendMode: sendMode,
+                sendMode: SendMode.PAY_GAS_SEPARATELY,
                 messages: [
                     internal({
                         value: toNano(payment.amount),
