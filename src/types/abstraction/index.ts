@@ -318,11 +318,13 @@ export interface UserPoints {
             telegram?: number
         }
         udDomains?: { [domain: string]: number }
+        nomisScores?: { [chain: string]: number }
         referrals: number
         demosFollow: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
+    linkedNomisIdentities: NomisWalletIdentity[]
     lastUpdated: Date
     flagged: boolean | null
     flaggedReason: string | null
