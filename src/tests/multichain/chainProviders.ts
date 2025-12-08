@@ -57,4 +57,10 @@ export default {
         mainnet: "https://blockstream.info/api",
         testnet: "https://blockstream.info/testnet/api",
     },
+    tron: {
+        mainnet: "https://api.trongrid.io",
+        testnet: "https://api.shasta.trongrid.io",
+        shasta: "https://api.shasta.trongrid.io",
+        nile: "https://nile.trongrid.io",
+    },
 }
