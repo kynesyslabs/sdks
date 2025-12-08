@@ -138,6 +138,7 @@ export interface UnifiedDomainResolution {
             sldPda: string
             domainPropertiesPda: string
             recordsVersion: number
+            owner: string
         }
     }
 }

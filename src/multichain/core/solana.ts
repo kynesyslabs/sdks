@@ -22,6 +22,8 @@ import nacl from "tweetnacl"
 import { decodeBase64, decodeUTF8, encodeBase64 } from "tweetnacl-util"
 
 import base58 from "bs58"
+import * as bip39 from "bip39"
+import { HDKey } from "micro-ed25519-hdkey"
 
 import { ns64, struct, u32 } from "@solana/buffer-layout"
 import { DefaultChain, SolanaDefaultChain } from "./types/defaultChain"
@@ -99,7 +101,25 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         }
     }
     // ANCHOR Public methods
-    async connectWallet(privateKey: string) {
+    async connectWallet(privateKey: string, accountIndex: number = 0) {
+        privateKey = privateKey.trim()
+
+        // INFO: Check if the input is a mnemonic phrase (contains spaces)
+        const isMnemonic = privateKey.includes(" ")
+
+        // INFO: Derive as BIP44 format
+        if (isMnemonic) {
+            // INFO: Convert mnemonic to seed using BIP39
+            const seed = bip39.mnemonicToSeedSync(privateKey, "")
+            // INFO: Create HD key from master seed
+            const hd = HDKey.fromMasterSeed(seed.toString("hex"))
+            // INFO: Derive keypair using Solana BIP44 path: m/44'/501'/{accountIndex}'/0'
+            const path = `m/44'/501'/${accountIndex}'/0'`
+            this.wallet = Keypair.fromSeed(hd.derive(path).privateKey)
+            return this.wallet
+        }
+
+        // INFO: Treat as base58 encoded private key
         const pkBuffer = base58.decode(privateKey)
         this.wallet = Keypair.fromSecretKey(pkBuffer)
         return this.wallet
@@ -363,10 +383,11 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
 
     // SECTION: Singleton methods
 
-    static getInstance(): SOLANA | boolean {
+    static getInstance(): SOLANA | null {
         if (!SOLANA.instance) {
-            return false
+            return null
         }
+
         return SOLANA.instance
     }
 
@@ -374,6 +395,7 @@ export class SOLANA extends DefaultChain implements SolanaDefaultChain {
         if (!SOLANA.instance) {
             SOLANA.instance = new SOLANA(rpc_url)
         }
+
         return SOLANA.instance
     }
 }

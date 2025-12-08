@@ -1,5 +1,5 @@
 import { Address, Idl } from "@project-serum/anchor"
-import { Contract, TransactionReceipt } from "ethers"
+import { Contract, Interface, InterfaceAbi, TransactionReceipt } from "ethers"
 import {
     IBCConnectWalletOptions,
     IPayParams,
@@ -275,11 +275,12 @@ export interface IEVMDefaultChain {
     readFromContract: (contract: any, method: string, args: any) => Promise<any>
     writeToContract: (contract: any, method: string, args: any) => Promise<any>
     listenForEvent: (
-        event: string,
         contract: string,
-        abi: any[],
+        abi: Interface | InterfaceAbi,
+        event: string,
+        timeout: number,
     ) => Promise<any>
-    listenForAllEvents: (contract: string, abi: any[]) => Promise<any>
+    listenForAllEvents: (contract: string, abi: Interface | InterfaceAbi, callback: (...args: any[]) => void) => () => void
     waitForReceipt: (tx_hash: string) => Promise<TransactionReceipt>
 }
 
