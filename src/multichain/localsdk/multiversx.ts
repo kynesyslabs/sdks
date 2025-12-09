@@ -43,21 +43,34 @@ export class MULTIVERSX extends EGLDCore implements IDefaultChainLocal {
         }
     }
 
-    async sendTransaction(raw_tx: Transaction | IPlainTransactionObject) :Promise<TransactionResponse> {
+    async sendTransaction(raw_tx: Transaction | IPlainTransactionObject | string): Promise<TransactionResponse> {
         required(this.provider, 'Provider not connected')
-        let signed_tx: Transaction
 
-        // INFO: raw_tx is a plain object when it comes from the frontend
-        if (!(raw_tx instanceof Transaction)) {
-            signed_tx = Transaction.fromPlainObject(raw_tx)
-        } else {
-            signed_tx = raw_tx
+        if (raw_tx instanceof Transaction) {
+            const tx_hash = await this.provider.sendTransaction(raw_tx)
+
+            return {
+                result: XmTransactionResult.success,
+                hash: tx_hash,
+            }
         }
 
-        // INFO: The provider can also send a list of transactions
-        const tx_hash = await this.provider.sendTransaction(
-            signed_tx as Transaction
-        )
+        // Handle hex-encoded JSON string
+        let plainTx: IPlainTransactionObject
+        if (typeof raw_tx === 'string') {
+            let jsonString = raw_tx;
+            if (raw_tx.startsWith('0x')) {
+                jsonString = Buffer.from(raw_tx.slice(2), 'hex').toString('utf-8');
+            }
+            plainTx = JSON.parse(jsonString) as IPlainTransactionObject;
+        } else {
+            plainTx = raw_tx
+        }
+
+        // This bypasses prepareTransactionForBroadcasting which expects Buffer objects
+        // The plain object format from toPlainObject() is already API-compatible
+        const response = await (this.provider as any).doPostGeneric('transactions', plainTx)
+        const tx_hash = response.txHash
 
         return {
             result: XmTransactionResult.success,
