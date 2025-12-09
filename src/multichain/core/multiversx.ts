@@ -11,8 +11,8 @@ import {
 import { ExtensionProvider } from "@multiversx/sdk-extension-provider"
 import { ApiNetworkProvider } from "@multiversx/sdk-network-providers"
 import { INetworkProvider } from "@multiversx/sdk-network-providers/out/interface"
-import { UserSigner } from "@multiversx/sdk-wallet"
-import bech32 from 'bech32'; 
+import { UserSigner, UserSecretKey } from "@multiversx/sdk-wallet"
+import bech32 from 'bech32';
 
 import {
     DefaultChain,
@@ -66,13 +66,22 @@ export class MULTIVERSX extends DefaultChain {
         return UserSigner.fromWallet(keyFile, password)
     }
 
-    async connectWallet(privateKey: string, options: { password: string }) {
+    async connectWallet(privateKey: string, options?: { password?: string }) {
         // INFO: This method is overriden in the web sdk
         // to connect with the extension wallet
-        this.wallet = await this.connectKeyFileWallet(
-            privateKey,
-            options?.password as string,
-        )
+
+        // Check if privateKey is a raw hex string (64 hex characters)
+        const isRawHexKey = /^[0-9a-fA-F]{64}$/.test(privateKey);
+
+        if (isRawHexKey) {
+            const secretKey = UserSecretKey.fromString(privateKey);
+            this.wallet = new UserSigner(secretKey);
+        } else {
+            this.wallet = await this.connectKeyFileWallet(
+                privateKey,
+                options?.password ?? '',
+            )
+        }
         return this.wallet
     }
 
