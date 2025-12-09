@@ -79,7 +79,7 @@ export class MULTIVERSX extends DefaultChain {
         } else {
             this.wallet = await this.connectKeyFileWallet(
                 privateKey,
-                options?.password as string,
+                options?.password ?? '',
             )
         }
         return this.wallet

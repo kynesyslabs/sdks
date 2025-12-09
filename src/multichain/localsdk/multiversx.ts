@@ -58,19 +58,26 @@ export class MULTIVERSX extends EGLDCore implements IDefaultChainLocal {
         // Handle hex-encoded JSON string
         let plainTx: IPlainTransactionObject
         if (typeof raw_tx === 'string') {
-            let jsonString = raw_tx;
-            if (raw_tx.startsWith('0x')) {
-                jsonString = Buffer.from(raw_tx.slice(2), 'hex').toString('utf-8');
+            try {
+                let jsonString = raw_tx;
+                if (raw_tx.startsWith('0x')) {
+                    jsonString = Buffer.from(raw_tx.slice(2), 'hex').toString('utf-8');
+                }
+                plainTx = JSON.parse(jsonString) as IPlainTransactionObject;
+            } catch (error) {
+                throw new Error('Failed to parse transaction string. Invalid JSON format.');
             }
-            plainTx = JSON.parse(jsonString) as IPlainTransactionObject;
         } else {
             plainTx = raw_tx
         }
 
-        // This bypasses prepareTransactionForBroadcasting which expects Buffer objects
-        // The plain object format from toPlainObject() is already API-compatible
+        // The plain object format from toPlainObject()/toSendable() is already API-compatible.
         const response = await (this.provider as any).doPostGeneric('transactions', plainTx)
         const tx_hash = response.txHash
+
+        if (!tx_hash || typeof tx_hash !== 'string') {
+            throw new Error(`Failed to send transaction. API response: ${JSON.stringify(response)}`);
+        }
 
         return {
             result: XmTransactionResult.success,
