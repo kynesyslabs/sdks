@@ -27,7 +27,7 @@ import * as bip32 from "@scure/bip32"
 
 export class IBC extends DefaultChain implements IBCDefaultChain {
     address: string = ''
-    chainID: string = ''
+    chainId: string = ''
     declare provider: StargateClient
     declare wallet: SigningStargateClient
     declare signer: DirectSecp256k1Wallet | DirectSecp256k1HdWallet
@@ -39,10 +39,6 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
     constructor(rpc_url: string) {
         super(rpc_url)
         this.name = 'ibc';
-        
-        if (rpc_url) {
-            this.setRpc(rpc_url);
-        }
     }
 
     override async setRpc(rpc_url: string) {
@@ -52,13 +48,15 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
 
     // INFO: rpc_url used to avoid overwriting this.provider for test mocking
     async connect(rpc_url?: string) {
-        if (rpc_url !== this.rpc_url) {
-            this.provider = await StargateClient.connect(this.rpc_url)
+        if (!this.provider || (rpc_url && rpc_url !== this.rpc_url)) {
+            const url = rpc_url || this.rpc_url;
+            this.rpc_url = url;
+            this.provider = await StargateClient.connect(url);
         }
 
         try {
             const chain_id = await this.provider.getChainId()
-            this.chainID = chain_id
+            this.chainId = chain_id
 
             this.connected = Boolean(chain_id)
         } catch (error) {
@@ -112,11 +110,14 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
         }
 
         this.rpc_url = rpc_url || this.rpc_url;
-        
+
         this.wallet = await SigningStargateClient.connectWithSigner(
             this.rpc_url,
             this.signer
         )
+
+        this.chainId = await this.wallet.getChainId()
+
         return this.wallet
     }
 
@@ -207,21 +208,38 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
     override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
         required(options && options?.privateKey, "Wallet not connected")
 
-        const seed = bip39.mnemonicToSeedSync(options.privateKey);
-        const hdkey = bip32.HDKey.fromMasterSeed(seed);
-        const derivedKey = hdkey.derive("m/44'/118'/0'/0/0");
-        const privateKey = derivedKey.privateKey;
-        const messageHash = createHash('sha256').update(message).digest();
-        const signObj = await Secp256k1.createSignature(messageHash, privateKey);
-        const fixedLengthData = signObj.toFixedLength();
-        const base64String = toBase64(fixedLengthData);
+        // Check if privateKey is a mnemonic or raw private key
+        const isMnemonic = options.privateKey.includes(' ')
 
-        return base64String;
+        let privateKey: Uint8Array
+        let publicKey: Uint8Array
+
+        if (isMnemonic) {
+            const seed = bip39.mnemonicToSeedSync(options.privateKey)
+            const hdkey = bip32.HDKey.fromMasterSeed(seed)
+            const derivedKey = hdkey.derive("m/44'/118'/0'/0/0")
+            privateKey = derivedKey.privateKey!
+            publicKey = derivedKey.publicKey!
+        } else {
+            const privateKeyBytes = Buffer.from(options.privateKey, 'hex')
+            const keypair = await Secp256k1.makeKeypair(privateKeyBytes)
+            privateKey = privateKeyBytes
+            publicKey = Secp256k1.compressPubkey(keypair.pubkey)
+        }
+
+        const messageHash = createHash('sha256').update(message).digest()
+        const signObj = await Secp256k1.createSignature(messageHash, privateKey)
+        const fixedLengthData = signObj.toFixedLength()
+        const base64Signature = toBase64(fixedLengthData)
+        const base64PublicKey = toBase64(publicKey)
+
+        // Return signature|publicKey so both can be extracted
+        return `${base64Signature}|${base64PublicKey}`
     }
 
     override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
         const signatureBytes = fromBase64(signature);
-        const rAndSBytes = signatureBytes.slice(0, 64); 
+        const rAndSBytes = signatureBytes.slice(0, 64);
         const publicKeyBytes = fromBase64(publicKey);
         const signatureObj = Secp256k1Signature.fromFixedLength(rAndSBytes);
         const messageHash = createHash('sha256').update(message).digest();
@@ -282,7 +300,7 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
             const signerInfo = {
                 sequence: current_sequence,
                 accountNumber: account.accountNumber,
-                chainId: this.chainID,
+                chainId: this.chainId,
             }
 
             if (tx.fee === null) {

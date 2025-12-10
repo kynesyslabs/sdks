@@ -7,9 +7,9 @@ export class IBC extends IBCCore implements IDefaultChainLocal {
     }
 
     async sendTransaction(signed_tx: Uint8Array): Promise<TransactionResponse> {
-        required(this.wallet, 'Wallet not connected')
+        required(this.provider, 'Provider not connected')
 
-        const hash = await this.wallet.broadcastTxSync(signed_tx)
+        const hash = await this.provider.broadcastTxSync(signed_tx)
         return {
             hash,
             result: XmTransactionResult.success,
