@@ -208,20 +208,33 @@ export class IBC extends DefaultChain implements IBCDefaultChain {
     override async signMessage(message: string, options?: { privateKey?: string }): Promise<string> {
         required(options && options?.privateKey, "Wallet not connected")
 
-        const seed = bip39.mnemonicToSeedSync(options.privateKey);
-        const hdkey = bip32.HDKey.fromMasterSeed(seed);
-        const derivedKey = hdkey.derive("m/44'/118'/0'/0/0");
-        const privateKey = derivedKey.privateKey;
-        const messageHash = createHash('sha256').update(message).digest();
-        const signObj = await Secp256k1.createSignature(messageHash, privateKey);
-        const fixedLengthData = signObj.toFixedLength();
-        const base64Signature = toBase64(fixedLengthData);
+        // Check if privateKey is a mnemonic or raw private key
+        const isMnemonic = options.privateKey.includes(' ')
 
-        const publicKey = derivedKey.publicKey;
-        const base64PublicKey = toBase64(publicKey);
+        let privateKey: Uint8Array
+        let publicKey: Uint8Array
+
+        if (isMnemonic) {
+            const seed = bip39.mnemonicToSeedSync(options.privateKey)
+            const hdkey = bip32.HDKey.fromMasterSeed(seed)
+            const derivedKey = hdkey.derive("m/44'/118'/0'/0/0")
+            privateKey = derivedKey.privateKey!
+            publicKey = derivedKey.publicKey!
+        } else {
+            const privateKeyBytes = Buffer.from(options.privateKey, 'hex')
+            const keypair = await Secp256k1.makeKeypair(privateKeyBytes)
+            privateKey = privateKeyBytes
+            publicKey = Secp256k1.compressPubkey(keypair.pubkey)
+        }
+
+        const messageHash = createHash('sha256').update(message).digest()
+        const signObj = await Secp256k1.createSignature(messageHash, privateKey)
+        const fixedLengthData = signObj.toFixedLength()
+        const base64Signature = toBase64(fixedLengthData)
+        const base64PublicKey = toBase64(publicKey)
 
         // Return signature|publicKey so both can be extracted
-        return `${base64Signature}|${base64PublicKey}`;
+        return `${base64Signature}|${base64PublicKey}`
     }
 
     override async verifyMessage(message: string, signature: string, publicKey: string): Promise<boolean> {
