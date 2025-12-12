@@ -1,7 +1,8 @@
 import * as bitcoin from "bitcoinjs-lib"
 import { BIP32Factory } from "bip32"
+import * as bip39 from "bip39"
 import ecc from "@bitcoinerlab/secp256k1"
-// import * as bitcoinMessage from "bitcoinjs-message"
+import * as bitcoinMessage from "bitcoinjs-message"
 import { required } from "./utils"
 import axios from "axios"
 import { ECPairAPI, ECPairFactory, ECPairInterface } from "ecpair"
@@ -46,18 +47,36 @@ export class BTC extends DefaultChain {
         this.network = network
     }
 
+    /**
+     * Infer the Bitcoin network from the RPC URL
+     * Returns mainnet by default if URL is null/undefined/empty
+     */
+    static inferNetworkFromUrl(rpc_url: string | null | undefined): bitcoin.Network {
+        if (!rpc_url) {
+            return bitcoin.networks.bitcoin // Default to mainnet for verification
+        }
+
+        const lowerUrl = rpc_url.toLowerCase()
+        if (lowerUrl.includes("testnet") || lowerUrl.includes("test")) {
+            return bitcoin.networks.testnet
+        }
+
+        return bitcoin.networks.bitcoin // mainnet
+    }
+
     static override async create<T extends BTC>(
         this: new (rpc_url: string, network: bitcoin.Network) => T,
-        rpc_url: string,
-        network: bitcoin.Network = BITCOIN_CONSTANTS.DEFAULT_NETWORK,
+        rpc_url: string | null,
+        network?: bitcoin.Network,
     ): Promise<T> {
-        const instance = new this(rpc_url, network)
+        const resolvedNetwork = network ?? BTC.inferNetworkFromUrl(rpc_url)
+        const instance = new this(rpc_url as string, resolvedNetwork)
         await instance.connect()
         return instance
     }
 
     async connect(): Promise<boolean> {
-        if (!this.rpc_url){
+        if (!this.rpc_url) {
             return false
         }
 
@@ -81,11 +100,10 @@ export class BTC extends DefaultChain {
     generatePrivateKey(seed?: Buffer): string {
         if (seed) {
             // Generate deterministic key from seed using BIP32
+            // Use the SAME path for both mainnet and testnet (m/84'/0'/0'/0/0)
+            // This matches most BTC wallets
             const root = bip32.fromSeed(seed, this.network)
-            const path =
-                this.network === bitcoin.networks.testnet
-                    ? "m/84'/1'/0'/0/0"
-                    : "m/84'/0'/0'/0/0"
+            const path = "m/84'/0'/0'/0/0"
             const child = root.derivePath(path)
             return child.toWIF()
         } else {
@@ -126,9 +144,28 @@ export class BTC extends DefaultChain {
         )
     }
 
-    async connectWallet(privateKeyWIF: string): Promise<ECPairInterface> {
+    /**
+     * Connect wallet using either a WIF private key or a BIP39 mnemonic phrase
+     * @param privateKeyOrMnemonic - WIF private key or 12/24 word mnemonic phrase
+     */
+    async connectWallet(privateKeyOrMnemonic: string): Promise<ECPairInterface> {
         try {
-            this.wallet = ECPair.fromWIF(privateKeyWIF, this.network)
+            // Check if input is a mnemonic (contains spaces and valid word count)
+            const words = privateKeyOrMnemonic.trim().split(/\s+/)
+            const isMnemonic = (words.length === 12 || words.length === 24) && bip39.validateMnemonic(privateKeyOrMnemonic.trim())
+
+            if (isMnemonic) {
+                // Derive key from mnemonic using BIP84 path (native SegWit)
+                const seed = bip39.mnemonicToSeedSync(privateKeyOrMnemonic.trim())
+                const root = bip32.fromSeed(seed, this.network)
+                const path = "m/84'/0'/0'/0/0"
+                const child = root.derivePath(path)
+                this.wallet = ECPair.fromPrivateKey(Buffer.from(child.privateKey!), { network: this.network })
+            } else {
+                // Assume WIF format
+                this.wallet = ECPair.fromWIF(privateKeyOrMnemonic, this.network)
+            }
+
             const { address } = bitcoin.payments.p2wpkh({
                 pubkey: Buffer.from(this.wallet.publicKey),
                 network: this.network,
@@ -337,8 +374,7 @@ export class BTC extends DefaultChain {
         )
         if (totalInput < amountNum + finalFee) {
             throw new Error(
-                `Insufficient funds: There is ${totalInput}, need ${
-                    amountNum + finalFee
+                `Insufficient funds: There is ${totalInput}, need ${amountNum + finalFee
                 }`,
             )
         }
@@ -458,28 +494,73 @@ export class BTC extends DefaultChain {
         }
     }
 
+    /**
+     * Get the legacy P2PKH address for signature verification
+     * Bitcoin message signatures can only be verified against legacy addresses
+     */
+    getLegacyAddress(): string {
+        required(this.wallet, "Wallet not connected")
+
+        const { address } = bitcoin.payments.p2pkh({
+            pubkey: Buffer.from(this.wallet.publicKey),
+            network: this.network,
+        })
+
+        return address!
+    }
+
+    /**
+     * Get the public key as hex string (needed for signature verification)
+     */
+    getPublicKey(): string {
+        required(this.wallet, "Wallet not connected")
+
+        return Buffer.from(this.wallet.publicKey).toString("hex")
+    }
+
     async signMessage(
         message: string,
         options?: { privateKey?: string },
     ): Promise<string> {
-        return ""
-        // let keyPair: ECPairInterface
-        // if (options?.privateKey) {
-        //     keyPair = ECPair.fromWIF(options.privateKey, this.network)
-        // } else {
-        //     required(this.wallet, "Wallet not connected")
-        //     keyPair = this.wallet
-        // }
+        let keyPair: ECPairInterface
+        if (options?.privateKey) {
+            keyPair = ECPair.fromWIF(options.privateKey, this.network)
+        } else {
+            required(this.wallet, "Wallet not connected")
+            keyPair = this.wallet
+        }
 
-        // const privateKey = Buffer.from(keyPair.privateKey!)
-        // const signature = bitcoinMessage.sign(
-        //     message,
-        //     privateKey,
-        //     keyPair.compressed,
-        //     { segwitType: "p2wpkh" },
-        // )
+        const privateKey = Buffer.from(keyPair.privateKey!)
+        // Use legacy signature format (no segwitType) for maximum compatibility
+        const signature = bitcoinMessage.sign(
+            message,
+            privateKey,
+            keyPair.compressed,
+        )
 
-        // return signature.toString("base64")
+        return signature.toString("base64")
+    }
+
+    /**
+     * Infer the Bitcoin network from an address format
+     * Mainnet: starts with 1, 3, or bc1
+     * Testnet: starts with m, n, 2, or tb1
+     */
+    static inferNetworkFromAddress(address: string): bitcoin.Network {
+        if (!address) return bitcoin.networks.bitcoin
+
+        // Mainnet patterns
+        if (address.startsWith("1") || address.startsWith("3") || address.toLowerCase().startsWith("bc1")) {
+            return bitcoin.networks.bitcoin
+        }
+
+        // Testnet patterns
+        if (address.startsWith("m") || address.startsWith("n") || address.startsWith("2") || address.toLowerCase().startsWith("tb1")) {
+            return bitcoin.networks.testnet
+        }
+
+        // Default to mainnet
+        return bitcoin.networks.bitcoin
     }
 
     async verifyMessage(
@@ -487,17 +568,19 @@ export class BTC extends DefaultChain {
         signature: string,
         address: string,
     ): Promise<boolean> {
-        return false
-        // try {
-        //     return bitcoinMessage.verify(
-        //         message,
-        //         address,
-        //         Buffer.from(signature, "base64"),
-        //         this.network.messagePrefix,
-        //         true, // checkSegwitAlways to support SegWit
-        //     )
-        // } catch (error) {
-        //     return false
-        // }
+        try {
+            // Infer network from address to use correct message prefix
+            const network = BTC.inferNetworkFromAddress(address)
+
+            return bitcoinMessage.verify(
+                message,
+                address,
+                Buffer.from(signature, "base64"),
+                network.messagePrefix,
+                true, // checkSegwitAlways to support both legacy and SegWit
+            )
+        } catch (error) {
+            return false
+        }
     }
 }
