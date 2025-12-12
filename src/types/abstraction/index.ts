@@ -19,6 +19,7 @@ export interface InferFromSignatureTargetIdentityPayload
     targetAddress: string
     signedData: string
     publicKey?: string
+    displayAddress?: string
 }
 
 /**
@@ -176,10 +177,10 @@ export interface BaseWeb2IdentityPayload {
 export interface Web2IdentityAssignPayload extends BaseWeb2IdentityPayload {
     method: "web2_identity_assign"
     payload:
-        | InferFromGithubPayload
-        | InferFromTwitterPayload
-        | InferFromTelegramPayload
-        | InferFromDiscordPayload
+    | InferFromGithubPayload
+    | InferFromTwitterPayload
+    | InferFromTelegramPayload
+    | InferFromDiscordPayload
 }
 
 export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
