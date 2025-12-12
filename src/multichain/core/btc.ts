@@ -70,8 +70,11 @@ export class BTC extends DefaultChain {
         network?: bitcoin.Network,
     ): Promise<T> {
         const resolvedNetwork = network ?? BTC.inferNetworkFromUrl(rpc_url)
-        const instance = new this(rpc_url as string, resolvedNetwork)
-        await instance.connect()
+        const instance = new this(rpc_url ?? "", resolvedNetwork)
+        if (rpc_url) {
+            await instance.connect()
+        }
+
         return instance
     }
 
@@ -160,7 +163,10 @@ export class BTC extends DefaultChain {
                 const root = bip32.fromSeed(seed, this.network)
                 const path = "m/84'/0'/0'/0/0"
                 const child = root.derivePath(path)
-                this.wallet = ECPair.fromPrivateKey(Buffer.from(child.privateKey!), { network: this.network })
+                if (!child.privateKey) {
+                    throw new Error("Failed to derive private key from mnemonic.")
+                }
+                this.wallet = ECPair.fromPrivateKey(child.privateKey, { network: this.network })
             } else {
                 // Assume WIF format
                 this.wallet = ECPair.fromWIF(privateKeyOrMnemonic, this.network)
@@ -536,6 +542,7 @@ export class BTC extends DefaultChain {
             message,
             privateKey,
             keyPair.compressed,
+            this.network.messagePrefix,
         )
 
         return signature.toString("base64")
