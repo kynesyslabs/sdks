@@ -1042,17 +1042,16 @@ export class Identities {
      * )
      * ```
      */
-    async addUnstoppableDomainIdentity<T extends EVM | SOLANA>(
+    async addUnstoppableDomainIdentity(
         demos: Demos,
-        xm: T,
+        signingAddress: string,
+        signature: string,
+        challenge: string,
         resolutionData: UnifiedDomainResolution,
         referralCode?: string,
     ): Promise<RPCResponseWithValidityData> {
         const publicKey = await demos.getEd25519Address()
-        const signingAddress = xm.getAddress()
         const signatureType = this.detectSignatureType(signingAddress)
-        const challenge = this.generateUDChallenge(publicKey, signingAddress)
-        const signature = await xm.signMessage(challenge)
 
         // INFO: Prevent signing with non-owner address
         const isOwner =

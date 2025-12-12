@@ -287,6 +287,9 @@ export interface UserPoints {
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
+    linkedUDDomains?: {
+        [network: string]: string[]
+    }
     lastUpdated: Date
     flagged: boolean | null
     flaggedReason: string | null
