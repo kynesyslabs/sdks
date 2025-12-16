@@ -10,7 +10,7 @@
  */
 
 // REVIEW: Phase 10.1 - Production cryptographic implementation
-// import * as snarkjs from 'snarkjs'
+import * as snarkjs from '@cryptkeeperzk/snarkjs'
 
 export interface ZKProof {
     pi_a: string[]
@@ -83,8 +83,6 @@ export async function generateIdentityProof(
     const zkeyPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle_final.zkey'
 
     // REVIEW: Phase 10.1 - Production-ready proof generation using snarkjs
-    // import snarkjs lazily here
-    const snarkjs = await import('snarkjs')
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
         circuitInputs,
         wasmPath,
@@ -148,11 +146,8 @@ export async function verifyProof(
             pi_b: proof.pi_b,
             pi_c: proof.pi_c,
             protocol: proof.protocol,
-            curve: 'bn128',
         }
 
-        // import snarkjs lazily here
-        const snarkjs = await import('snarkjs')
         return await snarkjs.groth16.verify(vkey, publicSignals, snarkjsProof)
     } catch (error) {
         throw new Error(
