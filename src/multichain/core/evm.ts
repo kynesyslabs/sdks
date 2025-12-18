@@ -1,5 +1,8 @@
 import {
     Contract,
+    HDNodeWallet,
+    Interface,
+    InterfaceAbi,
     JsonRpcProvider,
     TransactionRequest,
     Wallet,
@@ -9,6 +12,7 @@ import {
     toNumber,
     verifyMessage,
 } from "ethers"
+import * as bip39 from "bip39"
 import { DefaultChain, IEVMDefaultChain } from "./types/defaultChain"
 import { IPayParams } from "./types/interfaces"
 import { required } from "./utils"
@@ -160,19 +164,43 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         return this.connected
     }
 
-    // INFO Connecting a wallet through a private key (string)
+    // INFO Connecting a wallet through a private key (string) or mnemonic phrase
     // REVIEW should private key be a string or a Buffer?
-    async connectWallet(privateKey: string) {
+    async connectWallet(privateKey: string, accountIndex: number = 0) {
         if (!this.rpc_url) {
             console.warn(
                 "WARNING: No RPC URL set. Connecting wallet without provider",
             )
         }
 
-        this.wallet = new Wallet(
-            privateKey,
-            this.rpc_url ? this.provider : null,
-        )
+        privateKey = privateKey.trim()
+
+        // INFO: Check if the input is a mnemonic phrase (contains spaces)
+        const isMnemonic = privateKey.includes(" ")
+
+        if (isMnemonic) {
+            // INFO: Validate mnemonic
+            if (!bip39.validateMnemonic(privateKey)) {
+                throw new Error("Invalid mnemonic phrase")
+            }
+
+            // INFO: Create HD wallet from mnemonic using BIP44 path for Ethereum: m/44'/60'/0'/0/{accountIndex}
+            const hdNode = HDNodeWallet.fromPhrase(
+                privateKey,
+                "",
+                `m/44'/60'/0'/0/${accountIndex}`,
+            )
+            this.wallet = new Wallet(
+                hdNode.privateKey,
+                this.rpc_url ? this.provider : null,
+            )
+        } else {
+            // INFO: Treat as private key hex
+            this.wallet = new Wallet(
+                privateKey,
+                this.rpc_url ? this.provider : null,
+            )
+        }
 
         return this.wallet
     }
@@ -406,7 +434,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         contract_instance: Contract,
         function_name: string,
         args: any[],
-        options?: { gasLimit?: number; value?: string }
+        options?: { gasLimit?: number; value?: string },
     ): Promise<string> {
         required(this.wallet, "Wallet not connected")
 
@@ -423,10 +451,14 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
         }
 
         // Get nonce
-        const nonce = await this.provider.getTransactionCount(this.wallet.address)
+        const nonce = await this.provider.getTransactionCount(
+            this.wallet.address,
+        )
 
         // Get populated transaction without executing
-        const populatedTx = await contractWithSigner[function_name].populateTransaction(...args, txOptions)
+        const populatedTx = await contractWithSigner[
+            function_name
+        ].populateTransaction(...args, txOptions)
 
         // Ensure transaction has required fields
         if (!populatedTx.chainId) {
@@ -442,7 +474,7 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
             ...baseTx,
             ...populatedTx,
             // Override gasLimit if provided in options
-            ...(options?.gasLimit && { gasLimit: options.gasLimit })
+            ...(options?.gasLimit && { gasLimit: options.gasLimit }),
         }
 
         // Sign the transaction for node execution
@@ -450,31 +482,88 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     }
 
     // SECTION Event listener
+    /**
+     * Listen for a specific event from a contract
+     *
+     * @param contract The address of the contract to listen to
+     * @param abi The ABI of the contract to listen to
+     * @param event The event to listen to
+     * @param timeout The timeout in milliseconds before the listener is removed
+     *
+     * @returns A promise that resolves to the event data or rejects if the timeout is reached
+     */
     async listenForEvent(
-        event: string,
         contract: string,
-        abi: any[],
+        abi: Interface | InterfaceAbi,
+        event: string,
+        timeout: number = 5000,
     ): Promise<any> {
         if (!this.provider) {
             throw new Error("Provider not connected")
         }
-        let contractInstance = new Contract(contract, abi, this.provider)
-        // REVIEW THis could work
-        return contractInstance.on(event, (data: any) => {
-            ////console.log(data)
-            // TODO Do something with the data
+
+
+
+        const contractInstance = new Contract(contract, abi, this.provider)
+
+        return new Promise<any>((resolve, reject) => {
+            let settled = false
+
+            const listener = (...args: any[]) => {
+                if (settled) {
+                    return
+                }
+
+                settled = true
+                clearTimeout(timer)
+
+                const payload = args.length === 1 ? args[0] : args
+                contractInstance.off(event, listener)
+                resolve(payload)
+            }
+
+            const timer = setTimeout(() => {
+                if (settled) {
+                    return
+                }
+
+                settled = true
+                contractInstance.off(event, listener)
+                reject(new Error("Event listener timed out"))
+            }, timeout)
+
+            contractInstance.on(event, listener)
         })
     }
 
-    async listenForAllEvents(contract: string, abi: any[]): Promise<any> {
+    /**
+     * Listen for all events from a contract
+     *
+     * @param contract The address of the contract to listen to
+     * @param abi The ABI of the contract to listen to
+     * @param callback The callback to call when an event is emitted
+     *
+     * @returns A function to remove the listener
+     */
+    listenForAllEvents(
+        contract: string,
+        abi: Interface | InterfaceAbi,
+        callback: (...args: any[]) => void,
+    ): () => void {
         if (!this.provider) {
             throw new Error("Provider not connected")
         }
-        let contractInstance = new Contract(contract, abi, this.provider)
-        // REVIEW 99% Won't work
-        return contractInstance.on("*", (data: any) => {
-            ////console.log(data)
-            // TODO Do something with the data
-        })
+
+        const contractInstance = new Contract(contract, abi, this.provider)
+
+        const listener = (...args: any[]) => {
+            callback(...args)
+        }
+
+        contractInstance.on("*", listener)
+
+        return () => {
+            contractInstance.off("*", listener)
+        }
     }
 }

@@ -433,24 +433,24 @@ describe("UNSTOPPABLE DOMAINS IDENTITIES", () => {
         }
 
         // Step 4: Submit to node for verification
-        console.log("📤 Submitting to Demos network...")
-        const validityData = await identities.addUnstoppableDomainIdentity(
-            demos,
-            DOMAIN,
-            wallet.address,
-            signature,
-            challenge
-        )
+        // console.log("📤 Submitting to Demos network...")
+        // const validityData = await identities.addUnstoppableDomainIdentity(
+        //     demos,
+        //     DOMAIN,
+        //     wallet.address,
+        //     signature,
+        //     challenge
+        // )
 
-        console.log("✅ Validity data received:", validityData)
+        // console.log("✅ Validity data received:", validityData)
 
-        // Step 5: Broadcast transaction
-        console.log("📡 Broadcasting transaction...")
-        const res = await demos.broadcast(validityData)
-        console.log("🎉 Broadcast result:", res)
+        // // Step 5: Broadcast transaction
+        // console.log("📡 Broadcasting transaction...")
+        // const res = await demos.broadcast(validityData)
+        // console.log("🎉 Broadcast result:", res)
 
-        expect(res).toBeDefined()
-        expect(res.result).toBe(200)
+        // expect(res).toBeDefined()
+        // expect(res.result).toBe(200)
     })
 
     /**

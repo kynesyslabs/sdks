@@ -29,7 +29,7 @@ import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/un
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
-import { wordlist } from "@scure/bip39/wordlists/english"
+import { wordlist } from "@scure/bip39/wordlists/english.js"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
 

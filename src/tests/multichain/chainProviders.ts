@@ -7,7 +7,7 @@ const tenTokenAlt = "05F95F81F11474C151F27854BD43DDA1C8616BBF"
 
 export default {
     eth: {
-        mainnet: "https://ethereum-rpc.publicnode.com",
+        mainnet: "https://mainnet.gateway.tenderly.co",
         sepolia: "https://ethereum-sepolia-rpc.publicnode.com",
         goerli: "https://ethereum-goerli.publicnode.com",
     },
@@ -35,7 +35,7 @@ export default {
         testnet: "https://rpc.elgafar-1.stargaze-apis.com",
     },
     solana: {
-        mainnet: clusterApiUrl("mainnet-beta"),
+        mainnet: "https://britta-qyzo1g-fast-mainnet.helius-rpc.com",
         //TODO: Change to testnet when we have a testnet faucet
         // using devnet as testnet faucet is broken 👇
         testnet: clusterApiUrl("devnet"),

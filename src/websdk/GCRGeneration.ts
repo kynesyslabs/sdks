@@ -66,7 +66,10 @@ export class GCRGeneration {
         // Add gas operation edit with check for availability of gas amount in the sender's balance
         nonceEdits: try {
             // INFO: Skip gas for identity and D402 payments (gasless/sponsored transactions)
-            if (content.type === "identity" || content.type === "d402_payment") {
+            if (
+                content.type === "identity" ||
+                content.type === "d402_payment"
+            ) {
                 break nonceEdits
             }
 
@@ -313,6 +316,14 @@ export class HandleIdentityOperations {
                 break
             }
 
+            case "ud_identity_assign": {
+                edit.data = {
+                    ...identityPayload.payload,
+                    timestamp: tx.content.timestamp,
+                }
+                break
+            }
+
             case "nomis_identity_assign": {
                 edit.data = identityPayload.payload
                 break
@@ -321,6 +332,7 @@ export class HandleIdentityOperations {
             case "xm_identity_remove":
             case "web2_identity_remove":
             case "pqc_identity_remove":
+            case "ud_identity_remove":
             case "nomis_identity_remove": {
                 // INFO: Passthrough the payload
                 edit.data = identityPayload.payload as any

@@ -61,7 +61,7 @@ describe.only("IDENTITIES V2", () => {
             const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
             const instance = await EVM.create(chainProviders.eth.mainnet)
-            await instance.connectWallet(wallets.evm.privateKey)
+            await instance.connectWallet(demos.newMnemonic())
 
             const signature = await instance.signMessage(ed25519_address)
             const verified = await instance.verifyMessage(

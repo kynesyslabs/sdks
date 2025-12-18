@@ -1,7 +1,7 @@
 // TODO See handleGCR.ts for the execution of the GCREdit
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
-import { NomisWalletIdentity, PqcIdentityAssignPayload, PqcIdentityRemovePayload, XMCoreTargetIdentityPayload } from "../abstraction"
+import { PqcIdentityRemovePayload, UDIdentityPayload, XMCoreTargetIdentityPayload, NomisWalletIdentity } from "../abstraction"
 import { SigningAlgorithm } from "../cryptography"
 
 export interface GCREditBalance {
@@ -79,15 +79,7 @@ export interface PQCIdentityGCREditData {
     timestamp: number
 }
 
-export interface UdGCRData {
-    domain: string
-    resolvedAddress: string
-    signature: string
-    publicKey: string
-    timestamp: number
-    network: "polygon" | "ethereum" // Network where domain is registered
-    registryType: "UNS" | "CNS"
-}
+export type UdGCRData = UDIdentityPayload
 
 export interface GCREditIdentity {
     type: "identity"
@@ -147,6 +139,36 @@ export interface GCREditStorageProgram {
     }
 }
 
+/**
+ * Escrow GCR edit operation
+ * Enables trustless escrow to social identities (Twitter, GitHub, Telegram)
+ */
+export interface GCREditEscrow {
+    type: "escrow"
+    operation: "deposit" | "claim" | "refund"
+    account: string  // Escrow address (for deposit/claim) or refunder address
+    data: {
+        // Deposit fields
+        sender?: string           // Ed25519 pubkey of sender
+        platform?: "twitter" | "github" | "telegram"
+        username?: string         // Social username (e.g., "@bob")
+        amount?: number
+        expiryDays?: number       // Optional, default 30
+        message?: string          // Optional memo
+
+        // Claim fields
+        claimant?: string         // Ed25519 pubkey of claimant
+        claimed?: boolean         // Whether escrow has been claimed
+        claimedBy?: string        // Address that claimed the escrow
+        claimedAt?: number        // Timestamp when claimed
+
+        // Refund fields
+        refunder?: string         // Ed25519 pubkey of refunder
+    }
+    txhash: string
+    isRollback: boolean
+}
+
 export type GCREdit =
     | GCREditBalance
     | GCREditNonce
@@ -156,3 +178,4 @@ export type GCREdit =
     | GCREditIdentity
     | GCREditSmartContract
     | GCREditStorageProgram
+    | GCREditEscrow

@@ -235,14 +235,15 @@ export interface BaseUdIdentityPayload {
  * Multi-signature support: EVM (secp256k1) and Solana (ed25519)
  */
 export interface UDIdentityPayload {
-    domain: string              // e.g., "brad.crypto"
-    signingAddress: string      // Address used to sign (from domain's authorized addresses)
+    domain: string // e.g., "brad.crypto"
+    signingAddress: string // Address used to sign (from domain's authorized addresses)
     signatureType: "evm" | "solana" // Signature type: EVM (secp256k1) or Solana (ed25519)
-    signature: string           // Signature from signingAddress
-    publicKey: string           // Public key of Demos identity
-    signedData: string          // Challenge message that was signed
-    network?: "polygon" | "ethereum" | "base" | "sonic" | "solana" // Network where domain is registered (optional, auto-detected)
-    registryType?: "UNS" | "CNS" // Registry type (optional, auto-detected: UNS newer, CNS legacy)
+    signature: string // Signature from signingAddress
+    publicKey: string // Public key of Demos identity
+    signedData: string // Challenge message that was signed
+    network: "polygon" | "ethereum" | "base" | "sonic" | "solana" // Network where domain is registered (optional, auto-detected)
+    registryType: "UNS" | "CNS" // Registry type (optional, auto-detected: UNS newer, CNS legacy)
+    timestamp?: number // Auto-populated during GCR generation
 }
 
 export interface UDIdentityAssignPayload extends BaseUdIdentityPayload {
@@ -324,6 +325,9 @@ export interface UserPoints {
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
+    linkedUDDomains?: {
+        [network: string]: string[]
+    }
     linkedNomisIdentities: NomisWalletIdentity[]
     lastUpdated: Date
     flagged: boolean | null
