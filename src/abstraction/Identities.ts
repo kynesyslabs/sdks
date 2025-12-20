@@ -2,7 +2,6 @@
 // This should be able to query and set the GCR identities for a Demos address
 
 import axios from "axios"
-import { ethers } from "ethers"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
@@ -20,6 +19,7 @@ import {
     FindDemosIdByWeb2IdentityQuery,
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
+    NomisWalletIdentity,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -27,7 +27,6 @@ import { PQCAlgorithm } from "@/types/cryptography"
 import { Account, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
-import { EVM, SOLANA } from "@/multichain/core"
 
 export class Identities {
     formats = {
@@ -74,7 +73,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "nomis",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -133,7 +132,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -1114,48 +1113,59 @@ export class Identities {
         return await this.getIdentities(demos, "getUDIdentities", address)
     }
 
-      /**
-     * Add a Nomis identity to the GCR.
+    /**
+     * Fetch a Nomis score for a wallet.
      *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param walletAddress The wallet address to get the score for.
-     * @param options Optional parameters for the Nomis score request.
-     * @returns The response from the RPC call.
+     * Calls the `getNomisScore` GCR routine via the Demos RPC.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param walletAddress The wallet address to retrieve the Nomis score for.
+     * @param chain Optional blockchain type (e.g. "evm", "solana").
+     * @param subchain Optional subchain or network identifier.
+     * @param scoreType Optional Nomis score type identifier.
+     * @param forceRefresh Whether to force recomputation instead of using cached data.
+     * @returns The RPC response containing the Nomis score data.
      */
-    async addNomisIdentity(
+    async getNomisScore(
         demos: Demos,
         walletAddress: string,
-        options: {
-            chain?: string
-            subchain?: string
-            scoreType?: number
-            nonce?: number
-            deadline?: number
-            forceRefresh?: boolean
-        } = {},
+        chain?: string,
+        subchain?: string,
+        scoreType?: number,
+        forceRefresh?: boolean,
     ) {
-        // 1. Get the score data from the node (read-only)
         const request = {
             method: "gcr_routine",
             params: [
                 {
                     method: "getNomisScore",
-                    params: [{ walletAddress, ...options }],
+                    params: [
+                        {
+                            walletAddress,
+                            chain,
+                            subchain,
+                            scoreType,
+                            forceRefresh,
+                        },
+                    ],
                 },
             ],
         }
 
-        const response = await demos.rpcCall(request, true)
+        return await demos.rpcCall(request, true)
+    }
 
-        if (response.result !== 200) {
-            throw new Error(
-                response.extra?.error || "Failed to fetch Nomis score",
-            )
-        }
-
-        const nomisData = response.response
-
-        // 2. Create and sign the identity transaction
-        return await this.inferIdentity(demos, "nomis", nomisData)
+    /**
+     * Link a Nomis wallet identity to the GCR.
+     *
+     * Infers and persists the Nomis identity using the provided
+     * Nomis wallet identity payload.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Nomis wallet identity data to be linked.
+     * @returns The RPC response for the identity inference operation.
+     */
+    async addNomisIdentity(demos: Demos, payload: NomisWalletIdentity) {
+        return await this.inferIdentity(demos, "nomis", payload)
     }
 }
