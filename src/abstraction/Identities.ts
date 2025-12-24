@@ -1,14 +1,12 @@
 // TODO Implement the identities abstraction
 // This should be able to query and set the GCR identities for a Demos address
 
-import axios from "axios"
 import { ethers } from "ethers"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
-    GithubProof,
     TwitterProof,
-    InferFromGithubPayload,
+    InferFromGithubOAuthPayload,
     InferFromXPayload,
     InferFromSignaturePayload,
     PqcIdentityAssignPayload,
@@ -27,16 +25,12 @@ import { PQCAlgorithm } from "@/types/cryptography"
 import { Account, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
-import { EVM, SOLANA } from "@/multichain/core"
+import { EVM } from "@/multichain/core"
+import { SOLANA } from "@/multichain/core"
 
 export class Identities {
     formats = {
         web2: {
-            github: [
-                "https://gist.github.com",
-                "https://raw.githubusercontent.com",
-                "https://gist.githubusercontent.com",
-            ],
             twitter: ["https://x.com", "https://twitter.com"],
             discord: [
                 "https://discord.com/channels",
@@ -79,8 +73,14 @@ export class Identities {
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
             // Skip validation for telegram as it uses custom attestation format, not URL proofs
+            // Skip validation for GitHub OAuth proofs (JSON-stringified SignedGitHubOAuthAttestation)
+            const isSignedAttestationProof =
+                typeof payload.proof === "string" &&
+                payload.proof.startsWith("{") &&
+                payload.context === "github"
             if (
                 payload.context !== "telegram" &&
+                !isSignedAttestationProof &&
                 this.formats.web2[payload.context]
             ) {
                 if (
@@ -89,11 +89,10 @@ export class Identities {
                     )
                 ) {
                     // construct informative error message
-                    const errorMessage = `Invalid ${
-                        payload.context
-                    } proof format. Supported formats are: ${this.formats.web2[
-                        payload.context
-                    ].join(", ")}`
+                    const errorMessage = `Invalid ${payload.context
+                        } proof format. Supported formats are: ${this.formats.web2[
+                            payload.context
+                        ].join(", ")}`
                     throw new Error(errorMessage)
                 }
             }
@@ -223,32 +222,49 @@ export class Identities {
         return await this.removeIdentity(demos, "web2", payload)
     }
 
+    // REVIEW: GitHub OAuth identity method using cryptographically signed attestations from the node
     /**
-     * Add a github identity to the GCR.
+     * Add a github identity to the GCR using OAuth.
+     * This method is used when the user has authenticated via GitHub OAuth,
+     * providing userId, username, and a signed attestation from the node.
      *
      * @param demos A Demos instance to communicate with the RPC.
-     * @param payload The payload to add the identity to.
+     * @param payload The OAuth payload containing userId, username, and signed attestation.
+     * @param referralCode Optional referral code for incentive points.
      * @returns The response from the RPC call.
      */
-    async addGithubIdentity(
+    async addGithubIdentityOAuth(
         demos: Demos,
-        payload: GithubProof,
+        payload: {
+            userId: string
+            username: string
+            signedAttestation: {
+                attestation: {
+                    provider: "github"
+                    userId: string
+                    username: string
+                    timestamp: number
+                    nodePublicKey: string
+                }
+                signature: string
+                signatureType: string
+            }
+        },
         referralCode?: string,
     ) {
-        const username = payload.split("/")[3]
-        const ghUser = await axios.get(
-            `https://api.github.com/users/${username}`,
-        )
-
-        if (!ghUser.data.login) {
-            throw new Error("Failed to get github user")
+        if (!payload.userId || !payload.username) {
+            throw new Error("OAuth payload must include userId and username")
         }
 
-        let githubPayload: InferFromGithubPayload = {
+        if (!payload.signedAttestation) {
+            throw new Error("OAuth payload must include signed attestation")
+        }
+
+        const githubPayload: InferFromGithubOAuthPayload = {
             context: "github",
-            proof: payload,
-            username: ghUser.data.login,
-            userId: ghUser.data.id,
+            proof: JSON.stringify(payload.signedAttestation),
+            username: payload.username,
+            userId: payload.userId,
             referralCode: referralCode,
         }
 
@@ -957,7 +973,7 @@ export class Identities {
 
         throw new Error(
             `Unrecognized address format: ${address}. ` +
-                `Expected EVM (0x...) or Solana (base58) address.`,
+            `Expected EVM (0x...) or Solana (base58) address.`,
         )
     }
 
