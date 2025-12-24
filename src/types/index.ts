@@ -28,6 +28,18 @@ export {
     InstantMessagingTransaction,
     NativeBridgeTransaction,
     SpecificTransaction,
+    // REVIEW: IPFS transaction types
+    IPFSTransaction,
+    type IPFSTransactionContent,
+    type IPFSPayload,
+    type IPFSAddPayload,
+    type IPFSPinPayload,
+    type IPFSUnpinPayload,
+    type IPFSOperationType,
+    isIPFSAddPayload,
+    isIPFSPinPayload,
+    isIPFSUnpinPayload,
+    isIPFSPayload,
 } from "./blockchain/TransactionSubtypes"
 
 // L2PSEncryptedPayload removed to avoid circular dependency - import directly from @/l2ps

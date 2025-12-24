@@ -13,6 +13,7 @@ export * from './ContractDeployTransaction'
 export * from './ContractCallTransaction'
 export * from './D402PaymentTransaction'
 export * from './EscrowTransaction'
+export * from './IPFSTransaction'
 
 // Re-export all transaction types as a union
 import { L2PSTransaction } from './L2PSTransaction'
@@ -30,6 +31,7 @@ import { ContractDeployTransaction } from './ContractDeployTransaction'
 import { ContractCallTransaction } from './ContractCallTransaction'
 import { D402PaymentTransaction } from './D402PaymentTransaction'
 import { EscrowTransaction } from './EscrowTransaction'
+import { IPFSTransaction } from './IPFSTransaction'
 
 export type SpecificTransaction =
     | L2PSTransaction
@@ -46,4 +48,5 @@ export type SpecificTransaction =
     | ContractDeployTransaction
     | ContractCallTransaction
     | D402PaymentTransaction
-    | EscrowTransaction 
+    | EscrowTransaction
+    | IPFSTransaction
