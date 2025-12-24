@@ -26,3 +26,5 @@ export * as instantMessaging from "./instant_messaging"
 export * as storage from "./storage"
 
 export * as escrow from "./escrow"
+
+export * as ipfs from "./ipfs"
