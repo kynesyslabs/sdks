@@ -518,7 +518,7 @@ export class BTC extends DefaultChain {
     /**
      * Get the public key as hex string (needed for signature verification)
      */
-    getPublicKey(): string {
+    override getPublicKey(): string {
         required(this.wallet, "Wallet not connected")
 
         return Buffer.from(this.wallet.publicKey).toString("hex")
