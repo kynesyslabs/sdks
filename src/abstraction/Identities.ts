@@ -73,13 +73,14 @@ export class Identities {
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
             // Skip validation for telegram as it uses custom attestation format, not URL proofs
-            // Skip validation for OAuth proofs (format: "oauth:provider:userId")
-            const isOAuthProof =
+            // Skip validation for GitHub OAuth proofs (JSON-stringified SignedGitHubOAuthAttestation)
+            const isSignedAttestationProof =
                 typeof payload.proof === "string" &&
-                payload.proof.startsWith("oauth:")
+                payload.proof.startsWith("{") &&
+                payload.context === "github"
             if (
                 payload.context !== "telegram" &&
-                !isOAuthProof &&
+                !isSignedAttestationProof &&
                 this.formats.web2[payload.context]
             ) {
                 if (
@@ -221,28 +222,47 @@ export class Identities {
         return await this.removeIdentity(demos, "web2", payload)
     }
 
+    // REVIEW: GitHub OAuth identity method using cryptographically signed attestations from the node
     /**
      * Add a github identity to the GCR using OAuth.
      * This method is used when the user has authenticated via GitHub OAuth,
-     * providing userId and username directly without requiring a proof URL.
+     * providing userId, username, and a signed attestation from the node.
      *
      * @param demos A Demos instance to communicate with the RPC.
-     * @param payload The OAuth payload containing userId and username from GitHub OAuth.
+     * @param payload The OAuth payload containing userId, username, and signed attestation.
      * @param referralCode Optional referral code for incentive points.
      * @returns The response from the RPC call.
      */
     async addGithubIdentityOAuth(
         demos: Demos,
-        payload: { userId: string; username: string },
+        payload: {
+            userId: string
+            username: string
+            signedAttestation: {
+                attestation: {
+                    provider: "github"
+                    userId: string
+                    username: string
+                    timestamp: number
+                    nodePublicKey: string
+                }
+                signature: string
+                signatureType: string
+            }
+        },
         referralCode?: string,
     ) {
         if (!payload.userId || !payload.username) {
             throw new Error("OAuth payload must include userId and username")
         }
 
+        if (!payload.signedAttestation) {
+            throw new Error("OAuth payload must include signed attestation")
+        }
+
         const githubPayload: InferFromGithubOAuthPayload = {
             context: "github",
-            proof: `oauth:github:${payload.userId}` as any,
+            proof: JSON.stringify(payload.signedAttestation),
             username: payload.username,
             userId: payload.userId,
             referralCode: referralCode,
