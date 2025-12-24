@@ -1,10 +1,11 @@
 import pprint from "@/utils/pprint"
 import { Identities } from "@/abstraction"
 import { Demos, DemosWebAuth } from "@/websdk"
+import { sleep } from "@/utils"
 
 describe("Native transactions", () => {
-    // const RPC = "https://demos.mungaist.com"
-    const RPC = "http://localhost:53550"
+    const RPC = "https://demosnode.discus.sh"
+    // const RPC = "http://localhost:53550"
 
     let demos: Demos = new Demos()
     let senderWebAuth = new DemosWebAuth()
@@ -22,8 +23,8 @@ describe("Native transactions", () => {
         await demos.connectWallet(
             senderWebAuth.keypair.privateKey as Uint8Array,
             {
-                algorithm: "falcon"
-            }
+                algorithm: "falcon",
+            },
         )
     })
 
@@ -44,15 +45,16 @@ describe("Native transactions", () => {
         }
     })
 
-    test.skip("Node transaction Spam test", async () => {
-        // NOTE: To increase the number of concurrent transactions, 
+    test.only("Node transaction Spam test", async () => {
+        // NOTE: To increase the number of concurrent transactions,
         // run multiple instances of this test at the same time.
 
         // INFO: Local testnet RPCs
         // const rpcs = [
         //     "http://localhost:53550",
-        //     "http://localhost:53559",
-        //     "http://localhost:53560",
+        //     "http://localhost:53551",
+        //     "http://localhost:53552",
+        //     "http://localhost:53553",
         // ]
 
         // INFO: Private testnet RPCs
@@ -62,11 +64,18 @@ describe("Native transactions", () => {
         //     "http://node3.demos.sh:53560",
         // ]
 
-        // INFO: Public testnet RPCs
         const rpcs = [
-            "https://demosnode.discus.sh",
-            "http://mungaist.com:53550",
+            "http://node2.demos.sh:40002",
+            "http://node2.demos.sh:60001",
+            "http://node3.demos.sh:60001",
+            "http://node3.demos.sh:20002",
         ]
+
+        // INFO: Public testnet RPCs
+        // const rpcs = [
+        //     "https://demosnode.discus.sh",
+        //     "http://mungaist.com:53550",
+        // ]
 
         const demoss = rpcs.map(async rpc => {
             const demos = new Demos()
@@ -80,7 +89,9 @@ describe("Native transactions", () => {
             const sender = DemosWebAuth.getInstance()
 
             await sender.create()
-            await demos.connectWallet(sender.keypair.privateKey as Uint8Array)
+            await demos.connectWallet(
+                "educate upset find what salmon ritual bless include normal apple try firm",
+            )
 
             const receiver = DemosWebAuth.getInstance()
             await receiver.create()
@@ -100,19 +111,19 @@ describe("Native transactions", () => {
             }
         }
 
-        const TXCOUNT = 3
+        const TXCOUNT = 100
 
         // 2. Create a transaction
         for (let i = 0; i < TXCOUNT; i++) {
-            for (const demos of mademos) {
-                await sendTx(demos)
-            }
+            const randomDemos = mademos[Math.floor(Math.random() * mademos.length)]
+            await sleep(100)
+            await sendTx(randomDemos)
         }
 
         // 4. Broadcast the transaction
     }, 10000000)
 
-    test.only("Get account by web2 identity", async () => {
+    test.skip("Get account by web2 identity", async () => {
         const identities = new Identities()
         const identity = await identities.getDemosIdsByIdentity(demos, {
             type: "web2",
@@ -125,9 +136,13 @@ describe("Native transactions", () => {
         console.log("identity: ", identity)
     })
 
-    test.only("Get account by web3 identity", async () => {
+    test.skip("Get account by web3 identity", async () => {
         const identities = new Identities()
-        const identity = await identities.getDemosIdsByWeb3Identity(demos, "eth.mainnet", "0x4e32e615f6a01affda8ba038fe2df911f15dcfc7")
+        const identity = await identities.getDemosIdsByWeb3Identity(
+            demos,
+            "eth.mainnet",
+            "0x4e32e615f6a01affda8ba038fe2df911f15dcfc7",
+        )
 
         console.log("identity: ", identity)
     })

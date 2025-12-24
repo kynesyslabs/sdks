@@ -1,5 +1,9 @@
 # Demos SDK
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kynesyslabs/sdks)
+
+
+
 ![npm version](https://img.shields.io/npm/v/@kynesyslabs/demosdk)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 

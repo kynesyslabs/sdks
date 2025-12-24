@@ -89,19 +89,10 @@ export interface Web2CoreTargetIdentityPayload {
     referralCode?: string
 }
 
-// ANCHOR Github Identities
-type GistProofUrl = `https://gist.github.com/${string}/${string}`
-type RawGistProofUrl = `https://gist.githubusercontent.com/${string}/${string}`
-type RawGithubProofUrl = `https://raw.githubusercontent.com/${string}/${string}`
-
-export type GithubProof = RawGistProofUrl | GistProofUrl | RawGithubProofUrl
-
-// Add more as needed following the above pattern
-
-// ANCHOR Payloads
-export interface InferFromGithubPayload extends Web2CoreTargetIdentityPayload {
+// ANCHOR Github OAuth Identities
+export interface InferFromGithubOAuthPayload extends Web2CoreTargetIdentityPayload {
     context: "github"
-    proof: GithubProof
+    proof: string // OAuth marker format: "oauth:github:{userId}"
 }
 
 // ANCHOR X Identities (aka Twitter Identities)
@@ -177,7 +168,7 @@ export interface BaseWeb2IdentityPayload {
 export interface Web2IdentityAssignPayload extends BaseWeb2IdentityPayload {
     method: "web2_identity_assign"
     payload:
-    | InferFromGithubPayload
+    | InferFromGithubOAuthPayload
     | InferFromTwitterPayload
     | InferFromTelegramPayload
     | InferFromDiscordPayload
@@ -288,6 +279,9 @@ export interface UserPoints {
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
+    linkedUDDomains?: {
+        [network: string]: string[]
+    }
     lastUpdated: Date
     flagged: boolean | null
     flaggedReason: string | null

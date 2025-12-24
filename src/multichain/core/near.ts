@@ -16,6 +16,10 @@ import * as bip39 from "@scure/bip39"
 import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes"
 import nacl from "tweetnacl"
 import { decodeUTF8 } from "tweetnacl-util"
+import { derivePath } from "ed25519-hd-key"
+
+// NEAR BIP44 derivation path (coin type 397)
+const NEAR_DERIVATION_PATH = "m/44'/397'/0'"
 
 export class NEAR extends DefaultChain {
     networkId: string
@@ -91,8 +95,9 @@ export class NEAR extends DefaultChain {
         required(options && options.accountId, "AccountId is required")
 
         const seed = bip39.mnemonicToSeedSync(privateKey);
-        const derivedSeed = seed.slice(0, 32);
-        const base58PrivateKey = bs58.encode(derivedSeed);
+        const seedHex = Buffer.from(seed).toString('hex');
+        const { key: derivedKey } = derivePath(NEAR_DERIVATION_PATH, seedHex);
+        const base58PrivateKey = bs58.encode(derivedKey);
         this.wallet = KeyPair.fromString(`ed25519:${base58PrivateKey}` as any);
         this.accountId = options.accountId;
         this.networkId = options?.networkId;
@@ -143,7 +148,7 @@ export class NEAR extends DefaultChain {
         if (!currentNonce) {
             throw new Error(
                 "Failed to get the account nonce for accountId: " +
-                    this.accountId,
+                this.accountId,
             )
         }
 
@@ -250,10 +255,10 @@ export class NEAR extends DefaultChain {
         const messageBytes = decodeUTF8(message)
         const signature = wallet.sign(messageBytes);
         const signatureString = utils.serialize.base_encode(signature.signature);
-        
+
         return signatureString;
     }
-    
+
     // INFO Verifying a message
     override async verifyMessage(
         message: string,
@@ -271,7 +276,7 @@ export class NEAR extends DefaultChain {
             signatureDecoded,
             publicKeyDecoded
         );
-    
+
         return isValid;
     }
 }
