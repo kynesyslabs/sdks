@@ -2,7 +2,7 @@ import { Identities } from "@/abstraction"
 import { Demos, DemosWebAuth } from "@/websdk"
 
 describe("IDENTITIES PQC", () => {
-    let rpc = "http://localhost:53550"
+    let rpc = "https://node2.demos.sh"
     let demos: Demos
     const identities = new Identities()
 

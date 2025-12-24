@@ -5,7 +5,7 @@ import { sleep } from "@/utils"
 
 describe("Native transactions", () => {
     const RPC = "https://demosnode.discus.sh"
-    // const RPC = "http://localhost:53550"
+    // const RPC = "https://node2.demos.sh"
 
     let demos: Demos = new Demos()
     let senderWebAuth = new DemosWebAuth()
@@ -51,7 +51,7 @@ describe("Native transactions", () => {
 
         // INFO: Local testnet RPCs
         // const rpcs = [
-        //     "http://localhost:53550",
+        //     "https://node2.demos.sh",
         //     "http://localhost:53551",
         //     "http://localhost:53552",
         //     "http://localhost:53553",
@@ -59,7 +59,7 @@ describe("Native transactions", () => {
 
         // INFO: Private testnet RPCs
         // const rpcs = [
-        //     "https://demos.mungaist.com",
+        //     "https://node2.demos.sh",
         //     "http://node2.demos.sh:53560",
         //     "http://node3.demos.sh:53560",
         // ]
@@ -74,7 +74,7 @@ describe("Native transactions", () => {
         // INFO: Public testnet RPCs
         // const rpcs = [
         //     "https://demosnode.discus.sh",
-        //     "http://mungaist.com:53550",
+        //     "https://node2.demos.sh",
         // ]
 
         const demoss = rpcs.map(async rpc => {

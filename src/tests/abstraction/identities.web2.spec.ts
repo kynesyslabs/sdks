@@ -3,8 +3,8 @@ import { Identities } from "@/abstraction"
 
 describe("Web2 Identities", () => {
     // const rpc = "http://node2.demos.sh:53560"
-    const rpc = "http://localhost:53550"
-    // const rpc = "https://demos.mungaist.com"
+    const rpc = "https://node2.demos.sh"
+    // const rpc = "https://node2.demos.sh"
 
     const demos = new Demos()
     const identities = new Identities()

@@ -36,7 +36,7 @@ describe("DEMOS Transaction", () => {
             type: "pay",
         })
 
-        const rpc = "http://localhost:53550"
+        const rpc = "https://node2.demos.sh"
 
         const demos = new Demos()
 
@@ -75,8 +75,8 @@ describe("DEMOS Transaction", () => {
         // await identity.create()
 
         // const rpc = "https://demosnode.discus.sh"
-        const rpc = "http://localhost:53550"
-        // const rpc = "https://demos.mungaist.com"
+        const rpc = "https://node2.demos.sh"
+        // const rpc = "https://node2.demos.sh"
         const demos = new Demos()
 
         // 5. Connect to the DEMOS node

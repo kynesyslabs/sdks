@@ -6,7 +6,7 @@ import { wordlist } from "@scure/bip39/wordlists/english"
 
 describe("New Demos", () => {
     test.skip("Send Native tokens", async () => {
-        // const rpc = "http://localhost:53550"
+        // const rpc = "https://node2.demos.sh"
         const rpc = "http://node2.demos.sh:53560"
         // const rpc = "https://node2.demos.sh"
 
@@ -89,7 +89,7 @@ describe("New Demos", () => {
         const demos = new Demos()
         await demos.connectWallet(mnemonic)
         // await demos.connect("https://demosnode.discus.sh")
-        await demos.connect("http://localhost:53550")
+        await demos.connect("https://node2.demos.sh")
 
         const campaignData = await demos.call("getCampaignData", null)
         console.log(campaignData)
@@ -97,7 +97,7 @@ describe("New Demos", () => {
 
     test.skip("check is bot", async () => {
         const demos = new Demos()
-        await demos.connect("http://localhost:53550")
+        await demos.connect("https://node2.demos.sh")
 
         // const user = {
         //     username: "elydiem95",
@@ -139,7 +139,7 @@ describe("New Demos", () => {
 
     test.skip("rate limit unblock", async () => {
         const demos = new Demos()
-        await demos.connect("http://localhost:53550")
+        await demos.connect("https://node2.demos.sh")
         await demos.connectWallet("clock coffee open foam tell price urban deposit stadium motor since cover cushion recall chat master fabric arrange embrace zebra kind congress scene dutch")
 
         const unblocked = await demos.call("rate-limit/unblock", [
@@ -150,7 +150,7 @@ describe("New Demos", () => {
 
     test.skip("get address info", async () => {
         const demos = new Demos()
-        await demos.connect("http://localhost:53550")
+        await demos.connect("https://node2.demos.sh")
         await demos.connectWallet("clock coffee open foam tell price urban deposit stadium motor since cover cushion recall chat master fabric arrange embrace zebra kind congress scene dutch")
 
         const addressInfo = await demos.nodeCall("getAddressInfo", {
@@ -161,7 +161,7 @@ describe("New Demos", () => {
 
     test.skip("get transaction history", async () => {
         const demos = new Demos()
-        // await demos.connect("http://localhost:53550")
+        // await demos.connect("https://node2.demos.sh")
         await demos.connect("https://node2.demos.sh")
         // await demos.connectWallet("clock coffee recall chat master fabric arrange embrace zebra kind congress scene dutch")
 

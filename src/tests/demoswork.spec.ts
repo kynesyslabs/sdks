@@ -56,7 +56,7 @@ describe("Demos Workflow", () => {
         })
 
         const pingNode = prepareWeb2Step({
-            url: "https://mungaist.com",
+            url: "https://node2.demos.sh",
             method: "GET",
         })
 
@@ -170,7 +170,7 @@ describe("Demos Workflow", () => {
 
         const demos = new Demos()
 
-        const rpc_url = "https://mungaist.com"
+        const rpc_url = "https://node2.demos.sh"
         await demos.connect(rpc_url)
         await demos.connectWallet(identity.keypair.privateKey as any)
 

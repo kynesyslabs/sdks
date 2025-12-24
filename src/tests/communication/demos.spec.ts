@@ -2,7 +2,7 @@ import { demos } from "@/websdk"
 
 describe("DEMOS METHODS TESTS", () => {
     beforeAll(async () => {
-        const rpc_url = "http://localhost:53550"
+        const rpc_url = "https://node2.demos.sh"
         await demos.connect(rpc_url)
     })
 

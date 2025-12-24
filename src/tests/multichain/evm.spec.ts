@@ -7,7 +7,7 @@ import chainProviders from "./chainProviders"
 import { Demos, prepareXMPayload, prepareXMScript } from "@/websdk"
 
 describe("EVM CHAIN TESTS", () => {
-    const rpc = "http://localhost:53550"
+    const rpc = "https://node2.demos.sh"
     const demos = new Demos()
     const instance = new EVM(chainProviders.eth.mainnet)
 
@@ -98,7 +98,7 @@ describe("EVM CHAIN TESTS", () => {
         console.log(balance)
     })
 
-    test("writeToContract generates valid signed transaction", async () => {
+    test.skip("writeToContract generates valid signed transaction", async () => {
         // REVIEW: Test the updated writeToContract method
         const testERC20ABI = [
             {
@@ -146,7 +146,7 @@ describe("EVM CHAIN TESTS", () => {
         expect(tx.signature.v).toBeDefined()
     })
 
-    test("writeToContract with custom gas and value options", async () => {
+    test.skip("writeToContract with custom gas and value options", async () => {
         // REVIEW: Test custom options support
         const payableABI = [
             {

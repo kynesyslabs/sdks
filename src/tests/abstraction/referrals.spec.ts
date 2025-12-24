@@ -2,7 +2,7 @@ import { Identities } from "@/abstraction"
 import { Demos } from "@/websdk"
 
 describe("Referrals", () => {
-    const rpc = "http://localhost:53550"
+    const rpc = "https://node2.demos.sh"
 
     const demos = new Demos()
     const identities = new Identities()

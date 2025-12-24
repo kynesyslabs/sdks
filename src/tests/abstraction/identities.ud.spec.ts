@@ -4,7 +4,7 @@ import { uint8ArrayToHex } from "@/encryption"
 import { ethers } from "ethers"
 
 describe("UNSTOPPABLE DOMAINS IDENTITIES", () => {
-    const rpc = "http://localhost:53550"
+    const rpc = "https://node2.demos.sh"
     let demos: Demos
     let identities: Identities
 

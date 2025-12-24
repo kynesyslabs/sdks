@@ -7,7 +7,8 @@ const tenTokenAlt = "05F95F81F11474C151F27854BD43DDA1C8616BBF"
 
 export default {
     eth: {
-        mainnet: "https://mainnet.gateway.tenderly.co",
+        // Using a public endpoint avoids auth issues during CI read-only tests
+        mainnet: "https://ethereum.publicnode.com",
         sepolia: "https://ethereum-sepolia-rpc.publicnode.com",
         goerli: "https://ethereum-goerli.publicnode.com",
     },

@@ -11,7 +11,7 @@ import { XMScript } from "@/types"
 import { hexToUint8Array, uint8ArrayToHex } from "@/encryption"
 
 describe.only("APTOS CHAIN TESTS", () => {
-    // const rpc = "http://localhost:53550"
+    // const rpc = "https://node2.demos.sh"
     const rpc = "https://dev.node2.demos.sh"
     const network = Network.DEVNET
     const instance = new APTOS("", network)
