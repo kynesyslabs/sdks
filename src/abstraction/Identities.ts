@@ -13,6 +13,7 @@ import {
     PqcIdentityRemovePayload,
     DiscordProof,
     InferFromDiscordPayload,
+    InferFromDiscordOAuthPayload,
     InferFromTelegramPayload,
     TelegramSignedAttestation,
     FindDemosIdByWeb2IdentityQuery,
@@ -73,11 +74,11 @@ export class Identities {
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
             // Skip validation for telegram as it uses custom attestation format, not URL proofs
-            // Skip validation for GitHub OAuth proofs (JSON-stringified SignedGitHubOAuthAttestation)
+            // Skip validation for GitHub/Discord OAuth proofs (JSON-stringified SignedAttestation)
             const isSignedAttestationProof =
                 typeof payload.proof === "string" &&
                 payload.proof.startsWith("{") &&
-                payload.context === "github"
+                (payload.context === "github" || payload.context === "discord")
             if (
                 payload.context !== "telegram" &&
                 !isSignedAttestationProof &&
@@ -338,6 +339,55 @@ export class Identities {
             proof: payload,
             username: msg.authorUsername,
             userId: msg.authorId,
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "web2", discordPayload)
+    }
+
+    // REVIEW: Discord OAuth identity method using cryptographically signed attestations from the node
+    /**
+     * Add a discord identity to the GCR using OAuth.
+     * This method is used when the user has authenticated via Discord OAuth,
+     * providing userId, username, and a signed attestation from the node.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The OAuth payload containing userId, username, and signed attestation.
+     * @param referralCode Optional referral code for incentive points.
+     * @returns The response from the RPC call.
+     */
+    async addDiscordIdentityOAuth(
+        demos: Demos,
+        payload: {
+            userId: string
+            username: string
+            signedAttestation: {
+                attestation: {
+                    provider: "discord"
+                    userId: string
+                    username: string
+                    timestamp: number
+                    nodePublicKey: string
+                }
+                signature: string
+                signatureType: string
+            }
+        },
+        referralCode?: string,
+    ) {
+        if (!payload.userId || !payload.username) {
+            throw new Error("OAuth payload must include userId and username")
+        }
+
+        if (!payload.signedAttestation) {
+            throw new Error("OAuth payload must include signed attestation")
+        }
+
+        const discordPayload: InferFromDiscordOAuthPayload = {
+            context: "discord",
+            proof: JSON.stringify(payload.signedAttestation),
+            username: payload.username,
+            userId: payload.userId,
             referralCode: referralCode,
         }
 

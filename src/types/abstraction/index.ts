@@ -157,6 +157,25 @@ export interface InferFromDiscordPayload extends Web2CoreTargetIdentityPayload {
     userId: string
 }
 
+// ANCHOR Discord OAuth Identities
+export interface DiscordSignedAttestation {
+    attestation: {
+        provider: "discord"
+        userId: string
+        username: string
+        timestamp: number
+        nodePublicKey: string
+    }
+    signature: string
+    signatureType: string
+}
+
+export interface InferFromDiscordOAuthPayload extends Web2CoreTargetIdentityPayload {
+    context: "discord"
+    /** JSON-stringified {@link DiscordSignedAttestation} from node's OAuth exchange */
+    proof: string
+}
+
 // SECTION Web2 Identities
 export interface BaseWeb2IdentityPayload {
     context: "web2"
@@ -171,6 +190,7 @@ export interface Web2IdentityAssignPayload extends BaseWeb2IdentityPayload {
     | InferFromTwitterPayload
     | InferFromTelegramPayload
     | InferFromDiscordPayload
+    | InferFromDiscordOAuthPayload
 }
 
 export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
