@@ -6,19 +6,20 @@ import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
     TwitterProof,
-    InferFromGithubOAuthPayload,
     InferFromXPayload,
     InferFromSignaturePayload,
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
     DiscordProof,
     InferFromDiscordPayload,
-    InferFromDiscordOAuthPayload,
     InferFromTelegramPayload,
     TelegramSignedAttestation,
     FindDemosIdByWeb2IdentityQuery,
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
+    OAuthProvider,
+    OAuthIdentityPayload,
+    InferFromOAuthPayload,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -223,34 +224,22 @@ export class Identities {
         return await this.removeIdentity(demos, "web2", payload)
     }
 
-    // REVIEW: GitHub OAuth identity method using cryptographically signed attestations from the node
+    // ANCHOR: Generic OAuth identity method using cryptographically signed attestations from the node
     /**
-     * Add a github identity to the GCR using OAuth.
-     * This method is used when the user has authenticated via GitHub OAuth,
-     * providing userId, username, and a signed attestation from the node.
+     * Add an identity to the GCR using OAuth.
+     * This is a generic method that works with any OAuth provider (GitHub, Discord, etc.).
+     * The user authenticates via OAuth, and the node provides a signed attestation.
      *
      * @param demos A Demos instance to communicate with the RPC.
+     * @param provider The OAuth provider name (e.g., "github", "discord").
      * @param payload The OAuth payload containing userId, username, and signed attestation.
      * @param referralCode Optional referral code for incentive points.
      * @returns The response from the RPC call.
      */
-    async addGithubIdentityOAuth(
+    async addIdentityOAuth<T extends OAuthProvider>(
         demos: Demos,
-        payload: {
-            userId: string
-            username: string
-            signedAttestation: {
-                attestation: {
-                    provider: "github"
-                    userId: string
-                    username: string
-                    timestamp: number
-                    nodePublicKey: string
-                }
-                signature: string
-                signatureType: string
-            }
-        },
+        provider: T,
+        payload: OAuthIdentityPayload<T>,
         referralCode?: string,
     ) {
         if (!payload.userId || !payload.username) {
@@ -261,15 +250,43 @@ export class Identities {
             throw new Error("OAuth payload must include signed attestation")
         }
 
-        const githubPayload: InferFromGithubOAuthPayload = {
-            context: "github",
+        if (
+            payload.userId !== payload.signedAttestation.attestation.userId ||
+            payload.username !== payload.signedAttestation.attestation.username
+        ) {
+            throw new Error("Payload user data does not match signed attestation")
+        }
+
+        if (payload.signedAttestation.attestation.provider !== provider) {
+            throw new Error(`Attestation provider mismatch: expected ${provider}, got ${payload.signedAttestation.attestation.provider}`)
+        }
+
+        const oauthPayload: InferFromOAuthPayload = {
+            context: provider,
             proof: JSON.stringify(payload.signedAttestation),
             username: payload.username,
             userId: payload.userId,
             referralCode: referralCode,
         }
 
-        return await this.inferIdentity(demos, "web2", githubPayload)
+        return await this.inferIdentity(demos, "web2", oauthPayload)
+    }
+
+    /**
+     * Add a github identity to the GCR using OAuth.
+     * @deprecated Use {@link addIdentityOAuth} with provider "github" instead.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The OAuth payload containing userId, username, and signed attestation.
+     * @param referralCode Optional referral code for incentive points.
+     * @returns The response from the RPC call.
+     */
+    async addGithubIdentityOAuth(
+        demos: Demos,
+        payload: OAuthIdentityPayload<"github">,
+        referralCode?: string,
+    ) {
+        return await this.addIdentityOAuth(demos, "github", payload, referralCode)
     }
 
     /**
@@ -345,11 +362,9 @@ export class Identities {
         return await this.inferIdentity(demos, "web2", discordPayload)
     }
 
-    // REVIEW: Discord OAuth identity method using cryptographically signed attestations from the node
     /**
      * Add a discord identity to the GCR using OAuth.
-     * This method is used when the user has authenticated via Discord OAuth,
-     * providing userId, username, and a signed attestation from the node.
+     * @deprecated Use {@link addIdentityOAuth} with provider "discord" instead.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param payload The OAuth payload containing userId, username, and signed attestation.
@@ -358,40 +373,10 @@ export class Identities {
      */
     async addDiscordIdentityOAuth(
         demos: Demos,
-        payload: {
-            userId: string
-            username: string
-            signedAttestation: {
-                attestation: {
-                    provider: "discord"
-                    userId: string
-                    username: string
-                    timestamp: number
-                    nodePublicKey: string
-                }
-                signature: string
-                signatureType: string
-            }
-        },
+        payload: OAuthIdentityPayload<"discord">,
         referralCode?: string,
     ) {
-        if (!payload.userId || !payload.username) {
-            throw new Error("OAuth payload must include userId and username")
-        }
-
-        if (!payload.signedAttestation) {
-            throw new Error("OAuth payload must include signed attestation")
-        }
-
-        const discordPayload: InferFromDiscordOAuthPayload = {
-            context: "discord",
-            proof: JSON.stringify(payload.signedAttestation),
-            username: payload.username,
-            userId: payload.userId,
-            referralCode: referralCode,
-        }
-
-        return await this.inferIdentity(demos, "web2", discordPayload)
+        return await this.addIdentityOAuth(demos, "discord", payload, referralCode)
     }
 
     /**

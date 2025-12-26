@@ -88,6 +88,33 @@ export interface Web2CoreTargetIdentityPayload {
     referralCode?: string
 }
 
+// Generic OAuth Types
+export type OAuthProvider = "github" | "discord"
+
+export interface SignedOAuthAttestation<T extends OAuthProvider = OAuthProvider> {
+    attestation: {
+        provider: T
+        userId: string
+        username: string
+        timestamp: number
+        nodePublicKey: string
+    }
+    signature: string
+    signatureType: string
+}
+
+export interface OAuthIdentityPayload<T extends OAuthProvider = OAuthProvider> {
+    userId: string
+    username: string
+    signedAttestation: SignedOAuthAttestation<T>
+}
+
+export interface InferFromOAuthPayload extends Web2CoreTargetIdentityPayload {
+    context: OAuthProvider
+    /** JSON-stringified {@link SignedOAuthAttestation} from node's OAuth exchange */
+    proof: string
+}
+
 // ANCHOR Github OAuth Identities
 export interface InferFromGithubOAuthPayload extends Web2CoreTargetIdentityPayload {
     context: "github"
