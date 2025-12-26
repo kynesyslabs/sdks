@@ -42,6 +42,27 @@ describe("Web2 Identities", () => {
         console.log(res2)
     })
 
+    test.skip("Add Github Identity", async () => {
+        // INFO: All these proofs should work
+        const proof =
+            "https://gist.github.com/cwilvx/72b6dbdc51bdf13cd1c16aad020ebe95"
+        // const proof = "https://gist.githubusercontent.com/cwilvx/abf8db960c16dfc7f6dc1da840852f79/raw/224478424c5e6e51f5eb60cb6aeea278d3418742/gistfile1.txt"
+        // const proof =
+        //     "https://raw.githubusercontent.com/cwilvx/vonage-draft-images/refs/heads/master/proof.txt"
+
+        const validityData = await identities.addGithubIdentity(demos, proof)
+        console.log(validityData)
+
+        if (validityData.result == 200) {
+            const res = await demos.broadcast(validityData)
+            console.log(res)
+
+            expect(res.result).toBe(200)
+            expect(res.response["extra"]["message"]).toContain(
+                "Transaction applied",
+            )
+        }
+    })
 
     test.skip("Verify Github Identity", async () => {
         const res = await identities.getWeb2Identities(demos)
@@ -50,6 +71,7 @@ describe("Web2 Identities", () => {
         expect(res.result).toBe(200)
         expect(Array.isArray(res.response["github"])).toBe(true)
         expect(res.response["github"].length).toBeGreaterThan(0)
+        expect(res.response["github"][0].username).toBe("cwilvx")
     })
 
     test.skip("Remove Github Identity", async () => {
