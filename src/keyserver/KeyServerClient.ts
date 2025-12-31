@@ -16,6 +16,7 @@ import type {
     OAuthVerificationResult,
     OAuthProvidersResponse,
     OAuthStatus,
+    WalletBinding,
 } from "./types";
 import { OAuthError } from "./errors";
 
@@ -25,11 +26,13 @@ const DEFAULT_POLL_INTERVAL = 2000; // 2 seconds
 export class KeyServerClient {
     private readonly endpoint: string;
     private readonly nodePubKey: string;
+    private readonly defaultWalletAddress?: string;
 
     constructor(config: KeyServerClientConfig) {
         // Normalize endpoint (remove trailing slash)
         this.endpoint = config.endpoint.replace(/\/$/, "");
         this.nodePubKey = config.nodePubKey;
+        this.defaultWalletAddress = config.defaultWalletAddress;
     }
 
     /**
@@ -96,10 +99,11 @@ export class KeyServerClient {
      * Poll for OAuth verification result
      *
      * @param state - State identifier from initiateOAuth
+     * @param walletBinding - Optional wallet binding with signature proving ownership
      * @returns Current status of the OAuth flow
      * @throws OAuthError if polling fails
      */
-    async pollOAuth(state: string): Promise<OAuthPollResult> {
+    async pollOAuth(state: string, walletBinding?: WalletBinding): Promise<OAuthPollResult> {
         const response = await this.fetch<OAuthPollResult>(
             "/oauth/poll",
             {
@@ -107,6 +111,7 @@ export class KeyServerClient {
                 body: JSON.stringify({
                     state,
                     nodePubKey: this.nodePubKey,
+                    walletBinding,
                 }),
             },
         );
@@ -120,8 +125,9 @@ export class KeyServerClient {
      * This method handles the full OAuth flow:
      * 1. Initiates the OAuth flow
      * 2. Calls onAuthUrl callback for dApp to display the URL
-     * 3. Polls until completion, timeout, or failure
-     * 4. Returns the verified user info and attestation
+     * 3. Resolves wallet binding (if provided as function, calls with state)
+     * 4. Polls until completion, timeout, or failure
+     * 5. Returns the verified user info and attestation
      *
      * @param service - OAuth provider ("github" or "discord")
      * @param options - Configuration including callbacks
@@ -146,7 +152,18 @@ export class KeyServerClient {
             options.onAuthUrl(initResult.authUrl, initResult.state);
         }
 
-        // Step 3: Poll for result
+        // Step 3: Resolve wallet binding
+        let walletBinding: WalletBinding | undefined;
+        if (options?.walletBinding) {
+            if (typeof options.walletBinding === "function") {
+                // Call the async function with state to get wallet binding
+                walletBinding = await options.walletBinding(initResult.state);
+            } else {
+                walletBinding = options.walletBinding;
+            }
+        }
+
+        // Step 4: Poll for result
         const startTime = Date.now();
         let attempt = 0;
 
@@ -158,7 +175,7 @@ export class KeyServerClient {
                 await this.sleep(pollInterval);
             }
 
-            const pollResult = await this.pollOAuth(initResult.state);
+            const pollResult = await this.pollOAuth(initResult.state, walletBinding);
 
             // Notify dApp of poll status
             if (options?.onPoll) {

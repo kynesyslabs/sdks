@@ -44,4 +44,5 @@ export type {
     OAuthUserInfo,
     DAHRAttestation,
     OAuthProvidersResponse,
+    WalletBinding,
 } from "./types";

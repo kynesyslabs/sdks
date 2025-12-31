@@ -7,7 +7,7 @@
  */
 
 import { Cryptography } from "@/encryption";
-import type { DAHRAttestation, OAuthVerificationResult } from "./types";
+import type { DAHRAttestation, OAuthVerificationResult, WalletBinding } from "./types";
 
 /**
  * Options for attestation verification
@@ -42,6 +42,8 @@ export interface AttestationVerificationResult {
         keyServerPubKey: string;
         nodePubKey: string;
         version: string;
+        /** Wallet binding if present in attestation */
+        walletBinding?: WalletBinding;
     };
 }
 

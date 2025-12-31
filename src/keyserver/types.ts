@@ -11,6 +11,24 @@
 export type OAuthService = "github" | "discord";
 
 /**
+ * Wallet binding for OAuth verification.
+ * Proves ownership of a wallet address during OAuth flow.
+ */
+export interface WalletBinding {
+    /** The wallet address to bind to this OAuth verification */
+    address: string;
+    /**
+     * Signature proving ownership of the wallet address.
+     * The message signed should be: "demos-oauth-bind:{state}" where state is from initiateOAuth.
+     * For EVM: personal_sign or eth_sign
+     * For Solana: signMessage
+     */
+    signature: string;
+    /** Signature scheme used (for verification on receiving end) */
+    signatureType: "evm" | "solana" | "ed25519";
+}
+
+/**
  * Options for initiating an OAuth flow
  */
 export interface OAuthInitOptions {
@@ -18,6 +36,13 @@ export interface OAuthInitOptions {
     scopes?: string[];
     /** Flow timeout in milliseconds (default: 600000 = 10min) */
     timeout?: number;
+    /**
+     * Wallet address to associate with this OAuth verification.
+     * This address will be included in the DAHR attestation metadata.
+     * Overrides defaultWalletAddress from KeyServerClientConfig if both are set.
+     * @deprecated Use walletBinding for signed wallet proof instead
+     */
+    walletAddress?: string;
 }
 
 /**
@@ -83,6 +108,12 @@ export interface DAHRAttestation {
         nodePubKey: string;
         /** Key Server version */
         version: string;
+        /**
+         * Wallet binding included in the attestation.
+         * Contains the wallet address and signature proving ownership.
+         * The Key Server verifies this signature before including it.
+         */
+        walletBinding?: WalletBinding;
     };
 }
 
@@ -110,7 +141,8 @@ export interface OAuthPollResult {
  */
 export interface OAuthVerifyOptions extends OAuthInitOptions {
     /**
-     * Called when auth URL is ready - dApp should display this to user
+     * Called when auth URL is ready - dApp should display this to user.
+     * The state is needed for wallet binding signature.
      */
     onAuthUrl?: (authUrl: string, state: string) => void;
 
@@ -123,6 +155,25 @@ export interface OAuthVerifyOptions extends OAuthInitOptions {
      * Called on each poll attempt (for UI feedback)
      */
     onPoll?: (attempt: number, status: OAuthStatus) => void;
+
+    /**
+     * Wallet binding with signature proving ownership.
+     * The signature message format is: "demos-oauth-bind:{state}"
+     * This is called after initiateOAuth to get the state for signing.
+     *
+     * @example
+     * ```typescript
+     * const result = await client.verifyOAuth("github", {
+     *     onAuthUrl: async (authUrl, state) => {
+     *         // Sign with user's wallet
+     *         const message = `demos-oauth-bind:${state}`;
+     *         const signature = await wallet.signMessage(message);
+     *         return { address: wallet.address, signature, signatureType: "evm" };
+     *     },
+     * });
+     * ```
+     */
+    walletBinding?: WalletBinding | ((state: string) => Promise<WalletBinding>);
 }
 
 /**
@@ -145,6 +196,11 @@ export interface KeyServerClientConfig {
     endpoint: string;
     /** Node's public key (hex-encoded Ed25519) */
     nodePubKey: string;
+    /**
+     * Default wallet address to associate with OAuth verifications.
+     * Can be overridden per-request via OAuthInitOptions.walletAddress.
+     */
+    defaultWalletAddress?: string;
 }
 
 /**
