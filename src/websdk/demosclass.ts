@@ -51,6 +51,9 @@ export class Demos {
     /** The RPC URL of the demos node */
     private rpc_url: string = null
 
+    /** Cached TLSNotary instance */
+    private _tlsnotaryInstance: TLSNotary | null = null
+
     /** Connection status of the RPC URL */
     connected: boolean = false
     dual_sign: boolean = false
@@ -862,10 +865,15 @@ export class Demos {
      * ```
      */
     async tlsnotary(config?: TLSNotaryConfig): Promise<TLSNotary> {
+        // Return cached instance if available and no explicit config provided
+        if (!config && this._tlsnotaryInstance) {
+            return this._tlsnotaryInstance
+        }
+
         let tlsnConfig: TLSNotaryConfig
 
         if (config) {
-            // Use explicit configuration
+            // Use explicit configuration (don't cache explicit configs)
             tlsnConfig = config
         } else {
             // Discover endpoints from node
@@ -893,6 +901,11 @@ export class Demos {
 
         const tlsn = new TLSNotary(tlsnConfig)
         await tlsn.initialize()
+
+        // Cache the instance only when using discovery (no explicit config)
+        if (!config) {
+            this._tlsnotaryInstance = tlsn
+        }
 
         return tlsn
     }

@@ -69,6 +69,7 @@ export class TLSNotary {
     // Using any for Comlink wrapper as types are lost across the worker boundary
     private wasm: any = null
     private initialized = false
+    private initializingPromise: Promise<void> | null = null
 
     /**
      * Create a new TLSNotary instance
@@ -92,19 +93,24 @@ export class TLSNotary {
      */
     async initialize(): Promise<void> {
         if (this.initialized) return
+        if (this.initializingPromise) return this.initializingPromise
 
-        // Create Web Worker for WASM operations
-        // Note: This requires a bundler that supports worker URLs (webpack, vite, etc.)
-        // @ts-expect-error - import.meta.url is browser-only and requires ESNext module
-        this.worker = new Worker(new URL("./worker.ts", import.meta.url), {
-            type: "module",
-        })
+        this.initializingPromise = (async () => {
+            // Create Web Worker for WASM operations
+            // Note: This requires a bundler that supports worker URLs (webpack, vite, etc.)
+            // @ts-expect-error - import.meta.url is browser-only and requires ESNext module
+            this.worker = new Worker(new URL("./worker.ts", import.meta.url), {
+                type: "module",
+            })
 
-        this.wasm = Comlink.wrap(this.worker)
+            this.wasm = Comlink.wrap(this.worker)
 
-        // Initialize WASM with logging level
-        await this.wasm.init({ loggingLevel: this.config.loggingLevel })
-        this.initialized = true
+            // Initialize WASM with logging level
+            await this.wasm.init({ loggingLevel: this.config.loggingLevel })
+            this.initialized = true
+        })()
+
+        return this.initializingPromise
     }
 
     /**
@@ -260,6 +266,7 @@ export class TLSNotary {
                 sent: [{ start: 0, end: 100 }],
                 recv: [{ start: 0, end: 200 }],
             },
+            serverIdentity: true,
         })
 
         status("Verifying attestation...")
@@ -319,8 +326,12 @@ export class TLSNotary {
                 const notary = NotaryServer.from(this.config.notaryUrl)
                 notaryKey = await notary.publicKey("hex")
             }
-        } catch {
+        } catch (error) {
             // Notary might not be running for offline verification
+            console.warn(
+                "[TLSNotary] Could not fetch notary public key:",
+                error instanceof Error ? error.message : error,
+            )
         }
 
         return {
