@@ -32,6 +32,7 @@ import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english.js"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
+import { TLSNotary, type TLSNotaryConfig, type TLSNotaryDiscoveryInfo } from "@/tlsnotary"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -49,6 +50,9 @@ export class Demos {
 
     /** The RPC URL of the demos node */
     private rpc_url: string = null
+
+    /** Cached TLSNotary instance */
+    private _tlsnotaryInstance: TLSNotary | null = null
 
     /** Connection status of the RPC URL */
     connected: boolean = false
@@ -828,6 +832,85 @@ export class Demos {
         this.connected = false
         this.crypto = null
         this.algorithm = "ed25519"
+    }
+
+    // ANCHOR TLSNotary
+    /**
+     * Create a TLSNotary instance for HTTPS attestation.
+     *
+     * This method discovers the notary endpoints from the connected node
+     * and returns an initialized TLSNotary instance.
+     *
+     * @param config - Optional explicit configuration (overrides discovery)
+     * @returns Initialized TLSNotary instance
+     *
+     * @example
+     * ```typescript
+     * // Option 1: Auto-discovery from connected node (preferred)
+     * const demos = new Demos({ rpc: 'https://node.demos.sh' });
+     * await demos.connect();
+     * const tlsn = await demos.tlsnotary();
+     *
+     * // Option 2: Explicit configuration
+     * const tlsn = await demos.tlsnotary({
+     *   notaryUrl: 'wss://other-node.demos.sh:7047',
+     *   websocketProxyUrl: 'wss://other-node.demos.sh:55688',
+     * });
+     *
+     * // Attest an HTTPS request
+     * const result = await tlsn.attest({
+     *   url: 'https://api.github.com/users/octocat',
+     * });
+     * console.log('Verified server:', result.verification.serverName);
+     * ```
+     */
+    async tlsnotary(config?: TLSNotaryConfig): Promise<TLSNotary> {
+        // Return cached instance if available and no explicit config provided
+        if (!config && this._tlsnotaryInstance) {
+            if (!this._tlsnotaryInstance.isInitialized()) {
+                await this._tlsnotaryInstance.initialize()
+            }
+            return this._tlsnotaryInstance
+        }
+
+        let tlsnConfig: TLSNotaryConfig
+
+        if (config) {
+            // Use explicit configuration (don't cache explicit configs)
+            tlsnConfig = config
+        } else {
+            // Discover endpoints from node
+            if (!this.connected) {
+                throw new Error(
+                    "Not connected to a node. Either connect first or provide explicit TLSNotary config.",
+                )
+            }
+
+            const info = (await this.nodeCall("tlsnotary.getInfo")) as TLSNotaryDiscoveryInfo
+
+            if (!info || !info.notaryUrl) {
+                throw new Error(
+                    "Node does not support TLSNotary or tlsnotary.getInfo failed. " +
+                        "Provide explicit config or use a node with TLSNotary enabled.",
+                )
+            }
+
+            tlsnConfig = {
+                notaryUrl: info.notaryUrl,
+                websocketProxyUrl: info.proxyUrl,
+                notaryPublicKey: info.publicKey,
+            }
+        }
+
+        const tlsn = new TLSNotary(tlsnConfig)
+        await tlsn.initialize()
+
+        // Cache the instance only when using discovery (no explicit config)
+        if (!config) {
+            this._tlsnotaryInstance = tlsn
+        }
+
+        return tlsn
     }
 
     // ANCHOR Web2 Endpoints

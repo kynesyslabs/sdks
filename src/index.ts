@@ -28,3 +28,5 @@ export * as storage from "./storage"
 export * as escrow from "./escrow"
 
 export * as ipfs from "./ipfs"
+
+export * as tlsnotary from "./tlsnotary"

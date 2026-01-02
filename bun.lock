@@ -37,6 +37,7 @@
         "bitcoinjs-message": "^2.2.0",
         "bs58": "^5.0.0",
         "buffer": "^6.0.3",
+        "comlink": "^4.4.2",
         "dotenv": "^16.6.1",
         "ecpair": "^3.0.0",
         "ed25519-hd-key": "^1.3.0",
@@ -61,6 +62,7 @@
         "socket.io-client": "^4.8.1",
         "sphincs": "^3.0.4",
         "superdilithium": "^2.0.6",
+        "tlsn-js": "latest",
         "tronweb": "^6.0.0",
         "web3": "^4.16.0",
         "xrpl": "^3.1.0",
@@ -1189,6 +1191,8 @@
     "color-name": ["color-name@1.1.4", "", {}, "sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA=="],
 
     "combined-stream": ["combined-stream@1.0.8", "", { "dependencies": { "delayed-stream": "~1.0.0" } }, "sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg=="],
+
+    "comlink": ["comlink@4.4.2", "", {}, "sha512-OxGdvBmJuNKSCMO4NTl1L47VRp6xn2wG4F/2hYzB6tiCb709otOxtEYCSvK80PtjODfXXZu8ds+Nw5kVCjqd2g=="],
 
     "comma-separated-tokens": ["comma-separated-tokens@2.0.3", "", {}, "sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg=="],
 
@@ -2343,6 +2347,10 @@
     "tiny-secp256k1": ["tiny-secp256k1@2.2.4", "", { "dependencies": { "uint8array-tools": "0.0.7" } }, "sha512-FoDTcToPqZE454Q04hH9o2EhxWsm7pOSpicyHkgTwKhdKWdsTUuqfP5MLq3g+VjAtl2vSx6JpXGdwA2qpYkI0Q=="],
 
     "tiny-warning": ["tiny-warning@1.0.3", "", {}, "sha512-lBN9zLN/oAf68o3zNXYrdCt1kP8WsiGW8Oo2ka41b2IM5JL/S1CTyX1rW0mb/zSuJun0ZUrDxx4sqvYS2FWzPA=="],
+
+    "tlsn-js": ["tlsn-js@0.1.0-alpha.12.0", "", { "dependencies": { "tlsn-wasm": "0.1.0-alpha.12" } }, "sha512-un2ImvRjZ8d3BypReHJkC58NV1JPIppIhDrPLeR75+1uSsv805fSBruBtIYHklnLZQX38iyMJdDf+BEz7Z4nZQ=="],
+
+    "tlsn-wasm": ["tlsn-wasm@0.1.0-alpha.12", "", {}, "sha512-0HlhM466ewogualMmpevFAgfWfUh1qwt/RjbOKSQiE+EPK99x8BrMBlChAxjnCxWpuUaDfaVEXTEPF07RYBtuQ=="],
 
     "tmp": ["tmp@0.2.5", "", {}, "sha512-voyz6MApa1rQGUxT3E+BK7/ROe8itEx7vD8/HEvt4xwXucvQ5G5oeEiHkmHZJuBO21RpOf+YYm9MOivj709jow=="],
 
