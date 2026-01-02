@@ -97,18 +97,31 @@ export class TLSNotary {
         if (this.initializingPromise) return this.initializingPromise
 
         this.initializingPromise = (async () => {
-            // Create Web Worker for WASM operations
-            // Note: This requires a bundler that supports worker URLs (webpack, vite, etc.)
-            // @ts-expect-error - import.meta.url is browser-only and requires ESNext module
-            this.worker = new Worker(new URL("./worker.ts", import.meta.url), {
-                type: "module",
-            })
+            try {
+                // Create Web Worker for WASM operations
+                // Note: This requires a bundler that supports worker URLs (webpack, vite, etc.)
+                // @ts-expect-error - import.meta.url is browser-only and requires ESNext module
+                this.worker = new Worker(new URL("./worker.ts", import.meta.url), {
+                    type: "module",
+                })
 
-            this.wasm = Comlink.wrap(this.worker)
+                this.wasm = Comlink.wrap(this.worker)
 
-            // Initialize WASM with logging level
-            await this.wasm.init({ loggingLevel: this.config.loggingLevel })
-            this.initialized = true
+                // Initialize WASM with logging level
+                await this.wasm.init({ loggingLevel: this.config.loggingLevel })
+                this.initialized = true
+            } catch (e) {
+                if (this.worker) {
+                    this.worker.terminate()
+                    this.worker = null
+                }
+                this.wasm = null
+                this.initialized = false
+                throw e
+            } finally {
+                // Allow retries if initialization fails
+                if (!this.initialized) this.initializingPromise = null
+            }
         })()
 
         return this.initializingPromise
