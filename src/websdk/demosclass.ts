@@ -867,6 +867,9 @@ export class Demos {
     async tlsnotary(config?: TLSNotaryConfig): Promise<TLSNotary> {
         // Return cached instance if available and no explicit config provided
         if (!config && this._tlsnotaryInstance) {
+            if (!this._tlsnotaryInstance.isInitialized()) {
+                await this._tlsnotaryInstance.initialize()
+            }
             return this._tlsnotaryInstance
         }
 
