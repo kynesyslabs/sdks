@@ -111,16 +111,16 @@ export class TLSNotary {
                 await this.wasm.init({ loggingLevel: this.config.loggingLevel })
                 this.initialized = true
             } catch (e) {
+                // Clean up partially created resources
                 if (this.worker) {
                     this.worker.terminate()
                     this.worker = null
                 }
                 this.wasm = null
                 this.initialized = false
+                // Reset promise to allow retries on failure
+                this.initializingPromise = null
                 throw e
-            } finally {
-                // Allow retries if initialization fails
-                if (!this.initialized) this.initializingPromise = null
             }
         })()
 
