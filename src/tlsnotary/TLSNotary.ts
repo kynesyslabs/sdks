@@ -53,7 +53,7 @@ import type {
     AttestOptions,
     StatusCallback,
     TranscriptInfo,
-} from "./types"
+} from "@/tlsnotary/types"
 
 /**
  * TLSNotary class for browser-based HTTPS attestation
@@ -321,39 +321,47 @@ export class TLSNotary {
         const proof = (await new this.wasm.Presentation(
             presentationJSON.data,
         )) as TPresentation
-        const verifierOutput = await proof.verify()
 
-        const transcript = new Transcript({
-            sent: verifierOutput.transcript?.sent || [],
-            recv: verifierOutput.transcript?.recv || [],
-        })
-
-        const vk = await proof.verifyingKey()
-
-        // Try to get notary key if available
-        let notaryKey = "N/A"
         try {
-            if (this.config.notaryPublicKey) {
-                notaryKey = this.config.notaryPublicKey
-            } else {
-                const notary = NotaryServer.from(this.config.notaryUrl)
-                notaryKey = await notary.publicKey("hex")
-            }
-        } catch (error) {
-            // Notary might not be running for offline verification
-            console.warn(
-                "[TLSNotary] Could not fetch notary public key:",
-                error instanceof Error ? error.message : error,
-            )
-        }
+            const verifierOutput = await proof.verify()
 
-        return {
-            time: verifierOutput.connection_info.time,
-            serverName: verifierOutput.server_name,
-            sent: transcript.sent(),
-            recv: transcript.recv(),
-            notaryKey,
-            verifyingKey: Buffer.from(vk.data).toString("hex"),
+            const transcript = new Transcript({
+                sent: verifierOutput.transcript?.sent || [],
+                recv: verifierOutput.transcript?.recv || [],
+            })
+
+            const vk = await proof.verifyingKey()
+
+            // Try to get notary key if available
+            let notaryKey = "N/A"
+            try {
+                if (this.config.notaryPublicKey) {
+                    notaryKey = this.config.notaryPublicKey
+                } else {
+                    const notary = NotaryServer.from(this.config.notaryUrl)
+                    notaryKey = await notary.publicKey("hex")
+                }
+            } catch (error) {
+                // Notary might not be running for offline verification
+                console.warn(
+                    "[TLSNotary] Could not fetch notary public key:",
+                    error instanceof Error ? error.message : error,
+                )
+            }
+
+            return {
+                time: verifierOutput.connection_info.time,
+                serverName: verifierOutput.server_name,
+                sent: transcript.sent(),
+                recv: transcript.recv(),
+                notaryKey,
+                verifyingKey: Buffer.from(vk.data).toString("hex"),
+            }
+        } finally {
+            // Free WASM memory to prevent leaks
+            if (proof) {
+                await proof.free()
+            }
         }
     }
 
