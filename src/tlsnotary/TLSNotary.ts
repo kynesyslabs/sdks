@@ -40,6 +40,7 @@ import {
     NotaryServer,
     Transcript,
     type Commit,
+    type Method,
 } from "tlsn-js"
 import type { PresentationJSON } from "tlsn-js/build/types"
 
@@ -164,61 +165,73 @@ export class TLSNotary {
             maxRecvData: request.maxRecvData || 16384,
         })) as TProver
 
-        // Step 3: Setup MPC-TLS session
-        status("Setting up MPC-TLS session...")
-        await prover.setup(await notary.sessionUrl())
+        let presentation: TPresentation | null = null
 
-        // Step 4: Send the HTTPS request
-        status(`Sending attested request to ${serverDns}...`)
-        const headers: Record<string, string> = {
-            Accept: "application/json",
-            ...request.headers,
-        }
+        try {
+            // Step 3: Setup MPC-TLS session
+            status("Setting up MPC-TLS session...")
+            await prover.setup(await notary.sessionUrl())
 
-        await prover.sendRequest(this.config.websocketProxyUrl, {
-            url: request.url,
-            method: (request.method || "GET") as "GET" | "POST",
-            headers,
-            body: request.body,
-        })
+            // Step 4: Send the HTTPS request
+            status(`Sending attested request to ${serverDns}...`)
+            const headers: Record<string, string> = {
+                Accept: "application/json",
+                ...request.headers,
+            }
 
-        // Step 5: Get transcript
-        status("Getting transcript...")
-        const transcript = await prover.transcript()
-        const { sent, recv } = transcript
+            await prover.sendRequest(this.config.websocketProxyUrl, {
+                url: request.url,
+                method: (request.method || "GET") as Method,
+                headers,
+                body: request.body,
+            })
 
-        // Step 6: Create commit ranges (what to reveal)
-        status("Creating attestation commitment...")
-        const commitRanges: Commit = commit || {
-            sent: [{ start: 0, end: Math.min(sent.length, 200) }],
-            recv: [{ start: 0, end: Math.min(recv.length, 300) }],
-        }
+            // Step 5: Get transcript
+            status("Getting transcript...")
+            const transcript = await prover.transcript()
+            const { sent, recv } = transcript
 
-        // Step 7: Notarize
-        status("Generating attestation (this may take a moment)...")
-        const notarizationOutputs = await prover.notarize(commitRanges)
+            // Step 6: Create commit ranges (what to reveal)
+            status("Creating attestation commitment...")
+            const commitRanges: Commit = commit || {
+                sent: [{ start: 0, end: Math.min(sent.length, 200) }],
+                recv: [{ start: 0, end: Math.min(recv.length, 300) }],
+            }
 
-        // Step 8: Create presentation
-        status("Creating presentation...")
-        const presentation = (await new this.wasm.Presentation({
-            attestationHex: notarizationOutputs.attestation,
-            secretsHex: notarizationOutputs.secrets,
-            notaryUrl: notarizationOutputs.notaryUrl,
-            websocketProxyUrl: notarizationOutputs.websocketProxyUrl,
-            reveal: { ...commitRanges, server_identity: true },
-        })) as TPresentation
+            // Step 7: Notarize
+            status("Generating attestation (this may take a moment)...")
+            const notarizationOutputs = await prover.notarize(commitRanges)
 
-        const presentationJSON = await presentation.json()
+            // Step 8: Create presentation
+            status("Creating presentation...")
+            presentation = (await new this.wasm.Presentation({
+                attestationHex: notarizationOutputs.attestation,
+                secretsHex: notarizationOutputs.secrets,
+                notaryUrl: notarizationOutputs.notaryUrl,
+                websocketProxyUrl: notarizationOutputs.websocketProxyUrl,
+                reveal: { ...commitRanges, server_identity: true },
+            })) as TPresentation
 
-        // Step 9: Verify the presentation
-        status("Verifying attestation...")
-        const verification = await this.verify(presentationJSON)
+            const presentationJSON = await presentation.json()
 
-        status("Attestation complete!")
+            // Step 9: Verify the presentation
+            status("Verifying attestation...")
+            const verification = await this.verify(presentationJSON)
 
-        return {
-            presentation: presentationJSON,
-            verification,
+            status("Attestation complete!")
+
+            return {
+                presentation: presentationJSON,
+                verification,
+            }
+        } finally {
+            // Free WASM memory to prevent leaks
+            if (presentation) {
+                await presentation.free()
+            }
+            if (prover) {
+                await prover.free()
+            }
         }
     }
 
@@ -256,7 +269,7 @@ export class TLSNotary {
             maxSentData: request.maxSentData || 16384,
             maxRecvData: request.maxRecvData || 16384,
             url: request.url,
-            method: (request.method || "GET") as "GET" | "POST",
+            method: (request.method || "GET") as Method,
             headers: {
                 Accept: "application/json",
                 ...request.headers,
@@ -368,23 +381,30 @@ export class TLSNotary {
             maxRecvData: request.maxRecvData || 16384,
         })) as TProver
 
-        await prover.setup(await notary.sessionUrl())
+        try {
+            await prover.setup(await notary.sessionUrl())
 
-        await prover.sendRequest(this.config.websocketProxyUrl, {
-            url: request.url,
-            method: (request.method || "GET") as "GET" | "POST",
-            headers: {
-                Accept: "application/json",
-                ...request.headers,
-            },
-            body: request.body,
-        })
+            await prover.sendRequest(this.config.websocketProxyUrl, {
+                url: request.url,
+                method: (request.method || "GET") as Method,
+                headers: {
+                    Accept: "application/json",
+                    ...request.headers,
+                },
+                body: request.body,
+            })
 
-        const transcript = await prover.transcript()
+            const transcript = await prover.transcript()
 
-        return {
-            sent: transcript.sent,
-            recv: transcript.recv,
+            return {
+                sent: transcript.sent,
+                recv: transcript.recv,
+            }
+        } finally {
+            // Free WASM memory to prevent leaks
+            if (prover) {
+                await prover.free()
+            }
         }
     }
 
