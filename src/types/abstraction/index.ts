@@ -263,6 +263,42 @@ export interface UDIdentityRemovePayload extends BaseUdIdentityPayload {
 export type UdIdentityPayload =
     | UDIdentityAssignPayload
     | UDIdentityRemovePayload
+// SECTION Nomis Identities
+export interface NomisWalletIdentity {
+    chain: string
+    subchain: string
+    address: string
+    score: number
+    scoreType: number
+    mintedScore?: number | null
+    lastSyncedAt: string
+    metadata?: {
+        referralCode?: string
+        referrerCode?: string
+        deadline?: number
+        nonce?: number
+        apiVersion?: string
+        [key: string]: unknown
+    }
+}
+
+export interface BaseNomisIdentityPayload {
+    context: "nomis"
+}
+
+export interface NomisIdentityAssignPayload extends BaseNomisIdentityPayload {
+    method: "nomis_identity_assign"
+    payload: NomisWalletIdentity
+}
+
+export interface NomisIdentityRemovePayload extends BaseNomisIdentityPayload {
+    method: "nomis_identity_remove"
+    payload: NomisWalletIdentity
+}
+
+export type NomisIdentityPayload =
+    | NomisIdentityAssignPayload
+    | NomisIdentityRemovePayload
 
 // SECTION Final payload type
 export type IdentityPayload =
@@ -270,6 +306,7 @@ export type IdentityPayload =
     | Web2IdentityPayload
     | PqcIdentityPayload
     | UdIdentityPayload
+    | NomisIdentityPayload
 export interface UserPoints {
     userId: string
     referralCode: string
@@ -283,6 +320,7 @@ export interface UserPoints {
             telegram?: number
         }
         udDomains?: { [domain: string]: number }
+        nomisScores?: { [chain: string]: number }
         referrals: number
         demosFollow: number
     }
@@ -291,6 +329,7 @@ export interface UserPoints {
     linkedUDDomains?: {
         [network: string]: string[]
     }
+    linkedNomisIdentities: NomisWalletIdentity[]
     lastUpdated: Date
     flagged: boolean | null
     flaggedReason: string | null
