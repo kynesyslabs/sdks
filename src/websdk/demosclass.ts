@@ -897,8 +897,9 @@ export class Demos {
 
             tlsnConfig = {
                 notaryUrl: info.notaryUrl,
-                websocketProxyUrl: info.proxyUrl,
+                rpcUrl: this.rpc_url,
                 notaryPublicKey: info.publicKey,
+                // Note: websocketProxyUrl is deprecated - proxies are now requested dynamically
             }
         }
 

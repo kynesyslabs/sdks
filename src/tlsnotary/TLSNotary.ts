@@ -53,7 +53,10 @@ import type {
     AttestOptions,
     StatusCallback,
     TranscriptInfo,
+    ProxyRequestResponse,
+    ProxyRequestError,
 } from "@/tlsnotary/types"
+import axios from "axios"
 
 /**
  * TLSNotary class for browser-based HTTPS attestation
@@ -128,6 +131,101 @@ export class TLSNotary {
     }
 
     /**
+     * Request a dynamic WebSocket proxy for a target URL
+     *
+     * This method calls the node's `requestTLSNproxy` endpoint to get a
+     * dynamically allocated proxy for the specific target domain.
+     * Proxies auto-expire after 30 seconds of inactivity.
+     *
+     * @param targetUrl - The HTTPS URL to create a proxy for
+     * @returns Proxy response with websocketProxyUrl
+     * @throws Error if RPC URL is not configured or proxy request fails
+     *
+     * @internal This is called automatically by attest/attestQuick methods
+     */
+    private async requestProxy(targetUrl: string): Promise<ProxyRequestResponse> {
+        if (!this.config.rpcUrl) {
+            // Fallback to static proxy if no RPC URL configured (legacy mode)
+            if (this.config.websocketProxyUrl) {
+                const url = new URL(targetUrl)
+                return {
+                    websocketProxyUrl: this.config.websocketProxyUrl,
+                    targetDomain: url.hostname,
+                    expiresIn: 0, // Static proxy doesn't expire
+                    proxyId: "static",
+                }
+            }
+            throw new Error(
+                "No RPC URL configured for dynamic proxy requests. " +
+                    "Either provide rpcUrl in config or use Demos.tlsnotary() for auto-configuration.",
+            )
+        }
+
+        try {
+            const response = await axios.post(this.config.rpcUrl, {
+                method: "nodeCall",
+                params: [
+                    {
+                        message: "requestTLSNproxy",
+                        data: { targetUrl },
+                    },
+                ],
+            })
+
+            const result = response.data
+
+            if (result.result !== 200) {
+                const error = result.response as ProxyRequestError
+                throw new Error(
+                    `Failed to request proxy: ${error.message || error.error || "Unknown error"}`,
+                )
+            }
+
+            return result.response as ProxyRequestResponse
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                throw new Error(`Proxy request failed: ${error.message}`)
+            }
+            throw error
+        }
+    }
+
+    /**
+     * Get the WebSocket proxy URL for a target URL
+     *
+     * Automatically requests a dynamic proxy from the node if rpcUrl is configured,
+     * otherwise falls back to the static websocketProxyUrl.
+     *
+     * @param targetUrl - The target HTTPS URL
+     * @param onStatus - Optional status callback
+     * @returns The websocket proxy URL to use
+     */
+    private async getProxyUrl(
+        targetUrl: string,
+        onStatus?: StatusCallback,
+    ): Promise<string> {
+        const status = onStatus || (() => {})
+
+        // If we have rpcUrl, always request a dynamic proxy
+        if (this.config.rpcUrl) {
+            status("Requesting WebSocket proxy...")
+            const proxyResponse = await this.requestProxy(targetUrl)
+            status(`Proxy allocated for ${proxyResponse.targetDomain}`)
+            return proxyResponse.websocketProxyUrl
+        }
+
+        // Fallback to static proxy URL (legacy/explicit config mode)
+        if (this.config.websocketProxyUrl) {
+            return this.config.websocketProxyUrl
+        }
+
+        throw new Error(
+            "No proxy configuration available. " +
+                "Configure rpcUrl for dynamic proxies or websocketProxyUrl for static proxy.",
+        )
+    }
+
+    /**
      * Attest an HTTPS request using the step-by-step method
      *
      * This provides full control over the attestation process including
@@ -166,11 +264,14 @@ export class TLSNotary {
         const url = new URL(request.url)
         const serverDns = url.hostname
 
-        // Step 1: Connect to Notary
+        // Step 1: Request dynamic proxy for this target
+        const proxyUrl = await this.getProxyUrl(request.url, status)
+
+        // Step 2: Connect to Notary
         status("Connecting to Notary server...")
         const notary = NotaryServer.from(this.config.notaryUrl)
 
-        // Step 2: Create Prover
+        // Step 3: Create Prover
         status("Creating Prover instance...")
         const prover = (await new this.wasm.Prover({
             serverDns,
@@ -181,41 +282,41 @@ export class TLSNotary {
         let presentation: TPresentation | null = null
 
         try {
-            // Step 3: Setup MPC-TLS session
+            // Step 4: Setup MPC-TLS session
             status("Setting up MPC-TLS session...")
             await prover.setup(await notary.sessionUrl())
 
-            // Step 4: Send the HTTPS request
+            // Step 5: Send the HTTPS request
             status(`Sending attested request to ${serverDns}...`)
             const headers: Record<string, string> = {
                 Accept: "application/json",
                 ...request.headers,
             }
 
-            await prover.sendRequest(this.config.websocketProxyUrl, {
+            await prover.sendRequest(proxyUrl, {
                 url: request.url,
                 method: (request.method || "GET") as Method,
                 headers,
                 body: request.body,
             })
 
-            // Step 5: Get transcript
+            // Step 6: Get transcript
             status("Getting transcript...")
             const transcript = await prover.transcript()
             const { sent, recv } = transcript
 
-            // Step 6: Create commit ranges (what to reveal)
+            // Step 7: Create commit ranges (what to reveal)
             status("Creating attestation commitment...")
             const commitRanges: Commit = commit || {
                 sent: [{ start: 0, end: Math.min(sent.length, 200) }],
                 recv: [{ start: 0, end: Math.min(recv.length, 300) }],
             }
 
-            // Step 7: Notarize
+            // Step 8: Notarize
             status("Generating attestation (this may take a moment)...")
             const notarizationOutputs = await prover.notarize(commitRanges)
 
-            // Step 8: Create presentation
+            // Step 9: Create presentation
             status("Creating presentation...")
             presentation = (await new this.wasm.Presentation({
                 attestationHex: notarizationOutputs.attestation,
@@ -227,7 +328,7 @@ export class TLSNotary {
 
             const presentationJSON = await presentation.json()
 
-            // Step 9: Verify the presentation
+            // Step 10: Verify the presentation
             status("Verifying attestation...")
             const verification = await this.verify(presentationJSON)
 
@@ -272,13 +373,16 @@ export class TLSNotary {
         const { onStatus, commit, ...request } = options
         const status = onStatus || (() => {})
 
+        // Request dynamic proxy for this target
+        const proxyUrl = await this.getProxyUrl(request.url, status)
+
         status("Running quick attestation...")
 
         const presentationJSON = await (
             this.wasm.Prover.notarize as typeof TProver.notarize
         )({
             notaryUrl: this.config.notaryUrl,
-            websocketProxyUrl: this.config.websocketProxyUrl,
+            websocketProxyUrl: proxyUrl,
             maxSentData: request.maxSentData || 16384,
             maxRecvData: request.maxRecvData || 16384,
             url: request.url,
@@ -394,6 +498,9 @@ export class TLSNotary {
         const url = new URL(request.url)
         const serverDns = url.hostname
 
+        // Request dynamic proxy for this target
+        const proxyUrl = await this.getProxyUrl(request.url)
+
         const notary = NotaryServer.from(this.config.notaryUrl)
 
         const prover = (await new this.wasm.Prover({
@@ -405,7 +512,7 @@ export class TLSNotary {
         try {
             await prover.setup(await notary.sessionUrl())
 
-            await prover.sendRequest(this.config.websocketProxyUrl, {
+            await prover.sendRequest(proxyUrl, {
                 url: request.url,
                 method: (request.method || "GET") as Method,
                 headers: {

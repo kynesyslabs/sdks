@@ -10,12 +10,45 @@
 export interface TLSNotaryConfig {
     /** Notary server URL (e.g., 'wss://node.demos.sh:7047') */
     notaryUrl: string
-    /** WebSocket proxy URL for TCP tunneling (e.g., 'wss://node.demos.sh:55688') */
-    websocketProxyUrl: string
+    /**
+     * WebSocket proxy URL for TCP tunneling (e.g., 'wss://node.demos.sh:55688')
+     * @deprecated Use rpcUrl instead - proxies are now dynamically allocated per-request
+     */
+    websocketProxyUrl?: string
+    /** RPC URL for requesting dynamic proxies (e.g., 'https://node.demos.sh') */
+    rpcUrl?: string
     /** Notary's public key (hex string) for verification */
     notaryPublicKey?: string
     /** Logging level: 'Debug' | 'Info' | 'Warn' | 'Error' */
     loggingLevel?: "Debug" | "Info" | "Warn" | "Error"
+}
+
+/**
+ * Response from requestTLSNproxy RPC call
+ */
+export interface ProxyRequestResponse {
+    /** Dynamic WebSocket proxy URL for this request */
+    websocketProxyUrl: string
+    /** Target domain the proxy is configured for */
+    targetDomain: string
+    /** Milliseconds until proxy expires (resets on activity) */
+    expiresIn: number
+    /** Unique proxy identifier */
+    proxyId: string
+}
+
+/**
+ * Error response from requestTLSNproxy RPC call
+ */
+export interface ProxyRequestError {
+    /** Error code (e.g., 'INVALID_URL', 'PROXY_SPAWN_FAILED') */
+    error: string
+    /** Human-readable error message */
+    message: string
+    /** Target domain that failed */
+    targetDomain?: string
+    /** Last error details for spawn failures */
+    lastError?: string
 }
 
 /**
