@@ -11,4 +11,10 @@ interface INativeTlsnRequest {
     args: [string] // [targetUrl]
 }
 
-export type INativePayload = INativeSend | INativeTlsnRequest
+// REVIEW: TLSNotary proof storage
+interface INativeTlsnStore {
+    nativeOperation: "tlsn_store"
+    args: [string, string, "onchain" | "ipfs"] // [tokenId, proof, storageType]
+}
+
+export type INativePayload = INativeSend | INativeTlsnRequest | INativeTlsnStore

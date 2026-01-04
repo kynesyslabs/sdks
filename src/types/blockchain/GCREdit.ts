@@ -168,6 +168,24 @@ export interface GCREditEscrow {
     isRollback: boolean
 }
 
+/**
+ * TLSNotary attestation storage GCR edit
+ */
+export interface GCREditTLSNotary {
+    type: "tlsnotary"
+    operation: "store"
+    account: string
+    data: {
+        tokenId: string
+        domain: string
+        proof: string          // Full proof or IPFS hash
+        storageType: "onchain" | "ipfs"
+        timestamp: number
+    }
+    txhash: string
+    isRollback: boolean
+}
+
 export type GCREdit =
     | GCREditBalance
     | GCREditNonce
@@ -178,3 +196,4 @@ export type GCREdit =
     | GCREditSmartContract
     | GCREditStorageProgram
     | GCREditEscrow
+    | GCREditTLSNotary
