@@ -63,6 +63,10 @@ export interface StoreProofResponse {
     txHash: string
     /** Total fee burned for storage (in DEM) */
     storageFee: number
+    /** HTTP status code from broadcast (200 = success) */
+    broadcastStatus: number
+    /** Response message from the node */
+    broadcastMessage?: string
 }
 
 /**
@@ -282,6 +286,8 @@ export class TLSNotaryService {
         return {
             txHash: tx.hash,
             storageFee,
+            broadcastStatus: broadcastResult.result,
+            broadcastMessage: broadcastResult.response?.message || "Transaction accepted",
         }
     }
 
