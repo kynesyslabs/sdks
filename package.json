@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.7.8",
+    "version": "2.7.9",
     "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
     "types": "build/index.d.ts",
