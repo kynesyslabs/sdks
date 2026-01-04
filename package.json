@@ -1,11 +1,28 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.7.6",
+    "version": "2.7.7",
     "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
     "types": "build/index.d.ts",
     "author": "Kynesys Labs",
     "license": "MIT",
+    "browser": {
+        "fs": false,
+        "path": false,
+        "os": false,
+        "readline": false,
+        "crypto": false,
+        "stream": false,
+        "http": false,
+        "https": false,
+        "net": false,
+        "tls": false,
+        "zlib": false,
+        "child_process": false
+    },
+    "sideEffects": [
+        "./build/tlsnotary/worker.js"
+    ],
     "files": [
         "build/",
         "!build/tests"
@@ -39,7 +56,8 @@
         "./d402/server": "./build/d402/server/index.js",
         "./d402/client": "./build/d402/client/index.js",
         "./keyserver": "./build/keyserver/index.js",
-        "./tlsnotary": "./build/tlsnotary/index.js"
+        "./tlsnotary": "./build/tlsnotary/index.js",
+        "./tlsnotary/service": "./build/tlsnotary/service.js"
     },
     "scripts": {
         "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",

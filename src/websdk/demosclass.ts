@@ -32,7 +32,9 @@ import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english.js"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
-import { TLSNotary, type TLSNotaryConfig, type TLSNotaryDiscoveryInfo } from "@/tlsnotary"
+// TLSNotary is dynamically imported to avoid bundling issues with webpack
+// The worker.js reference and WASM dependencies break static bundling
+import type { TLSNotary, TLSNotaryConfig, TLSNotaryDiscoveryInfo } from "@/tlsnotary"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -872,6 +874,10 @@ export class Demos {
             }
             return this._tlsnotaryInstance
         }
+
+        // Dynamic import to avoid bundling issues with webpack
+        // The TLSNotary class uses Web Workers and WASM which require runtime loading
+        const { TLSNotary } = await import("@/tlsnotary")
 
         let tlsnConfig: TLSNotaryConfig
 
