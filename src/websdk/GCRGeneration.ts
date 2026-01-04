@@ -216,13 +216,52 @@ export class HandleNativeOperations {
                 }
                 edits.push(addEdit)
                 break
-            default:
+
+            // TLSNotary attestation request - burns 1 DEM fee
+            // Token creation is handled by the node, SDK only generates the balance edit
+            case "tlsn_request": {
+                const TLSN_REQUEST_FEE = 1
+                var burnFeeEdit: GCREdit = {
+                    type: "balance",
+                    operation: "remove",
+                    isRollback: isRollback,
+                    account: tx.content.from_ed25519_address,
+                    txhash: tx.hash,
+                    amount: TLSN_REQUEST_FEE,
+                }
+                edits.push(burnFeeEdit)
+                break
+            }
+
+            // TLSNotary proof storage - burns fee based on size
+            // Actual storage is handled by the node
+            case "tlsn_store": {
+                const [, proof] = nativePayload.args
+                const TLSN_STORE_BASE_FEE = 1
+                const TLSN_STORE_PER_KB_FEE = 1
+                const proofSizeKB = Math.ceil(proof.length / 1024)
+                const storageFee = TLSN_STORE_BASE_FEE + (proofSizeKB * TLSN_STORE_PER_KB_FEE)
+                var burnStorageFeeEdit: GCREdit = {
+                    type: "balance",
+                    operation: "remove",
+                    isRollback: isRollback,
+                    account: tx.content.from_ed25519_address,
+                    txhash: tx.hash,
+                    amount: storageFee,
+                }
+                edits.push(burnStorageFeeEdit)
+                break
+            }
+
+            default: {
+                // Exhaustive check - if this is reached, a new operation was added without handling
+                const _exhaustiveCheck: never = nativePayload
                 console.log(
                     "Unknown native operation: ",
-                    nativePayload.nativeOperation,
-                ) // TODO Better error handling
-                // throw new Error("Unknown native operation: " + nativePayload.nativeOperation)
+                    (_exhaustiveCheck as INativePayload).nativeOperation,
+                )
                 break
+            }
         }
         return edits
     }

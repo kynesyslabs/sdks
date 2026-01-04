@@ -169,14 +169,40 @@ export class TLSNotaryService {
             )
         }
 
-        // 3. Extract tokenId from transaction result
-        const tokenId = broadcastResult.response?.tokenId || tx.hash
+        // 3. Wait for token to be created by polling with txHash
+        // Token is created when tx is processed (included in block), not when broadcast
+        const txHash = tx.hash
+        let tokenId: string | undefined
+        const maxAttempts = 30 // 30 attempts
+        const pollInterval = 1000 // 1 second between attempts
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const tokenResponse = await this.demos.nodeCall("tlsnotary.getToken", {
+                txHash,
+            }) as { token?: { id: string } } | null
+
+            if (tokenResponse?.token?.id) {
+                tokenId = tokenResponse.token.id
+                break
+            }
+
+            // Wait before next attempt
+            if (attempt < maxAttempts - 1) {
+                await new Promise(resolve => setTimeout(resolve, pollInterval))
+            }
+        }
+
+        if (!tokenId) {
+            throw new Error(
+                `Token not created after ${maxAttempts} seconds. Transaction may still be pending in mempool. txHash: ${txHash}`,
+            )
+        }
 
         // 4. Get owner address
         const { publicKey } = await this.demos.crypto.getIdentity("ed25519")
         const owner = uint8ArrayToHex(publicKey as Uint8Array)
 
-        // 5. Call nodeCall to get proxy URL
+        // 5. Call nodeCall to get proxy URL using the actual tokenId
         const proxyResponse = (await this.demos.nodeCall("requestTLSNproxy", {
             tokenId,
             owner,
