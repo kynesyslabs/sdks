@@ -5,4 +5,10 @@ interface INativeSend {
     args: [string, number] // [to, amount]
 }
 
-export type INativePayload = INativeSend
+// REVIEW: TLSNotary attestation request
+interface INativeTlsnRequest {
+    nativeOperation: "tlsn_request"
+    args: [string] // [targetUrl]
+}
+
+export type INativePayload = INativeSend | INativeTlsnRequest
