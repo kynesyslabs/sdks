@@ -18,6 +18,7 @@ import { StandardGenesis } from "@/types/blockchain/genesisTypes"
 export interface NativeTablesHashes {
     native_gcr: string
     native_subnets_txs: string
+    native_tlsnotary: string
 }
 
 export interface BlockContent {
