@@ -57,11 +57,14 @@
         "./d402/client": "./build/d402/client/index.js",
         "./keyserver": "./build/keyserver/index.js",
         "./tlsnotary": "./build/tlsnotary/index.js",
-        "./tlsnotary/service": "./build/tlsnotary/service.js"
+        "./tlsnotary/service": "./build/tlsnotary/service.js",
+        "./tlsnotary/webpack": "./build/tlsnotary/webpack.js",
+        "./tlsnotary/wasm/*": "./build/tlsnotary/wasm/*"
     },
     "scripts": {
         "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",
-        "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src",
+        "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src && npm run build:copy-wasm",
+        "build:copy-wasm": "mkdir -p build/tlsnotary/wasm && cp node_modules/tlsn-js/build/*.wasm build/tlsnotary/wasm/ && cp node_modules/tlsn-js/build/*.js build/tlsnotary/wasm/ && cp -r node_modules/tlsn-js/build/snippets build/tlsnotary/wasm/",
         "typedoc": "typedoc",
         "test": "jest",
         "setup:pre-push": "cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo \"Pre-push hook installed\"",
