@@ -37,6 +37,21 @@
  *
  * console.log('Proof stored:', txHash);
  * ```
+ *
+ * @example Using low-level tlsn-js classes (re-exported for convenience)
+ * ```typescript
+ * import {
+ *   Prover, Presentation, NotaryServer, Transcript,
+ *   init as initTlsnWasm
+ * } from '@kynesyslabs/demosdk/tlsnotary';
+ *
+ * // Initialize WASM (required before using Prover/Presentation)
+ * await initTlsnWasm({ loggingLevel: 'Info' });
+ *
+ * // Now you can use the classes directly without installing tlsn-js
+ * const notary = NotaryServer.from('wss://notary.example.com');
+ * const prover = await new Prover({ serverDns: 'api.example.com' });
+ * ```
  */
 
 // Core TLSNotary class for attestation
@@ -74,3 +89,34 @@ export { default } from "./TLSNotary"
 
 // Helper function exports
 export { calculateStorageFee } from "./helpers"
+
+/**
+ * Re-export tlsn-js classes and functions for convenience.
+ *
+ * This allows users to import everything from '@kynesyslabs/demosdk/tlsnotary'
+ * without needing to install tlsn-js as a separate dependency.
+ *
+ * Note: The WASM must still be initialized (call `init()`) before using
+ * Prover or Presentation classes.
+ */
+export {
+    // WASM initialization
+    default as init,
+    // Core classes
+    Prover,
+    Presentation,
+    NotaryServer,
+    Transcript,
+    // Types re-exported from tlsn-js
+    type Commit,
+    type Reveal,
+    type Method,
+    type ProverConfig,
+    type LoggingLevel,
+    type LoggingConfig,
+} from "tlsn-js"
+
+// Re-export types from tlsn-js/build/types for advanced usage
+export type {
+    PresentationJSON as TlsnPresentationJSON,
+} from "tlsn-js/build/types"
