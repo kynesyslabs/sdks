@@ -29,12 +29,12 @@ import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/un
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
-import { wordlist } from "@scure/bip39/wordlists/english"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
 // TLSNotary is dynamically imported to avoid bundling issues with webpack
 // The worker.js reference and WASM dependencies break static bundling
 import type { TLSNotary, TLSNotaryConfig, TLSNotaryDiscoveryInfo } from "@/tlsnotary"
+import { wordList } from "@/encryption/PQC/falconts"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -103,7 +103,7 @@ export class Demos {
      * @returns The mnemonic
      */
     newMnemonic(strength: 128 | 256 = 128) {
-        return bip39.generateMnemonic(wordlist, strength)
+        return bip39.generateMnemonic(wordList, strength)
     }
 
     /**
@@ -164,7 +164,7 @@ export class Demos {
         if (typeof masterSeed === "string") {
             masterSeed = masterSeed.trim()
 
-            if (!bip39.validateMnemonic(masterSeed, wordlist)) {
+            if (!bip39.validateMnemonic(masterSeed, wordList)) {
                 hashable = bip39.mnemonicToSeedSync(masterSeed)
             } else {
                 hashable = masterSeed
