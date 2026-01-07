@@ -19,6 +19,7 @@ import { ContractCallPayload } from "./TransactionSubtypes/ContractCallTransacti
 import { D402PaymentPayload } from "./TransactionSubtypes/D402PaymentTransaction"
 import { EscrowPayload } from "./TransactionSubtypes/EscrowTransaction"
 import { IPFSPayload } from "./TransactionSubtypes/IPFSTransaction"
+import { CustomCharges } from "./CustomCharges"
 
 // TODO Implement multisignature transactions
 
@@ -80,6 +81,9 @@ export interface TransactionContent {
     nonce: number // Increments every time a transaction is sent from the same account
     timestamp: number // Is the registered unix timestamp when the transaction was sent the first time
     transaction_fee: TxFee // Is the signed message where the sender locks X tokens until the tx is confirmed
+    // REVIEW: Phase 9 - Custom charges for variable-cost operations (IPFS, compute, etc.)
+    // Client includes this BEFORE signing to specify maximum cost they agree to pay
+    custom_charges?: CustomCharges
 }
 
 export interface Transaction {
