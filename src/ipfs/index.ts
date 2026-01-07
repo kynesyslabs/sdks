@@ -7,6 +7,10 @@ export type {
     IPFSGetResponse,
     PinInfo,
     IPFSPinsResponse,
+    // REVIEW: Phase 9 - Cost quote types
+    IpfsQuoteResponse,
+    AddOptionsWithCharges,
+    PinOptionsWithCharges,
 } from "./IPFSOperations"
 export type {
     IPFSOperationType,

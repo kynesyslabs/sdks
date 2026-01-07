@@ -10,6 +10,7 @@
  */
 
 import { Transaction, TransactionContent } from "../Transaction"
+import { CustomCharges } from "../CustomCharges"
 
 // ============================================================================
 // IPFS Operation Types
@@ -42,6 +43,10 @@ export interface IPFSAddPayload {
 
     /** Optional metadata to associate with the pin */
     metadata?: Record<string, unknown>
+
+    // REVIEW: Phase 9 - Custom charges for cost control
+    /** Optional custom charges configuration (from ipfsQuote) */
+    custom_charges?: CustomCharges
 }
 
 /**
@@ -62,6 +67,10 @@ export interface IPFSPinPayload {
 
     /** Optional metadata to associate with the pin */
     metadata?: Record<string, unknown>
+
+    // REVIEW: Phase 9 - Custom charges for cost control
+    /** Optional custom charges configuration (from ipfsQuote) */
+    custom_charges?: CustomCharges
 }
 
 /**

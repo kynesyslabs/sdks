@@ -938,6 +938,57 @@ export class Demos {
         }
     }
 
+    // REVIEW: Phase 9 - IPFS cost estimation endpoints
+    // ANCHOR IPFS Endpoints
+    ipfs = {
+        /**
+         * Get a cost quote for an IPFS operation without submitting a transaction.
+         *
+         * Use this to estimate costs and populate custom_charges before signing.
+         * The returned cost should be used as max_cost_dem in the transaction's
+         * custom_charges field.
+         *
+         * @param fileSizeBytes - Size of file in bytes
+         * @param operation - IPFS operation type ('IPFS_ADD', 'IPFS_PIN', or 'IPFS_UNPIN')
+         * @param durationBlocks - Optional duration in blocks (for PIN operations)
+         * @returns Cost quote with detailed breakdown
+         *
+         * @example
+         * ```typescript
+         * // Get quote for add operation
+         * const quote = await demos.ipfs.quote(content.length, 'IPFS_ADD')
+         * console.log(`Cost: ${quote.cost_dem} DEM`)
+         *
+         * // Use quote to build transaction with cost control
+         * const payload = IPFSOperations.createAddPayload(content, {
+         *   customCharges: IPFSOperations.quoteToCustomCharges(quote)
+         * })
+         * ```
+         */
+        quote: async (
+            fileSizeBytes: number,
+            operation: "IPFS_ADD" | "IPFS_PIN" | "IPFS_UNPIN" = "IPFS_ADD",
+            durationBlocks?: number,
+        ): Promise<{
+            cost_dem: string
+            file_size_bytes: number
+            is_genesis: boolean
+            breakdown: {
+                base_cost: string
+                size_cost: string
+                free_tier_bytes: number
+                chargeable_bytes: number
+            }
+            operation: string
+        }> => {
+            return await this.nodeCall("ipfsQuote", {
+                file_size_bytes: fileSizeBytes,
+                operation,
+                duration_blocks: durationBlocks,
+            })
+        },
+    }
+
     xm = {
         // INFO Working with XMTransactions
         createPayload: (xm_payload: XMScript, keypair?: IKeyPair) => {
