@@ -5,7 +5,7 @@ This library contains all the functions that are used to interact with the demos
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 import axios from "axios"
-import { Buffer } from "buffer/"
+import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
 
 // NOTE Including custom libraries from Demos
@@ -29,7 +29,7 @@ import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/un
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
-import { wordlist } from "@scure/bip39/wordlists/english.js"
+import { wordlist } from "@scure/bip39/wordlists/english"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
 // TLSNotary is dynamically imported to avoid bundling issues with webpack
