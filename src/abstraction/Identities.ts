@@ -1162,7 +1162,10 @@ export class Identities {
      * @param payload The Nomis wallet identity data to be linked.
      * @returns The RPC response for the identity inference operation.
      */
-    async addNomisIdentity(demos: Demos, payload: NomisWalletIdentity) {
+    async addNomisIdentity(
+        demos: Demos,
+        payload: NomisWalletIdentity,
+    ): Promise<RPCResponseWithValidityData> {
         return await this.inferIdentity(demos, "nomis", payload)
     }
 
@@ -1173,7 +1176,10 @@ export class Identities {
      * @param payload The Nomis wallet identity data identifying the identity to remove.
      * @returns The RPC response for the identity removal operation.
      */
-    async removeNomisIdentity(demos: Demos, payload: NomisWalletIdentity) {
+    async removeNomisIdentity(
+        demos: Demos,
+        payload: NomisWalletIdentity,
+    ): Promise<RPCResponseWithValidityData> {
         return await this.removeIdentity(demos, "nomis", payload)
     }
 }
