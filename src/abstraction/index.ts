@@ -28,7 +28,14 @@ import {
     FindDemosIdByWeb3IdentityQuery,
     TelegramAttestationPayload,
     TelegramSignedAttestation,
-    DiscordProof
+    DiscordProof,
+    AgentIdentityPayload,
+    AgentIdentityAssignPayload,
+    AgentIdentityRemovePayload,
+    AgentIdentityPayloadType,
+    DemosOwnershipProof,
+    ERC8004AgentCard,
+    ERC8004Endpoint,
 } from "@/types/abstraction"
 
 export {
@@ -54,5 +61,12 @@ export {
     FindDemosIdByWeb3IdentityQuery,
     TelegramAttestationPayload,
     TelegramSignedAttestation,
-    DiscordProof
+    DiscordProof,
+    AgentIdentityPayload,
+    AgentIdentityAssignPayload,
+    AgentIdentityRemovePayload,
+    AgentIdentityPayloadType,
+    DemosOwnershipProof,
+    ERC8004AgentCard,
+    ERC8004Endpoint,
 }

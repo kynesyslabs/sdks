@@ -264,12 +264,96 @@ export type UdIdentityPayload =
     | UDIdentityAssignPayload
     | UDIdentityRemovePayload
 
+// SECTION ERC-8004 Agent Identities
+export interface BaseAgentIdentityPayload {
+    context: "agent"
+}
+
+/**
+ * ERC-8004 Agent Identity endpoint configuration
+ */
+export interface ERC8004Endpoint {
+    name: string
+    endpoint: string
+    version?: string
+}
+
+/**
+ * Demos ownership proof for linking EVM address to Demos identity
+ * This proves the EVM address owner authorized the agent registration
+ */
+export interface DemosOwnershipProof {
+    type: "demos-signature"
+    message: string
+    signature: string | { type: string; data: string }
+    demosPublicKey: string
+    evmAddress: string
+    timestamp: number
+}
+
+/**
+ * ERC-8004 Agent Card data structure
+ * Based on https://eips.ethereum.org/EIPS/eip-8004
+ */
+export interface ERC8004AgentCard {
+    type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
+    name: string
+    description?: string
+    endpoints: ERC8004Endpoint[]
+    supportedTrust?: string[]
+    proof?: DemosOwnershipProof
+}
+
+/**
+ * Agent identity payload for assigning an ERC-8004 agent to a Demos identity
+ *
+ * Requirements:
+ * - User must have an EVM identity linked to their Demos account
+ * - The EVM wallet must own the ERC-8004 agent NFT on Base Sepolia
+ * - User must sign ownership proof with their Demos wallet
+ */
+export interface AgentIdentityPayload {
+    /** ERC-8004 agent ID (NFT token ID) */
+    agentId: string
+    /** EVM address that owns the agent NFT */
+    evmAddress: string
+    /** The chain where the agent is registered (e.g., "base.sepolia") */
+    chain: string
+    /** Transaction hash of the agent registration */
+    txHash: string
+    /** Token URI pointing to the agent card metadata */
+    tokenUri: string
+    /** Ownership proof signed by Demos wallet */
+    proof: DemosOwnershipProof
+    /** Optional resolver URL for the agent */
+    resolverUrl?: string
+}
+
+export interface AgentIdentityAssignPayload extends BaseAgentIdentityPayload {
+    method: "agent_identity_assign"
+    payload: AgentIdentityPayload
+    referralCode?: string
+}
+
+export interface AgentIdentityRemovePayload extends BaseAgentIdentityPayload {
+    method: "agent_identity_remove"
+    payload: {
+        agentId: string
+        chain: string
+    }
+}
+
+export type AgentIdentityPayloadType =
+    | AgentIdentityAssignPayload
+    | AgentIdentityRemovePayload
+
 // SECTION Final payload type
 export type IdentityPayload =
     | XmIdentityPayload
     | Web2IdentityPayload
     | PqcIdentityPayload
     | UdIdentityPayload
+    | AgentIdentityPayloadType
 export interface UserPoints {
     userId: string
     referralCode: string
@@ -283,6 +367,7 @@ export interface UserPoints {
             telegram?: number
         }
         udDomains?: { [domain: string]: number }
+        agents?: { [agentId: string]: number }
         referrals: number
         demosFollow: number
     }
@@ -290,6 +375,14 @@ export interface UserPoints {
     linkedSocials: { twitter?: string }
     linkedUDDomains?: {
         [network: string]: string[]
+    }
+    linkedAgents?: {
+        [chain: string]: Array<{
+            agentId: string
+            evmAddress: string
+            tokenUri?: string
+            timestamp: number
+        }>
     }
     lastUpdated: Date
     flagged: boolean | null
