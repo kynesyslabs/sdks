@@ -1140,31 +1140,39 @@ export class Identities {
      * linking an EVM address (which owns the agent NFT) to their Demos identity.
      *
      * @param demosPublicKey The user's Demos public key (hex string)
+     * @param agentId The ERC-8004 token ID being claimed
      * @param evmAddress The EVM address that owns the agent NFT
-     * @returns The message to be signed
+     * @returns Object containing the message and timestamp
      */
     generateAgentOwnershipMessage(
         demosPublicKey: string,
+        agentId: string,
         evmAddress: string,
-    ): string {
+    ): { message: string; timestamp: number } {
         const timestamp = Date.now()
-        return `I authorize EVM address ${evmAddress} to register an ERC-8004 agent for Demos identity ${demosPublicKey}. Timestamp: ${timestamp}`
+        const message = `I authorize EVM address ${evmAddress} to register ERC-8004 agent #${agentId} for Demos identity ${demosPublicKey}. Timestamp: ${timestamp}`
+        return { message, timestamp }
     }
 
     /**
      * Create an ownership proof by signing the ownership message with the Demos wallet.
      *
      * @param demos A Demos instance to sign the message
+     * @param agentId The ERC-8004 token ID being claimed
      * @param evmAddress The EVM address that owns the agent NFT
      * @returns The complete ownership proof object
      */
     async createAgentOwnershipProof(
         demos: Demos,
+        agentId: string,
         evmAddress: string,
     ): Promise<DemosOwnershipProof> {
         const demosPublicKey = await demos.getEd25519Address()
-        const timestamp = Date.now()
-        const message = `I authorize EVM address ${evmAddress} to register an ERC-8004 agent for Demos identity ${demosPublicKey}. Timestamp: ${timestamp}`
+        const { message, timestamp } = this.generateAgentOwnershipMessage(
+            demosPublicKey,
+            agentId,
+            evmAddress,
+        )
 
         const signature = await demos.crypto.sign(
             demos.algorithm,
@@ -1179,6 +1187,7 @@ export class Identities {
                 data: uint8ArrayToHex(signature.signature),
             },
             demosPublicKey,
+            agentId,
             evmAddress,
             timestamp,
         }
@@ -1357,7 +1366,7 @@ export class Identities {
                     "data:application/json;base64,",
                     "",
                 )
-                const json = atob(base64)
+                const json = Buffer.from(base64, "base64").toString("utf-8")
                 return JSON.parse(json)
             } else if (tokenUri.startsWith("ipfs://")) {
                 // IPFS URI - fetch via gateway

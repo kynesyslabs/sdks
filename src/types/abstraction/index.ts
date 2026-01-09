@@ -287,6 +287,7 @@ export interface DemosOwnershipProof {
     message: string
     signature: string | { type: string; data: string }
     demosPublicKey: string
+    agentId: string
     evmAddress: string
     timestamp: number
 }
