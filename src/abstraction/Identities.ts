@@ -1123,7 +1123,6 @@ export class Identities {
      * @param chain Optional blockchain type (e.g. "evm", "solana").
      * @param subchain Optional subchain or network identifier.
      * @param scoreType Optional Nomis score type identifier.
-     * @param forceRefresh Whether to force recomputation instead of using cached data.
      * @returns The RPC response containing the Nomis score data.
      */
     async getNomisScore(
@@ -1132,7 +1131,6 @@ export class Identities {
         chain?: string,
         subchain?: string,
         scoreType?: number,
-        forceRefresh?: boolean,
     ) {
         const request = {
             method: "gcr_routine",
@@ -1145,7 +1143,6 @@ export class Identities {
                             chain,
                             subchain,
                             scoreType,
-                            forceRefresh,
                         },
                     ],
                 },
@@ -1167,5 +1164,16 @@ export class Identities {
      */
     async addNomisIdentity(demos: Demos, payload: NomisWalletIdentity) {
         return await this.inferIdentity(demos, "nomis", payload)
+    }
+
+    /**
+     * Remove a Nomis wallet identity from the GCR.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Nomis wallet identity data identifying the identity to remove.
+     * @returns The RPC response for the identity removal operation.
+     */
+    async removeNomisIdentity(demos: Demos, payload: NomisWalletIdentity) {
+        return await this.removeIdentity(demos, "nomis", payload)
     }
 }
