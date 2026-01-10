@@ -19,7 +19,7 @@ import { CustomCharges } from "../CustomCharges"
 /**
  * IPFS operation type constants
  */
-export type IPFSOperationType = "IPFS_ADD" | "IPFS_PIN" | "IPFS_UNPIN"
+export type IPFSOperationType = "IPFS_ADD" | "IPFS_PIN" | "IPFS_UNPIN" | "IPFS_EXTEND_PIN"
 
 // ============================================================================
 // Payload Interfaces
@@ -44,6 +44,15 @@ export interface IPFSAddPayload {
     /** Optional metadata to associate with the pin */
     metadata?: Record<string, unknown>
 
+    // REVIEW: DEM-481 - Pin duration support
+    /**
+     * Optional pin duration
+     * - Preset string: 'permanent' | 'week' | 'month' | 'quarter' | 'year'
+     * - Custom number: duration in seconds (min 1 day, max 10 years)
+     * - undefined or 'permanent': pin never expires
+     */
+    duration?: "permanent" | "week" | "month" | "quarter" | "year" | number
+
     // REVIEW: Phase 9 - Custom charges for cost control
     /** Optional custom charges configuration (from ipfsQuote) */
     custom_charges?: CustomCharges
@@ -62,8 +71,14 @@ export interface IPFSPinPayload {
     /** Content Identifier to pin */
     cid: string
 
-    /** Optional duration in blocks (0 = indefinite) */
-    duration?: number
+    // REVIEW: DEM-481 - Pin duration support
+    /**
+     * Optional pin duration
+     * - Preset string: 'permanent' | 'week' | 'month' | 'quarter' | 'year'
+     * - Custom number: duration in seconds (min 1 day, max 10 years)
+     * - undefined or 'permanent': pin never expires
+     */
+    duration?: "permanent" | "week" | "month" | "quarter" | "year" | number
 
     /** Optional metadata to associate with the pin */
     metadata?: Record<string, unknown>
@@ -87,10 +102,37 @@ export interface IPFSUnpinPayload {
     cid: string
 }
 
+// REVIEW: DEM-481 - Pin expiration extension
+/**
+ * Payload for IPFS_EXTEND_PIN operation
+ *
+ * Extends the expiration time of an existing pin.
+ * User pays additional cost based on the extension duration.
+ */
+export interface IPFSExtendPinPayload {
+    /** The IPFS operation type */
+    operation: "IPFS_EXTEND_PIN"
+
+    /** Content Identifier of the pin to extend */
+    cid: string
+
+    /**
+     * Additional duration to add
+     * - Preset string: 'week' | 'month' | 'quarter' | 'year'
+     * - Custom number: additional duration in seconds (min 1 day, max 10 years)
+     * Note: 'permanent' converts the pin to never expire
+     */
+    additionalDuration: "permanent" | "week" | "month" | "quarter" | "year" | number
+
+    // REVIEW: Phase 9 - Custom charges for cost control
+    /** Optional custom charges configuration (from ipfsQuote) */
+    custom_charges?: CustomCharges
+}
+
 /**
  * Union type for all IPFS payloads
  */
-export type IPFSPayload = IPFSAddPayload | IPFSPinPayload | IPFSUnpinPayload
+export type IPFSPayload = IPFSAddPayload | IPFSPinPayload | IPFSUnpinPayload | IPFSExtendPinPayload
 
 // ============================================================================
 // Transaction Types
@@ -136,6 +178,14 @@ export function isIPFSUnpinPayload(payload: IPFSPayload): payload is IPFSUnpinPa
     return payload.operation === "IPFS_UNPIN"
 }
 
+// REVIEW: DEM-481 - Pin extension type guard
+/**
+ * Check if a payload is an IPFS_EXTEND_PIN operation
+ */
+export function isIPFSExtendPinPayload(payload: IPFSPayload): payload is IPFSExtendPinPayload {
+    return payload.operation === "IPFS_EXTEND_PIN"
+}
+
 /**
  * Check if any payload is an IPFS payload
  */
@@ -145,6 +195,7 @@ export function isIPFSPayload(payload: unknown): payload is IPFSPayload {
     return (
         p.operation === "IPFS_ADD" ||
         p.operation === "IPFS_PIN" ||
-        p.operation === "IPFS_UNPIN"
+        p.operation === "IPFS_UNPIN" ||
+        p.operation === "IPFS_EXTEND_PIN"
     )
 }
