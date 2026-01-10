@@ -45,10 +45,14 @@ export {
     type IPFSAddPayload,
     type IPFSPinPayload,
     type IPFSUnpinPayload,
+    // REVIEW: DEM-481 - Pin expiration extension
+    type IPFSExtendPinPayload,
     type IPFSOperationType,
     isIPFSAddPayload,
     isIPFSPinPayload,
     isIPFSUnpinPayload,
+    // REVIEW: DEM-481 - Pin expiration extension
+    isIPFSExtendPinPayload,
     isIPFSPayload,
 } from "./blockchain/TransactionSubtypes"
 
