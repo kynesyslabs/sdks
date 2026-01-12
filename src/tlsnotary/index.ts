@@ -65,6 +65,9 @@ export {
     type TLSNotaryToken,
     type RequestAttestationOptions,
     type StoreProofOptions,
+    type TransactionDetails,
+    type TransactionConfirmCallback,
+    type WithConfirmationOptions,
 } from "./TLSNotaryService"
 
 // Types

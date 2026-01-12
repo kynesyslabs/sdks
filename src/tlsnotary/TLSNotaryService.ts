@@ -40,6 +40,8 @@
 import type { Demos } from "@/websdk/demosclass"
 import { DemosTransactions } from "@/websdk/DemosTransactions"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
+import { TLSNotary } from "./TLSNotary"
+import type { StatusCallback } from "./types"
 
 /**
  * Response from requestAttestation
@@ -107,6 +109,38 @@ export interface RequestAttestationOptions {
 export interface StoreProofOptions {
     /** Storage location: on-chain or IPFS */
     storage: "onchain" | "ipfs"
+}
+
+/**
+ * Transaction details for user confirmation
+ */
+export interface TransactionDetails {
+    /** The signed transaction object */
+    transaction: any
+    /** Transaction hash */
+    txHash: string
+    /** Amount in DEM being burned/spent */
+    amount: number
+    /** Description of what this transaction does */
+    description: string
+    /** Target URL for attestation requests */
+    targetUrl?: string
+    /** Token ID for store transactions */
+    tokenId?: string
+}
+
+/**
+ * Callback for user to confirm or reject a transaction
+ * Return true to proceed with broadcast, false to cancel
+ */
+export type TransactionConfirmCallback = (details: TransactionDetails) => Promise<boolean>
+
+/**
+ * Options for methods that require user confirmation
+ */
+export interface WithConfirmationOptions {
+    /** Callback for user to confirm or reject the transaction */
+    onConfirm: TransactionConfirmCallback
 }
 
 /**
@@ -230,6 +264,307 @@ export class TLSNotaryService {
     }
 
     /**
+     * Request an attestation token with user confirmation before broadcasting
+     *
+     * This method shows the transaction details to the user via the onConfirm callback
+     * and only broadcasts if the user confirms. This is the recommended way to request
+     * attestation tokens in user-facing applications.
+     *
+     * @param options - Request options including target URL
+     * @param confirmOptions - Options containing the confirmation callback
+     * @returns Attestation token response with proxyUrl and tokenId
+     * @throws Error if user rejects the transaction
+     *
+     * @example
+     * ```typescript
+     * const { proxyUrl, tokenId } = await service.requestAttestationWithConfirmation(
+     *   { targetUrl: 'https://api.github.com/users/octocat' },
+     *   {
+     *     onConfirm: async (details) => {
+     *       // Show confirmation dialog to user
+     *       return await showConfirmDialog({
+     *         title: 'Confirm Attestation Request',
+     *         message: `This will burn ${details.amount} DEM to request attestation for ${details.targetUrl}`,
+     *         txHash: details.txHash,
+     *       });
+     *     }
+     *   }
+     * );
+     * ```
+     */
+    async requestAttestationWithConfirmation(
+        options: RequestAttestationOptions,
+        confirmOptions: WithConfirmationOptions,
+    ): Promise<AttestationTokenResponse> {
+        const { targetUrl } = options
+        const { onConfirm } = confirmOptions
+
+        // Validate URL is HTTPS
+        const url = new URL(targetUrl)
+        if (url.protocol !== "https:") {
+            throw new Error("Only HTTPS URLs are supported for TLS attestation")
+        }
+
+        // 1. Create the transaction (but don't broadcast yet)
+        const tx = await this.createTlsnRequestTransaction(targetUrl)
+
+        // 2. Get confirmation from user
+        const details: TransactionDetails = {
+            transaction: tx,
+            txHash: tx.hash,
+            amount: 1,
+            description: "TLSNotary attestation request (burns 1 DEM)",
+            targetUrl,
+        }
+
+        const confirmed = await onConfirm(details)
+        if (!confirmed) {
+            throw new Error("Transaction rejected by user")
+        }
+
+        // 3. Now confirm and broadcast the transaction
+        const confirmResult = await DemosTransactions.confirm(tx, this.demos)
+        const broadcastResult = await DemosTransactions.broadcast(
+            confirmResult,
+            this.demos,
+        )
+
+        if (broadcastResult.result !== 200) {
+            throw new Error(
+                `Failed to submit attestation request: ${broadcastResult.response?.message || "Unknown error"}`,
+            )
+        }
+
+        // 4. Wait for token to be created by polling with txHash
+        const txHash = tx.hash
+        let tokenId: string | undefined
+        const maxAttempts = 30
+        const pollInterval = 1000
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const tokenResponse = await this.demos.nodeCall("tlsnotary.getToken", {
+                txHash,
+            }) as { token?: { id: string } } | null
+
+            if (tokenResponse?.token?.id) {
+                tokenId = tokenResponse.token.id
+                break
+            }
+
+            if (attempt < maxAttempts - 1) {
+                await new Promise(resolve => setTimeout(resolve, pollInterval))
+            }
+        }
+
+        if (!tokenId) {
+            throw new Error(
+                `Token not created after ${maxAttempts} seconds. Transaction may still be pending in mempool. txHash: ${txHash}`,
+            )
+        }
+
+        // 5. Get owner address
+        const { publicKey } = await this.demos.crypto.getIdentity("ed25519")
+        const owner = uint8ArrayToHex(publicKey as Uint8Array)
+
+        // 6. Call nodeCall to get proxy URL using the actual tokenId
+        const proxyResponse = (await this.demos.nodeCall("requestTLSNproxy", {
+            tokenId,
+            owner,
+            targetUrl,
+        })) as {
+            websocketProxyUrl: string
+            expiresIn: number
+            retriesLeft?: number
+        }
+
+        if (!proxyResponse || !proxyResponse.websocketProxyUrl) {
+            throw new Error("Failed to get proxy URL from node")
+        }
+
+        return {
+            proxyUrl: proxyResponse.websocketProxyUrl,
+            tokenId,
+            expiresAt: Date.now() + (proxyResponse.expiresIn || 30000),
+            retriesLeft: proxyResponse.retriesLeft ?? 3,
+        }
+    }
+
+    /**
+     * Request attestation token and create a pre-configured TLSNotary instance
+     *
+     * This is the recommended way to perform attestations. It handles:
+     * 1. Creating and broadcasting the TLSN_REQUEST transaction
+     * 2. Waiting for the token to be created
+     * 3. Getting the proxy URL
+     * 4. Creating a TLSNotary instance configured with that proxy
+     * 5. Initializing the WASM module
+     *
+     * The returned TLSNotary instance is ready to call `attest()` immediately.
+     *
+     * @param options - Request options including target URL
+     * @param onStatus - Optional status callback for progress updates
+     * @returns Object with TLSNotary instance, tokenId, and proxyUrl
+     *
+     * @example
+     * ```typescript
+     * const service = new TLSNotaryService(demos);
+     *
+     * // Get a ready-to-use TLSNotary instance
+     * const { tlsn, tokenId, proxyUrl } = await service.createTLSNotary({
+     *   targetUrl: 'https://api.github.com/users/octocat'
+     * });
+     *
+     * // Perform attestation - the proxy is already configured!
+     * const result = await tlsn.attest({
+     *   url: 'https://api.github.com/users/octocat',
+     * });
+     *
+     * // Store proof on-chain
+     * await service.storeProof(tokenId, JSON.stringify(result.presentation), { storage: 'onchain' });
+     * ```
+     */
+    async createTLSNotary(
+        options: RequestAttestationOptions,
+        onStatus?: StatusCallback,
+    ): Promise<{ tlsn: TLSNotary; tokenId: string; proxyUrl: string; expiresAt: number }> {
+        const status = onStatus || (() => {})
+
+        // Step 1: Request attestation token and get proxy URL
+        status("Requesting attestation token...")
+        const tokenResponse = await this.requestAttestation(options)
+
+        status(`Token obtained: ${tokenResponse.tokenId}`)
+
+        // Step 2: Get notary info from the node
+        status("Getting notary configuration...")
+        const notaryInfo = (await this.demos.nodeCall("tlsnotary.getInfo", {})) as {
+            notaryUrl: string
+            publicKey: string
+        }
+
+        if (!notaryInfo?.notaryUrl) {
+            throw new Error("Failed to get notary info from node")
+        }
+
+        // Step 3: Create TLSNotary instance with the pre-obtained proxy URL
+        // IMPORTANT: We only set websocketProxyUrl (not rpcUrl) so that TLSNotary
+        // uses our pre-obtained proxy instead of trying to request its own
+        status("Creating TLSNotary instance...")
+        const tlsn = new TLSNotary({
+            notaryUrl: notaryInfo.notaryUrl,
+            websocketProxyUrl: tokenResponse.proxyUrl, // Use the proxy we already obtained!
+            notaryPublicKey: notaryInfo.publicKey,
+            // Note: rpcUrl is intentionally NOT set - this prevents TLSNotary
+            // from trying to request its own proxy in getProxyUrl()
+        })
+
+        // Step 4: Initialize WASM
+        status("Initializing TLSNotary WASM...")
+        await tlsn.initialize()
+
+        status("TLSNotary ready for attestation!")
+
+        return {
+            tlsn,
+            tokenId: tokenResponse.tokenId,
+            proxyUrl: tokenResponse.proxyUrl,
+            expiresAt: tokenResponse.expiresAt,
+        }
+    }
+
+    /**
+     * Request attestation token and create a pre-configured TLSNotary instance
+     * WITH user confirmation before broadcasting the transaction.
+     *
+     * This is the recommended way to perform attestations in user-facing applications.
+     * It handles:
+     * 1. Creating the TLSN_REQUEST transaction
+     * 2. **Asking the user to confirm via the onConfirm callback**
+     * 3. Broadcasting the transaction if confirmed
+     * 4. Waiting for the token to be created
+     * 5. Getting the proxy URL
+     * 6. Creating a TLSNotary instance configured with that proxy
+     * 7. Initializing the WASM module
+     *
+     * @param options - Request options including target URL
+     * @param confirmOptions - Options containing the confirmation callback
+     * @param onStatus - Optional status callback for progress updates
+     * @returns Object with TLSNotary instance, tokenId, and proxyUrl
+     * @throws Error if user rejects the transaction
+     *
+     * @example
+     * ```typescript
+     * const service = new TLSNotaryService(demos);
+     *
+     * // Get a ready-to-use TLSNotary instance with user confirmation
+     * const { tlsn, tokenId, proxyUrl } = await service.createTLSNotaryWithConfirmation(
+     *   { targetUrl: 'https://api.github.com/users/octocat' },
+     *   {
+     *     onConfirm: async (details) => {
+     *       // Show confirmation dialog to user in your UI
+     *       return await showConfirmDialog({
+     *         title: 'Confirm Attestation',
+     *         message: `Burn ${details.amount} DEM for attestation?`,
+     *         txHash: details.txHash,
+     *       });
+     *     }
+     *   },
+     *   (status) => console.log(status)
+     * );
+     *
+     * // Perform attestation - the proxy is already configured!
+     * const result = await tlsn.attest({
+     *   url: 'https://api.github.com/users/octocat',
+     * });
+     * ```
+     */
+    async createTLSNotaryWithConfirmation(
+        options: RequestAttestationOptions,
+        confirmOptions: WithConfirmationOptions,
+        onStatus?: StatusCallback,
+    ): Promise<{ tlsn: TLSNotary; tokenId: string; proxyUrl: string; expiresAt: number }> {
+        const status = onStatus || (() => {})
+
+        // Step 1: Request attestation token with user confirmation
+        status("Preparing attestation request...")
+        const tokenResponse = await this.requestAttestationWithConfirmation(options, confirmOptions)
+
+        status(`Token obtained: ${tokenResponse.tokenId}`)
+
+        // Step 2: Get notary info from the node
+        status("Getting notary configuration...")
+        const notaryInfo = (await this.demos.nodeCall("tlsnotary.getInfo", {})) as {
+            notaryUrl: string
+            publicKey: string
+        }
+
+        if (!notaryInfo?.notaryUrl) {
+            throw new Error("Failed to get notary info from node")
+        }
+
+        // Step 3: Create TLSNotary instance with the pre-obtained proxy URL
+        status("Creating TLSNotary instance...")
+        const tlsn = new TLSNotary({
+            notaryUrl: notaryInfo.notaryUrl,
+            websocketProxyUrl: tokenResponse.proxyUrl,
+            notaryPublicKey: notaryInfo.publicKey,
+        })
+
+        // Step 4: Initialize WASM
+        status("Initializing TLSNotary WASM...")
+        await tlsn.initialize()
+
+        status("TLSNotary ready for attestation!")
+
+        return {
+            tlsn,
+            tokenId: tokenResponse.tokenId,
+            proxyUrl: tokenResponse.proxyUrl,
+            expiresAt: tokenResponse.expiresAt,
+        }
+    }
+
+    /**
      * Store a TLSNotary proof on-chain or IPFS
      *
      * This submits a TLSN_STORE native transaction that burns:
@@ -271,6 +606,95 @@ export class TLSNotaryService {
         )
 
         // 3. Confirm and broadcast
+        const confirmResult = await DemosTransactions.confirm(tx, this.demos)
+        const broadcastResult = await DemosTransactions.broadcast(
+            confirmResult,
+            this.demos,
+        )
+
+        if (broadcastResult.result !== 200) {
+            throw new Error(
+                `Failed to store proof: ${broadcastResult.response?.message || "Unknown error"}`,
+            )
+        }
+
+        return {
+            txHash: tx.hash,
+            storageFee,
+            broadcastStatus: broadcastResult.result,
+            broadcastMessage: broadcastResult.response?.message || "Transaction accepted",
+        }
+    }
+
+    /**
+     * Store a TLSNotary proof on-chain or IPFS with user confirmation
+     *
+     * This method shows the transaction details to the user via the onConfirm callback
+     * and only broadcasts if the user confirms. This is the recommended way to store
+     * proofs in user-facing applications.
+     *
+     * @param tokenId - The attestation token ID
+     * @param proof - The proof data (JSON string or serialized presentation)
+     * @param options - Storage options (on-chain or IPFS)
+     * @param confirmOptions - Options containing the confirmation callback
+     * @returns Storage response with transaction hash and fee
+     * @throws Error if user rejects the transaction
+     *
+     * @example
+     * ```typescript
+     * const { txHash, storageFee } = await service.storeProofWithConfirmation(
+     *   tokenId,
+     *   JSON.stringify(presentation),
+     *   { storage: 'onchain' },
+     *   {
+     *     onConfirm: async (details) => {
+     *       // Show confirmation dialog to user
+     *       return await showConfirmDialog({
+     *         title: 'Confirm Proof Storage',
+     *         message: `This will burn ${details.amount} DEM to store the proof on-chain`,
+     *         txHash: details.txHash,
+     *       });
+     *     }
+     *   }
+     * );
+     * ```
+     */
+    async storeProofWithConfirmation(
+        tokenId: string,
+        proof: string,
+        options: StoreProofOptions,
+        confirmOptions: WithConfirmationOptions,
+    ): Promise<StoreProofResponse> {
+        const { storage } = options
+        const { onConfirm } = confirmOptions
+
+        // 1. Calculate storage fee
+        const proofSizeKB = Math.ceil(proof.length / 1024)
+        const storageFee = this.calculateStorageFee(proofSizeKB)
+
+        // 2. Create the transaction (but don't broadcast yet)
+        const tx = await this.createTlsnStoreTransaction(
+            tokenId,
+            proof,
+            storage,
+            storageFee,
+        )
+
+        // 3. Get confirmation from user
+        const details: TransactionDetails = {
+            transaction: tx,
+            txHash: tx.hash,
+            amount: storageFee,
+            description: `Store TLSNotary proof ${storage === 'onchain' ? 'on-chain' : 'on IPFS'} (burns ${storageFee} DEM)`,
+            tokenId,
+        }
+
+        const confirmed = await onConfirm(details)
+        if (!confirmed) {
+            throw new Error("Transaction rejected by user")
+        }
+
+        // 4. Confirm and broadcast
         const confirmResult = await DemosTransactions.confirm(tx, this.demos)
         const broadcastResult = await DemosTransactions.broadcast(
             confirmResult,
