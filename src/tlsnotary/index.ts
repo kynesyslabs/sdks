@@ -93,6 +93,15 @@ export { default } from "./TLSNotary"
 // Helper function exports
 export { calculateStorageFee } from "./helpers"
 
+// Auto-init helper for simplified WASM setup
+export {
+    initTlsn,
+    checkWasmAvailability,
+    getWasmSourcePath,
+    WASM_FILES,
+    type AutoInitOptions,
+} from "./auto-init"
+
 /**
  * Re-export tlsn-js classes and functions for convenience.
  *

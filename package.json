@@ -59,6 +59,7 @@
         "./tlsnotary": "./build/tlsnotary/index.js",
         "./tlsnotary/service": "./build/tlsnotary/service.js",
         "./tlsnotary/webpack": "./build/tlsnotary/webpack.js",
+        "./tlsnotary/auto-init": "./build/tlsnotary/auto-init.js",
         "./tlsnotary/wasm/*": "./build/tlsnotary/wasm/*"
     },
     "scripts": {
