@@ -55,6 +55,8 @@ export interface AttestationTokenResponse {
     expiresAt: number
     /** Number of retry attempts remaining */
     retriesLeft: number
+    /** Transaction hash of the attestation request */
+    txHash: string
 }
 
 /**
@@ -260,6 +262,7 @@ export class TLSNotaryService {
             tokenId,
             expiresAt: Date.now() + (proxyResponse.expiresIn || 30000),
             retriesLeft: proxyResponse.retriesLeft ?? 3,
+            txHash,
         }
     }
 
@@ -386,6 +389,7 @@ export class TLSNotaryService {
             tokenId,
             expiresAt: Date.now() + (proxyResponse.expiresIn || 30000),
             retriesLeft: proxyResponse.retriesLeft ?? 3,
+            txHash,
         }
     }
 
@@ -426,7 +430,7 @@ export class TLSNotaryService {
     async createTLSNotary(
         options: RequestAttestationOptions,
         onStatus?: StatusCallback,
-    ): Promise<{ tlsn: TLSNotary; tokenId: string; proxyUrl: string; expiresAt: number }> {
+    ): Promise<{ tlsn: TLSNotary; tokenId: string; proxyUrl: string; expiresAt: number; requestTxHash: string }> {
         const status = onStatus || (() => {})
 
         // Step 1: Request attestation token and get proxy URL
@@ -469,6 +473,7 @@ export class TLSNotaryService {
             tokenId: tokenResponse.tokenId,
             proxyUrl: tokenResponse.proxyUrl,
             expiresAt: tokenResponse.expiresAt,
+            requestTxHash: tokenResponse.txHash,
         }
     }
 
@@ -522,7 +527,7 @@ export class TLSNotaryService {
         options: RequestAttestationOptions,
         confirmOptions: WithConfirmationOptions,
         onStatus?: StatusCallback,
-    ): Promise<{ tlsn: TLSNotary; tokenId: string; proxyUrl: string; expiresAt: number }> {
+    ): Promise<{ tlsn: TLSNotary; tokenId: string; proxyUrl: string; expiresAt: number; requestTxHash: string }> {
         const status = onStatus || (() => {})
 
         // Step 1: Request attestation token with user confirmation
@@ -561,6 +566,7 @@ export class TLSNotaryService {
             tokenId: tokenResponse.tokenId,
             proxyUrl: tokenResponse.proxyUrl,
             expiresAt: tokenResponse.expiresAt,
+            requestTxHash: tokenResponse.txHash,
         }
     }
 
