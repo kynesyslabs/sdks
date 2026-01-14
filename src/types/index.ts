@@ -175,6 +175,7 @@ export {
     GCREditIdentity,
     GCREditNonce,
     GCREditSubnetsTx,
+    GCREditStorageProgram,
     Web2GCRData,
     XmGCRData,
     XmGCRIdentityData,
