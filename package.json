@@ -97,6 +97,7 @@
         "@cosmjs/proto-signing": "^0.32.4",
         "@cosmjs/stargate": "^0.32.4",
         "@cryptkeeperzk/snarkjs": "^0.7.2",
+        "@kynesyslabs/demosdk": "^2.8.22",
         "@metaplex-foundation/js": "^0.20.1",
         "@multiversx/sdk-core": "^13.17.2",
         "@multiversx/sdk-extension-provider": "^3.0.0",

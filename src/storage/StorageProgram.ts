@@ -699,8 +699,29 @@ export class StorageProgram {
     }
 
     // ========================================================================
-    // Query Methods (RPC calls)
+    // Query Methods (RPC calls via gcr_routine)
     // ========================================================================
+
+    /**
+     * Internal helper to make gcr_routine RPC calls
+     */
+    private static async gcrRoutineCall<T>(
+        rpcUrl: string,
+        method: string,
+        params: unknown[],
+    ): Promise<{ result: number; response: T; extra?: unknown }> {
+        const response = await axios.post<{ result: number; response: T; extra?: unknown }>(
+            rpcUrl,
+            {
+                method: "gcr_routine",
+                params: [{ method, params }],
+            },
+            {
+                headers: { "Content-Type": "application/json" },
+            },
+        )
+        return response.data
+    }
 
     /**
      * Get a storage program by address
@@ -727,32 +748,17 @@ export class StorageProgram {
         identity?: string,
     ): Promise<StorageProgramData | null> {
         try {
-            const headers: Record<string, string> = {}
-            if (identity) {
-                headers["identity"] = identity
-            }
-
-            const response = await axios.get<StorageProgramResponse>(
-                `${rpcUrl}/storage-program/${storageAddress}`,
-                { headers },
+            const result = await this.gcrRoutineCall<StorageProgramData | null>(
+                rpcUrl,
+                "getStorageProgram",
+                [storageAddress, identity],
             )
 
-            if (!response.data.success || !response.data.storageAddress) {
+            if (result.result !== 200 || !result.response) {
                 return null
             }
 
-            return {
-                storageAddress: response.data.storageAddress,
-                owner: response.data.owner!,
-                programName: response.data.programName!,
-                encoding: response.data.encoding!,
-                data: response.data.data,
-                metadata: response.data.metadata,
-                storageLocation: response.data.storageLocation!,
-                sizeBytes: response.data.sizeBytes!,
-                createdAt: response.data.createdAt!,
-                updatedAt: response.data.updatedAt!,
-            }
+            return result.response
         } catch (error) {
             if (axios.isAxiosError(error) && error.response?.status === 404) {
                 return null
@@ -783,21 +789,21 @@ export class StorageProgram {
         owner: string,
         identity?: string,
     ): Promise<StorageProgramListItem[]> {
-        const headers: Record<string, string> = {}
-        if (identity) {
-            headers["identity"] = identity
-        }
+        try {
+            const result = await this.gcrRoutineCall<StorageProgramListItem[]>(
+                rpcUrl,
+                "getStorageProgramsByOwner",
+                [owner, identity],
+            )
 
-        const response = await axios.get<StorageProgramsListResponse>(
-            `${rpcUrl}/storage-program/owner/${owner}`,
-            { headers },
-        )
+            if (result.result !== 200 || !result.response) {
+                return []
+            }
 
-        if (!response.data.success || !response.data.programs) {
+            return result.response
+        } catch (error) {
             return []
         }
-
-        return response.data.programs
     }
 
     /**
@@ -841,32 +847,26 @@ export class StorageProgram {
             identity?: string
         },
     ): Promise<StorageProgramListItem[]> {
-        const headers: Record<string, string> = {}
-        if (options?.identity) {
-            headers["identity"] = options.identity
-        }
+        try {
+            const searchOptions = {
+                limit: options?.limit,
+                offset: options?.offset,
+                exactMatch: options?.exactMatch,
+            }
 
-        const params = new URLSearchParams()
-        params.set("q", nameQuery)
-        if (options?.exactMatch) {
-            params.set("exact", "true")
-        }
-        if (options?.limit !== undefined) {
-            params.set("limit", options.limit.toString())
-        }
-        if (options?.offset !== undefined) {
-            params.set("offset", options.offset.toString())
-        }
+            const result = await this.gcrRoutineCall<StorageProgramListItem[]>(
+                rpcUrl,
+                "searchStoragePrograms",
+                [nameQuery, searchOptions, options?.identity],
+            )
 
-        const response = await axios.get<StorageProgramsListResponse>(
-            `${rpcUrl}/storage-program/search?${params.toString()}`,
-            { headers },
-        )
+            if (result.result !== 200 || !result.response) {
+                return []
+            }
 
-        if (!response.data.success || !response.data.programs) {
+            return result.response
+        } catch (error) {
             return []
         }
-
-        return response.data.programs
     }
 }
