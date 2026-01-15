@@ -108,10 +108,10 @@ export class GCRGeneration {
 
         for (const edit of gcrEdits) {
             // Storage programs use 'target' instead of 'account'
+            // Storage addresses use stor- prefix (not 0x), so skip prefix addition for them
             if (edit.type === "storageProgram") {
-                if (!edit.target.startsWith("0x")) {
-                    edit.target = "0x" + edit.target
-                }
+                // Storage addresses already have correct format: stor-{40 hex chars}
+                // Do NOT add 0x prefix to storage targets
             } else if ("account" in edit && !edit.account.startsWith("0x")) {
                 edit.account = "0x" + edit.account
             }
