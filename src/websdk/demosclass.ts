@@ -324,14 +324,13 @@ export class Demos {
         }
 
         // INFO: Validate and normalize 'to' address
-        // Storage program transactions use format: stor-{40 hex chars}
+        // Storage program transactions (type: "storageProgram") use format: stor-{40 hex chars}
         // Regular addresses use format: 0x{64 hex chars}
-        const storageOperations = ["CREATE_STORAGE_PROGRAM", "WRITE_STORAGE", "DELETE_STORAGE_PROGRAM"]
-        const isStorageOperation = storageOperations.includes(raw_tx.content.type)
+        const isStorageTransaction = raw_tx.content.type === "storageProgram"
         const isStorageAddress = /^stor-[0-9a-f]{40}$/i.test(raw_tx.content.to)
 
-        if (isStorageOperation) {
-            // Storage operations must use stor- address format
+        if (isStorageTransaction) {
+            // Storage transactions must use stor- address format
             if (!isStorageAddress) {
                 throw new Error(`Invalid storage address format: ${raw_tx.content.to}. Expected: stor-{40 hex chars}`)
             }
