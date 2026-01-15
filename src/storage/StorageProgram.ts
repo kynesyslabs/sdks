@@ -1,4 +1,4 @@
-import { createHash } from "crypto"
+import { sha256 } from "js-sha256"
 import type {
     StorageProgramPayload,
     StorageProgramACL,
@@ -82,8 +82,8 @@ export class StorageProgram {
         // Create hash input: deployerAddress:programName:salt
         const hashInput = `${deployerAddress}:${programName}:${salt}`
 
-        // SHA-256 hash and take first 40 characters
-        const hash = createHash("sha256").update(hashInput).digest("hex")
+        // SHA-256 hash and take first 40 characters (using browser-compatible js-sha256)
+        const hash = sha256(hashInput)
         const addressHash = hash.substring(0, 40)
 
         return `stor-${addressHash}`
