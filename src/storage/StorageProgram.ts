@@ -31,13 +31,14 @@ import { STORAGE_PROGRAM_CONSTANTS } from "../types/blockchain/TransactionSubtyp
  * ```typescript
  * import { StorageProgram } from '@kynesyslabs/demosdk'
  *
- * // Create JSON storage program
+ * // Create JSON storage program (nonce required for unique address)
  * const jsonPayload = StorageProgram.createStorageProgram(
  *   'demos1abc...',
  *   'myConfig',
  *   { apiKey: 'secret', settings: { theme: 'dark' } },
  *   'json',
- *   { mode: 'public' }
+ *   { mode: 'public' },
+ *   { nonce: 42 }  // sender's current nonce
  * )
  *
  * // Create Binary storage program
@@ -47,7 +48,7 @@ import { STORAGE_PROGRAM_CONSTANTS } from "../types/blockchain/TransactionSubtyp
  *   Buffer.from(imageData).toString('base64'),
  *   'binary',
  *   { mode: 'restricted', allowed: ['demos1user1...'] },
- *   { metadata: { filename: 'avatar.png', mimeType: 'image/png' } }
+ *   { nonce: 43, metadata: { filename: 'avatar.png', mimeType: 'image/png' } }
  * )
  * ```
  */
@@ -61,7 +62,8 @@ export class StorageProgram {
      *
      * @param deployerAddress - Address of the program deployer (will be owner)
      * @param programName - Name of the storage program
-     * @param salt - Optional random salt for uniqueness (default: empty string)
+     * @param nonce - Sender's nonce for uniqueness (ensures unique address per transaction)
+     * @param salt - Optional random salt for additional uniqueness (default: empty string)
      * @returns Storage address in format: stor-{first 40 chars of sha256}
      *
      * @example
@@ -69,6 +71,7 @@ export class StorageProgram {
      * const address = StorageProgram.deriveStorageAddress(
      *   'demos1abc...',
      *   'myConfig',
+     *   42,  // nonce
      *   'salt123'
      * )
      * // Returns: 'stor-7a8b9c...' (40 chars after prefix)
@@ -77,10 +80,12 @@ export class StorageProgram {
     static deriveStorageAddress(
         deployerAddress: string,
         programName: string,
+        nonce: number,
         salt: string = "",
     ): string {
-        // Create hash input: deployerAddress:programName:salt
-        const hashInput = `${deployerAddress}:${programName}:${salt}`
+        // Create hash input: deployerAddress:programName:nonce:salt
+        // Nonce ensures uniqueness per transaction from same deployer
+        const hashInput = `${deployerAddress}:${programName}:${nonce}:${salt}`
 
         // SHA-256 hash and take first 40 characters (using browser-compatible js-sha256)
         const hash = sha256(hashInput)
@@ -101,7 +106,7 @@ export class StorageProgram {
      * @param data - Initial data (JSON object or base64 binary string)
      * @param encoding - "json" or "binary" (default: "json")
      * @param acl - Access control configuration (default: owner-only)
-     * @param options - Additional options (salt, metadata, storageLocation)
+     * @param options - Options including nonce (required), salt, metadata, storageLocation
      * @returns StorageProgramPayload for transaction creation
      *
      * @example
@@ -112,7 +117,8 @@ export class StorageProgram {
      *   'appConfig',
      *   { version: '1.0', features: ['auth', 'storage'] },
      *   'json',
-     *   { mode: 'public' }
+     *   { mode: 'public' },
+     *   { nonce: 42 }  // Required: sender's current nonce
      * )
      *
      * // Binary storage with group access
@@ -128,7 +134,7 @@ export class StorageProgram {
      *       viewers: { members: ['demos1c...'], permissions: ['read'] }
      *     }
      *   },
-     *   { metadata: { filename: 'report.pdf', mimeType: 'application/pdf' } }
+     *   { nonce: 43, metadata: { filename: 'report.pdf', mimeType: 'application/pdf' } }
      * )
      * ```
      */
@@ -139,14 +145,20 @@ export class StorageProgram {
         encoding: StorageEncoding = "json",
         acl?: Partial<StorageProgramACL>,
         options?: {
+            nonce: number // Required: sender's nonce for unique address derivation
             salt?: string
             metadata?: Record<string, unknown>
             storageLocation?: StorageLocation
         },
     ): StorageProgramPayload {
+        if (options?.nonce === undefined) {
+            throw new Error("nonce is required for storage program creation")
+        }
+
         const storageAddress = this.deriveStorageAddress(
             deployerAddress,
             programName,
+            options.nonce,
             options?.salt || "",
         )
 
@@ -580,6 +592,7 @@ export class StorageProgram {
         deployerAddress: string,
         programName: string,
         initialData: Record<string, any>,
+        nonce: number,
         accessControl: StorageProgramAccessControl = "private",
         salt?: string,
         allowedAddresses?: string[],
@@ -587,6 +600,7 @@ export class StorageProgram {
         const storageAddress = this.deriveStorageAddress(
             deployerAddress,
             programName,
+            nonce,
             salt || "",
         )
 
