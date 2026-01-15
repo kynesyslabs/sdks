@@ -323,14 +323,32 @@ export class Demos {
             }
         }
 
-        // INFO: Add 0x prefix to addresses if not present
-        if (!raw_tx.content.to.startsWith("0x")) {
-            raw_tx.content.to = "0x" + raw_tx.content.to
-        }
+        // INFO: Validate and normalize 'to' address
+        // Storage program transactions use format: stor-{40 hex chars}
+        // Regular addresses use format: 0x{64 hex chars}
+        const storageOperations = ["CREATE_STORAGE_PROGRAM", "WRITE_STORAGE", "DELETE_STORAGE_PROGRAM"]
+        const isStorageOperation = storageOperations.includes(raw_tx.content.type)
+        const isStorageAddress = /^stor-[0-9a-f]{40}$/i.test(raw_tx.content.to)
 
-        const isHex = /^0x[0-9a-f]{64}$/i.test(raw_tx.content.to)
-        if (!isHex) {
-            throw new Error(`Invalid To address: ${raw_tx.content.to}`)
+        if (isStorageOperation) {
+            // Storage operations must use stor- address format
+            if (!isStorageAddress) {
+                throw new Error(`Invalid storage address format: ${raw_tx.content.to}. Expected: stor-{40 hex chars}`)
+            }
+        } else {
+            // Non-storage transactions must use 0x address format
+            if (isStorageAddress) {
+                throw new Error(`Storage address format not allowed for transaction type: ${raw_tx.content.type}`)
+            }
+            // Add 0x prefix to regular addresses if not present
+            if (!raw_tx.content.to.startsWith("0x")) {
+                raw_tx.content.to = "0x" + raw_tx.content.to
+            }
+
+            const isHex = /^0x[0-9a-f]{64}$/i.test(raw_tx.content.to)
+            if (!isHex) {
+                throw new Error(`Invalid To address: ${raw_tx.content.to}`)
+            }
         }
 
         if (!raw_tx.content.from_ed25519_address.startsWith("0x")) {
