@@ -1,4 +1,5 @@
 export { StorageProgram } from "./StorageProgram"
+export type { StorageProgramData, StorageProgramListItem } from "./StorageProgram"
 export type {
     // Operations and encoding
     StorageProgramOperation,

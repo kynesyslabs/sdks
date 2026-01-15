@@ -1,4 +1,5 @@
 import { sha256 } from "js-sha256"
+import axios from "axios"
 import type {
     StorageProgramPayload,
     StorageProgramACL,
@@ -9,6 +10,68 @@ import type {
     StorageProgramAccessControl,
 } from "../types/blockchain/TransactionSubtypes/StorageProgramTransaction"
 import { STORAGE_PROGRAM_CONSTANTS } from "../types/blockchain/TransactionSubtypes/StorageProgramTransaction"
+
+// ============================================================================
+// Query Response Types
+// ============================================================================
+
+/**
+ * Storage program data returned from RPC queries
+ */
+export interface StorageProgramData {
+    storageAddress: string
+    owner: string
+    programName: string
+    encoding: "json" | "binary"
+    data?: Record<string, unknown> | string | null
+    metadata?: Record<string, unknown> | null
+    storageLocation: string
+    sizeBytes: number
+    createdAt: string
+    updatedAt: string
+}
+
+/**
+ * Storage program list item (without full data)
+ */
+export interface StorageProgramListItem {
+    storageAddress: string
+    programName: string
+    encoding: "json" | "binary"
+    sizeBytes: number
+    storageLocation: string
+    createdAt: string
+    updatedAt: string
+}
+
+/**
+ * Response from storage program RPC endpoints
+ */
+interface StorageProgramResponse {
+    success: boolean
+    storageAddress?: string
+    owner?: string
+    programName?: string
+    encoding?: "json" | "binary"
+    data?: Record<string, unknown> | string | null
+    metadata?: Record<string, unknown> | null
+    storageLocation?: string
+    sizeBytes?: number
+    createdAt?: string
+    updatedAt?: string
+    error?: string
+    errorCode?: string
+}
+
+/**
+ * Response from storage program list endpoints
+ */
+interface StorageProgramsListResponse {
+    success: boolean
+    programs?: StorageProgramListItem[]
+    count?: number
+    error?: string
+}
 
 // REVIEW: Unified Storage Program class for both JSON and Binary storage with robust ACL
 
@@ -633,5 +696,177 @@ export class StorageProgram {
             accessControl,
             allowedAddresses,
         }
+    }
+
+    // ========================================================================
+    // Query Methods (RPC calls)
+    // ========================================================================
+
+    /**
+     * Get a storage program by address
+     *
+     * @param rpcUrl - The RPC endpoint URL (e.g., "https://node.demos.sh")
+     * @param storageAddress - The storage program address (stor-{hash})
+     * @param identity - Optional requester identity for ACL-protected programs
+     * @returns Storage program data or null if not found
+     *
+     * @example
+     * ```typescript
+     * const program = await StorageProgram.getByAddress(
+     *   'https://node.demos.sh',
+     *   'stor-7a8b9c...'
+     * )
+     * if (program) {
+     *   console.log(`Found: ${program.programName}`)
+     * }
+     * ```
+     */
+    static async getByAddress(
+        rpcUrl: string,
+        storageAddress: string,
+        identity?: string,
+    ): Promise<StorageProgramData | null> {
+        try {
+            const headers: Record<string, string> = {}
+            if (identity) {
+                headers["identity"] = identity
+            }
+
+            const response = await axios.get<StorageProgramResponse>(
+                `${rpcUrl}/storage-program/${storageAddress}`,
+                { headers },
+            )
+
+            if (!response.data.success || !response.data.storageAddress) {
+                return null
+            }
+
+            return {
+                storageAddress: response.data.storageAddress,
+                owner: response.data.owner!,
+                programName: response.data.programName!,
+                encoding: response.data.encoding!,
+                data: response.data.data,
+                metadata: response.data.metadata,
+                storageLocation: response.data.storageLocation!,
+                sizeBytes: response.data.sizeBytes!,
+                createdAt: response.data.createdAt!,
+                updatedAt: response.data.updatedAt!,
+            }
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+                return null
+            }
+            throw error
+        }
+    }
+
+    /**
+     * Get all storage programs owned by an address
+     *
+     * @param rpcUrl - The RPC endpoint URL
+     * @param owner - The owner's address
+     * @param identity - Optional requester identity for ACL filtering
+     * @returns Array of storage program list items
+     *
+     * @example
+     * ```typescript
+     * const programs = await StorageProgram.getByOwner(
+     *   'https://node.demos.sh',
+     *   'demos1abc...'
+     * )
+     * console.log(`Found ${programs.length} programs`)
+     * ```
+     */
+    static async getByOwner(
+        rpcUrl: string,
+        owner: string,
+        identity?: string,
+    ): Promise<StorageProgramListItem[]> {
+        const headers: Record<string, string> = {}
+        if (identity) {
+            headers["identity"] = identity
+        }
+
+        const response = await axios.get<StorageProgramsListResponse>(
+            `${rpcUrl}/storage-program/owner/${owner}`,
+            { headers },
+        )
+
+        if (!response.data.success || !response.data.programs) {
+            return []
+        }
+
+        return response.data.programs
+    }
+
+    /**
+     * Search storage programs by name (supports partial matching)
+     *
+     * @param rpcUrl - The RPC endpoint URL
+     * @param nameQuery - The name or partial name to search for
+     * @param options - Search options (exactMatch, limit, offset, identity)
+     * @returns Array of storage program list items
+     *
+     * @example
+     * ```typescript
+     * // Partial match search
+     * const results = await StorageProgram.searchByName(
+     *   'https://node.demos.sh',
+     *   'config'  // matches "appConfig", "myConfig", etc.
+     * )
+     *
+     * // Exact match search
+     * const exact = await StorageProgram.searchByName(
+     *   'https://node.demos.sh',
+     *   'myConfig',
+     *   { exactMatch: true }
+     * )
+     *
+     * // Paginated search
+     * const page2 = await StorageProgram.searchByName(
+     *   'https://node.demos.sh',
+     *   'config',
+     *   { limit: 10, offset: 10 }
+     * )
+     * ```
+     */
+    static async searchByName(
+        rpcUrl: string,
+        nameQuery: string,
+        options?: {
+            exactMatch?: boolean
+            limit?: number
+            offset?: number
+            identity?: string
+        },
+    ): Promise<StorageProgramListItem[]> {
+        const headers: Record<string, string> = {}
+        if (options?.identity) {
+            headers["identity"] = options.identity
+        }
+
+        const params = new URLSearchParams()
+        params.set("q", nameQuery)
+        if (options?.exactMatch) {
+            params.set("exact", "true")
+        }
+        if (options?.limit !== undefined) {
+            params.set("limit", options.limit.toString())
+        }
+        if (options?.offset !== undefined) {
+            params.set("offset", options.offset.toString())
+        }
+
+        const response = await axios.get<StorageProgramsListResponse>(
+            `${rpcUrl}/storage-program/search?${params.toString()}`,
+            { headers },
+        )
+
+        if (!response.data.success || !response.data.programs) {
+            return []
+        }
+
+        return response.data.programs
     }
 }
