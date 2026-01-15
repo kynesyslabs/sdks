@@ -699,22 +699,23 @@ export class StorageProgram {
     }
 
     // ========================================================================
-    // Query Methods (RPC calls via gcr_routine)
+    // Query Methods (RPC calls via nodeCall - no authentication required)
     // ========================================================================
 
     /**
-     * Internal helper to make gcr_routine RPC calls
+     * Internal helper to make nodeCall RPC calls
+     * nodeCall is used for public endpoints that don't require authentication
      */
-    private static async gcrRoutineCall<T>(
+    private static async nodeCall<T>(
         rpcUrl: string,
-        method: string,
-        params: unknown[],
+        message: string,
+        data: Record<string, unknown>,
     ): Promise<{ result: number; response: T; extra?: unknown }> {
         const response = await axios.post<{ result: number; response: T; extra?: unknown }>(
             rpcUrl,
             {
-                method: "gcr_routine",
-                params: [{ method, params }],
+                method: "nodeCall",
+                params: [{ message, data, muid: `storage-${Date.now()}` }],
             },
             {
                 headers: { "Content-Type": "application/json" },
@@ -748,10 +749,10 @@ export class StorageProgram {
         identity?: string,
     ): Promise<StorageProgramData | null> {
         try {
-            const result = await this.gcrRoutineCall<StorageProgramData | null>(
+            const result = await this.nodeCall<StorageProgramData | null>(
                 rpcUrl,
                 "getStorageProgram",
-                [storageAddress, identity],
+                { storageAddress, requesterAddress: identity },
             )
 
             if (result.result !== 200 || !result.response) {
@@ -790,10 +791,10 @@ export class StorageProgram {
         identity?: string,
     ): Promise<StorageProgramListItem[]> {
         try {
-            const result = await this.gcrRoutineCall<StorageProgramListItem[]>(
+            const result = await this.nodeCall<StorageProgramListItem[]>(
                 rpcUrl,
                 "getStorageProgramsByOwner",
-                [owner, identity],
+                { owner, requesterAddress: identity },
             )
 
             if (result.result !== 200 || !result.response) {
@@ -848,16 +849,18 @@ export class StorageProgram {
         },
     ): Promise<StorageProgramListItem[]> {
         try {
-            const searchOptions = {
-                limit: options?.limit,
-                offset: options?.offset,
-                exactMatch: options?.exactMatch,
-            }
-
-            const result = await this.gcrRoutineCall<StorageProgramListItem[]>(
+            const result = await this.nodeCall<StorageProgramListItem[]>(
                 rpcUrl,
                 "searchStoragePrograms",
-                [nameQuery, searchOptions, options?.identity],
+                {
+                    query: nameQuery,
+                    options: {
+                        limit: options?.limit,
+                        offset: options?.offset,
+                        exactMatch: options?.exactMatch,
+                    },
+                    requesterAddress: options?.identity,
+                },
             )
 
             if (result.result !== 200 || !result.response) {
