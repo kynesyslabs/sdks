@@ -2,7 +2,7 @@ import { Identities } from "@/abstraction"
 import { Hashing, uint8ArrayToHex } from "@/encryption"
 import { Demos, DemosWebAuth } from "@/websdk"
 import * as bip39 from "@scure/bip39"
-import { wordlist } from "@scure/bip39/wordlists/english"
+import { wordlist } from "@scure/bip39/wordlists/english.js"
 
 describe("New Demos", () => {
     test.skip("Send Native tokens", async () => {
