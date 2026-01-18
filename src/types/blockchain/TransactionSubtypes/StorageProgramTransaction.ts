@@ -30,11 +30,19 @@ export const STORAGE_PROGRAM_CONSTANTS = {
 /**
  * Storage Program operations
  *
+ * Full data operations:
  * - CREATE_STORAGE_PROGRAM: Initialize a new storage program with access control
- * - WRITE_STORAGE: Write/update data in the storage
+ * - WRITE_STORAGE: Write/update entire data in the storage
  * - READ_STORAGE: Query operation (not a transaction, used for validation)
  * - UPDATE_ACCESS_CONTROL: Modify access control settings (owner only)
  * - DELETE_STORAGE_PROGRAM: Remove the entire storage program (owner/ACL permissioned)
+ *
+ * Granular field operations (JSON encoding only):
+ * - SET_FIELD: Set a single field value
+ * - SET_ITEM: Set an item at a specific array index
+ * - APPEND_ITEM: Append an item to an array field
+ * - DELETE_FIELD: Delete a single field
+ * - DELETE_ITEM: Delete an item at a specific array index
  */
 export type StorageProgramOperation =
     | "CREATE_STORAGE_PROGRAM"
@@ -42,6 +50,12 @@ export type StorageProgramOperation =
     | "READ_STORAGE"
     | "UPDATE_ACCESS_CONTROL"
     | "DELETE_STORAGE_PROGRAM"
+    // REVIEW: Granular field operations for JSON storage
+    | "SET_FIELD"
+    | "SET_ITEM"
+    | "APPEND_ITEM"
+    | "DELETE_FIELD"
+    | "DELETE_ITEM"
 
 // ============================================================================
 // Encoding Types
@@ -186,6 +200,28 @@ export interface StorageProgramPayload {
      * Note: "ipfs" is not yet implemented, will fall back to "onchain"
      */
     storageLocation?: StorageLocation
+
+    // =========================================================================
+    // Granular Operation Fields (JSON encoding only)
+    // =========================================================================
+
+    /**
+     * Field name for granular operations (SET_FIELD, SET_ITEM, APPEND_ITEM, DELETE_FIELD, DELETE_ITEM)
+     * Required for all granular operations
+     */
+    field?: string
+
+    /**
+     * Array index for SET_ITEM and DELETE_ITEM operations
+     * Required for SET_ITEM and DELETE_ITEM
+     */
+    index?: number
+
+    /**
+     * Value for SET_FIELD, SET_ITEM, and APPEND_ITEM operations
+     * Required for SET_FIELD, SET_ITEM, and APPEND_ITEM
+     */
+    value?: unknown
 }
 
 // ============================================================================
@@ -229,10 +265,23 @@ export interface StorageProgramTransaction extends Omit<Transaction, "content"> 
 export function isStorageProgramPayload(payload: unknown): payload is StorageProgramPayload {
     if (!payload || typeof payload !== "object") return false
     const p = payload as Record<string, unknown>
+    const validOperations = [
+        "CREATE_STORAGE_PROGRAM",
+        "WRITE_STORAGE",
+        "READ_STORAGE",
+        "UPDATE_ACCESS_CONTROL",
+        "DELETE_STORAGE_PROGRAM",
+        // Granular operations
+        "SET_FIELD",
+        "SET_ITEM",
+        "APPEND_ITEM",
+        "DELETE_FIELD",
+        "DELETE_ITEM",
+    ]
     return (
         typeof p.operation === "string" &&
         typeof p.storageAddress === "string" &&
-        ["CREATE_STORAGE_PROGRAM", "WRITE_STORAGE", "READ_STORAGE", "UPDATE_ACCESS_CONTROL", "DELETE_STORAGE_PROGRAM"].includes(p.operation as string)
+        validOperations.includes(p.operation as string)
     )
 }
 

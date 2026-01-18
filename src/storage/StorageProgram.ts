@@ -29,6 +29,12 @@ export interface StorageProgramData {
     sizeBytes: number
     createdAt: string
     updatedAt: string
+    /** Transaction hash that created this storage program */
+    createdByTx?: string
+    /** Transaction hash of the last modification */
+    lastModifiedByTx?: string
+    /** Array of all transaction hashes that interacted with this storage program */
+    interactionTxs?: string[]
 }
 
 /**
@@ -71,6 +77,63 @@ interface StorageProgramsListResponse {
     programs?: StorageProgramListItem[]
     count?: number
     error?: string
+}
+
+// ============================================================================
+// Granular Operation Types
+// ============================================================================
+
+/**
+ * Granular write operations for storage programs
+ */
+export type GranularWriteOperation = "SET_FIELD" | "SET_ITEM" | "APPEND_ITEM" | "DELETE_FIELD" | "DELETE_ITEM"
+
+/**
+ * Field type returned by getFieldType
+ */
+export type StorageFieldType = "string" | "number" | "boolean" | "array" | "object" | "null" | "undefined"
+
+/**
+ * Response from getFields operation
+ */
+export interface StorageProgramFieldsResponse {
+    fields: string[]
+    count: number
+}
+
+/**
+ * Response from getValue operation
+ */
+export interface StorageProgramValueResponse<T = unknown> {
+    field: string
+    value: T
+    type: StorageFieldType
+}
+
+/**
+ * Response from getItem operation
+ */
+export interface StorageProgramItemResponse<T = unknown> {
+    field: string
+    index: number
+    value: T
+    arrayLength: number
+}
+
+/**
+ * Response from hasField operation
+ */
+export interface StorageProgramHasFieldResponse {
+    field: string
+    exists: boolean
+}
+
+/**
+ * Response from getFieldType operation
+ */
+export interface StorageProgramFieldTypeResponse {
+    field: string
+    type: StorageFieldType
 }
 
 // REVIEW: Unified Storage Program class for both JSON and Binary storage with robust ACL
@@ -870,6 +933,467 @@ export class StorageProgram {
             return result.response
         } catch (error) {
             return []
+        }
+    }
+
+    // ========================================================================
+    // Granular Read Methods (RPC calls via nodeCall)
+    // ========================================================================
+
+    /**
+     * Get all field names from a storage program (JSON encoding only)
+     *
+     * @param rpcUrl - The RPC endpoint URL
+     * @param storageAddress - The storage program address
+     * @param identity - Optional requester identity for ACL-protected programs
+     * @returns Object with field names array and count
+     *
+     * @example
+     * ```typescript
+     * const result = await StorageProgram.getFields(
+     *   'https://node.demos.sh',
+     *   'stor-7a8b9c...'
+     * )
+     * console.log(`Fields: ${result.fields.join(', ')}`)
+     * // Fields: name, settings, users
+     * ```
+     */
+    static async getFields(
+        rpcUrl: string,
+        storageAddress: string,
+        identity?: string,
+    ): Promise<StorageProgramFieldsResponse | null> {
+        try {
+            const result = await this.nodeCall<StorageProgramFieldsResponse>(
+                rpcUrl,
+                "getStorageProgramFields",
+                { storageAddress, requesterAddress: identity },
+            )
+
+            if (result.result !== 200 || !result.response) {
+                return null
+            }
+
+            return result.response
+        } catch (error) {
+            return null
+        }
+    }
+
+    /**
+     * Get a specific field value from a storage program (JSON encoding only)
+     *
+     * @param rpcUrl - The RPC endpoint URL
+     * @param storageAddress - The storage program address
+     * @param field - The field name to retrieve
+     * @param identity - Optional requester identity for ACL-protected programs
+     * @returns Object with field name, value, and type
+     *
+     * @example
+     * ```typescript
+     * const result = await StorageProgram.getValue(
+     *   'https://node.demos.sh',
+     *   'stor-7a8b9c...',
+     *   'settings'
+     * )
+     * if (result) {
+     *   console.log(`${result.field} = ${JSON.stringify(result.value)} (${result.type})`)
+     * }
+     * ```
+     */
+    static async getValue<T = unknown>(
+        rpcUrl: string,
+        storageAddress: string,
+        field: string,
+        identity?: string,
+    ): Promise<StorageProgramValueResponse<T> | null> {
+        try {
+            const result = await this.nodeCall<StorageProgramValueResponse<T>>(
+                rpcUrl,
+                "getStorageProgramValue",
+                { storageAddress, field, requesterAddress: identity },
+            )
+
+            if (result.result !== 200 || !result.response) {
+                return null
+            }
+
+            return result.response
+        } catch (error) {
+            return null
+        }
+    }
+
+    /**
+     * Get an item from an array field by index (JSON encoding only)
+     *
+     * @param rpcUrl - The RPC endpoint URL
+     * @param storageAddress - The storage program address
+     * @param field - The array field name
+     * @param index - The array index (0-based, supports negative indexing)
+     * @param identity - Optional requester identity for ACL-protected programs
+     * @returns Object with field name, index, value, and array length
+     *
+     * @example
+     * ```typescript
+     * // Get first item
+     * const first = await StorageProgram.getItem(
+     *   'https://node.demos.sh',
+     *   'stor-7a8b9c...',
+     *   'users',
+     *   0
+     * )
+     *
+     * // Get last item (negative indexing)
+     * const last = await StorageProgram.getItem(
+     *   'https://node.demos.sh',
+     *   'stor-7a8b9c...',
+     *   'users',
+     *   -1
+     * )
+     * ```
+     */
+    static async getItem<T = unknown>(
+        rpcUrl: string,
+        storageAddress: string,
+        field: string,
+        index: number,
+        identity?: string,
+    ): Promise<StorageProgramItemResponse<T> | null> {
+        try {
+            const result = await this.nodeCall<StorageProgramItemResponse<T>>(
+                rpcUrl,
+                "getStorageProgramItem",
+                { storageAddress, field, index, requesterAddress: identity },
+            )
+
+            if (result.result !== 200 || !result.response) {
+                return null
+            }
+
+            return result.response
+        } catch (error) {
+            return null
+        }
+    }
+
+    /**
+     * Check if a field exists in a storage program (JSON encoding only)
+     *
+     * @param rpcUrl - The RPC endpoint URL
+     * @param storageAddress - The storage program address
+     * @param field - The field name to check
+     * @param identity - Optional requester identity for ACL-protected programs
+     * @returns Object with field name and exists boolean
+     *
+     * @example
+     * ```typescript
+     * const result = await StorageProgram.hasField(
+     *   'https://node.demos.sh',
+     *   'stor-7a8b9c...',
+     *   'apiKey'
+     * )
+     * if (result?.exists) {
+     *   console.log('API key is configured')
+     * }
+     * ```
+     */
+    static async hasField(
+        rpcUrl: string,
+        storageAddress: string,
+        field: string,
+        identity?: string,
+    ): Promise<StorageProgramHasFieldResponse | null> {
+        try {
+            const result = await this.nodeCall<StorageProgramHasFieldResponse>(
+                rpcUrl,
+                "hasStorageProgramField",
+                { storageAddress, field, requesterAddress: identity },
+            )
+
+            if (result.result !== 200 || !result.response) {
+                return null
+            }
+
+            return result.response
+        } catch (error) {
+            return null
+        }
+    }
+
+    /**
+     * Get the type of a field in a storage program (JSON encoding only)
+     *
+     * @param rpcUrl - The RPC endpoint URL
+     * @param storageAddress - The storage program address
+     * @param field - The field name
+     * @param identity - Optional requester identity for ACL-protected programs
+     * @returns Object with field name and type
+     *
+     * @example
+     * ```typescript
+     * const result = await StorageProgram.getFieldType(
+     *   'https://node.demos.sh',
+     *   'stor-7a8b9c...',
+     *   'users'
+     * )
+     * if (result?.type === 'array') {
+     *   // Safe to use array operations
+     * }
+     * ```
+     */
+    static async getFieldType(
+        rpcUrl: string,
+        storageAddress: string,
+        field: string,
+        identity?: string,
+    ): Promise<StorageProgramFieldTypeResponse | null> {
+        try {
+            const result = await this.nodeCall<StorageProgramFieldTypeResponse>(
+                rpcUrl,
+                "getStorageProgramFieldType",
+                { storageAddress, field, requesterAddress: identity },
+            )
+
+            if (result.result !== 200 || !result.response) {
+                return null
+            }
+
+            return result.response
+        } catch (error) {
+            return null
+        }
+    }
+
+    /**
+     * Get all data from a storage program (alias for getByAddress with full data)
+     *
+     * @param rpcUrl - The RPC endpoint URL
+     * @param storageAddress - The storage program address
+     * @param identity - Optional requester identity for ACL-protected programs
+     * @returns Full storage program data or null if not found
+     *
+     * @example
+     * ```typescript
+     * const program = await StorageProgram.getAll(
+     *   'https://node.demos.sh',
+     *   'stor-7a8b9c...'
+     * )
+     * if (program) {
+     *   console.log(`Data: ${JSON.stringify(program.data)}`)
+     * }
+     * ```
+     */
+    static async getAll(
+        rpcUrl: string,
+        storageAddress: string,
+        identity?: string,
+    ): Promise<StorageProgramData | null> {
+        try {
+            const result = await this.nodeCall<StorageProgramData>(
+                rpcUrl,
+                "getStorageProgramAll",
+                { storageAddress, requesterAddress: identity },
+            )
+
+            if (result.result !== 200 || !result.response) {
+                return null
+            }
+
+            return result.response
+        } catch (error) {
+            return null
+        }
+    }
+
+    // ========================================================================
+    // Granular Write Payload Builders (for transactions)
+    // ========================================================================
+
+    /**
+     * Set a specific field value in a storage program (JSON encoding only)
+     *
+     * Creates a payload for the SET_FIELD operation.
+     * Use this with transaction submission flow.
+     *
+     * @param storageAddress - The storage program address
+     * @param field - The field name to set
+     * @param value - The value to set (any JSON-serializable value)
+     * @returns StorageProgramPayload for transaction creation
+     *
+     * @example
+     * ```typescript
+     * const payload = StorageProgram.setField(
+     *   'stor-7a8b9c...',
+     *   'theme',
+     *   'dark'
+     * )
+     * // Submit via standard transaction flow
+     * ```
+     */
+    static setField(
+        storageAddress: string,
+        field: string,
+        value: unknown,
+    ): StorageProgramPayload {
+        return {
+            operation: "SET_FIELD" as any,
+            storageAddress,
+            field,
+            value,
+        }
+    }
+
+    /**
+     * Set an item at a specific index in an array field (JSON encoding only)
+     *
+     * Creates a payload for the SET_ITEM operation.
+     * Supports negative indexing (-1 = last item).
+     *
+     * @param storageAddress - The storage program address
+     * @param field - The array field name
+     * @param index - The array index (0-based, supports negative)
+     * @param value - The value to set at the index
+     * @returns StorageProgramPayload for transaction creation
+     *
+     * @example
+     * ```typescript
+     * // Update first user
+     * const payload = StorageProgram.setItem(
+     *   'stor-7a8b9c...',
+     *   'users',
+     *   0,
+     *   { name: 'Updated User', role: 'admin' }
+     * )
+     *
+     * // Update last user (negative indexing)
+     * const payload = StorageProgram.setItem(
+     *   'stor-7a8b9c...',
+     *   'users',
+     *   -1,
+     *   { name: 'Last User', role: 'user' }
+     * )
+     * ```
+     */
+    static setItem(
+        storageAddress: string,
+        field: string,
+        index: number,
+        value: unknown,
+    ): StorageProgramPayload {
+        return {
+            operation: "SET_ITEM" as any,
+            storageAddress,
+            field,
+            index,
+            value,
+        }
+    }
+
+    /**
+     * Append an item to an array field (JSON encoding only)
+     *
+     * Creates a payload for the APPEND_ITEM operation.
+     * The field must exist and be an array, or the operation will create
+     * a new array with the item as its first element.
+     *
+     * @param storageAddress - The storage program address
+     * @param field - The array field name
+     * @param value - The value to append
+     * @returns StorageProgramPayload for transaction creation
+     *
+     * @example
+     * ```typescript
+     * // Add new user to users array
+     * const payload = StorageProgram.appendItem(
+     *   'stor-7a8b9c...',
+     *   'users',
+     *   { name: 'New User', role: 'viewer' }
+     * )
+     * ```
+     */
+    static appendItem(
+        storageAddress: string,
+        field: string,
+        value: unknown,
+    ): StorageProgramPayload {
+        return {
+            operation: "APPEND_ITEM" as any,
+            storageAddress,
+            field,
+            value,
+        }
+    }
+
+    /**
+     * Delete a field from a storage program (JSON encoding only)
+     *
+     * Creates a payload for the DELETE_FIELD operation.
+     * Completely removes the field from the stored data.
+     *
+     * @param storageAddress - The storage program address
+     * @param field - The field name to delete
+     * @returns StorageProgramPayload for transaction creation
+     *
+     * @example
+     * ```typescript
+     * // Remove deprecated config field
+     * const payload = StorageProgram.deleteField(
+     *   'stor-7a8b9c...',
+     *   'legacyConfig'
+     * )
+     * ```
+     */
+    static deleteField(
+        storageAddress: string,
+        field: string,
+    ): StorageProgramPayload {
+        return {
+            operation: "DELETE_FIELD" as any,
+            storageAddress,
+            field,
+        }
+    }
+
+    /**
+     * Delete an item from an array field by index (JSON encoding only)
+     *
+     * Creates a payload for the DELETE_ITEM operation.
+     * Supports negative indexing (-1 = last item).
+     * The array will be compacted after deletion.
+     *
+     * @param storageAddress - The storage program address
+     * @param field - The array field name
+     * @param index - The array index to delete (0-based, supports negative)
+     * @returns StorageProgramPayload for transaction creation
+     *
+     * @example
+     * ```typescript
+     * // Delete first user
+     * const payload = StorageProgram.deleteItem(
+     *   'stor-7a8b9c...',
+     *   'users',
+     *   0
+     * )
+     *
+     * // Delete last user
+     * const payload = StorageProgram.deleteItem(
+     *   'stor-7a8b9c...',
+     *   'users',
+     *   -1
+     * )
+     * ```
+     */
+    static deleteItem(
+        storageAddress: string,
+        field: string,
+        index: number,
+    ): StorageProgramPayload {
+        return {
+            operation: "DELETE_ITEM" as any,
+            storageAddress,
+            field,
+            index,
         }
     }
 }
