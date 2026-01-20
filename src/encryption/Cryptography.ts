@@ -10,9 +10,11 @@ KyneSys Labs: https://www.kynesys.xyz/
 */
 
 import * as crypto from "crypto"
-import { promises as fs } from "fs"
 import * as path from "path"
 import forge from "node-forge"
+
+// Helper to dynamically import fs (Node.js only) - avoids bundling fs for browser builds
+const getFs = async () => (await import("fs")).promises
 
 import * as bip39 from "@scure/bip39"
 import { HexToForge } from "@/utils/dataManipulation"
@@ -69,6 +71,7 @@ export class Cryptography {
 
     // TODO Eliminate the old legacy compatibility
     static async save(keypair: forge.pki.KeyPair, path: string, mode = "hex") {
+        const fs = await getFs()
         if (mode === "hex") {
             let hexPrivKey = Cryptography.saveToHex(keypair.privateKey)
             await fs.writeFile(path, hexPrivKey)
@@ -89,6 +92,7 @@ export class Cryptography {
         path: string,
         password: string,
     ) {
+        const fs = await getFs()
         const key = crypto.createCipher(algorithm, password)
         // Getting the private key in hex form
         const hex_key = keypair.privateKey.toString("hex")
@@ -98,6 +102,7 @@ export class Cryptography {
     }
 
     static async loadEncrypted(path: string, password: string) {
+        const fs = await getFs()
         let keypair: forge.pki.KeyPair = {
             privateKey: null,
             publicKey: null,
@@ -128,6 +133,7 @@ export class Cryptography {
         }
         let content: string
         if (isFile) {
+            const fs = await getFs()
             // Validate and sanitize the file path to prevent path traversal attacks
             const safePath = Cryptography.validateFilePath(path)
             content = await fs.readFile(safePath, "utf8")
