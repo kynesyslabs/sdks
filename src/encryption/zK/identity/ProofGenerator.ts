@@ -18,7 +18,7 @@
 // REVIEW: Phase 10.1 - Production cryptographic implementation
 import * as snarkjs from 'snarkjs'
 
-// Type augmentation for snarkjs - @types/snarkjs@0.7.9 doesn't include proverOptions
+// Type augmentation for snarkjs - @types/snarkjs@0.7.9 doesn't include proverOptions for groth16.prove
 declare module 'snarkjs' {
     namespace groth16 {
         interface ProverOptions {
@@ -31,15 +31,32 @@ declare module 'snarkjs' {
             protocol: string
             curve: string
         }
-        function fullProve(
-            input: object,
-            wasmFile: string | Uint8Array,
+        // groth16.prove accepts proverOptions (including singleThread)
+        function prove(
             zkeyFileName: string | Uint8Array,
+            wtnsFileName: Uint8Array | { type: string; data: Uint8Array },
             logger?: object,
-            wtnsCalcOptions?: object,
             proverOptions?: ProverOptions
         ): Promise<{ proof: Groth16Proof; publicSignals: string[] }>
     }
+    namespace wtns {
+        // Calculate witness from circuit inputs
+        function calculate(
+            input: object,
+            wasmFile: string | Uint8Array,
+            wtnsFileName: { type: string; data?: Uint8Array }
+        ): Promise<{ type: string; data: Uint8Array }>
+    }
+}
+
+// Narrow interface for environment detection globals
+interface RestrictedEnvGlobals {
+    ServiceWorkerGlobalScope?: { new(): unknown }
+    caches?: unknown
+    window?: unknown
+    document?: unknown
+    HTMLRewriter?: unknown
+    Bun?: unknown
 }
 
 /**
@@ -50,42 +67,44 @@ declare module 'snarkjs' {
  * - Cloudflare Workers
  * - Bun runtime (limited Worker support)
  * - SES (Secure EcmaScript) sandboxes
+ * - Runtimes without Worker constructor
  *
  * @returns true if Web Workers are not available or unreliable
  */
 function isRestrictedWorkerEnvironment(): boolean {
+    // Early check: if Worker constructor doesn't exist, it's restricted
+    if (typeof Worker === 'undefined') {
+        return true
+    }
+
+    const g = globalThis as typeof globalThis & RestrictedEnvGlobals
+
     // Check for Service Worker context (Chrome MV3 extensions)
-    // Use string-based check to avoid TypeScript errors in non-browser environments
-    const g = globalThis as any
-    if (typeof g.ServiceWorkerGlobalScope !== 'undefined' &&
+    if ('ServiceWorkerGlobalScope' in g &&
+        typeof g.ServiceWorkerGlobalScope !== 'undefined' &&
         typeof self !== 'undefined' &&
         self instanceof g.ServiceWorkerGlobalScope) {
         return true
     }
 
-    // Check for Cloudflare Workers (no window, has caches API)
-    if (typeof globalThis !== 'undefined' &&
-        typeof (globalThis as any).caches !== 'undefined' &&
-        typeof (globalThis as any).window === 'undefined' &&
-        typeof (globalThis as any).document === 'undefined') {
+    // Check for Cloudflare Workers (no window, has caches API, has HTMLRewriter)
+    if ('caches' in g && typeof g.caches !== 'undefined' &&
+        !('window' in g) && !('document' in g)) {
         // Could be Cloudflare Worker or Service Worker - check for CF-specific globals
-        if (typeof (globalThis as any).HTMLRewriter !== 'undefined') {
+        if ('HTMLRewriter' in g && typeof g.HTMLRewriter !== 'undefined') {
             return true
         }
     }
 
-    // Check if Worker constructor exists but is a stub/polyfill
-    if (typeof Worker !== 'undefined') {
-        // A valid Worker implementation should have standard methods on its prototype.
-        // If it's a simple stub/polyfill, these might be missing.
-        const workerProto = Worker.prototype
-        if (!workerProto || typeof workerProto.postMessage !== 'function' || typeof workerProto.terminate !== 'function') {
-            return true // Likely a stub Worker
-        }
+    // Check if Worker constructor is a stub/polyfill
+    // A valid Worker implementation should have standard methods on its prototype
+    const workerProto = Worker.prototype
+    if (!workerProto || typeof workerProto.postMessage !== 'function' || typeof workerProto.terminate !== 'function') {
+        return true // Likely a stub Worker
     }
 
-    // Check for Bun runtime
-    if (typeof (globalThis as any).Bun !== 'undefined') {
+    // Check for Bun runtime (limited Worker support)
+    if ('Bun' in g && typeof g.Bun !== 'undefined') {
         return true
     }
 
@@ -243,12 +262,15 @@ export async function generateIdentityProof(
     }
 
     // REVIEW: Phase 10.1 - Production-ready proof generation using snarkjs
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-        circuitInputs,
-        wasmPath,
+    // Step 1: Calculate witness from circuit inputs
+    const wtnsBuffer = { type: 'mem' as const, data: undefined as Uint8Array | undefined }
+    await snarkjs.wtns.calculate(circuitInputs, wasmPath, wtnsBuffer)
+
+    // Step 2: Generate proof using groth16.prove (supports singleThread option)
+    const { proof, publicSignals } = await snarkjs.groth16.prove(
         zkeyPath,
+        wtnsBuffer as { type: string; data: Uint8Array },
         globalConfig.logger,
-        undefined, // wtnsCalcOptions
         useSingleThread ? { singleThread: true } : undefined, // proverOptions - auto-detect environment
     )
 
