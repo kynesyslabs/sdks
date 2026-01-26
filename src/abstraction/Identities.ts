@@ -20,6 +20,8 @@ import {
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
     NomisWalletIdentity,
+    TLSNotaryPresentation,
+    InferFromTLSNGithubPayload,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -73,7 +75,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "tlsn",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -132,7 +134,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "tlsn",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -252,6 +254,55 @@ export class Identities {
         }
 
         return await this.inferIdentity(demos, "web2", githubPayload)
+    }
+
+    /**
+     * Add a GitHub identity via TLSNotary attestation.
+     *
+     * This method uses a cryptographic proof from TLSNotary instead of
+     * the traditional gist-based verification. The proof must be from
+     * attesting the api.github.com/user endpoint.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param proof The TLSNotary presentation (from attestResult.presentation).
+     * @param username GitHub username from the proven response.
+     * @param userId GitHub user ID from the proven response.
+     * @param referralCode Optional referral code.
+     * @returns The response from the RPC call.
+     */
+    async addGithubIdentityViaTLSN(
+        demos: Demos,
+        proof: TLSNotaryPresentation,
+        username: string,
+        userId: string | number,
+        referralCode?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        const payload: InferFromTLSNGithubPayload = {
+            context: "github",
+            proof: proof,
+            username: username,
+            userId: String(userId),
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "tlsn", payload)
+    }
+
+    /**
+     * Remove a GitHub identity that was added via TLSNotary.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The GitHub username to remove.
+     * @returns The response from the RPC call.
+     */
+    async removeGithubIdentityViaTLSN(
+        demos: Demos,
+        username: string,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "tlsn", {
+            context: "github",
+            username: username,
+        })
     }
 
     /**
