@@ -18,6 +18,30 @@
 // REVIEW: Phase 10.1 - Production cryptographic implementation
 import * as snarkjs from 'snarkjs'
 
+// Type augmentation for snarkjs - @types/snarkjs@0.7.9 doesn't include proverOptions
+declare module 'snarkjs' {
+    namespace groth16 {
+        interface ProverOptions {
+            singleThread?: boolean
+        }
+        interface Groth16Proof {
+            pi_a: string[]
+            pi_b: string[][]
+            pi_c: string[]
+            protocol: string
+            curve: string
+        }
+        function fullProve(
+            input: object,
+            wasmFile: string | Uint8Array,
+            zkeyFileName: string | Uint8Array,
+            logger?: object,
+            wtnsCalcOptions?: object,
+            proverOptions?: ProverOptions
+        ): Promise<{ proof: Groth16Proof; publicSignals: string[] }>
+    }
+}
+
 /**
  * Detect if running in a restricted environment that doesn't support Web Workers
  *
@@ -52,16 +76,11 @@ function isRestrictedWorkerEnvironment(): boolean {
 
     // Check if Worker constructor exists but is a stub/polyfill
     if (typeof Worker !== 'undefined') {
-        try {
-            // Some polyfills define Worker but it doesn't work properly
-            // Check for common stub patterns (e.g., _listeners property)
-            const workerProto = Worker.prototype
-            if (workerProto && typeof (workerProto as any)._listeners !== 'undefined') {
-                return true // It's our stub Worker
-            }
-        } catch {
-            // If checking fails, assume restricted
-            return true
+        // A valid Worker implementation should have standard methods on its prototype.
+        // If it's a simple stub/polyfill, these might be missing.
+        const workerProto = Worker.prototype
+        if (!workerProto || typeof workerProto.postMessage !== 'function' || typeof workerProto.terminate !== 'function') {
+            return true // Likely a stub Worker
         }
     }
 
@@ -73,6 +92,8 @@ function isRestrictedWorkerEnvironment(): boolean {
     // Default: assume Workers are available
     return false
 }
+
+// REVIEW: Phase 10.5 - Global Configuration API (configure, getConfig, willUseSingleThread)
 
 /**
  * Configuration options for proof generation
@@ -226,7 +247,7 @@ export async function generateIdentityProof(
         circuitInputs,
         wasmPath,
         zkeyPath,
-        undefined, // logger
+        globalConfig.logger,
         undefined, // wtnsCalcOptions
         useSingleThread ? { singleThread: true } : undefined, // proverOptions - auto-detect environment
     )
