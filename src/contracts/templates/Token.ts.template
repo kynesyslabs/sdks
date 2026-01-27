@@ -1,0 +1,250 @@
+/**
+ * Standard Token Contract Template
+ * 
+ * A basic token implementation with transfer, balance, and allowance functionality.
+ * Similar to ERC-20 but adapted for the Demos Network.
+ */
+
+class Token extends DemosContract {
+    constructor(
+        name: string = "{{TOKEN_NAME}}",
+        symbol: string = "{{TOKEN_SYMBOL}}", 
+        totalSupply: number = {{TOTAL_SUPPLY}},
+        decimals: number = {{DECIMALS}}
+    ) {
+        super()
+        
+        // Initialize token metadata
+        this.state.set('name', name)
+        this.state.set('symbol', symbol)
+        this.state.set('decimals', decimals)
+        this.state.set('totalSupply', totalSupply)
+        
+        // Initialize balances and allowances
+        this.state.set('balances', {})
+        this.state.set('allowances', {})
+        
+        // Assign all tokens to the creator
+        const creator = this.sender
+        const balances = this.state.get('balances')
+        balances[creator] = totalSupply
+        this.state.set('balances', balances)
+        
+        // Emit initial supply event
+        this.emit('Transfer', { from: '0x0', to: creator, amount: totalSupply })
+    }
+    
+    /**
+     * Get token name
+     */
+    name(): string {
+        return this.state.get('name')
+    }
+    
+    /**
+     * Get token symbol
+     */
+    symbol(): string {
+        return this.state.get('symbol')
+    }
+    
+    /**
+     * Get token decimals
+     */
+    decimals(): number {
+        return this.state.get('decimals')
+    }
+    
+    /**
+     * Get total token supply
+     */
+    totalSupply(): number {
+        return this.state.get('totalSupply')
+    }
+    
+    /**
+     * Get balance of an address
+     */
+    balanceOf(address: string): number {
+        const balances = this.state.get('balances')
+        return balances[address] || 0
+    }
+    
+    /**
+     * Transfer tokens to another address
+     */
+    transfer(to: string, amount: number): boolean {
+        const from = this.sender
+        return this._transfer(from, to, amount)
+    }
+    
+    /**
+     * Transfer tokens from one address to another (requires allowance)
+     */
+    transferFrom(from: string, to: string, amount: number): boolean {
+        const spender = this.sender
+        const currentAllowance = this.allowance(from, spender)
+        
+        if (currentAllowance < amount) {
+            this.revert('Insufficient allowance')
+        }
+        
+        // Update allowance
+        this._approve(from, spender, currentAllowance - amount)
+        
+        // Execute transfer
+        return this._transfer(from, to, amount)
+    }
+    
+    /**
+     * Approve another address to spend tokens on your behalf
+     */
+    approve(spender: string, amount: number): boolean {
+        const owner = this.sender
+        this._approve(owner, spender, amount)
+        return true
+    }
+    
+    /**
+     * Get the allowance for a spender from an owner
+     */
+    allowance(owner: string, spender: string): number {
+        const allowances = this.state.get('allowances')
+        return allowances[owner]?.[spender] || 0
+    }
+    
+    /**
+     * Increase allowance for a spender
+     */
+    increaseAllowance(spender: string, addedValue: number): boolean {
+        const owner = this.sender
+        const currentAllowance = this.allowance(owner, spender)
+        this._approve(owner, spender, currentAllowance + addedValue)
+        return true
+    }
+    
+    /**
+     * Decrease allowance for a spender
+     */
+    decreaseAllowance(spender: string, subtractedValue: number): boolean {
+        const owner = this.sender
+        const currentAllowance = this.allowance(owner, spender)
+        
+        if (currentAllowance < subtractedValue) {
+            this.revert('Decreased allowance below zero')
+        }
+        
+        this._approve(owner, spender, currentAllowance - subtractedValue)
+        return true
+    }
+    
+    /**
+     * Mint new tokens (only callable by contract creator)
+     */
+    mint(to: string, amount: number): boolean {
+        // Only the creator can mint (simple access control)
+        const balances = this.state.get('balances')
+        const creator = Object.keys(balances).find(addr => balances[addr] > 0)
+        
+        if (this.sender !== creator) {
+            this.revert('Only creator can mint tokens')
+        }
+        
+        // Update total supply
+        const currentSupply = this.state.get('totalSupply')
+        this.state.set('totalSupply', currentSupply + amount)
+        
+        // Update balance
+        const currentBalance = this.balanceOf(to)
+        balances[to] = currentBalance + amount
+        this.state.set('balances', balances)
+        
+        // Emit mint event
+        this.emit('Transfer', { from: '0x0', to, amount })
+        this.emit('Mint', { to, amount })
+        
+        return true
+    }
+    
+    /**
+     * Burn tokens from sender's balance
+     */
+    burn(amount: number): boolean {
+        const from = this.sender
+        const currentBalance = this.balanceOf(from)
+        
+        if (currentBalance < amount) {
+            this.revert('Insufficient balance to burn')
+        }
+        
+        // Update total supply
+        const currentSupply = this.state.get('totalSupply')
+        this.state.set('totalSupply', currentSupply - amount)
+        
+        // Update balance
+        const balances = this.state.get('balances')
+        balances[from] = currentBalance - amount
+        this.state.set('balances', balances)
+        
+        // Emit burn event
+        this.emit('Transfer', { from, to: '0x0', amount })
+        this.emit('Burn', { from, amount })
+        
+        return true
+    }
+    
+    /**
+     * Internal transfer function
+     */
+    private _transfer(from: string, to: string, amount: number): boolean {
+        if (!to || to === '0x0') {
+            this.revert('Transfer to zero address')
+        }
+        
+        if (amount <= 0) {
+            this.revert('Transfer amount must be positive')
+        }
+        
+        const balances = this.state.get('balances')
+        const fromBalance = balances[from] || 0
+        
+        if (fromBalance < amount) {
+            this.revert('Insufficient balance')
+        }
+        
+        // Update balances
+        balances[from] = fromBalance - amount
+        balances[to] = (balances[to] || 0) + amount
+        this.state.set('balances', balances)
+        
+        // Emit transfer event
+        this.emit('Transfer', { from, to, amount })
+        
+        return true
+    }
+    
+    /**
+     * Internal approve function
+     */
+    private _approve(owner: string, spender: string, amount: number): void {
+        if (!owner || owner === '0x0') {
+            this.revert('Approve from zero address')
+        }
+        
+        if (!spender || spender === '0x0') {
+            this.revert('Approve to zero address')
+        }
+        
+        const allowances = this.state.get('allowances')
+        
+        if (!allowances[owner]) {
+            allowances[owner] = {}
+        }
+        
+        allowances[owner][spender] = amount
+        this.state.set('allowances', allowances)
+        
+        // Emit approval event
+        this.emit('Approval', { owner, spender, amount })
+    }
+}

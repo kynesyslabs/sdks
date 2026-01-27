@@ -1,7 +1,7 @@
 // TODO See handleGCR.ts for the execution of the GCREdit
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
-import { PqcIdentityAssignPayload, PqcIdentityRemovePayload, XMCoreTargetIdentityPayload } from "../abstraction"
+import { PqcIdentityRemovePayload, UDIdentityPayload, XMCoreTargetIdentityPayload, NomisWalletIdentity } from "../abstraction"
 import { SigningAlgorithm } from "../cryptography"
 
 export interface GCREditBalance {
@@ -79,11 +79,13 @@ export interface PQCIdentityGCREditData {
     timestamp: number
 }
 
+export type UdGCRData = UDIdentityPayload
+
 export interface GCREditIdentity {
     type: "identity"
     isRollback: boolean
     account: string
-    context: "xm" | "web2" | "pqc"
+    context: "xm" | "web2" | "pqc" | "nomis" | "ud"
     operation: "add" | "remove"
     data:
     | Web2GCRData // web2 add or remove identity
@@ -91,6 +93,9 @@ export interface GCREditIdentity {
     | XMCoreTargetIdentityPayload // xm remove identity
     | PQCIdentityGCREditData[] // pqc add identity
     | PqcIdentityRemovePayload["payload"] // pqc remove identity
+    | UdGCRData // ud add identity
+    | { domain: string } // ud remove identity
+    | NomisWalletIdentity // nomis add/remove identity
     txhash: string
     referralCode?: string
 }
@@ -101,22 +106,85 @@ export interface GCREditSmartContract {
     account: string           // Contract address
     txhash: string
     isRollback: boolean
-    
+
     // Deploy-specific fields
     code?: string
     deployer?: string
-    
+
     // Call-specific fields
     method?: string
     args?: any[]
-    
+
     // State-specific fields
     key?: string
     value?: any
-    
+
     // Results
     result?: any
     gasUsed?: number
+}
+
+export interface GCREditStorageProgram {
+    type: "storageProgram"
+    target: string              // Storage program address
+    isRollback: boolean
+    txhash: string
+    context: {
+        operation: string       // CREATE, WRITE, DELETE, UPDATE_ACCESS_CONTROL
+        sender: string          // Transaction sender
+        data?: {                // Optional for DELETE operations
+            variables: any      // Key-value storage data
+            metadata: any       // Program metadata (deployer, accessControl, etc.)
+        }
+    }
+}
+
+/**
+ * Escrow GCR edit operation
+ * Enables trustless escrow to social identities (Twitter, GitHub, Telegram)
+ */
+export interface GCREditEscrow {
+    type: "escrow"
+    operation: "deposit" | "claim" | "refund"
+    account: string  // Escrow address (for deposit/claim) or refunder address
+    data: {
+        // Deposit fields
+        sender?: string           // Ed25519 pubkey of sender
+        platform?: "twitter" | "github" | "telegram"
+        username?: string         // Social username (e.g., "@bob")
+        amount?: number
+        expiryDays?: number       // Optional, default 30
+        message?: string          // Optional memo
+
+        // Claim fields
+        claimant?: string         // Ed25519 pubkey of claimant
+        claimed?: boolean         // Whether escrow has been claimed
+        claimedBy?: string        // Address that claimed the escrow
+        claimedAt?: number        // Timestamp when claimed
+
+        // Refund fields
+        refunder?: string         // Ed25519 pubkey of refunder
+    }
+    txhash: string
+    isRollback: boolean
+}
+
+/**
+ * TLSNotary attestation storage GCR edit
+ */
+export interface GCREditTLSNotary {
+    type: "tlsnotary"
+    operation: "store"
+    account: string
+    data: {
+        tokenId: string
+        domain: string
+        proof: string          // Full proof or IPFS hash
+        storageType: "onchain" | "ipfs"
+        timestamp: number
+    }
+    txhash: string
+    isRollback: boolean
 }
 
 export type GCREdit =
@@ -127,3 +195,6 @@ export type GCREdit =
     | GCREditSubnetsTx
     | GCREditIdentity
     | GCREditSmartContract
+    | GCREditStorageProgram
+    | GCREditEscrow
+    | GCREditTLSNotary

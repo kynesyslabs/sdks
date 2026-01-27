@@ -2,12 +2,73 @@ import { EnumWeb2Actions } from "@/types"
 import { web2_request } from "./utils/skeletons"
 import { DemosTransactions } from "./DemosTransactions"
 import { Demos } from "./demosclass"
+import {
+    canonicalJSONStringify,
+    validatePureJson,
+    looksLikeJsonString,
+} from "./utils/canonicalJson"
 import type {
     IStartProxyParams,
     Transaction,
     IWeb2Payload,
     IWeb2Result,
 } from "@/types"
+
+class Web2InvalidUrlError extends Error {
+    code: string
+    constructor(message: string, code: string) {
+        super(message)
+        this.name = "Web2InvalidUrlError"
+        this.code = code
+    }
+}
+
+function getCanonicalHttpUrlOrThrow(input: unknown): string {
+    if (typeof input !== "string") {
+        throw new Web2InvalidUrlError(
+            "URL must be a string",
+            "INVALID_URL_TYPE",
+        )
+    }
+    const trimmed = input.trim()
+    if (!trimmed) {
+        throw new Web2InvalidUrlError(
+            "URL is required for startProxy and cannot be empty.",
+            "EMPTY_URL",
+        )
+    }
+    let u: URL
+    try {
+        u = new URL(trimmed)
+    } catch {
+        throw new Web2InvalidUrlError(
+            "Invalid URL provided to startProxy. Only http(s) URLs are allowed.",
+            "INVALID_URL",
+        )
+    }
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+        throw new Web2InvalidUrlError(
+            "Invalid URL provided to startProxy. Only http(s) URLs are allowed.",
+            "INVALID_URL",
+        )
+    }
+    if (u.username || u.password || !u.hostname) {
+        throw new Web2InvalidUrlError(
+            "Invalid URL provided to startProxy. Only http(s) URLs without embedded credentials are allowed.",
+            "INVALID_URL",
+        )
+    }
+    // Avoid persisting potential secrets in fragments (e.g., OAuth implicit flow tokens)
+    u.hash = ""
+    // Normalize default ports
+    if (
+        (u.protocol === "http:" && u.port === "80") ||
+        (u.protocol === "https:" && u.port === "443")
+    ) {
+        u.port = ""
+    }
+    return u.toString() // canonical form
+}
 
 export class Web2Proxy {
     private readonly _sessionId: string
@@ -36,25 +97,65 @@ export class Web2Proxy {
         method,
         options = {
             headers: {},
-            payload: {},
+            payload: undefined,
             authorization: "",
         },
     }: IStartProxyParams): Promise<IWeb2Result> {
+        const canonicalUrl = getCanonicalHttpUrlOrThrow(url)
+
         // Create a fresh copy of web2Request for each call
         const freshWeb2Request = { ...web2_request }
+
+        // Shallow-merge headers without mutating caller's object
+        const callerHeaders = options?.headers ? { ...options.headers } : {}
 
         freshWeb2Request.raw = {
             ...freshWeb2Request.raw,
             action: EnumWeb2Actions.START_PROXY,
             method,
-            url,
-            headers: options?.headers,
+            url: canonicalUrl,
+            headers: callerHeaders,
+        }
+
+        // Validate and canonicalize
+        let canonicalPayload: any = undefined
+        if (options?.payload !== undefined) {
+            if (typeof options.payload === "object") {
+                validatePureJson(options.payload)
+                canonicalPayload = canonicalJSONStringify(options.payload)
+                // Only set JSON content-type if not already set by caller
+                if (
+                    !Object.keys(callerHeaders).some(
+                        h => h.toLowerCase() === "content-type",
+                    )
+                ) {
+                    callerHeaders["Content-Type"] = "application/json"
+                }
+            } else if (typeof options.payload === "string") {
+                // Heuristic warning for accidental double-stringify
+                if (looksLikeJsonString(options.payload)) {
+                    console.warn(
+                        "[Web2Calls] String payload looks like JSON. It will be used as raw bytes; if you intended object canonicalization, pass the object instead.",
+                    )
+                }
+                canonicalPayload = options.payload
+            } else {
+                // numbers/booleans/null are allowed by fetch/XHR as body. Use JSON.stringify semantics explicitly
+                canonicalPayload = JSON.stringify(options.payload)
+                if (
+                    !Object.keys(callerHeaders).some(
+                        h => h.toLowerCase() === "content-type",
+                    )
+                ) {
+                    callerHeaders["Content-Type"] = "application/json"
+                }
+            }
         }
 
         const response = await this._demos.call("web2ProxyRequest", {
             web2Request: freshWeb2Request,
             sessionId: this._sessionId,
-            payload: options?.payload,
+            payload: canonicalPayload, // can be undefined ⇒ no body
             authorization: options?.authorization,
         })
 
@@ -71,8 +172,12 @@ export class Web2Proxy {
                         timestamp: Date.now(),
                         status: response.response.status,
                         headers: response.response.headers,
-                        dataHash: response.response.dataHash,
-                        headersHash: response.response.headersHash,
+                        responseHash: response.response.responseHash,
+                        responseHeadersHash:
+                            response.response.responseHeadersHash,
+                        ...(response.response.requestHash
+                            ? { requestHash: response.response.requestHash }
+                            : {}),
                         statusText: response.response.statusText,
                     },
                 },

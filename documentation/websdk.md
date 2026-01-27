@@ -11,7 +11,7 @@ import { demos } from "@kynesyslabs/demosdk-http/websdk"
 To connect to a node, use the `connect` method.
 
 ```ts
-const rpc_url = "http://localhost:53550"
+const rpc_url = "https://node2.demos.sh"
 
 await demos.connect(rpc_url)
 assert(demos.connected === true)

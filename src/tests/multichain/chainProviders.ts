@@ -7,7 +7,8 @@ const tenTokenAlt = "05F95F81F11474C151F27854BD43DDA1C8616BBF"
 
 export default {
     eth: {
-        mainnet: "https://ethereum-rpc.publicnode.com",
+        // Using a public endpoint avoids auth issues during CI read-only tests
+        mainnet: "https://ethereum.publicnode.com",
         sepolia: "https://ethereum-sepolia-rpc.publicnode.com",
         goerli: "https://ethereum-goerli.publicnode.com",
     },
@@ -35,7 +36,7 @@ export default {
         testnet: "https://rpc.elgafar-1.stargaze-apis.com",
     },
     solana: {
-        mainnet: clusterApiUrl("mainnet-beta"),
+        mainnet: "https://britta-qyzo1g-fast-mainnet.helius-rpc.com",
         //TODO: Change to testnet when we have a testnet faucet
         // using devnet as testnet faucet is broken 👇
         testnet: clusterApiUrl("devnet"),
@@ -56,5 +57,11 @@ export default {
     btc: {
         mainnet: "https://blockstream.info/api",
         testnet: "https://blockstream.info/testnet/api",
+    },
+    tron: {
+        mainnet: "https://api.trongrid.io",
+        testnet: "https://api.shasta.trongrid.io",
+        shasta: "https://api.shasta.trongrid.io",
+        nile: "https://nile.trongrid.io",
     },
 }

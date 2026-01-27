@@ -19,6 +19,10 @@ export { NativeBridge } from "./nativeBridge"
 export {
     BridgeOperation as NativeBridgeOperation,
     BridgeOperationCompiled as NativeBridgeOperationCompiled,
+    CompiledContent,
+    EVMTankData,
+    SolanaTankData,
+    NativeBridgeTxPayload,
     SupportedChain as NativeBridgeSupportedChain,
     SupportedStablecoin as NativeBridgeSupportedStablecoin,
     supportedChains as NativeBridgeSupportedChains,
@@ -26,13 +30,9 @@ export {
     supportedChains as NativeBridgeSupportedEVMChains,
     StableCoinContracts as NativeBridgeStableCoinContracts,
     usdcAbi as NativeBridgeUSDCAbi,
-    CompiledContent,
-    EVMTankData,
-    SolanaTankData,
     TankData,
     providerUrls,
     supportedNonEVMChains,
-    NativeBridgeTxPayload,
 } from "./nativeBridgeTypes"
 export { RubicBridge }
 export { validateChain } from "./utils"

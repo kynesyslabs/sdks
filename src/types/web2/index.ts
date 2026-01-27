@@ -12,8 +12,9 @@ export interface IWeb2Result {
     statusText: string
     headers: IncomingHttpHeaders
     data: any
-    dataHash: string
-    headersHash: string
+    responseHash: string
+    responseHeadersHash: string
+    requestHash?: string
     txHash?: string
 }
 

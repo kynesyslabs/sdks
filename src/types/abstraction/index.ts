@@ -19,6 +19,7 @@ export interface InferFromSignatureTargetIdentityPayload
     targetAddress: string
     signedData: string
     publicKey?: string
+    displayAddress?: string
 }
 
 /**
@@ -51,7 +52,6 @@ export interface InferFromSignaturePayload {
     referralCode?: string
 }
 
-
 export interface BaseXmIdentityPayload {
     context: "xm"
 }
@@ -66,7 +66,9 @@ export interface XmIdentityRemovePayload extends BaseXmIdentityPayload {
     payload: XMCoreTargetIdentityPayload
 }
 
-export type XmIdentityPayload = XmIdentityAssignPayload | XmIdentityRemovePayload
+export type XmIdentityPayload =
+    | XmIdentityAssignPayload
+    | XmIdentityRemovePayload
 
 // SECTION Web2 Identities
 /**
@@ -81,7 +83,7 @@ export type XmIdentityPayload = XmIdentityAssignPayload | XmIdentityRemovePayloa
  */
 export interface Web2CoreTargetIdentityPayload {
     context: string
-    proof: string
+    proof: string | TelegramProof
     username: string
     userId: string
     referralCode?: string
@@ -105,6 +107,11 @@ export interface InferFromGithubPayload extends Web2CoreTargetIdentityPayload {
 // ANCHOR X Identities (aka Twitter Identities)
 export type XProof = `https://x.com/${string}/${string}` // TODO Better scope for X posts
 export type TwitterProof = XProof
+export type DiscordProof =
+    | `https://discord.com/channels/${string}/${string}/${string}`
+    | `https://ptb.discord.com/channels/${string}/${string}/${string}`
+    | `https://canary.discord.com/channels/${string}/${string}/${string}`
+    | `https://discordapp.com/channels/${string}/${string}/${string}`
 
 export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
     context: "twitter"
@@ -112,11 +119,50 @@ export interface InferFromXPayload extends Web2CoreTargetIdentityPayload {
     userId: string
 }
 
-export interface InferFromTwitterPayload extends InferFromXPayload { }
+export interface InferFromTwitterPayload extends InferFromXPayload {}
 
 // ANCHOR Telegram Identities
-export interface InferFromTelegramPayload extends Web2CoreTargetIdentityPayload {
+
+/**
+ * Telegram bot attestation payload structure
+ */
+export interface TelegramAttestationPayload {
+    telegram_user_id: string
+    challenge: string
+    signature: string
+    username: string
+    public_key: string
+    timestamp: number
+    bot_address: string
+    group_membership: boolean
+}
+
+/**
+ * Signed attestation from Telegram bot containing dual signatures
+ */
+export interface TelegramSignedAttestation {
+    payload: TelegramAttestationPayload
+    signature: {
+        type: SigningAlgorithm
+        data: string
+    }
+}
+
+/**
+ * Telegram proof is a stringified signed attestation with dual signatures
+ */
+export type TelegramProof = TelegramSignedAttestation // JSON.stringify(TelegramSignedAttestation)
+
+export interface InferFromTelegramPayload
+    extends Web2CoreTargetIdentityPayload {
     context: "telegram"
+    username: string
+    userId: string
+    proof: TelegramProof
+}
+
+export interface InferFromDiscordPayload extends Web2CoreTargetIdentityPayload {
+    context: "discord"
     username: string
     userId: string
 }
@@ -130,7 +176,11 @@ export interface BaseWeb2IdentityPayload {
 
 export interface Web2IdentityAssignPayload extends BaseWeb2IdentityPayload {
     method: "web2_identity_assign"
-    payload: InferFromGithubPayload | InferFromTwitterPayload | InferFromTelegramPayload
+    payload:
+        | InferFromGithubPayload
+        | InferFromTwitterPayload
+        | InferFromTelegramPayload
+        | InferFromDiscordPayload
 }
 
 export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
@@ -141,7 +191,9 @@ export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
     }
 }
 
-export type Web2IdentityPayload = Web2IdentityAssignPayload | Web2IdentityRemovePayload
+export type Web2IdentityPayload =
+    | Web2IdentityAssignPayload
+    | Web2IdentityRemovePayload
 
 // SECTION PQC Identities
 export interface BasePqcIdentityPayload {
@@ -165,10 +217,96 @@ export interface PqcIdentityRemovePayload extends BasePqcIdentityPayload {
     }[]
 }
 
-export type PqcIdentityPayload = PqcIdentityAssignPayload | PqcIdentityRemovePayload
+export type PqcIdentityPayload =
+    | PqcIdentityAssignPayload
+    | PqcIdentityRemovePayload
+
+// SECTION Unstoppable Domains Identities
+export interface BaseUdIdentityPayload {
+    context: "ud"
+}
+
+/**
+ * Unstoppable Domains identity payload
+ *
+ * Follows signature-based verification pattern (like XM identities)
+ * User signs challenge with any authorized address from domain records
+ *
+ * Multi-chain support: Polygon L2, Base L2, Sonic, Ethereum L1, and Solana
+ * Multi-signature support: EVM (secp256k1) and Solana (ed25519)
+ */
+export interface UDIdentityPayload {
+    domain: string // e.g., "brad.crypto"
+    signingAddress: string // Address used to sign (from domain's authorized addresses)
+    signatureType: "evm" | "solana" // Signature type: EVM (secp256k1) or Solana (ed25519)
+    signature: string // Signature from signingAddress
+    publicKey: string // Public key of Demos identity
+    signedData: string // Challenge message that was signed
+    network: "polygon" | "ethereum" | "base" | "sonic" | "solana" // Network where domain is registered (optional, auto-detected)
+    registryType: "UNS" | "CNS" // Registry type (optional, auto-detected: UNS newer, CNS legacy)
+    timestamp?: number // Auto-populated during GCR generation
+}
+
+export interface UDIdentityAssignPayload extends BaseUdIdentityPayload {
+    method: "ud_identity_assign"
+    payload: UDIdentityPayload
+    referralCode?: string
+}
+
+export interface UDIdentityRemovePayload extends BaseUdIdentityPayload {
+    method: "ud_identity_remove"
+    payload: {
+        domain: string
+    }
+}
+
+export type UdIdentityPayload =
+    | UDIdentityAssignPayload
+    | UDIdentityRemovePayload
+// SECTION Nomis Identities
+export interface NomisWalletIdentity {
+    chain: string
+    subchain: string
+    address: string
+    score: number
+    scoreType: number
+    mintedScore?: number | null
+    lastSyncedAt: string
+    metadata?: {
+        referralCode?: string
+        referrerCode?: string
+        deadline?: number
+        nonce?: number
+        apiVersion?: string
+        [key: string]: unknown
+    }
+}
+
+export interface BaseNomisIdentityPayload {
+    context: "nomis"
+}
+
+export interface NomisIdentityAssignPayload extends BaseNomisIdentityPayload {
+    method: "nomis_identity_assign"
+    payload: NomisWalletIdentity
+}
+
+export interface NomisIdentityRemovePayload extends BaseNomisIdentityPayload {
+    method: "nomis_identity_remove"
+    payload: NomisWalletIdentity
+}
+
+export type NomisIdentityPayload =
+    | NomisIdentityAssignPayload
+    | NomisIdentityRemovePayload
 
 // SECTION Final payload type
-export type IdentityPayload = XmIdentityPayload | Web2IdentityPayload | PqcIdentityPayload
+export type IdentityPayload =
+    | XmIdentityPayload
+    | Web2IdentityPayload
+    | PqcIdentityPayload
+    | UdIdentityPayload
+    | NomisIdentityPayload
 export interface UserPoints {
     userId: string
     referralCode: string
@@ -179,13 +317,33 @@ export interface UserPoints {
             twitter: number
             github: number
             discord: number
+            telegram?: number
         }
+        udDomains?: { [domain: string]: number }
+        nomisScores?: { [chain: string]: number }
         referrals: number
         demosFollow: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
+    linkedUDDomains?: {
+        [network: string]: string[]
+    }
+    linkedNomisIdentities: NomisWalletIdentity[]
     lastUpdated: Date
     flagged: boolean | null
     flaggedReason: string | null
+}
+
+export interface FindDemosIdByWeb2IdentityQuery {
+    type: "web2"
+    context: "twitter" | "telegram" | "github" | "discord"
+    username: string
+    userId?: string
+}
+
+export interface FindDemosIdByWeb3IdentityQuery {
+    type: "xm"
+    chain: string // eg. "eth.mainnet" | "solana.mainnet", etc.
+    address: string
 }

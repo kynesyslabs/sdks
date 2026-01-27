@@ -6,7 +6,8 @@ export {
     forkGenesis,
 } from "./blockchain/genesisTypes"
 
-export { Block, BlockContent, NativeTablesHashes } from "./blockchain/blocks"
+
+export { Block, BlockContent, NativeTablesHashes, GenesisBlock } from "./blockchain/blocks"
 //export { EncryptedTransaction } from "./blockchain/encryptedTransaction" // Obsolete - using new L2PS implementation
 export { ISignature } from "./blockchain/ISignature"
 export { RawTransaction } from "./blockchain/rawTransaction"
@@ -15,6 +16,16 @@ export {
     TransactionContent,
     TransactionContentData,
 } from "./blockchain/Transaction"
+
+// REVIEW: Phase 9 - Custom charges for variable-cost operations
+export {
+    type CustomCharges,
+    type IPFSCustomCharges,
+    type IPFSCostBreakdown,
+    type ValidityDataCustomCharges,
+    hasIPFSCustomCharges,
+    isValidCharge,
+} from "./blockchain/CustomCharges"
 
 // Export all specific transaction types
 export {
@@ -27,6 +38,22 @@ export {
     InstantMessagingTransaction,
     NativeBridgeTransaction,
     SpecificTransaction,
+    // REVIEW: IPFS transaction types
+    IPFSTransaction,
+    type IPFSTransactionContent,
+    type IPFSPayload,
+    type IPFSAddPayload,
+    type IPFSPinPayload,
+    type IPFSUnpinPayload,
+    // REVIEW: DEM-481 - Pin expiration extension
+    type IPFSExtendPinPayload,
+    type IPFSOperationType,
+    isIPFSAddPayload,
+    isIPFSPinPayload,
+    isIPFSUnpinPayload,
+    // REVIEW: DEM-481 - Pin expiration extension
+    isIPFSExtendPinPayload,
+    isIPFSPayload,
 } from "./blockchain/TransactionSubtypes"
 
 // L2PSEncryptedPayload removed to avoid circular dependency - import directly from @/l2ps
@@ -54,6 +81,20 @@ export {
     OperationResult,
 } from "./gls/Operation"
 export { StateChange } from "./gls/StateChange"
+export {
+    Account,
+    AccountIdentities,
+    XMIdentities,
+    ChainIdentities,
+    IdentityLink,
+    Web2Identities,
+    TwitterIdentity,
+    AccountPoints,
+    PointsBreakdown,
+    Web3WalletPoints,
+    SocialAccountPoints,
+    ReferralInfo,
+} from "./gls/account"
 
 // network
 
@@ -134,6 +175,7 @@ export {
     GCREditIdentity,
     GCREditNonce,
     GCREditSubnetsTx,
+    GCREditStorageProgram,
     Web2GCRData,
     XmGCRData,
     XmGCRIdentityData,
@@ -154,5 +196,22 @@ export {
     isTransactionType,
     isTransactionDataType,
 } from "./blockchain/TransactionSubtypes/utils"
+
+// Export Unstoppable Domains multi-chain resolution types
+export {
+    type SignatureType,
+    type UDNetwork,
+    type UDRegistryType,
+    type UDRecordKey,
+    type SolanaRecordResult,
+    type SolanaDomainResolution,
+    type EVMDomainResolution,
+    type SignableAddress,
+    type UnifiedDomainResolution,
+    type UDIdentityAssignPayload,
+    type UDIdentityPayload,
+    type UDResolutionConfig,
+    type AddressTypeInfo,
+} from "../abstraction/types/UDResolution"
 
 export { BLOCKCHAIN_NAME, BridgeTradePayload, CROSS_CHAIN_TRADE_TYPE, ChainProviders, CompiledContent, CrossChainTrade, EVMTankData, NativeBridge, NativeBridgeOperation, NativeBridgeOperationCompiled, NativeBridgeSupportedChain, NativeBridgeSupportedChains, NativeBridgeSupportedEVMChains, NativeBridgeSupportedStablecoin, NativeBridgeSupportedStablecoins, NativeBridgeUSDCAbi, NativeBridgeStableCoinContracts, NativeBridgeUSDCContracts, RubicBridge, RubicSdkError, SolanaTankData, SupportedChains, SupportedTokens, TankData, WrappedCrossChainTrade, providerUrls, supportedNonEVMChains } from "@/bridge"

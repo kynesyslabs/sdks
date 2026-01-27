@@ -21,7 +21,15 @@ import {
     InferFromSignatureTargetIdentityPayload,
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
+    UDIdentityAssignPayload,
+    UDIdentityRemovePayload,
     UserPoints,
+    FindDemosIdByWeb2IdentityQuery,
+    FindDemosIdByWeb3IdentityQuery,
+    TelegramAttestationPayload,
+    TelegramSignedAttestation,
+    DiscordProof,
+    NomisWalletIdentity
 } from "@/types/abstraction"
 
 export {
@@ -40,5 +48,13 @@ export {
     InferFromSignatureTargetIdentityPayload,
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
+    UDIdentityAssignPayload,
+    UDIdentityRemovePayload,
     UserPoints,
+    FindDemosIdByWeb2IdentityQuery,
+    FindDemosIdByWeb3IdentityQuery,
+    TelegramAttestationPayload,
+    TelegramSignedAttestation,
+    DiscordProof,
+    NomisWalletIdentity
 }

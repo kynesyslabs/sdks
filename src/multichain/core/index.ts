@@ -26,7 +26,8 @@ export { MULTIVERSX } from './multiversx'
 export { SOLANA } from './solana'
 export { TON } from "./ton"
 export { BTC } from "./btc"
-// export { APTOS } from './aptos'
+export { APTOS } from './aptos'
+export { TRON } from './tron'
 
 // The official XRPL Library is called "xrpl" which conflicts with the name of our XRPL SDK
 export { XRPL, xrplGetLastSequence } from './xrp'

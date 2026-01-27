@@ -12,10 +12,19 @@ import {
     InferFromSignaturePayload,
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
+    DiscordProof,
+    InferFromDiscordPayload,
+    InferFromTelegramPayload,
+    TelegramSignedAttestation,
+    FindDemosIdByWeb2IdentityQuery,
+    FindDemosIdByWeb3IdentityQuery,
+    UDIdentityPayload,
+    NomisWalletIdentity,
 } from "@/types/abstraction"
+import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
-import { RPCResponseWithValidityData } from "@/types"
+import { Account, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
 
@@ -28,6 +37,10 @@ export class Identities {
                 "https://gist.githubusercontent.com",
             ],
             twitter: ["https://x.com", "https://twitter.com"],
+            discord: [
+                "https://discord.com/channels",
+                "https://ptb.discord.com/channels",
+            ],
         },
     }
 
@@ -60,22 +73,28 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
+            // Skip validation for telegram as it uses custom attestation format, not URL proofs
             if (
-                !this.formats.web2[payload.context].some((format: string) =>
-                    payload.proof.startsWith(format),
-                )
+                payload.context !== "telegram" &&
+                this.formats.web2[payload.context]
             ) {
-                // construct informative error message
-                const errorMessage = `Invalid ${
-                    payload.context
-                } proof format. Supported formats are: ${this.formats.web2[
-                    payload.context
-                ].join(", ")}`
-                throw new Error(errorMessage)
+                if (
+                    !this.formats.web2[payload.context].some((format: string) =>
+                        payload.proof.startsWith(format),
+                    )
+                ) {
+                    // construct informative error message
+                    const errorMessage = `Invalid ${
+                        payload.context
+                    } proof format. Supported formats are: ${this.formats.web2[
+                        payload.context
+                    ].join(", ")}`
+                    throw new Error(errorMessage)
+                }
             }
         }
 
@@ -113,7 +132,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -268,6 +287,71 @@ export class Identities {
         }
 
         return await this.inferIdentity(demos, "web2", twitterPayload)
+    }
+
+    /**
+     * Add a discord identity to the GCR.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The payload to add the identity to.
+     * @returns The response from the RPC call.
+     */
+    async addDiscordIdentity(
+        demos: Demos,
+        payload: DiscordProof,
+        referralCode?: string,
+    ) {
+        const data = await demos.web2.getDiscordMessage(payload)
+
+        if (!data.success) {
+            throw new Error(data.error)
+        }
+
+        const msg = data.message
+        if (!msg.authorId || !msg.authorUsername) {
+            throw new Error(
+                "Unable to get discord user info. Please try again.",
+            )
+        }
+
+        const discordPayload: InferFromDiscordPayload & {
+            referralCode?: string
+        } = {
+            context: "discord",
+            proof: payload,
+            username: msg.authorUsername,
+            userId: msg.authorId,
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "web2", discordPayload)
+    }
+
+    /**
+     * Add a telegram identity to the GCR.
+     * This method is designed to work with telegram bot attestations.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param payload The telegram identity payload containing user and bot signatures.
+     * @param referralCode Optional referral code for incentive points.
+     * @returns The response from the RPC call.
+     */
+    async addTelegramIdentity(
+        demos: Demos,
+        payload: TelegramSignedAttestation,
+        referralCode?: string,
+    ) {
+        const telegramPayload: InferFromTelegramPayload & {
+            referralCode?: string
+        } = {
+            context: "telegram",
+            proof: payload,
+            username: payload.payload.username,
+            userId: payload.payload.telegram_user_id,
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "web2", telegramPayload)
     }
 
     // SECTION: PQC Identities
@@ -465,21 +549,638 @@ export class Identities {
     }
 
     /**
-     * Get an account by twitter username.
+     * Get demos accounts by linked web2 or web3 identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param identity The identity to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getDemosIdsByIdentity(
+        demos: Demos,
+        identity:
+            | FindDemosIdByWeb2IdentityQuery
+            | FindDemosIdByWeb3IdentityQuery,
+    ): Promise<Account[]> {
+        const request = {
+            method: "gcr_routine",
+            params: [{ method: "getAccountByIdentity", params: [identity] }],
+        }
+
+        const response = await demos.rpcCall(request, true)
+
+        // INFO: If the response is 200, return the inner gcr object in response key
+        if (response.result == 200) {
+            return response.response
+        }
+
+        // INFO: If the response is not 200, return full response
+        return response as any
+    }
+
+    /**
+     * Get demos accounts by linked web2 identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param context The context of the identity to get the account for.
+     * @param username The username to get the account for.
+     * @param userId The user id to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getDemosIdsByWeb2Identity(
+        demos: Demos,
+        context: "twitter" | "github" | "discord" | "telegram",
+        username: string,
+        userId?: string,
+    ) {
+        return await this.getDemosIdsByIdentity(demos, {
+            type: "web2",
+            context: context,
+            username: username,
+            userId: userId,
+        })
+    }
+
+    /**
+     * Get demos accounts by linked web3 identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param chain The chain as a string containing the chain and subchain separated by a period (eg. "eth.mainnet" | "solana.mainnet", etc.)
+     * @param address The address to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getDemosIdsByWeb3Identity(
+        demos: Demos,
+        chain: `${string}.${string}`,
+        address: string,
+    ) {
+        return await this.getDemosIdsByIdentity(demos, {
+            type: "xm",
+            chain: chain,
+            address: address,
+        })
+    }
+
+    /**
+     * Get demos accounts by linked twitter identity.
      *
      * @param demos A Demos instance to communicate with the RPC.
      * @param username The username to get the account for.
      * @returns The account associated with the username.
      */
-    async getAccountByTwitterUsername(demos: Demos, username: string) {
+    async getDemosIdsByTwitter(
+        demos: Demos,
+        username: string,
+        userId?: string,
+    ) {
+        return await this.getDemosIdsByWeb2Identity(
+            demos,
+            "twitter",
+            username,
+            userId,
+        )
+    }
+
+    /**
+     * Get demos accounts by linked github identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The username to get the account for.
+     * @param userId The user id to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getDemosIdsByGithub(demos: Demos, username: string, userId?: string) {
+        return await this.getDemosIdsByWeb2Identity(
+            demos,
+            "github",
+            username,
+            userId,
+        )
+    }
+
+    /**
+     * Get demos accounts by linked discord identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The username to get the account for.
+     * @param userId The user id to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getDemosIdsByDiscord(
+        demos: Demos,
+        username: string,
+        userId?: string,
+    ) {
+        return await this.getDemosIdsByWeb2Identity(
+            demos,
+            "discord",
+            username,
+            userId,
+        )
+    }
+
+    /**
+     * Get demos accounts by linked telegram identity.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The username to get the account for.
+     * @param userId The user id to get the account for.
+     * @returns The account associated with the identity.
+     */
+    async getDemosIdsByTelegram(
+        demos: Demos,
+        username: string,
+        userId?: string,
+    ) {
+        return await this.getDemosIdsByWeb2Identity(
+            demos,
+            "telegram",
+            username,
+            userId,
+        )
+    }
+
+    // SECTION: Unstoppable Domains Identities
+    // /**
+    //  * Resolve an Unstoppable Domain to its owner's Ethereum address.
+    //  *
+    //  * Multi-chain resolution strategy (per UD docs):
+    //  * 1. Try Polygon L2 UNS first (most new domains, cheaper gas)
+    //  * 2. Try Base L2 UNS (new L2 option - growing adoption)
+    //  * 3. Try Sonic (emerging network support)
+    //  * 4. Fallback to Ethereum L1 UNS (legacy domains)
+    //  * 5. Fallback to Ethereum L1 CNS (oldest legacy domains)
+    //  *
+    //  * @param domain The UD domain (e.g., "brad.crypto")
+    //  * @returns Object with owner address, network, and registry type
+    //  */
+    // private async resolveUDDomain(domain: string): Promise<{
+    //     owner: string
+    //     network: "polygon" | "ethereum" | "base" | "sonic"
+    //     registryType: "UNS" | "CNS"
+    // }> {
+    //     const tokenId = ethers.namehash(domain)
+
+    //     const registryAbi = [
+    //         "function ownerOf(uint256 tokenId) external view returns (address)",
+    //     ]
+
+    //     // Polygon L2 UNS Registry (primary - most new domains)
+    //     const polygonUnsRegistry = "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f"
+    //     // Base L2 UNS Registry (new L2 option - growing adoption)
+    //     const baseUnsRegistry = "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498"
+    //     // Sonic UNS Registry (emerging network support)
+    //     const sonicUnsRegistry = "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4"
+    //     // Ethereum L1 UNS Registry (fallback)
+    //     const ethereumUnsRegistry = "0x049aba7510f45BA5b64ea9E658E342F904DB358D"
+    //     // Ethereum L1 CNS Registry (legacy fallback)
+    //     const ethereumCnsRegistry = "0xD1E5b0FF1287aA9f9A268759062E4Ab08b9Dacbe"
+
+    //     // Try Polygon UNS first (L2 - cheaper, faster, most new domains)
+    //     try {
+    //         const polygonProvider = new ethers.JsonRpcProvider(
+    //             "https://polygon-rpc.com",
+    //         )
+    //         const contract = new ethers.Contract(
+    //             polygonUnsRegistry,
+    //             registryAbi,
+    //             polygonProvider,
+    //         )
+    //         const owner = await contract.ownerOf(tokenId)
+    //         return { owner, network: "polygon", registryType: "UNS" }
+    //     } catch (polygonError) {
+    //         console.log("Polygon failed, trying Base L2 UNS")
+    //         // Polygon failed, try Base L2 UNS
+    //         try {
+    //             const baseProvider = new ethers.JsonRpcProvider(
+    //                 "https://mainnet.base.org",
+    //             )
+    //             const contract = new ethers.Contract(
+    //                 baseUnsRegistry,
+    //                 registryAbi,
+    //                 baseProvider,
+    //             )
+    //             const owner = await contract.ownerOf(tokenId)
+    //             return { owner, network: "base", registryType: "UNS" }
+    //         } catch (baseError) {
+    //             console.log("Base failed, trying Sonic")
+    //             // Base failed, try Sonic
+    //             try {
+    //                 const sonicProvider = new ethers.JsonRpcProvider(
+    //                     "https://rpc.soniclabs.com",
+    //                 )
+    //                 const contract = new ethers.Contract(
+    //                     sonicUnsRegistry,
+    //                     registryAbi,
+    //                     sonicProvider,
+    //                 )
+    //                 const owner = await contract.ownerOf(tokenId)
+    //                 return { owner, network: "sonic", registryType: "UNS" }
+    //             } catch (sonicError) {
+    //                 console.log("Sonic failed, trying Ethereum UNS")
+    //                 // Sonic failed, try Ethereum UNS
+    //                 try {
+    //                     const ethereumProvider = new ethers.JsonRpcProvider(
+    //                         "https://eth.llamarpc.com",
+    //                     )
+    //                     const contract = new ethers.Contract(
+    //                         ethereumUnsRegistry,
+    //                         registryAbi,
+    //                         ethereumProvider,
+    //                     )
+    //                     const owner = await contract.ownerOf(tokenId)
+    //                     return {
+    //                         owner,
+    //                         network: "ethereum",
+    //                         registryType: "UNS",
+    //                     }
+    //                 } catch (ethereumUnsError) {
+    //                     console.log("Ethereum UNS failed, trying Ethereum CNS")
+    //                     // Ethereum UNS failed, try Ethereum CNS (legacy)
+    //                     const ethereumProvider = new ethers.JsonRpcProvider(
+    //                         "https://eth.llamarpc.com",
+    //                     )
+    //                     const contract = new ethers.Contract(
+    //                         ethereumCnsRegistry,
+    //                         registryAbi,
+    //                         ethereumProvider,
+    //                     )
+    //                     const owner = await contract.ownerOf(tokenId)
+    //                     return {
+    //                         owner,
+    //                         network: "ethereum",
+    //                         registryType: "CNS",
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // /**
+    //  * Get all signable addresses for a UD domain.
+    //  *
+    //  * This method resolves the domain and extracts all addresses from domain records
+    //  * that can be used to sign challenges (EVM and Solana addresses).
+    //  *
+    //  * @param domain The UD domain (e.g., "brad.crypto")
+    //  * @returns Array of signable addresses with their types
+    //  *
+    //  * @example
+    //  * ```typescript
+    //  * const identities = new Identities()
+    //  * const addresses = await identities.getUDSignableAddresses("brad.crypto")
+    //  * console.log(addresses)
+    //  * // [
+    //  * //   { address: "0x1234...", recordKey: "crypto.ETH.address", signatureType: "evm" },
+    //  * //   { address: "ABC123...", recordKey: "crypto.SOL.address", signatureType: "solana" }
+    //  * // ]
+    //  * ```
+    //  */
+    // async getUDSignableAddresses(domain: string): Promise<SignableAddress[]> {
+    //     // Common UD record keys for crypto addresses
+    //     const UD_RECORD_KEYS = [
+    //         "crypto.ETH.address",
+    //         "crypto.SOL.address",
+    //         "crypto.BTC.address",
+    //         "crypto.MATIC.address",
+    //         "token.EVM.ETH.ETH.address",
+    //         "token.EVM.MATIC.MATIC.address",
+    //         "token.SOL.SOL.SOL.address",
+    //         "token.SOL.SOL.USDC.address",
+    //     ]
+
+    //     const tokenId = ethers.namehash(domain)
+    //     const resolverAbi = [
+    //         "function ownerOf(uint256 tokenId) external view returns (address)",
+    //         "function get(string calldata key, uint256 tokenId) external view returns (string memory)",
+    //     ]
+
+    //     // Try networks in order: Polygon → Base → Sonic → Ethereum UNS → Ethereum CNS
+    //     const networks = [
+    //         {
+    //             name: "polygon",
+    //             registry: "0xa9a6A3626993D487d2Dbda3173cf58cA1a9D9e9f",
+    //             rpc: "https://polygon-rpc.com",
+    //         },
+    //         {
+    //             name: "base",
+    //             registry: "0xF6c1b83977DE3dEffC476f5048A0a84d3375d498",
+    //             rpc: "https://mainnet.base.org",
+    //         },
+    //         {
+    //             name: "sonic",
+    //             registry: "0xDe1DAdcF11a7447C3D093e97FdbD513f488cE3b4",
+    //             rpc: "https://rpc.soniclabs.com",
+    //         },
+    //         {
+    //             name: "ethereum",
+    //             registry: "0x049aba7510f45BA5b64ea9E658E342F904DB358D",
+    //             rpc: "https://eth.llamarpc.com",
+    //         },
+    //     ]
+
+    //     for (const network of networks) {
+    //         try {
+    //             const provider = new ethers.JsonRpcProvider(network.rpc)
+    //             const contract = new ethers.Contract(
+    //                 network.registry,
+    //                 resolverAbi,
+    //                 provider,
+    //             )
+
+    //             // Verify domain exists on this network
+    //             await contract.ownerOf(tokenId)
+
+    //             // Fetch all record values
+    //             const records: Record<string, string | null> = {}
+    //             for (const key of UD_RECORD_KEYS) {
+    //                 try {
+    //                     const value = await contract.get(key, tokenId)
+    //                     records[key] = value || null
+    //                 } catch {
+    //                     records[key] = null
+    //                 }
+    //             }
+
+    //             // Extract signable addresses
+    //             const signableAddresses: SignableAddress[] = []
+    //             for (const [key, value] of Object.entries(records)) {
+    //                 if (!value || value === "") continue
+
+    //                 try {
+    //                     const signatureType = this.detectSignatureType(value)
+    //                     signableAddresses.push({
+    //                         address: value,
+    //                         recordKey: key,
+    //                         signatureType,
+    //                     })
+    //                 } catch {
+    //                     // Skip addresses that don't match EVM or Solana format
+    //                     continue
+    //                 }
+    //             }
+
+    //             return signableAddresses
+    //         } catch {
+    //             // Try next network
+    //             continue
+    //         }
+    //     }
+
+    //     throw new Error(`Domain ${domain} not found on any supported network`)
+    // }
+
+    /**
+     * Detect signature type from address format
+     *
+     * @param address The blockchain address to analyze
+     * @returns "evm" for Ethereum-compatible addresses, "solana" for Solana addresses
+     * @throws Error if address format is not recognized
+     *
+     * @private
+     */
+    private detectSignatureType(address: string): "evm" | "solana" {
+        // EVM addresses: 0x + 40 hex characters (secp256k1)
+        const evmPattern = /^0x[0-9a-fA-F]{40}$/
+
+        // Solana addresses: base58 encoded, 32-44 characters (ed25519)
+        const solanaPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
+
+        if (evmPattern.test(address)) {
+            return "evm"
+        }
+
+        if (solanaPattern.test(address)) {
+            return "solana"
+        }
+
+        throw new Error(
+            `Unrecognized address format: ${address}. ` +
+                `Expected EVM (0x...) or Solana (base58) address.`,
+        )
+    }
+
+    /**
+     * Generate a challenge message for Unstoppable Domain ownership verification.
+     *
+     * The user must sign this challenge with one of their domain's authorized addresses
+     * using MetaMask (EVM) or Phantom (Solana) wallet.
+     *
+     * @param demosPublicKey The user's Demos public key (hex string)
+     * @param signingAddress The address that will sign the challenge (from domain's authorized addresses)
+     * @returns Challenge message to be signed
+     */
+    generateUDChallenge(
+        demosPublicKey: string,
+        signingAddress: string,
+    ): string {
+        const timestamp = Date.now()
+        const nonce = Math.random().toString(36).substring(7)
+
+        return (
+            `Link ${signingAddress} to Demos identity ${demosPublicKey}\n` +
+            `Timestamp: ${timestamp}\n` +
+            `Nonce: ${nonce}`
+        )
+    }
+
+    /**
+     * Resolve a domain to its owner's address and other metadata.
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param domain The UD domain (e.g., "brad.crypto")
+     * @returns The unified domain resolution result
+     */
+    async resolveUDDomain(
+        demos: Demos,
+        domain: string,
+    ): Promise<UnifiedDomainResolution> {
+        return (await demos.nodeCall("resolveUdDomain", {
+            domain: domain,
+        })) as UnifiedDomainResolution
+    }
+
+    /**
+     * Add an Unstoppable Domain identity to the GCR.
+     *
+     * Flow:
+     * 1. User selects an authorized address from their domain records
+     * 2. User signs challenge with their wallet (MetaMask for EVM, Phantom for Solana)
+     * 3. Submit domain + signature for verification
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param domain The UD domain (e.g., "brad.crypto")
+     * @param signingAddress The address used to sign (from domain's authorized addresses)
+     * @param signature Signature from the signing address
+     * @param signedData The challenge message that was signed
+     * @param referralCode Optional referral code
+     * @returns The response from the RPC call
+     *
+     * @example
+     * ```typescript
+     * const identities = new Identities()
+     * // Get signable addresses for the domain
+     * const addresses = await identities.getUDSignableAddresses("brad.crypto")
+     * const signingAddress = addresses[0].address // User selects address
+     *
+     * // Generate challenge with selected address
+     * const challenge = identities.generateUDChallenge(demos.publicKey, signingAddress)
+     *
+     * // User signs challenge (EVM example with MetaMask)
+     * const signature = await ethereum.request({
+     *     method: 'personal_sign',
+     *     params: [challenge, signingAddress]
+     * })
+     *
+     * await identities.addUnstoppableDomainIdentity(
+     *     demos,
+     *     "brad.crypto",
+     *     signingAddress,
+     *     signature,
+     *     challenge
+     * )
+     * ```
+     */
+    async addUnstoppableDomainIdentity(
+        demos: Demos,
+        signingAddress: string,
+        signature: string,
+        challenge: string,
+        resolutionData: UnifiedDomainResolution,
+        referralCode?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        const publicKey = await demos.getEd25519Address()
+        const signatureType = this.detectSignatureType(signingAddress)
+
+        // INFO: Prevent signing with non-owner address
+        const isOwner =
+            resolutionData.metadata?.[signatureType]?.owner === signingAddress
+
+        if (!isOwner) {
+            const isAuthorized = resolutionData.authorizedAddresses.some(
+                auth => auth.address === signingAddress,
+            )
+
+            if (!isAuthorized) {
+                throw new Error(
+                    `Can't sign payload. Signing address (${signingAddress} on ${signatureType}) is not the owner or an authorized address`,
+                )
+            }
+        }
+
+        // Get Demos public key
+        const udPayload: UDIdentityPayload = {
+            domain: resolutionData.domain,
+            signingAddress,
+            signatureType,
+            signature,
+            publicKey,
+            signedData: challenge,
+            network: resolutionData.network,
+            registryType: resolutionData.registryType,
+        }
+
+        return await this.inferIdentity(demos, "ud" as any, {
+            ...udPayload,
+            referralCode,
+        })
+    }
+
+    /**
+     * Remove an Unstoppable Domain identity from the GCR.
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param domain The UD domain (e.g., "brad.crypto")
+     *
+     * @returns The validity data response from the RPC
+     */
+    async removeUnstoppableDomainIdentity(
+        demos: Demos,
+        domain: string,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "ud", { domain })
+    }
+
+    /**
+     * Get the Unstoppable Domain identities associated with an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param address The address to get identities for. Defaults to the connected wallet's address.
+     *
+     * @returns The identities associated with the address.
+     */
+    async getUDIdentities(demos: Demos, address?: string) {
+        return await this.getIdentities(demos, "getUDIdentities", address)
+    }
+
+    /**
+     * Fetch a Nomis score for a wallet.
+     *
+     * Calls the `getNomisScore` GCR routine via the Demos RPC.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param walletAddress The wallet address to retrieve the Nomis score for.
+     * @param chain Optional blockchain type (e.g. "evm", "solana").
+     * @param subchain Optional subchain or network identifier.
+     * @param scoreType Optional Nomis score type identifier.
+     * @returns The RPC response containing the Nomis score data.
+     */
+    async getNomisScore(
+        demos: Demos,
+        walletAddress: string,
+        chain?: string,
+        subchain?: string,
+        scoreType?: number,
+    ) {
         const request = {
             method: "gcr_routine",
             params: [
-                { method: "getAccountByTwitterUsername", params: [username] },
+                {
+                    method: "getNomisScore",
+                    params: [
+                        {
+                            walletAddress,
+                            chain,
+                            subchain,
+                            scoreType,
+                        },
+                    ],
+                },
             ],
         }
 
         return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Link a Nomis wallet identity to the GCR.
+     *
+     * Infers and persists the Nomis identity using the provided
+     * Nomis wallet identity payload.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Nomis wallet identity data to be linked.
+     * @returns The RPC response for the identity inference operation.
+     */
+    async addNomisIdentity(
+        demos: Demos,
+        payload: NomisWalletIdentity,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.inferIdentity(demos, "nomis", payload)
+    }
+
+    /**
+     * Remove a Nomis wallet identity from the GCR.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Nomis wallet identity data identifying the identity to remove.
+     * @returns The RPC response for the identity removal operation.
+     */
+    async removeNomisIdentity(
+        demos: Demos,
+        payload: NomisWalletIdentity,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "nomis", payload)
     }
 
     /**

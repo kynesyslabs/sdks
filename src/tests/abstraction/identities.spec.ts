@@ -23,7 +23,7 @@ import { uint8ArrayToHex } from "@/encryption"
 
 describe.only("IDENTITIES V2", () => {
     // const rpc = "http://node2.demos.sh:53560"
-    const rpc = "http://localhost:53550"
+    const rpc = "https://node2.demos.sh"
     let demos: Demos
 
     beforeAll(async () => {
@@ -61,7 +61,7 @@ describe.only("IDENTITIES V2", () => {
             const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
             const instance = await EVM.create(chainProviders.eth.mainnet)
-            await instance.connectWallet(wallets.evm.privateKey)
+            await instance.connectWallet(demos.newMnemonic())
 
             const signature = await instance.signMessage(ed25519_address)
             const verified = await instance.verifyMessage(
@@ -224,7 +224,7 @@ describe.skip.each(chains)(
         beforeAll(async () => {
             await identity.create()
 
-            await demos.connect("http://localhost:53550")
+            await demos.connect("https://node2.demos.sh")
             await demos.connectWallet(
                 "2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
             )
@@ -483,7 +483,7 @@ describe.skip("Individual Sign & Verify", () => {
         }
 
         // const rpc = "https://demosnode.discus.sh"
-        const rpc = "http://localhost:53550"
+        const rpc = "https://node2.demos.sh"
         const identity = DemosWebAuth.getInstance()
         await identity.create()
 

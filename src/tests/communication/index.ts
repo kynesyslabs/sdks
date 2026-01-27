@@ -7,7 +7,7 @@ import { Cryptography } from "@/encryption/Cryptography"
 
 describe("COMMUNICATION TESTS", () => {
     beforeAll(async () => {
-        const rpc_url = "http://localhost:53550"
+        const rpc_url = "https://node2.demos.sh"
         await demos.connect(rpc_url)
     })
 

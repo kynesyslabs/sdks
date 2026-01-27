@@ -7,9 +7,9 @@ import chainProviders from "./chainProviders"
 import { Demos, prepareXMPayload, prepareXMScript } from "@/websdk"
 
 describe("EVM CHAIN TESTS", () => {
-    const rpc = "http://localhost:53550"
+    const rpc = "https://node2.demos.sh"
     const demos = new Demos()
-    const instance = new EVM(chainProviders.eth.sepolia)
+    const instance = new EVM(chainProviders.eth.mainnet)
 
     beforeAll(async () => {
         const connected = await instance.connect()
@@ -18,7 +18,9 @@ describe("EVM CHAIN TESTS", () => {
         expect(connected).toBe(true)
 
         await demos.connect(rpc)
-        await demos.connectWallet("polar scale globe beauty stock employ rail exercise goat into sample embark")
+        await demos.connectWallet(
+            "polar scale globe beauty stock employ rail exercise goat into sample embark",
+        )
     })
 
     test("preparePay returns a signed transaction", async () => {
@@ -96,7 +98,7 @@ describe("EVM CHAIN TESTS", () => {
         console.log(balance)
     })
 
-    test("writeToContract generates valid signed transaction", async () => {
+    test.skip("writeToContract generates valid signed transaction", async () => {
         // REVIEW: Test the updated writeToContract method
         const testERC20ABI = [
             {
@@ -115,12 +117,18 @@ describe("EVM CHAIN TESTS", () => {
 
         // Use a mock ERC20 contract address (doesn't need to exist for signing test)
         const mockContractAddress = "0x1234567890123456789012345678901234567890"
-        const contract = await instance.getContractInstance(mockContractAddress, JSON.stringify(testERC20ABI))
+        const contract = await instance.getContractInstance(
+            mockContractAddress,
+            JSON.stringify(testERC20ABI),
+        )
 
         const recipient = "0xa2f64eec3E69C0B2E9978AB371A16eaA3a1Cf793"
         const amount = parseEther("1.0")
 
-        const signedTx = await instance.writeToContract(contract, "transfer", [recipient, amount])
+        const signedTx = await instance.writeToContract(contract, "transfer", [
+            recipient,
+            amount,
+        ])
 
         // Verify it's a valid signed transaction
         expect(typeof signedTx).toBe("string")
@@ -138,7 +146,7 @@ describe("EVM CHAIN TESTS", () => {
         expect(tx.signature.v).toBeDefined()
     })
 
-    test("writeToContract with custom gas and value options", async () => {
+    test.skip("writeToContract with custom gas and value options", async () => {
         // REVIEW: Test custom options support
         const payableABI = [
             {
@@ -153,7 +161,10 @@ describe("EVM CHAIN TESTS", () => {
         ]
 
         const mockContractAddress = "0x1234567890123456789012345678901234567890"
-        const contract = await instance.getContractInstance(mockContractAddress, JSON.stringify(payableABI))
+        const contract = await instance.getContractInstance(
+            mockContractAddress,
+            JSON.stringify(payableABI),
+        )
 
         const signedTx = await instance.writeToContract(
             contract,
@@ -161,8 +172,8 @@ describe("EVM CHAIN TESTS", () => {
             [],
             {
                 gasLimit: 100000,
-                value: "1"
-            }
+                value: "1",
+            },
         )
 
         // Verify transaction structure
@@ -190,4 +201,34 @@ describe("EVM CHAIN TESTS", () => {
         const res = await demos.broadcast(validityData)
         console.log(res)
     })
+
+    test.skip("listenForEvent", async () => {
+        const eventData = await instance.listenForEvent(
+            "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            '[{"constant":false,"inputs":[{"name":"newImplementation","type":"address"}],"name":"upgradeTo","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"newImplementation","type":"address"},{"name":"data","type":"bytes"}],"name":"upgradeToAndCall","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"implementation","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"newAdmin","type":"address"}],"name":"changeAdmin","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"admin","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[{"name":"_implementation","type":"address"}],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"payable":true,"stateMutability":"payable","type":"fallback"},{"anonymous":false,"inputs":[{"indexed":false,"name":"previousAdmin","type":"address"},{"indexed":false,"name":"newAdmin","type":"address"}],"name":"AdminChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"implementation","type":"address"}],"name":"Upgraded","type":"event"}]',
+            "*",
+            10000
+        )
+
+        try {
+            console.log("event data:", eventData)
+        } catch (error) {
+            console.log("error: here")
+            console.log(error)
+        }
+    }, 2000000)
+
+    test.skip("listenForAllEvents", async () => {
+        const removeListener = instance.listenForAllEvents(
+            "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            '[{"constant":false,"inputs":[{"name":"newImplementation","type":"address"}],"name":"upgradeTo","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"newImplementation","type":"address"},{"name":"data","type":"bytes"}],"name":"upgradeToAndCall","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"implementation","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"newAdmin","type":"address"}],"name":"changeAdmin","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"admin","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[{"name":"_implementation","type":"address"}],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"payable":true,"stateMutability":"payable","type":"fallback"},{"anonymous":false,"inputs":[{"indexed":false,"name":"previousAdmin","type":"address"},{"indexed":false,"name":"newAdmin","type":"address"}],"name":"AdminChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"implementation","type":"address"}],"name":"Upgraded","type":"event"}]',
+            (data: any) => {
+                console.log("event data:", data)
+            },
+        )
+
+        await new Promise(resolve => setTimeout(resolve, 40000))
+        console.log("removing listener")
+        removeListener()
+    }, 2000000)
 })

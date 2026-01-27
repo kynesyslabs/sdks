@@ -1,6 +1,7 @@
 import {
     BridgeOperation,
     BridgeOperationCompiled,
+    NativeBridgeTxPayload,
     SupportedChain,
     SupportedStablecoin,
     supportedChains,

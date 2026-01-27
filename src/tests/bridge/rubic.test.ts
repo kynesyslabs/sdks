@@ -16,7 +16,7 @@ describe("RubicService", () => {
     const demos: Demos = new Demos()
 
     beforeAll(async () => {
-        await demos.connect("http://localhost:53550")
+        await demos.connect("https://node2.demos.sh")
         await demos.connectWallet(
             "0x2befb9016e8a39a6177fe8af8624c763da1a6f51b0e7c6ebc58d62749c5c68d55a6f62c7335deb2672a6217c7594c7af9f0fae0e84358673ba268f6901287928",
         )

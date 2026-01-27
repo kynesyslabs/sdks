@@ -12,8 +12,14 @@ import { InstantMessagingPayload } from "../instantMessaging"
 import { BridgeOperationCompiled, NativeBridgeTxPayload } from "@/bridge/nativeBridgeTypes"
 import { L2PSEncryptedPayload } from "@/l2ps"
 import { StoragePayload } from "./TransactionSubtypes/StorageTransaction"
+import { StorageProgramPayload } from "./TransactionSubtypes/StorageProgramTransaction"
 import { L2PSHashPayload } from "./TransactionSubtypes/L2PSHashTransaction"
-import { SmartContractPayload } from "./TransactionSubtypes/SmartContractTransaction"
+import { ContractDeployPayload } from "./TransactionSubtypes/ContractDeployTransaction"
+import { ContractCallPayload } from "./TransactionSubtypes/ContractCallTransaction"
+import { D402PaymentPayload } from "./TransactionSubtypes/D402PaymentTransaction"
+import { EscrowPayload } from "./TransactionSubtypes/EscrowTransaction"
+import { IPFSPayload } from "./TransactionSubtypes/IPFSTransaction"
+import { CustomCharges } from "./CustomCharges"
 
 // TODO Implement multisignature transactions
 
@@ -33,8 +39,13 @@ export type TransactionContentData =
     | ["instantMessaging", InstantMessagingPayload]
     | ["nativeBridge", NativeBridgeTxPayload]
     | ["storage", StoragePayload]
+    | ["storageProgram", StorageProgramPayload]
     | ["l2ps_hash_update", L2PSHashPayload]
-    | ["smartContract", SmartContractPayload]
+    | ["contractDeploy", ContractDeployPayload]
+    | ["contractCall", ContractCallPayload]
+    | ["d402_payment", D402PaymentPayload]
+    | ["escrow", EscrowPayload]
+    | ["ipfs", IPFSPayload]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
@@ -52,8 +63,13 @@ export interface TransactionContent {
     | "nativeBridge"
     | "l2psEncryptedTx"
     | "storage"
+    | "storageProgram"
     | "l2ps_hash_update"
-    | "smartContract"
+    | "contractDeploy"
+    | "contractCall"
+    | "d402_payment"
+    | "escrow"
+    | "ipfs"
     from: string
     from_ed25519_address: string
     to: string
@@ -65,6 +81,9 @@ export interface TransactionContent {
     nonce: number // Increments every time a transaction is sent from the same account
     timestamp: number // Is the registered unix timestamp when the transaction was sent the first time
     transaction_fee: TxFee // Is the signed message where the sender locks X tokens until the tx is confirmed
+    // REVIEW: Phase 9 - Custom charges for variable-cost operations (IPFS, compute, etc.)
+    // Client includes this BEFORE signing to specify maximum cost they agree to pay
+    custom_charges?: CustomCharges
 }
 
 export interface Transaction {

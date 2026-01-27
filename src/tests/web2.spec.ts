@@ -8,8 +8,8 @@ describe("Web2", () => {
         await identity.create()
 
         const rpc = "https://demosnode.discus.sh"
-        // const rpc = "http://localhost:53550"
-        // const rpc = "https://demos.mungaist.com"
+        // const rpc = "https://node2.demos.sh"
+        // const rpc = "https://node2.demos.sh"
         const demos = new Demos()
         await demos.connect(rpc)
 

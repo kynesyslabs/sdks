@@ -23,6 +23,22 @@ module.exports = {
         // "no-console": "warn",
         // no-unused-vars is disabled
         "no-unused-vars": ["off"],
+        // Allow both camelCase and CONSTANT_CASE naming conventions
+        "@typescript-eslint/naming-convention": [
+            "error",
+            {
+                "selector": "variable",
+                "format": ["camelCase", "UPPER_CASE"]
+            },
+            {
+                "selector": "function",
+                "format": ["camelCase"]
+            },
+            {
+                "selector": "typeLike",
+                "format": ["PascalCase"]
+            }
+        ],
         "switch-colon-spacing": ["error", { after: true, before: false }],
         "no-extra-semi": "error",
         "comma-dangle": ["error", "always-multiline"],

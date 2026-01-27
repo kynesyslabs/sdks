@@ -94,8 +94,8 @@ describe.only("DEMOS Transaction with Bitcoin SDK", () => {
 
         await identity.create()
 
-        const rpc = "http://localhost:53550"
-        // const rpc = "https://demos.mungaist.com"
+        const rpc = "https://node2.demos.sh"
+        // const rpc = "https://node2.demos.sh"
 
         const demos = new Demos()
         await demos.connect(rpc)

@@ -1,0 +1,3 @@
+# Local Node Integrations
+- `src/multichain/localsdk/` wraps server-side providers for each chain with straightforward `sendTransaction`/`sendSignedTransaction` helpers (EVM, BTC, NEAR, SOLANA, TON, TEN, IBC, XRPL, APTOS, MULTIVERSX).
+- Designed for backend use: expect pre-signed payloads, rely on provider clients (`provider.broadcastTransaction`, `submitAndWait`, etc.), and often expose `wait` toggles for confirmation.
