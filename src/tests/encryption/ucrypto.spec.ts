@@ -8,7 +8,7 @@ import {
 } from "../../encryption/unifiedCrypto"
 import { randomBytes } from "@noble/hashes/utils"
 import * as bip39 from "@scure/bip39"
-import { wordlist } from "@scure/bip39/wordlists/english"
+import { wordlist } from "@scure/bip39/wordlists/english.js"
 import { sha3_512 } from "@noble/hashes/sha3"
 import { Demos } from "@/websdk/demosclass"
 

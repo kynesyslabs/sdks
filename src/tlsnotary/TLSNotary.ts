@@ -126,7 +126,6 @@ export class TLSNotary {
                 // Create Web Worker for WASM operations
                 // Note: This requires a bundler that supports worker URLs (webpack, vite, etc.)
                 // Using .js extension for compatibility with compiled output
-                // @ts-expect-error - import.meta.url is browser-only and requires ESNext module
                 this.worker = new Worker(new URL("./worker.js", import.meta.url), {
                     type: "module",
                 })
