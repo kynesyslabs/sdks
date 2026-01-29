@@ -22,6 +22,7 @@ import {
     NomisWalletIdentity,
     TLSNotaryPresentation,
     InferFromTLSNGithubPayload,
+    InferFromTLSNDiscordPayload,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -301,6 +302,55 @@ export class Identities {
     ): Promise<RPCResponseWithValidityData> {
         return await this.removeIdentity(demos, "tlsn", {
             context: "github",
+            username: username,
+        })
+    }
+
+    /**
+     * Add a Discord identity via TLSNotary attestation.
+     *
+     * This method uses a cryptographic proof from TLSNotary instead of
+     * the traditional message-based verification. The proof must be from
+     * attesting the discord.com/api/users/@me endpoint.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param proof The TLSNotary presentation (from attestResult.presentation).
+     * @param username Discord username from the proven response.
+     * @param userId Discord user ID from the proven response.
+     * @param referralCode Optional referral code.
+     * @returns The response from the RPC call.
+     */
+    async addDiscordIdentityViaTLSN(
+        demos: Demos,
+        proof: TLSNotaryPresentation,
+        username: string,
+        userId: string | number,
+        referralCode?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        const payload: InferFromTLSNDiscordPayload = {
+            context: "discord",
+            proof: proof,
+            username: username,
+            userId: String(userId),
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "tlsn", payload)
+    }
+
+    /**
+     * Remove a Discord identity that was added via TLSNotary.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The Discord username to remove.
+     * @returns The response from the RPC call.
+     */
+    async removeDiscordIdentityViaTLSN(
+        demos: Demos,
+        username: string,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "tlsn", {
+            context: "discord",
             username: username,
         })
     }

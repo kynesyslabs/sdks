@@ -337,6 +337,24 @@ export interface InferFromTLSNGithubPayload {
     referralCode?: string
 }
 
+/**
+ * Discord identity payload via TLSNotary
+ *
+ * Used when verifying Discord identity through TLSNotary attestation
+ * of the discord.com/api/users/@me endpoint.
+ */
+export interface InferFromTLSNDiscordPayload {
+    context: "discord"
+    /** The TLSNotary presentation proof */
+    proof: TLSNotaryPresentation
+    /** Discord username from the proven response */
+    username: string
+    /** Discord user ID from the proven response */
+    userId: string
+    /** Optional referral code */
+    referralCode?: string
+}
+
 // Future TLSN payloads for other platforms:
 // export interface InferFromTLSNDiscordPayload { ... }
 // export interface InferFromTLSNTwitterPayload { ... }
@@ -353,7 +371,7 @@ export interface BaseTLSNIdentityPayload {
  */
 export interface TLSNIdentityAssignPayload extends BaseTLSNIdentityPayload {
     method: "tlsn_identity_assign"
-    payload: InferFromTLSNGithubPayload // | InferFromTLSNDiscordPayload | ...
+    payload: InferFromTLSNGithubPayload | InferFromTLSNDiscordPayload
 }
 
 /**
