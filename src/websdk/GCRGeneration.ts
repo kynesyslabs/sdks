@@ -382,11 +382,17 @@ export class HandleIdentityOperations {
                 break
             }
 
+            case "humanpassport_identity_assign": {
+                edit.data = identityPayload.payload
+                break
+            }
+
             case "xm_identity_remove":
             case "web2_identity_remove":
             case "pqc_identity_remove":
             case "ud_identity_remove":
-            case "nomis_identity_remove": {
+            case "nomis_identity_remove":
+            case "humanpassport_identity_remove": {
                 // INFO: Passthrough the payload
                 edit.data = identityPayload.payload as any
                 break
