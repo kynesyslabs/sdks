@@ -46,6 +46,26 @@ const DECODER_ABI = [
 ]
 
 /**
+ * Raw stamp tuple from ABI (matches contract return type)
+ */
+type StampTuple = {
+    provider: string
+    score: bigint
+} | [string, bigint]
+
+/**
+ * Type guard to check if error is an ethers error with message
+ */
+function isEthersError(error: unknown): error is { message: string; reason?: string } {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof (error as { message: unknown }).message === 'string'
+    )
+}
+
+/**
  * Stamp data from onchain passport
  */
 export interface OnchainStamp {
@@ -157,18 +177,25 @@ export class HumanPassportOnchain {
             const rawScore = await this.decoder.getScore(address)
             // Score is returned as uint256, divide by 10000 per docs
             return Number(rawScore) / 10000
-        } catch (error: any) {
-            if (error.reason?.includes('revert') || error.message?.includes('revert')) {
+        } catch (error: unknown) {
+            if (isEthersError(error)) {
+                if (error.reason?.includes('revert') || error.message.includes('revert')) {
+                    throw new HumanPassportException(
+                        HumanPassportError.NO_PASSPORT,
+                        'No passport score found onchain for this address',
+                        { address, chainId: this.chainId }
+                    )
+                }
                 throw new HumanPassportException(
-                    HumanPassportError.NO_PASSPORT,
-                    'No passport score found onchain for this address',
-                    { address, chainId: this.chainId }
+                    HumanPassportError.API_UNAVAILABLE,
+                    `Onchain verification failed: ${error.message}`,
+                    { address, chainId: this.chainId, originalError: error.message }
                 )
             }
             throw new HumanPassportException(
                 HumanPassportError.API_UNAVAILABLE,
-                `Onchain verification failed: ${error.message}`,
-                { address, chainId: this.chainId, originalError: error.message }
+                'Onchain verification failed with unknown error',
+                { address, chainId: this.chainId }
             )
         }
     }
@@ -180,17 +207,28 @@ export class HumanPassportOnchain {
      * @returns true if address passes humanity threshold
      */
     async isHuman(address: string): Promise<boolean> {
+        if (!ethers.isAddress(address)) {
+            throw new HumanPassportException(
+                HumanPassportError.INVALID_ADDRESS,
+                `Invalid Ethereum address format: ${address}`,
+                { address, chainId: this.chainId }
+            )
+        }
+
         try {
             return await this.decoder.isHuman(address)
-        } catch (error: any) {
-            if (error.reason?.includes('revert') || error.message?.includes('revert')) {
-                return false // No passport = not human
+        } catch (error: unknown) {
+            if (isEthersError(error)) {
+                if (error.reason?.includes('revert') || error.message.includes('revert')) {
+                    return false // No passport = not human
+                }
+                throw new HumanPassportException(
+                    HumanPassportError.API_UNAVAILABLE,
+                    `Onchain verification failed: ${error.message}`,
+                    { address, chainId: this.chainId, originalError: error.message }
+                )
             }
-            throw new HumanPassportException(
-                HumanPassportError.API_UNAVAILABLE,
-                `Onchain verification failed: ${error.message}`,
-                { address, chainId: this.chainId, originalError: error.message }
-            )
+            return false // Unknown error = treat as not human
         }
     }
 
@@ -201,21 +239,41 @@ export class HumanPassportOnchain {
      * @returns Array of stamps with provider and score
      */
     async getPassport(address: string): Promise<OnchainStamp[]> {
-        try {
-            const stamps = await this.decoder.getPassport(address)
-            return stamps.map((s: any) => ({
-                provider: s.provider || s[0],
-                score: Number(s.score || s[1])
-            }))
-        } catch (error: any) {
-            if (error.reason?.includes('revert') || error.message?.includes('revert')) {
-                return [] // No passport = no stamps
-            }
+        if (!ethers.isAddress(address)) {
             throw new HumanPassportException(
-                HumanPassportError.API_UNAVAILABLE,
-                `Failed to get onchain passport: ${error.message}`,
-                { address, chainId: this.chainId, originalError: error.message }
+                HumanPassportError.INVALID_ADDRESS,
+                `Invalid Ethereum address format: ${address}`,
+                { address, chainId: this.chainId }
             )
+        }
+
+        try {
+            const stamps: StampTuple[] = await this.decoder.getPassport(address)
+            return stamps.map((s: StampTuple) => {
+                // Handle both object and tuple formats
+                if (Array.isArray(s)) {
+                    return {
+                        provider: s[0],
+                        score: Number(s[1])
+                    }
+                }
+                return {
+                    provider: s.provider,
+                    score: Number(s.score)
+                }
+            })
+        } catch (error: unknown) {
+            if (isEthersError(error)) {
+                if (error.reason?.includes('revert') || error.message.includes('revert')) {
+                    return [] // No passport = no stamps
+                }
+                throw new HumanPassportException(
+                    HumanPassportError.API_UNAVAILABLE,
+                    `Failed to get onchain passport: ${error.message}`,
+                    { address, chainId: this.chainId, originalError: error.message }
+                )
+            }
+            return [] // Unknown error = no stamps
         }
     }
 
@@ -226,11 +284,29 @@ export class HumanPassportOnchain {
      * @returns Complete score data including stamps
      */
     async getFullScore(address: string): Promise<OnchainScoreResult> {
-        const [score, isHuman, stamps] = await Promise.all([
+        const [scoreResult, isHumanResult, stampsResult] = await Promise.allSettled([
             this.getScore(address),
             this.isHuman(address),
             this.getPassport(address)
         ])
+
+        // Handle NO_PASSPORT error from getScore - return 0 instead of rejecting
+        let score = 0
+        if (scoreResult.status === 'fulfilled') {
+            score = scoreResult.value
+        } else if (scoreResult.reason instanceof HumanPassportException) {
+            if (scoreResult.reason.code === HumanPassportError.NO_PASSPORT) {
+                score = 0 // No passport = score 0
+            } else {
+                throw scoreResult.reason // Re-throw other errors
+            }
+        } else {
+            throw scoreResult.reason // Re-throw non-HumanPassportException errors
+        }
+
+        // isHuman and getPassport already handle NO_PASSPORT gracefully (return false/[])
+        const isHuman = isHumanResult.status === 'fulfilled' ? isHumanResult.value : false
+        const stamps = stampsResult.status === 'fulfilled' ? stampsResult.value : []
 
         return {
             address: address.toLowerCase(),

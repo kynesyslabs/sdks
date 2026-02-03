@@ -25,9 +25,15 @@ interface RawScoreResponse {
     expiration_timestamp: string | null
     threshold: string
     error: string | null
-    stamps: Record<string, any>
-    points_data: any | null
-    possible_points_data: any | null
+    stamps: Record<string, HumanPassportStamp>
+    points_data: {
+        total: number
+        breakdown: Record<string, number>
+    } | null
+    possible_points_data: {
+        total: number
+        breakdown: Record<string, number>
+    } | null
 }
 
 /**
@@ -124,7 +130,7 @@ export class HumanPassportClient {
             )
 
             return this.transformScoreResponse(response.data)
-        } catch (error: any) {
+        } catch (error: unknown) {
             throw this.handleApiError(error)
         }
     }
@@ -135,10 +141,18 @@ export class HumanPassportClient {
      * @param address - Ethereum address to check
      * @param includeMetadata - Include stamp metadata (default: true)
      * @returns Array of stamps
+     * @throws HumanPassportException on API errors
      */
-    async getStamps(address: string, includeMetadata = true): Promise<HumanPassportStamp[]> {
+    async getStamps<T = HumanPassportStamp>(address: string, includeMetadata = true): Promise<T[]> {
+        if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+            throw new HumanPassportException(
+                HumanPassportError.INVALID_ADDRESS,
+                `Invalid Ethereum address format: ${address}`
+            )
+        }
+
         try {
-            const response = await this.axiosInstance.get(
+            const response = await this.axiosInstance.get<{ items: T[] }>(
                 `/v2/stamps/${address}`,
                 {
                     params: { include_metadata: includeMetadata }
@@ -146,7 +160,7 @@ export class HumanPassportClient {
             )
 
             return response.data.items || []
-        } catch (error: any) {
+        } catch (error: unknown) {
             throw this.handleApiError(error)
         }
     }
@@ -181,12 +195,12 @@ export class HumanPassportClient {
     private transformScoreResponse(data: RawScoreResponse): HumanPassportScore {
         return {
             address: data.address,
-            score: parseFloat(data.score) || 0,
+            score: parseFloat(data.score) ?? 0,
             passingScore: data.passing_score,
             lastScoreTimestamp: data.last_score_timestamp,
             expirationTimestamp: data.expiration_timestamp,
             threshold: parseFloat(data.threshold) ?? 20,
-            stamps: data.stamps || {},
+            stamps: data.stamps ?? {},
             error: data.error
         }
     }
@@ -194,59 +208,68 @@ export class HumanPassportClient {
     /**
      * Handle API errors and convert to HumanPassportException
      */
-    private handleApiError(error: any): HumanPassportException {
-        if (error.response) {
-            const status = error.response.status
-            const message = error.response.data?.detail || error.message
+    private handleApiError(error: unknown): HumanPassportException {
+        // Type narrowing for axios errors
+        if (typeof error === 'object' && error !== null && 'response' in error) {
+            const axiosError = error as { response?: { status: number; data?: unknown }; message?: string; code?: string }
 
-            switch (status) {
-                case 400:
-                    return new HumanPassportException(
-                        HumanPassportError.INVALID_ADDRESS,
-                        `Invalid address: ${message}`,
-                        error.response.data
-                    )
-                case 404:
-                    return new HumanPassportException(
-                        HumanPassportError.NO_PASSPORT,
-                        'User has not created a Human Passport. Direct them to passport.human.tech',
-                        error.response.data
-                    )
-                case 429:
-                    return new HumanPassportException(
-                        HumanPassportError.API_RATE_LIMITED,
-                        'API rate limit exceeded. Try again later.',
-                        error.response.data
-                    )
-                case 500:
-                case 502:
-                case 503:
-                    return new HumanPassportException(
-                        HumanPassportError.API_UNAVAILABLE,
-                        `Human Passport API unavailable: ${message}`,
-                        error.response.data
-                    )
-                default:
-                    return new HumanPassportException(
-                        HumanPassportError.API_UNAVAILABLE,
-                        `API error (${status}): ${message}`,
-                        error.response.data
-                    )
+            if (axiosError.response) {
+                const status = axiosError.response.status
+                const responseData = axiosError.response.data as { detail?: string } | undefined
+                const message = responseData?.detail || axiosError.message || 'Unknown error'
+
+                switch (status) {
+                    case 400:
+                        return new HumanPassportException(
+                            HumanPassportError.INVALID_ADDRESS,
+                            `Invalid address: ${message}`,
+                            axiosError.response.data
+                        )
+                    case 404:
+                        return new HumanPassportException(
+                            HumanPassportError.NO_PASSPORT,
+                            'User has not created a Human Passport. Direct them to https://app.passport.xyz/',
+                            axiosError.response.data
+                        )
+                    case 429:
+                        return new HumanPassportException(
+                            HumanPassportError.API_RATE_LIMITED,
+                            'API rate limit exceeded. Try again later.',
+                            axiosError.response.data
+                        )
+                    case 500:
+                    case 502:
+                    case 503:
+                        return new HumanPassportException(
+                            HumanPassportError.API_UNAVAILABLE,
+                            `Human Passport API unavailable: ${message}`,
+                            axiosError.response.data
+                        )
+                    default:
+                        return new HumanPassportException(
+                            HumanPassportError.API_UNAVAILABLE,
+                            `API error (${status}): ${message}`,
+                            axiosError.response.data
+                        )
+                }
+            }
+
+            // Check for timeout errors
+            if (axiosError.code === 'ECONNABORTED') {
+                return new HumanPassportException(
+                    HumanPassportError.API_UNAVAILABLE,
+                    'Request timeout - Human Passport API did not respond',
+                    { timeout: true }
+                )
             }
         }
 
-        if (error.code === 'ECONNABORTED') {
-            return new HumanPassportException(
-                HumanPassportError.API_UNAVAILABLE,
-                'Request timeout - Human Passport API did not respond',
-                { timeout: true }
-            )
-        }
-
+        // Fallback for unknown errors
+        const errorMessage = error instanceof Error ? error.message : String(error)
         return new HumanPassportException(
             HumanPassportError.API_UNAVAILABLE,
-            `Network error: ${error.message}`,
-            { originalError: error.message }
+            `Network error: ${errorMessage}`,
+            { originalError: errorMessage }
         )
     }
 }
