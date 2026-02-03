@@ -16,14 +16,13 @@ import {
     InferFromDiscordPayload,
     InferFromTelegramPayload,
     TelegramSignedAttestation,
-    InferFromTLSNTelegramPayload,
     FindDemosIdByWeb2IdentityQuery,
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
     NomisWalletIdentity,
     TLSNotaryPresentation,
-    InferFromTLSNGithubPayload,
-    InferFromTLSNDiscordPayload,
+    TLSNIdentityContext,
+    InferFromTLSNPayload,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -259,28 +258,32 @@ export class Identities {
     }
 
     /**
-     * Add a GitHub identity via TLSNotary attestation.
+     * Add a Web2 identity via TLSNotary attestation.
      *
-     * This method uses a cryptographic proof from TLSNotary instead of
-     * the traditional gist-based verification. The proof must be from
-     * attesting the api.github.com/user endpoint.
+     * This generic method uses a cryptographic proof from TLSNotary to verify
+     * identity ownership. The context determines which platform's API was attested:
+     * - "github": api.github.com/user
+     * - "discord": discord.com/api/users/@me
+     * - "telegram": backend's /api/telegram/user
      *
      * @param demos A Demos instance to communicate with the RPC.
+     * @param context The platform context ("github", "discord", or "telegram").
      * @param proof The TLSNotary presentation (from attestResult.presentation).
-     * @param username GitHub username from the proven response.
-     * @param userId GitHub user ID from the proven response.
+     * @param username Username from the proven response.
+     * @param userId User ID from the proven response.
      * @param referralCode Optional referral code.
      * @returns The response from the RPC call.
      */
-    async addGithubIdentityViaTLSN(
+    async addWeb2IdentityViaTLSN(
         demos: Demos,
+        context: TLSNIdentityContext,
         proof: TLSNotaryPresentation,
         username: string,
         userId: string | number,
         referralCode?: string,
     ): Promise<RPCResponseWithValidityData> {
-        const payload: InferFromTLSNGithubPayload = {
-            context: "github",
+        const payload: InferFromTLSNPayload = {
+            context: context,
             proof: proof,
             username: username,
             userId: String(userId),
@@ -291,67 +294,20 @@ export class Identities {
     }
 
     /**
-     * Remove a GitHub identity that was added via TLSNotary.
+     * Remove a Web2 identity that was added via TLSNotary.
      *
      * @param demos A Demos instance to communicate with the RPC.
-     * @param username The GitHub username to remove.
+     * @param context The platform context ("github", "discord", or "telegram").
+     * @param username The username to remove.
      * @returns The response from the RPC call.
      */
-    async removeGithubIdentityViaTLSN(
+    async removeWeb2IdentityViaTLSN(
         demos: Demos,
+        context: TLSNIdentityContext,
         username: string,
     ): Promise<RPCResponseWithValidityData> {
         return await this.removeIdentity(demos, "tlsn", {
-            context: "github",
-            username: username,
-        })
-    }
-
-    /**
-     * Add a Discord identity via TLSNotary attestation.
-     *
-     * This method uses a cryptographic proof from TLSNotary instead of
-     * the traditional message-based verification. The proof must be from
-     * attesting the discord.com/api/users/@me endpoint.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param proof The TLSNotary presentation (from attestResult.presentation).
-     * @param username Discord username from the proven response.
-     * @param userId Discord user ID from the proven response.
-     * @param referralCode Optional referral code.
-     * @returns The response from the RPC call.
-     */
-    async addDiscordIdentityViaTLSN(
-        demos: Demos,
-        proof: TLSNotaryPresentation,
-        username: string,
-        userId: string | number,
-        referralCode?: string,
-    ): Promise<RPCResponseWithValidityData> {
-        const payload: InferFromTLSNDiscordPayload = {
-            context: "discord",
-            proof: proof,
-            username: username,
-            userId: String(userId),
-            referralCode: referralCode,
-        }
-
-        return await this.inferIdentity(demos, "tlsn", payload)
-    }
-
-    /**
-     * Remove a Discord identity that was added via TLSNotary.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param username The Discord username to remove.
-     * @returns The response from the RPC call.
-     */
-    async removeDiscordIdentityViaTLSN(
-        demos: Demos,
-        username: string,
-    ): Promise<RPCResponseWithValidityData> {
-        return await this.removeIdentity(demos, "tlsn", {
-            context: "discord",
+            context: context,
             username: username,
         })
     }
@@ -454,55 +410,6 @@ export class Identities {
         }
 
         return await this.inferIdentity(demos, "web2", telegramPayload)
-    }
-
-    /**
-     * Add a Telegram identity via TLSNotary attestation.
-     *
-     * This method uses a cryptographic proof from TLSNotary instead of
-     * the traditional bot attestation. The proof must be from
-     * attesting the api.telegram.org endpoint.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param proof The TLSNotary presentation (from attestResult.presentation).
-     * @param username Telegram username from the proven response.
-     * @param userId Telegram user ID from the proven response.
-     * @param referralCode Optional referral code.
-     * @returns The response from the RPC call.
-     */
-    async addTelegramIdentityViaTLSN(
-        demos: Demos,
-        proof: TLSNotaryPresentation,
-        username: string,
-        userId: string | number,
-        referralCode?: string,
-    ): Promise<RPCResponseWithValidityData> {
-        const payload: InferFromTLSNTelegramPayload = {
-            context: "telegram",
-            proof: proof,
-            username: username,
-            userId: String(userId),
-            referralCode: referralCode,
-        }
-
-        return await this.inferIdentity(demos, "tlsn", payload)
-    }
-
-    /**
-     * Remove a Telegram identity that was added via TLSNotary.
-     *
-     * @param demos A Demos instance to communicate with the RPC.
-     * @param username The Telegram username to remove.
-     * @returns The response from the RPC call.
-     */
-    async removeTelegramIdentityViaTLSN(
-        demos: Demos,
-        username: string,
-    ): Promise<RPCResponseWithValidityData> {
-        return await this.removeIdentity(demos, "web2", {
-            context: "telegram",
-            username: username,
-        })
     }
 
     // SECTION: PQC Identities

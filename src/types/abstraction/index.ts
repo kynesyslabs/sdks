@@ -161,24 +161,6 @@ export interface InferFromTelegramPayload
     proof: TelegramProof
 }
 
-/**
- * Telegram identity payload via TLSNotary
- *
- * Used when verifying Telegram identity through TLSNotary attestation
- * of the api.telegram.org endpoint.
- */
-export interface InferFromTLSNTelegramPayload {
-    context: "telegram"
-    /** The TLSNotary presentation proof */
-    proof: TLSNotaryPresentation
-    /** Telegram username from the proven response */
-    username: string
-    /** Telegram user ID from the proven response */
-    userId: string
-    /** Optional referral code */
-    referralCode?: string
-}
-
 export interface InferFromDiscordPayload extends Web2CoreTargetIdentityPayload {
     context: "discord"
     username: string
@@ -338,44 +320,28 @@ export interface TLSNotaryPresentation {
 }
 
 /**
- * GitHub identity payload via TLSNotary
- *
- * Used when verifying GitHub identity through TLSNotary attestation
- * of the api.github.com/user endpoint.
+ * Supported TLSN identity contexts
  */
-export interface InferFromTLSNGithubPayload {
-    context: "github"
-    /** The TLSNotary presentation proof */
-    proof: TLSNotaryPresentation
-    /** GitHub username from the proven response */
-    username: string
-    /** GitHub user ID from the proven response */
-    userId: string
-    /** Optional referral code */
-    referralCode?: string
-}
+export type TLSNIdentityContext = "github" | "discord" | "telegram"
 
 /**
- * Discord identity payload via TLSNotary
+ * Generic Web2 identity payload via TLSNotary
  *
- * Used when verifying Discord identity through TLSNotary attestation
- * of the discord.com/api/users/@me endpoint.
+ * Used for verifying any Web2 identity through TLSNotary attestation.
+ * The context determines which platform's API was attested.
  */
-export interface InferFromTLSNDiscordPayload {
-    context: "discord"
+export interface InferFromTLSNPayload {
+    /** The platform context (github, discord, telegram) */
+    context: TLSNIdentityContext
     /** The TLSNotary presentation proof */
     proof: TLSNotaryPresentation
-    /** Discord username from the proven response */
+    /** Username from the proven response */
     username: string
-    /** Discord user ID from the proven response */
+    /** User ID from the proven response */
     userId: string
     /** Optional referral code */
     referralCode?: string
 }
-
-// Future TLSN payloads for other platforms:
-// export interface InferFromTLSNDiscordPayload { ... }
-// export interface InferFromTLSNTwitterPayload { ... }
 
 /**
  * Base TLSN identity payload
@@ -389,10 +355,7 @@ export interface BaseTLSNIdentityPayload {
  */
 export interface TLSNIdentityAssignPayload extends BaseTLSNIdentityPayload {
     method: "tlsn_identity_assign"
-    payload:
-        | InferFromTLSNGithubPayload
-        | InferFromTLSNDiscordPayload
-        | InferFromTLSNTelegramPayload
+    payload: InferFromTLSNPayload
 }
 
 /**

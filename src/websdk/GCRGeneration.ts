@@ -9,7 +9,7 @@ import {
     InferFromSignaturePayload,
     TelegramSignedAttestation,
     Web2CoreTargetIdentityPayload,
-    InferFromTLSNGithubPayload,
+    InferFromTLSNPayload,
 } from "@/types/abstraction"
 import { Hashing } from "@/encryption/Hashing"
 import { INativePayload } from "@/types/native"
@@ -386,7 +386,7 @@ export class HandleIdentityOperations {
             case "tlsn_identity_assign": {
                 // TLSN identity uses TLSNotary proof for verification
                 // The proof contains cryptographically verified data from the target API
-                const payload = identityPayload.payload as InferFromTLSNGithubPayload
+                const payload = identityPayload.payload as InferFromTLSNPayload
 
                 // Stringify the proof for storage (Web2GCRData.data.proof expects string)
                 const proofString = JSON.stringify(payload.proof)
