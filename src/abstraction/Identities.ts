@@ -1239,6 +1239,14 @@ export class Identities {
         }
 
         const response = await demos.rpcCall(request, true)
+        if ((response as any).error) {
+            throw new Error(`Failed to get Human Passport identities: ${(response as any).error.message}`)
+        }
+
+        if (response.result !== 200) {
+            throw new Error(`Failed to get Human Passport identities: unexpected status ${response.result}`)
+        }
+
         return response.response || []
     }
 
@@ -1264,6 +1272,10 @@ export class Identities {
         demos: Demos,
         payload: HumanPassportIdentityData,
     ): Promise<RPCResponseWithValidityData> {
+        if (payload.verificationMethod === 'onchain' && payload.chainId == null) {
+            throw new Error('chainId must be provided for onchain verification')
+        }
+
         return await this.inferIdentity(demos, "humanpassport", payload)
     }
 

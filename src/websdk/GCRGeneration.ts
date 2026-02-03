@@ -384,6 +384,7 @@ export class HandleIdentityOperations {
 
             case "humanpassport_identity_assign": {
                 edit.data = identityPayload.payload
+                edit.referralCode = identityPayload.payload.referralCode
                 break
             }
 

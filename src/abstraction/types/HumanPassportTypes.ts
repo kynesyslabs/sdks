@@ -127,7 +127,7 @@ export class HumanPassportException extends Error {
     constructor(
         public code: HumanPassportError,
         message: string,
-        public details?: any
+        public details?: unknown
     ) {
         super(message)
         this.name = 'HumanPassportException'

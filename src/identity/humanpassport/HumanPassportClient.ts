@@ -111,6 +111,13 @@ export class HumanPassportClient {
      * @throws HumanPassportException on API errors
      */
     async getScore(address: string): Promise<HumanPassportScore> {
+        if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+            throw new HumanPassportException(
+                HumanPassportError.INVALID_ADDRESS,
+                `Invalid Ethereum address format: ${address}`
+            )
+        }
+
         try {
             const response = await this.axiosInstance.get<RawScoreResponse>(
                 `/v2/stamps/${this.config.scorerId}/score/${address}`
@@ -178,7 +185,7 @@ export class HumanPassportClient {
             passingScore: data.passing_score,
             lastScoreTimestamp: data.last_score_timestamp,
             expirationTimestamp: data.expiration_timestamp,
-            threshold: parseFloat(data.threshold) || 20,
+            threshold: parseFloat(data.threshold) ?? 20,
             stamps: data.stamps || {},
             error: data.error
         }

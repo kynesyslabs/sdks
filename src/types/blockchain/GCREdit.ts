@@ -1,7 +1,7 @@
 // TODO See handleGCR.ts for the execution of the GCREdit
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
-import { PqcIdentityRemovePayload, UDIdentityPayload, XMCoreTargetIdentityPayload, NomisWalletIdentity } from "../abstraction"
+import { PqcIdentityRemovePayload, UDIdentityPayload, XMCoreTargetIdentityPayload, NomisWalletIdentity, HumanPassportIdentityData } from "../abstraction"
 import { SigningAlgorithm } from "../cryptography"
 
 export interface GCREditBalance {
@@ -81,29 +81,6 @@ export interface PQCIdentityGCREditData {
 
 export type UdGCRData = UDIdentityPayload
 
-/**
- * Human Passport identity data stored in GCR
- */
-export interface HumanPassportGCRData {
-    /** EVM address */
-    address: string
-    /** Humanity score */
-    score: number
-    /** Whether score passed threshold */
-    passingScore: boolean
-    /** Score threshold used */
-    threshold: number
-    /** List of verified stamp provider names */
-    stamps: string[]
-    /** Verification method used */
-    verificationMethod: "api" | "onchain"
-    /** Chain ID for onchain verification */
-    chainId?: number
-    /** Timestamp when verified */
-    verifiedAt: number
-    /** Timestamp when score expires */
-    expiresAt: number | null
-}
 
 export interface GCREditIdentity {
     type: "identity"
@@ -120,7 +97,7 @@ export interface GCREditIdentity {
     | UdGCRData // ud add identity
     | { domain: string } // ud remove identity
     | NomisWalletIdentity // nomis add/remove identity
-    | HumanPassportGCRData // humanpassport add identity
+    | HumanPassportIdentityData // humanpassport add identity
     | { address: string } // humanpassport remove identity
     txhash: string
     referralCode?: string

@@ -145,6 +145,14 @@ export class HumanPassportOnchain {
      * @returns Score (divide by 10000 for actual value)
      */
     async getScore(address: string): Promise<number> {
+        if (!ethers.isAddress(address)) {
+            throw new HumanPassportException(
+                HumanPassportError.INVALID_ADDRESS,
+                `Invalid Ethereum address format: ${address}`,
+                { address, chainId: this.chainId }
+            )
+        }
+
         try {
             const rawScore = await this.decoder.getScore(address)
             // Score is returned as uint256, divide by 10000 per docs
