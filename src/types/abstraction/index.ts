@@ -161,6 +161,24 @@ export interface InferFromTelegramPayload
     proof: TelegramProof
 }
 
+/**
+ * Telegram identity payload via TLSNotary
+ *
+ * Used when verifying Telegram identity through TLSNotary attestation
+ * of the api.telegram.org endpoint.
+ */
+export interface InferFromTLSNTelegramPayload {
+    context: "telegram"
+    /** The TLSNotary presentation proof */
+    proof: TLSNotaryPresentation
+    /** Telegram username from the proven response */
+    username: string
+    /** Telegram user ID from the proven response */
+    userId: string
+    /** Optional referral code */
+    referralCode?: string
+}
+
 export interface InferFromDiscordPayload extends Web2CoreTargetIdentityPayload {
     context: "discord"
     username: string
@@ -371,7 +389,10 @@ export interface BaseTLSNIdentityPayload {
  */
 export interface TLSNIdentityAssignPayload extends BaseTLSNIdentityPayload {
     method: "tlsn_identity_assign"
-    payload: InferFromTLSNGithubPayload | InferFromTLSNDiscordPayload
+    payload:
+        | InferFromTLSNGithubPayload
+        | InferFromTLSNDiscordPayload
+        | InferFromTLSNTelegramPayload
 }
 
 /**

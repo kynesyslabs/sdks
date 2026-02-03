@@ -16,6 +16,7 @@ import {
     InferFromDiscordPayload,
     InferFromTelegramPayload,
     TelegramSignedAttestation,
+    InferFromTLSNTelegramPayload,
     FindDemosIdByWeb2IdentityQuery,
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
@@ -453,6 +454,55 @@ export class Identities {
         }
 
         return await this.inferIdentity(demos, "web2", telegramPayload)
+    }
+
+    /**
+     * Add a Telegram identity via TLSNotary attestation.
+     *
+     * This method uses a cryptographic proof from TLSNotary instead of
+     * the traditional bot attestation. The proof must be from
+     * attesting the api.telegram.org endpoint.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param proof The TLSNotary presentation (from attestResult.presentation).
+     * @param username Telegram username from the proven response.
+     * @param userId Telegram user ID from the proven response.
+     * @param referralCode Optional referral code.
+     * @returns The response from the RPC call.
+     */
+    async addTelegramIdentityViaTLSN(
+        demos: Demos,
+        proof: TLSNotaryPresentation,
+        username: string,
+        userId: string | number,
+        referralCode?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        const payload: InferFromTLSNTelegramPayload = {
+            context: "telegram",
+            proof: proof,
+            username: username,
+            userId: String(userId),
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "tlsn", payload)
+    }
+
+    /**
+     * Remove a Telegram identity that was added via TLSNotary.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param username The Telegram username to remove.
+     * @returns The response from the RPC call.
+     */
+    async removeTelegramIdentityViaTLSN(
+        demos: Demos,
+        username: string,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "web2", {
+            context: "telegram",
+            username: username,
+        })
     }
 
     // SECTION: PQC Identities
