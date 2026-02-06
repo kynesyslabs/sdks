@@ -20,6 +20,7 @@ import {
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
     NomisWalletIdentity,
+    EthosWalletIdentity,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -73,7 +74,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -132,7 +133,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -1181,5 +1182,81 @@ export class Identities {
         payload: NomisWalletIdentity,
     ): Promise<RPCResponseWithValidityData> {
         return await this.removeIdentity(demos, "nomis", payload)
+    }
+
+    /**
+     * Retrieve the Ethos reputation score for a given wallet address.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param walletAddress The EVM wallet address to retrieve the Ethos score for.
+     * @returns The RPC response containing the Ethos score data.
+     */
+    async getEthosScore(
+        demos: Demos,
+        walletAddress: string,
+    ) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getEthosScore",
+                    params: [
+                        {
+                            walletAddress,
+                        },
+                    ],
+                },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Get Ethos identities linked to the current user.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @returns The RPC response containing linked Ethos identities.
+     */
+    async getEthosIdentities(demos: Demos) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getEthosIdentities",
+                    params: [],
+                },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Link an Ethos wallet identity to the GCR.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Ethos wallet identity data to be linked.
+     * @returns The RPC response for the identity inference operation.
+     */
+    async addEthosIdentity(
+        demos: Demos,
+        payload: EthosWalletIdentity,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.inferIdentity(demos, "ethos", payload)
+    }
+
+    /**
+     * Remove an Ethos wallet identity from the GCR.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Ethos wallet identity data identifying the identity to remove.
+     * @returns The RPC response for the identity removal operation.
+     */
+    async removeEthosIdentity(
+        demos: Demos,
+        payload: EthosWalletIdentity,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "ethos", payload)
     }
 }

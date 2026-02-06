@@ -29,7 +29,10 @@ import {
     TelegramAttestationPayload,
     TelegramSignedAttestation,
     DiscordProof,
-    NomisWalletIdentity
+    NomisWalletIdentity,
+    EthosWalletIdentity,
+    EthosIdentityAssignPayload,
+    EthosIdentityRemovePayload
 } from "@/types/abstraction"
 
 export {
@@ -56,5 +59,8 @@ export {
     TelegramAttestationPayload,
     TelegramSignedAttestation,
     DiscordProof,
-    NomisWalletIdentity
+    NomisWalletIdentity,
+    EthosWalletIdentity,
+    EthosIdentityAssignPayload,
+    EthosIdentityRemovePayload
 }
