@@ -314,6 +314,16 @@ export interface EthosWalletIdentity {
     }
 }
 
+/**
+ * Minimal payload for Ethos identity removal.
+ * Only includes identifying fields (chain, subchain, address).
+ */
+export interface EthosIdentityRemoveData {
+    chain: string
+    subchain: string
+    address: string
+}
+
 export interface BaseEthosIdentityPayload {
     context: "ethos"
 }
@@ -325,7 +335,7 @@ export interface EthosIdentityAssignPayload extends BaseEthosIdentityPayload {
 
 export interface EthosIdentityRemovePayload extends BaseEthosIdentityPayload {
     method: "ethos_identity_remove"
-    payload: EthosWalletIdentity
+    payload: EthosIdentityRemoveData
 }
 
 export type EthosIdentityPayload =
@@ -364,7 +374,7 @@ export interface UserPoints {
         [network: string]: string[]
     }
     linkedNomisIdentities: NomisWalletIdentity[]
-    linkedEthosIdentities: EthosWalletIdentity[]
+    linkedEthosIdentities?: EthosWalletIdentity[]
     lastUpdated: Date
     flagged: boolean | null
     flaggedReason: string | null

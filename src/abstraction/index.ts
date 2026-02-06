@@ -31,6 +31,7 @@ import {
     DiscordProof,
     NomisWalletIdentity,
     EthosWalletIdentity,
+    EthosIdentityRemoveData,
     EthosIdentityAssignPayload,
     EthosIdentityRemovePayload
 } from "@/types/abstraction"
@@ -61,6 +62,7 @@ export {
     DiscordProof,
     NomisWalletIdentity,
     EthosWalletIdentity,
+    EthosIdentityRemoveData,
     EthosIdentityAssignPayload,
     EthosIdentityRemovePayload
 }
