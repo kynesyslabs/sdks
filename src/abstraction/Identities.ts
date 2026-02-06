@@ -20,6 +20,8 @@ import {
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
     NomisWalletIdentity,
+    EthosWalletIdentity,
+    EthosIdentityRemoveData,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -73,7 +75,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -88,8 +90,7 @@ export class Identities {
                     )
                 ) {
                     // construct informative error message
-                    const errorMessage = `Invalid ${
-                        payload.context
+                    const errorMessage = `Invalid ${payload.context
                     } proof format. Supported formats are: ${this.formats.web2[
                         payload.context
                     ].join(", ")}`
@@ -132,7 +133,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -1181,5 +1182,240 @@ export class Identities {
         payload: NomisWalletIdentity,
     ): Promise<RPCResponseWithValidityData> {
         return await this.removeIdentity(demos, "nomis", payload)
+    }
+
+    /**
+     * Retrieve the Ethos reputation score for a given wallet address.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param walletAddress The EVM wallet address to retrieve the Ethos score for.
+     * @returns The RPC response containing the Ethos score data.
+     */
+    async getEthosScore(
+        demos: Demos,
+        walletAddress: string,
+    ) {
+        // Validate wallet address input
+        if (!walletAddress || typeof walletAddress !== "string") {
+            throw new Error("Wallet address is required")
+        }
+
+        const trimmed = walletAddress.trim()
+        if (!trimmed) {
+            throw new Error("Wallet address cannot be empty")
+        }
+
+        // Validate EVM address format (0x followed by 40 hex characters)
+        if (!/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+            throw new Error("Invalid EVM wallet address format")
+        }
+
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getEthosScore",
+                    params: [
+                        {
+                            walletAddress: trimmed.toLowerCase(),
+                        },
+                    ],
+                },
+            ],
+        }
+
+        const response = await demos.rpcCall(request, true)
+
+        // Handle RPC failure responses
+        if (response?.result !== 200) {
+            const errorMessage =
+                response?.extra?.error ||
+                response?.response?.error ||
+                "Failed to fetch Ethos score"
+            throw new Error(errorMessage)
+        }
+
+        return response
+    }
+
+    /**
+     * Get the Ethos identities associated with an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param address The address to get identities for. Defaults to the connected wallet's address.
+     * @returns The identities associated with the address.
+     */
+    async getEthosIdentities(demos: Demos, address?: string) {
+        return await this.getIdentities(demos, "getEthosIdentities", address)
+    }
+
+    /**
+     * Validates an Ethos wallet identity payload.
+     * @param payload The payload to validate.
+     * @param requireScore Whether score validation is required (true for add, false for remove).
+     * @throws Error if validation fails.
+     */
+    private validateEthosPayload(
+        payload: EthosWalletIdentity,
+        requireScore: boolean,
+    ): void {
+        if (!payload || typeof payload !== "object") {
+            throw new Error("Ethos identity payload is required")
+        }
+
+        // Validate chain
+        if (
+            !payload.chain ||
+            typeof payload.chain !== "string" ||
+            !payload.chain.trim()
+        ) {
+            throw new Error("chain is required and must be a non-empty string")
+        }
+
+        // Validate subchain
+        if (
+            !payload.subchain ||
+            typeof payload.subchain !== "string" ||
+            !payload.subchain.trim()
+        ) {
+            throw new Error(
+                "subchain is required and must be a non-empty string",
+            )
+        }
+
+        // Validate address
+        if (
+            !payload.address ||
+            typeof payload.address !== "string" ||
+            !payload.address.trim()
+        ) {
+            throw new Error(
+                "address is required and must be a non-empty string",
+            )
+        }
+
+        // Validate EVM address format
+        const trimmedAddress = payload.address.trim()
+        if (!/^0x[a-fA-F0-9]{40}$/.test(trimmedAddress)) {
+            throw new Error("Invalid EVM wallet address format")
+        }
+
+        // Validate score for add operations
+        if (requireScore) {
+            if (
+                typeof payload.score !== "number" ||
+                !Number.isFinite(payload.score)
+            ) {
+                throw new Error("score is required and must be a valid number")
+            }
+
+            if (payload.score < 0) {
+                throw new Error("score must be non-negative")
+            }
+
+            // Validate lastSyncedAt
+            if (
+                !payload.lastSyncedAt ||
+                typeof payload.lastSyncedAt !== "string"
+            ) {
+                throw new Error(
+                    "lastSyncedAt is required and must be an ISO date string",
+                )
+            }
+
+            // Validate ISO date format
+            const parsedDate = Date.parse(payload.lastSyncedAt)
+            if (isNaN(parsedDate)) {
+                throw new Error("lastSyncedAt must be a valid ISO date string")
+            }
+        }
+
+        // Validate optional profileId if present
+        if (
+            payload.profileId !== undefined &&
+            (typeof payload.profileId !== "number" ||
+                !Number.isFinite(payload.profileId))
+        ) {
+            throw new Error("profileId must be a valid number if provided")
+        }
+    }
+
+    /**
+     * Link an Ethos wallet identity to the GCR.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Ethos wallet identity data to be linked.
+     * @returns The RPC response for the identity inference operation.
+     */
+    async addEthosIdentity(
+        demos: Demos,
+        payload: EthosWalletIdentity,
+    ): Promise<RPCResponseWithValidityData> {
+        this.validateEthosPayload(payload, true)
+        return await this.inferIdentity(demos, "ethos", payload)
+    }
+
+    /**
+     * Validates an Ethos identity removal payload.
+     * Only validates identifying fields (chain, subchain, address).
+     * @param payload The payload to validate.
+     * @throws Error if validation fails.
+     */
+    private validateEthosRemovePayload(payload: EthosIdentityRemoveData): void {
+        if (!payload || typeof payload !== "object") {
+            throw new Error("Ethos identity payload is required")
+        }
+
+        // Validate chain
+        if (
+            !payload.chain ||
+            typeof payload.chain !== "string" ||
+            !payload.chain.trim()
+        ) {
+            throw new Error("chain is required and must be a non-empty string")
+        }
+
+        // Validate subchain
+        if (
+            !payload.subchain ||
+            typeof payload.subchain !== "string" ||
+            !payload.subchain.trim()
+        ) {
+            throw new Error(
+                "subchain is required and must be a non-empty string",
+            )
+        }
+
+        // Validate address
+        if (
+            !payload.address ||
+            typeof payload.address !== "string" ||
+            !payload.address.trim()
+        ) {
+            throw new Error(
+                "address is required and must be a non-empty string",
+            )
+        }
+
+        // Validate EVM address format
+        const trimmedAddress = payload.address.trim()
+        if (!/^0x[a-fA-F0-9]{40}$/.test(trimmedAddress)) {
+            throw new Error("Invalid EVM wallet address format")
+        }
+    }
+
+    /**
+     * Remove an Ethos wallet identity from the GCR.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The identifying data for the Ethos identity to remove (chain, subchain, address).
+     * @returns The RPC response for the identity removal operation.
+     */
+    async removeEthosIdentity(
+        demos: Demos,
+        payload: EthosIdentityRemoveData,
+    ): Promise<RPCResponseWithValidityData> {
+        this.validateEthosRemovePayload(payload)
+        return await this.removeIdentity(demos, "ethos", payload)
     }
 }

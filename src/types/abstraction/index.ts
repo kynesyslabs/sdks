@@ -300,6 +300,48 @@ export type NomisIdentityPayload =
     | NomisIdentityAssignPayload
     | NomisIdentityRemovePayload
 
+export interface EthosWalletIdentity {
+    chain: string
+    subchain: string
+    address: string
+    score: number
+    profileId?: number
+    lastSyncedAt: string
+    metadata?: {
+        displayName?: string
+        username?: string
+        [key: string]: unknown
+    }
+}
+
+/**
+ * Minimal payload for Ethos identity removal.
+ * Only includes identifying fields (chain, subchain, address).
+ */
+export interface EthosIdentityRemoveData {
+    chain: string
+    subchain: string
+    address: string
+}
+
+export interface BaseEthosIdentityPayload {
+    context: "ethos"
+}
+
+export interface EthosIdentityAssignPayload extends BaseEthosIdentityPayload {
+    method: "ethos_identity_assign"
+    payload: EthosWalletIdentity
+}
+
+export interface EthosIdentityRemovePayload extends BaseEthosIdentityPayload {
+    method: "ethos_identity_remove"
+    payload: EthosIdentityRemoveData
+}
+
+export type EthosIdentityPayload =
+    | EthosIdentityAssignPayload
+    | EthosIdentityRemovePayload
+
 // SECTION Final payload type
 export type IdentityPayload =
     | XmIdentityPayload
@@ -307,6 +349,7 @@ export type IdentityPayload =
     | PqcIdentityPayload
     | UdIdentityPayload
     | NomisIdentityPayload
+    | EthosIdentityPayload
 export interface UserPoints {
     userId: string
     referralCode: string
@@ -321,6 +364,7 @@ export interface UserPoints {
         }
         udDomains?: { [domain: string]: number }
         nomisScores?: { [chain: string]: number }
+        ethosScores?: { [chain: string]: number }
         referrals: number
         demosFollow: number
     }
@@ -330,6 +374,7 @@ export interface UserPoints {
         [network: string]: string[]
     }
     linkedNomisIdentities: NomisWalletIdentity[]
+    linkedEthosIdentities?: EthosWalletIdentity[]
     lastUpdated: Date
     flagged: boolean | null
     flaggedReason: string | null
