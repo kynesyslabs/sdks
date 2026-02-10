@@ -9,6 +9,7 @@ import {
     InferFromSignaturePayload,
     TelegramSignedAttestation,
     Web2CoreTargetIdentityPayload,
+    InferFromTLSNPayload,
 } from "@/types/abstraction"
 import { Hashing } from "@/encryption/Hashing"
 import { INativePayload } from "@/types/native"
@@ -382,11 +383,34 @@ export class HandleIdentityOperations {
                 break
             }
 
+            case "tlsn_identity_assign": {
+                // TLSN identity uses TLSNotary proof for verification
+                // The proof contains cryptographically verified data from the target API
+                const payload = identityPayload.payload as InferFromTLSNPayload
+
+                // Stringify the proof for storage (Web2GCRData.data.proof expects string)
+                const proofString = JSON.stringify(payload.proof)
+
+                edit.data = {
+                    context: payload.context,
+                    data: {
+                        username: payload.username,
+                        userId: payload.userId,
+                        proof: proofString,
+                        proofHash: Hashing.sha256(proofString),
+                        timestamp: tx.content.timestamp,
+                    },
+                } as Web2GCRData
+                edit.referralCode = payload.referralCode
+                break
+            }
+
             case "xm_identity_remove":
             case "web2_identity_remove":
             case "pqc_identity_remove":
             case "ud_identity_remove":
-            case "nomis_identity_remove": {
+            case "nomis_identity_remove":
+            case "tlsn_identity_remove": {
                 // INFO: Passthrough the payload
                 edit.data = identityPayload.payload as any
                 break

@@ -85,7 +85,7 @@ export interface GCREditIdentity {
     type: "identity"
     isRollback: boolean
     account: string
-    context: "xm" | "web2" | "pqc" | "nomis" | "ud"
+    context: "xm" | "web2" | "pqc" | "nomis" | "ud" | "tlsn"
     operation: "add" | "remove"
     data:
     | Web2GCRData // web2 add or remove identity

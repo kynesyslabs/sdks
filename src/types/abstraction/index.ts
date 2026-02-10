@@ -300,6 +300,79 @@ export type NomisIdentityPayload =
     | NomisIdentityAssignPayload
     | NomisIdentityRemovePayload
 
+// SECTION TLSNotary Identities
+/**
+ * TLSNotary presentation format (from tlsn-js attestation)
+ *
+ * This is the proof structure returned by TLSNotary attestation.
+ * Contains cryptographically signed proof of an HTTPS request/response.
+ */
+export interface TLSNotaryPresentation {
+    /** TLSNotary version (e.g., "0.1.0-alpha.12") */
+    version: string
+    /** Hex-encoded proof data containing request/response and signatures */
+    data: string
+    /** Metadata about the attestation */
+    meta: {
+        notaryUrl?: string
+        websocketProxyUrl?: string
+    }
+}
+
+/**
+ * Supported TLSN identity contexts
+ */
+export type TLSNIdentityContext = "github" | "discord" | "telegram"
+
+/**
+ * Generic Web2 identity payload via TLSNotary
+ *
+ * Used for verifying any Web2 identity through TLSNotary attestation.
+ * The context determines which platform's API was attested.
+ */
+export interface InferFromTLSNPayload {
+    /** The platform context (github, discord, telegram) */
+    context: TLSNIdentityContext
+    /** The TLSNotary presentation proof */
+    proof: TLSNotaryPresentation
+    /** Username from the proven response */
+    username: string
+    /** User ID from the proven response */
+    userId: string
+    /** Optional referral code */
+    referralCode?: string
+}
+
+/**
+ * Base TLSN identity payload
+ */
+export interface BaseTLSNIdentityPayload {
+    context: "tlsn"
+}
+
+/**
+ * TLSN identity assign payload
+ */
+export interface TLSNIdentityAssignPayload extends BaseTLSNIdentityPayload {
+    method: "tlsn_identity_assign"
+    payload: InferFromTLSNPayload
+}
+
+/**
+ * TLSN identity remove payload
+ */
+export interface TLSNIdentityRemovePayload extends BaseTLSNIdentityPayload {
+    method: "tlsn_identity_remove"
+    payload: {
+        context: string
+        username: string
+    }
+}
+
+export type TLSNIdentityPayload =
+    | TLSNIdentityAssignPayload
+    | TLSNIdentityRemovePayload
+
 // SECTION Final payload type
 export type IdentityPayload =
     | XmIdentityPayload
@@ -307,6 +380,7 @@ export type IdentityPayload =
     | PqcIdentityPayload
     | UdIdentityPayload
     | NomisIdentityPayload
+    | TLSNIdentityPayload
 export interface UserPoints {
     userId: string
     referralCode: string
