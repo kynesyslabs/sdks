@@ -23,6 +23,7 @@ import {
     TLSNotaryPresentation,
     TLSNIdentityContext,
     InferFromTLSNPayload,
+    TLSNProofRanges,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -278,6 +279,9 @@ export class Identities {
         demos: Demos,
         context: TLSNIdentityContext,
         proof: TLSNotaryPresentation,
+        recvHash: string,
+        proofRanges: TLSNProofRanges,
+        revealedRecv: number[],
         username: string,
         userId: string | number,
         referralCode?: string,
@@ -285,9 +289,12 @@ export class Identities {
         const payload: InferFromTLSNPayload = {
             context: context,
             proof: proof,
-            username: username,
+            recvHash,
+            proofRanges,
+            revealedRecv,
+            username,
             userId: String(userId),
-            referralCode: referralCode,
+            referralCode,
         }
 
         return await this.inferIdentity(demos, "tlsn", payload)
