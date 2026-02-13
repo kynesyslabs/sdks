@@ -2,6 +2,7 @@ import {
     GCREdit,
     GCREditIdentity,
     GCREditStorageProgram,
+    Web2TLSNGCRData,
     Web2GCRData,
 } from "@/types/blockchain/GCREdit"
 import {
@@ -388,10 +389,10 @@ export class HandleIdentityOperations {
                 // The proof contains cryptographically verified data from the target API
                 const payload = identityPayload.payload as InferFromTLSNPayload
 
-                // Stringify the proof for storage (Web2GCRData.data.proof expects string)
+                // Stringify the proof for storage
                 const proofString = JSON.stringify(payload.proof)
 
-                edit.data = {
+                const tlsnData: Web2TLSNGCRData = {
                     context: payload.context,
                     data: {
                         username: payload.username,
@@ -403,7 +404,8 @@ export class HandleIdentityOperations {
                         revealedRecv: payload.revealedRecv,
                         timestamp: tx.content.timestamp,
                     },
-                } as Web2GCRData
+                }
+                edit.data = tlsnData
                 edit.referralCode = payload.referralCode
                 break
             }
