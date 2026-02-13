@@ -406,6 +406,7 @@ export interface UserPoints {
         nomisScores?: { [chain: string]: number }
         referrals: number
         demosFollow: number
+        firstWalletTransaction: number
     }
     linkedWallets: string[]
     linkedSocials: { twitter?: string }
