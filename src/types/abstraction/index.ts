@@ -12,8 +12,7 @@ export interface XMCoreTargetIdentityPayload {
 /**
  * The identity of the target address to bind to the Demos identity
  */
-export interface InferFromSignatureTargetIdentityPayload
-    extends XMCoreTargetIdentityPayload {
+export interface InferFromSignatureTargetIdentityPayload extends XMCoreTargetIdentityPayload {
     chainId: number | string
     signature: string
     targetAddress: string
@@ -25,8 +24,7 @@ export interface InferFromSignatureTargetIdentityPayload
 /**
  * The identity of the target address to bind to the Demos identity
  */
-export interface InferFromWriteTargetIdentityPayload
-    extends XMCoreTargetIdentityPayload {
+export interface InferFromWriteTargetIdentityPayload extends XMCoreTargetIdentityPayload {
     txHash: string
     chainId: number | string
     rpcUrl?: string
@@ -153,8 +151,7 @@ export interface TelegramSignedAttestation {
  */
 export type TelegramProof = TelegramSignedAttestation // JSON.stringify(TelegramSignedAttestation)
 
-export interface InferFromTelegramPayload
-    extends Web2CoreTargetIdentityPayload {
+export interface InferFromTelegramPayload extends Web2CoreTargetIdentityPayload {
     context: "telegram"
     username: string
     userId: string
@@ -335,12 +332,24 @@ export interface InferFromTLSNPayload {
     context: TLSNIdentityContext
     /** The TLSNotary presentation proof */
     proof: TLSNotaryPresentation
+    recvHash: string
+    /** Transcript byte ranges revealed in the proof */
+    proofRanges: TLSNProofRanges
+    /** Disclosed recv transcript bytes used for server-side hash check and identity extraction */
+    revealedRecv: number[]
     /** Username from the proven response */
     username: string
     /** User ID from the proven response */
     userId: string
     /** Optional referral code */
     referralCode?: string
+}
+
+export type TranscriptRange = { start: number; end: number }
+
+export type TLSNProofRanges = {
+    recv: TranscriptRange[]
+    sent: TranscriptRange[]
 }
 
 /**
