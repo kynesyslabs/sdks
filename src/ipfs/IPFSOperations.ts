@@ -34,6 +34,10 @@ import type {
     IPFSUnpinPayload,
     IPFSPayload,
 } from "../types/blockchain/TransactionSubtypes/IPFSTransaction"
+import type {
+    IPFSCustomCharges,
+    IPFSCostBreakdown,
+} from "../types/blockchain/CustomCharges"
 
 // REVIEW: IPFS Operations class for Demos Network SDK
 
@@ -140,6 +144,64 @@ export interface IPFSPinsResponse {
     error?: string
 }
 
+// REVIEW: Phase 9 - Cost quote types for custom_charges flow
+
+/**
+ * Response from ipfsQuote nodeCall
+ *
+ * Provides cost estimation before transaction is built and signed.
+ * Use this to populate custom_charges in the transaction.
+ */
+export interface IpfsQuoteResponse {
+    /** Estimated cost in DEM (as string for BigInt safety) */
+    cost_dem: string
+    /** File size used for calculation */
+    file_size_bytes: number
+    /** Whether sender is a genesis account */
+    is_genesis: boolean
+    /** Detailed cost breakdown */
+    breakdown: {
+        /** Base cost component */
+        base_cost: string
+        /** Cost for file size */
+        size_cost: string
+        /** Bytes covered by free tier (genesis only) */
+        free_tier_bytes: number
+        /** Bytes that will be charged */
+        chargeable_bytes: number
+    }
+    /** Operation quoted for */
+    operation: string
+}
+
+/**
+ * Extended add options with custom charges support
+ */
+export interface AddOptionsWithCharges extends AddOptions {
+    /** Optional custom charges configuration for cost control */
+    customCharges?: {
+        /** Maximum cost user agrees to pay (from ipfsQuote response) */
+        maxCostDem: string
+        /** Optional cost breakdown for reference */
+        estimatedBreakdown?: IPFSCostBreakdown
+    }
+}
+
+/**
+ * Extended pin options with custom charges support
+ */
+export interface PinOptionsWithCharges extends PinOptions {
+    /** File size in bytes (required when using custom charges) */
+    fileSize?: number
+    /** Optional custom charges configuration for cost control */
+    customCharges?: {
+        /** Maximum cost user agrees to pay (from ipfsQuote response) */
+        maxCostDem: string
+        /** Optional cost breakdown for reference */
+        estimatedBreakdown?: IPFSCostBreakdown
+    }
+}
+
 // ============================================================================
 // Main Class
 // ============================================================================
@@ -178,7 +240,7 @@ export class IPFSOperations {
      * Uploads content to IPFS and automatically pins it to the sender's account.
      *
      * @param content - Content to upload (Buffer, Uint8Array, or string)
-     * @param options - Optional filename and metadata
+     * @param options - Optional filename, metadata, and custom charges configuration
      * @returns IPFSAddPayload for transaction creation
      *
      * @example
@@ -195,27 +257,55 @@ export class IPFSOperations {
      *   imageBuffer,
      *   { filename: 'image.png', metadata: { type: 'image/png' } }
      * )
+     *
+     * // With custom charges (recommended for cost control)
+     * const quote = await demos.ipfs.quote(content.length, 'IPFS_ADD')
+     * const chargedPayload = IPFSOperations.createAddPayload(
+     *   content,
+     *   {
+     *     filename: 'data.json',
+     *     customCharges: { maxCostDem: quote.cost_dem }
+     *   }
+     * )
      * ```
      */
     static createAddPayload(
         content: Buffer | Uint8Array | string,
-        options: AddOptions = {},
+        options: AddOptionsWithCharges = {},
     ): IPFSAddPayload {
         // Convert content to base64
         let base64Content: string
+        let contentSize: number
+
         if (typeof content === "string") {
             base64Content = Buffer.from(content).toString("base64")
+            contentSize = Buffer.byteLength(content)
         } else {
             // Both Buffer and Uint8Array can be converted via Buffer.from
             base64Content = Buffer.from(content).toString("base64")
+            contentSize = content.length
         }
 
-        return {
+        const payload: IPFSAddPayload = {
             operation: "IPFS_ADD",
             content: base64Content,
             filename: options.filename,
             metadata: options.metadata,
         }
+
+        // REVIEW: Phase 9 - Add custom_charges if provided
+        if (options.customCharges?.maxCostDem) {
+            payload.custom_charges = {
+                ipfs: {
+                    max_cost_dem: options.customCharges.maxCostDem,
+                    file_size_bytes: contentSize,
+                    operation: "IPFS_ADD",
+                    estimated_breakdown: options.customCharges.estimatedBreakdown,
+                },
+            }
+        }
+
+        return payload
     }
 
     /**
@@ -224,7 +314,7 @@ export class IPFSOperations {
      * Pins an existing CID to the sender's account.
      *
      * @param cid - Content Identifier to pin
-     * @param options - Optional duration and metadata
+     * @param options - Optional duration, metadata, fileSize, and custom charges
      * @returns IPFSPinPayload for transaction creation
      *
      * @example
@@ -237,23 +327,45 @@ export class IPFSOperations {
      *   duration: 1000000, // ~30 days at 2.5s blocks
      *   metadata: { source: 'user-upload' }
      * })
+     *
+     * // Pin with custom charges (recommended for cost control)
+     * const quote = await demos.ipfs.quote(fileSize, 'IPFS_PIN')
+     * const chargedPayload = IPFSOperations.createPinPayload('QmExample...', {
+     *   fileSize: 1024,
+     *   customCharges: { maxCostDem: quote.cost_dem }
+     * })
      * ```
      */
     static createPinPayload(
         cid: string,
-        options: PinOptions = {},
+        options: PinOptionsWithCharges = {},
     ): IPFSPinPayload {
         // Validate CID format
         if (!this.isValidCID(cid)) {
             throw new Error(`Invalid CID format: ${cid}`)
         }
 
-        return {
+        const payload: IPFSPinPayload = {
             operation: "IPFS_PIN",
             cid,
             duration: options.duration,
             metadata: options.metadata,
         }
+
+        // REVIEW: Phase 9 - Add custom_charges if provided
+        if (options.customCharges?.maxCostDem && options.fileSize !== undefined) {
+            payload.custom_charges = {
+                ipfs: {
+                    max_cost_dem: options.customCharges.maxCostDem,
+                    file_size_bytes: options.fileSize,
+                    operation: "IPFS_PIN",
+                    duration_blocks: options.duration,
+                    estimated_breakdown: options.customCharges.estimatedBreakdown,
+                },
+            }
+        }
+
+        return payload
     }
 
     /**
@@ -412,5 +524,83 @@ export class IPFSOperations {
      */
     static isUnpinPayload(payload: IPFSPayload): payload is IPFSUnpinPayload {
         return payload.operation === "IPFS_UNPIN"
+    }
+
+    // ========================================================================
+    // REVIEW: Phase 9 - Custom Charges Utilities
+    // ========================================================================
+
+    /**
+     * Convert an ipfsQuote response to custom charges configuration
+     *
+     * Convenience method for converting quote response to the format expected
+     * by createAddPayload and createPinPayload options.
+     *
+     * @param quote - Response from ipfsQuote nodeCall
+     * @returns Custom charges configuration for payload options
+     *
+     * @example
+     * ```typescript
+     * // Get quote from node
+     * const quote = await demos.ipfs.quote(content.length, 'IPFS_ADD')
+     *
+     * // Convert to custom charges options
+     * const customCharges = IPFSOperations.quoteToCustomCharges(quote)
+     *
+     * // Use in payload creation
+     * const payload = IPFSOperations.createAddPayload(content, {
+     *   filename: 'data.json',
+     *   customCharges
+     * })
+     * ```
+     */
+    static quoteToCustomCharges(quote: IpfsQuoteResponse): {
+        maxCostDem: string
+        estimatedBreakdown: IPFSCostBreakdown
+    } {
+        return {
+            maxCostDem: quote.cost_dem,
+            estimatedBreakdown: {
+                base_cost: quote.breakdown.base_cost,
+                size_cost: quote.breakdown.size_cost,
+            },
+        }
+    }
+
+    /**
+     * Create IPFSCustomCharges object from quote response
+     *
+     * Creates a fully formed custom charges object suitable for including
+     * directly in transaction content.
+     *
+     * @param quote - Response from ipfsQuote nodeCall
+     * @param operation - IPFS operation type
+     * @param durationBlocks - Optional duration for PIN operations
+     * @returns IPFSCustomCharges object
+     *
+     * @example
+     * ```typescript
+     * const quote = await demos.ipfs.quote(fileSize, 'IPFS_PIN')
+     * const charges = IPFSOperations.createCustomCharges(quote, 'IPFS_PIN', 1000000)
+     *
+     * // Include in transaction content
+     * tx.content.custom_charges = { ipfs: charges }
+     * ```
+     */
+    static createCustomCharges(
+        quote: IpfsQuoteResponse,
+        operation: "IPFS_ADD" | "IPFS_PIN" | "IPFS_UNPIN",
+        durationBlocks?: number,
+    ): IPFSCustomCharges {
+        return {
+            max_cost_dem: quote.cost_dem,
+            file_size_bytes: quote.file_size_bytes,
+            operation,
+            duration_blocks: durationBlocks,
+            estimated_breakdown: {
+                base_cost: quote.breakdown.base_cost,
+                size_cost: quote.breakdown.size_cost,
+            },
+        }
     }
 }

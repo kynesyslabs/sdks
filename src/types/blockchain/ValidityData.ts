@@ -4,6 +4,7 @@ import { Transaction } from "./Transaction"
 import { Cryptography } from "@/encryption/Cryptography"
 import { Hashing } from "@/encryption/Hashing"
 import { SigningAlgorithm } from "../cryptography"
+import { ValidityDataCustomCharges } from "./CustomCharges"
 // import terminalkit from "terminal-kit"
 // const term = terminalkit.terminal
 
@@ -14,6 +15,9 @@ export interface ValidityData {
         message: string
         gas_operation: Operation
         transaction: Transaction
+        // REVIEW: Phase 9 - Custom charges response from confirmTx
+        // Shows actual cost vs max signed cost for variable-cost operations
+        custom_charges?: ValidityDataCustomCharges
     }
     signature: {
         type: SigningAlgorithm
@@ -34,6 +38,8 @@ export class CValidityData implements ValidityData {
         message: string
         gas_operation: Operation
         transaction: Transaction
+        // REVIEW: Phase 9 - Custom charges response
+        custom_charges?: ValidityDataCustomCharges
     }
     signature: {
         type: SigningAlgorithm

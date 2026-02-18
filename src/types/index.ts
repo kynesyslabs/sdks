@@ -17,6 +17,16 @@ export {
     TransactionContentData,
 } from "./blockchain/Transaction"
 
+// REVIEW: Phase 9 - Custom charges for variable-cost operations
+export {
+    type CustomCharges,
+    type IPFSCustomCharges,
+    type IPFSCostBreakdown,
+    type ValidityDataCustomCharges,
+    hasIPFSCustomCharges,
+    isValidCharge,
+} from "./blockchain/CustomCharges"
+
 // Export all specific transaction types
 export {
     L2PSTransaction,
@@ -35,10 +45,14 @@ export {
     type IPFSAddPayload,
     type IPFSPinPayload,
     type IPFSUnpinPayload,
+    // REVIEW: DEM-481 - Pin expiration extension
+    type IPFSExtendPinPayload,
     type IPFSOperationType,
     isIPFSAddPayload,
     isIPFSPinPayload,
     isIPFSUnpinPayload,
+    // REVIEW: DEM-481 - Pin expiration extension
+    isIPFSExtendPinPayload,
     isIPFSPayload,
 } from "./blockchain/TransactionSubtypes"
 
@@ -161,6 +175,7 @@ export {
     GCREditIdentity,
     GCREditNonce,
     GCREditSubnetsTx,
+    GCREditStorageProgram,
     Web2GCRData,
     XmGCRData,
     XmGCRIdentityData,

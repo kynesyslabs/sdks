@@ -1,6 +1,8 @@
 import {
     GCREdit,
     GCREditIdentity,
+    GCREditStorageProgram,
+    Web2TLSNGCRData,
     Web2GCRData,
 } from "@/types/blockchain/GCREdit"
 import {
@@ -8,10 +10,15 @@ import {
     InferFromSignaturePayload,
     TelegramSignedAttestation,
     Web2CoreTargetIdentityPayload,
+    InferFromTLSNPayload,
 } from "@/types/abstraction"
 import { Hashing } from "@/encryption/Hashing"
 import { INativePayload } from "@/types/native"
 import { Transaction, TransactionContent } from "@/types/blockchain/Transaction"
+import {
+    StorageProgramPayload,
+    STORAGE_PROGRAM_CONSTANTS,
+} from "@/types/blockchain/TransactionSubtypes/StorageProgramTransaction"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -59,6 +66,15 @@ export class GCRGeneration {
                 gcrEdits.push(...d402Edits)
                 break
             }
+            // REVIEW: Storage Program operations - unified JSON/Binary storage with ACL
+            case "storageProgram": {
+                var storageProgramEdits = await HandleStorageProgramOperations.handle(
+                    tx,
+                    isRollback,
+                )
+                gcrEdits.push(...storageProgramEdits)
+                break
+            }
         }
 
         // SECTION Operations valid for all tx types
@@ -94,10 +110,10 @@ export class GCRGeneration {
 
         for (const edit of gcrEdits) {
             // Storage programs use 'target' instead of 'account'
+            // Storage addresses use stor- prefix (not 0x), so skip prefix addition for them
             if (edit.type === "storageProgram") {
-                if (!edit.target.startsWith("0x")) {
-                    edit.target = "0x" + edit.target
-                }
+                // Storage addresses already have correct format: stor-{40 hex chars}
+                // Do NOT add 0x prefix to storage targets
             } else if ("account" in edit && !edit.account.startsWith("0x")) {
                 edit.account = "0x" + edit.account
             }
@@ -371,11 +387,44 @@ export class HandleIdentityOperations {
                 break
             }
 
+            case "nomis_identity_assign": {
+                edit.data = identityPayload.payload
+                break
+            }
+
+            case "tlsn_identity_assign": {
+                // TLSN identity uses TLSNotary proof for verification
+                // The proof contains cryptographically verified data from the target API
+                const payload = identityPayload.payload as InferFromTLSNPayload
+
+                // Stringify the proof for storage
+                const proofString = JSON.stringify(payload.proof)
+
+                const tlsnData: Web2TLSNGCRData = {
+                    context: payload.context,
+                    data: {
+                        username: payload.username,
+                        userId: payload.userId,
+                        proof: proofString,
+                        proofHash: Hashing.sha256(proofString),
+                        recvHash: payload.recvHash,
+                        proofRanges: payload.proofRanges,
+                        revealedRecv: payload.revealedRecv,
+                        timestamp: tx.content.timestamp,
+                    },
+                }
+                edit.data = tlsnData
+                edit.referralCode = payload.referralCode
+                break
+            }
+
             case "xm_identity_remove":
             case "web2_identity_remove":
             case "pqc_identity_remove":
             case "ud_identity_remove":
-            case "agent_identity_remove": {
+            case "agent_identity_remove":
+            case "nomis_identity_remove":
+            case "tlsn_identity_remove": {
                 // INFO: Passthrough the payload
                 edit.data = identityPayload.payload as any
                 break
@@ -438,6 +487,184 @@ export class HandleD402Operations {
             amount: amount,
         }
         edits.push(addEdit)
+
+        return edits
+    }
+}
+
+// REVIEW: Storage Program operations handler for GCR edit generation
+/**
+ * This class is responsible for handling Storage Program operations when generating
+ * the GCREdit for a transaction.
+ *
+ * Storage Program features:
+ * - Unified JSON/Binary storage with robust ACL
+ * - 1MB max size, 1 DEM per 10KB pricing
+ * - Permanent storage, owner/ACL-deletable only
+ *
+ * Operations:
+ * - CREATE_STORAGE_PROGRAM: Creates storage + burns fee
+ * - WRITE_STORAGE: Updates storage + burns additional fee based on size delta
+ * - UPDATE_ACCESS_CONTROL: Updates ACL (no fee)
+ * - DELETE_STORAGE_PROGRAM: Soft deletes (no fee)
+ */
+export class HandleStorageProgramOperations {
+    /**
+     * Calculate the storage fee based on data size
+     * Pricing: 1 DEM per 10KB (rounded up)
+     */
+    private static calculateStorageFee(data: Record<string, any> | string | undefined, encoding: "json" | "binary" = "json"): number {
+        if (!data) return 1 // Minimum 1 DEM
+
+        let sizeBytes: number
+        if (encoding === "binary") {
+            // Binary: base64 string, decode to get actual bytes
+            const base64String = data as string
+            sizeBytes = Math.ceil((base64String.length * 3) / 4)
+        } else {
+            // JSON: stringify and count bytes
+            const jsonString = JSON.stringify(data)
+            sizeBytes = new TextEncoder().encode(jsonString).length
+        }
+
+        const chunks = Math.ceil(sizeBytes / STORAGE_PROGRAM_CONSTANTS.PRICING_CHUNK_BYTES)
+        // FEE_PER_CHUNK is bigint in constants, convert to number for GCREdit compatibility
+        const feePerChunk = Number(STORAGE_PROGRAM_CONSTANTS.FEE_PER_CHUNK)
+        return Math.max(1, chunks) * feePerChunk
+    }
+
+    static async handle(
+        tx: Transaction,
+        isRollback: boolean = false,
+    ): Promise<GCREdit[]> {
+        const edits: GCREdit[] = []
+
+        // Parse storage program payload from transaction
+        const storageProgramPayloadData: ["storageProgram", StorageProgramPayload] =
+            tx.content.data as ["storageProgram", StorageProgramPayload]
+        const payload: StorageProgramPayload = storageProgramPayloadData[1]
+
+        const { operation, storageAddress, encoding = "json", data } = payload
+
+        switch (operation) {
+            case "CREATE_STORAGE_PROGRAM": {
+                // Calculate and burn the storage fee
+                const fee = this.calculateStorageFee(data, encoding)
+
+                const burnFeeEdit: GCREdit = {
+                    type: "balance",
+                    operation: "remove",
+                    isRollback: isRollback,
+                    account: tx.content.from_ed25519_address,
+                    txhash: tx.hash,
+                    amount: fee,
+                }
+                edits.push(burnFeeEdit)
+
+                // Create the storage program edit
+                const createEdit: GCREditStorageProgram = {
+                    type: "storageProgram",
+                    target: storageAddress,
+                    isRollback: isRollback,
+                    txhash: tx.hash,
+                    context: {
+                        operation: "CREATE_STORAGE_PROGRAM",
+                        sender: tx.content.from_ed25519_address,
+                        data: {
+                            variables: payload,
+                            metadata: payload.metadata || null,
+                        },
+                    },
+                }
+                edits.push(createEdit)
+                break
+            }
+
+            case "WRITE_STORAGE": {
+                // Calculate and burn the storage fee for the new data
+                const fee = this.calculateStorageFee(data, encoding)
+
+                const burnFeeEdit: GCREdit = {
+                    type: "balance",
+                    operation: "remove",
+                    isRollback: isRollback,
+                    account: tx.content.from_ed25519_address,
+                    txhash: tx.hash,
+                    amount: fee,
+                }
+                edits.push(burnFeeEdit)
+
+                // Create the write storage edit
+                const writeEdit: GCREditStorageProgram = {
+                    type: "storageProgram",
+                    target: storageAddress,
+                    isRollback: isRollback,
+                    txhash: tx.hash,
+                    context: {
+                        operation: "WRITE_STORAGE",
+                        sender: tx.content.from_ed25519_address,
+                        data: {
+                            variables: payload,
+                            metadata: payload.metadata || null,
+                        },
+                    },
+                }
+                edits.push(writeEdit)
+                break
+            }
+
+            case "UPDATE_ACCESS_CONTROL": {
+                // No fee for ACL updates
+                const aclEdit: GCREditStorageProgram = {
+                    type: "storageProgram",
+                    target: storageAddress,
+                    isRollback: isRollback,
+                    txhash: tx.hash,
+                    context: {
+                        operation: "UPDATE_ACCESS_CONTROL",
+                        sender: tx.content.from_ed25519_address,
+                        data: {
+                            variables: payload,
+                            metadata: null,
+                        },
+                    },
+                }
+                edits.push(aclEdit)
+                break
+            }
+
+            case "DELETE_STORAGE_PROGRAM": {
+                // No fee for deletions
+                const deleteEdit: GCREditStorageProgram = {
+                    type: "storageProgram",
+                    target: storageAddress,
+                    isRollback: isRollback,
+                    txhash: tx.hash,
+                    context: {
+                        operation: "DELETE_STORAGE_PROGRAM",
+                        sender: tx.content.from_ed25519_address,
+                        data: {
+                            variables: payload,
+                            metadata: null,
+                        },
+                    },
+                }
+                edits.push(deleteEdit)
+                break
+            }
+
+            case "READ_STORAGE": {
+                // READ operations don't generate edits - they're handled via RPC
+                // This case is here for completeness
+                console.log("[StorageProgram] READ_STORAGE is handled via RPC, not transactions")
+                break
+            }
+
+            default: {
+                console.log("[StorageProgram] Unknown operation:", operation)
+                break
+            }
+        }
 
         return edits
     }

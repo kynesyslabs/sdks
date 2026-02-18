@@ -5,7 +5,7 @@ This library contains all the functions that are used to interact with the demos
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 import axios from "axios"
-import { Buffer } from "buffer/"
+import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
 
 // NOTE Including custom libraries from Demos
@@ -29,12 +29,12 @@ import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/un
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
-import { wordlist } from "@scure/bip39/wordlists/english.js"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
 // TLSNotary is dynamically imported to avoid bundling issues with webpack
 // The worker.js reference and WASM dependencies break static bundling
 import type { TLSNotary, TLSNotaryConfig, TLSNotaryDiscoveryInfo } from "@/tlsnotary"
+import { wordList } from "@/encryption/PQC/falconts"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -103,7 +103,7 @@ export class Demos {
      * @returns The mnemonic
      */
     newMnemonic(strength: 128 | 256 = 128) {
-        return bip39.generateMnemonic(wordlist, strength)
+        return bip39.generateMnemonic(wordList, strength)
     }
 
     /**
@@ -164,7 +164,7 @@ export class Demos {
         if (typeof masterSeed === "string") {
             masterSeed = masterSeed.trim()
 
-            if (!bip39.validateMnemonic(masterSeed, wordlist)) {
+            if (!bip39.validateMnemonic(masterSeed, wordList)) {
                 hashable = bip39.mnemonicToSeedSync(masterSeed)
             } else {
                 hashable = masterSeed
@@ -323,14 +323,31 @@ export class Demos {
             }
         }
 
-        // INFO: Add 0x prefix to addresses if not present
-        if (!raw_tx.content.to.startsWith("0x")) {
-            raw_tx.content.to = "0x" + raw_tx.content.to
-        }
+        // INFO: Validate and normalize 'to' address
+        // Storage program transactions (type: "storageProgram") use format: stor-{40 hex chars}
+        // Regular addresses use format: 0x{64 hex chars}
+        const isStorageTransaction = raw_tx.content.type === "storageProgram"
+        const isStorageAddress = /^stor-[0-9a-f]{40}$/i.test(raw_tx.content.to)
 
-        const isHex = /^0x[0-9a-f]{64}$/i.test(raw_tx.content.to)
-        if (!isHex) {
-            throw new Error(`Invalid To address: ${raw_tx.content.to}`)
+        if (isStorageTransaction) {
+            // Storage transactions must use stor- address format
+            if (!isStorageAddress) {
+                throw new Error(`Invalid storage address format: ${raw_tx.content.to}. Expected: stor-{40 hex chars}`)
+            }
+        } else {
+            // Non-storage transactions must use 0x address format
+            if (isStorageAddress) {
+                throw new Error(`Storage address format not allowed for transaction type: ${raw_tx.content.type}`)
+            }
+            // Add 0x prefix to regular addresses if not present
+            if (!raw_tx.content.to.startsWith("0x")) {
+                raw_tx.content.to = "0x" + raw_tx.content.to
+            }
+
+            const isHex = /^0x[0-9a-f]{64}$/i.test(raw_tx.content.to)
+            if (!isHex) {
+                throw new Error(`Invalid To address: ${raw_tx.content.to}`)
+            }
         }
 
         if (!raw_tx.content.from_ed25519_address.startsWith("0x")) {
@@ -936,6 +953,57 @@ export class Demos {
                 discordUrl,
             })
         }
+    }
+
+    // REVIEW: Phase 9 - IPFS cost estimation endpoints
+    // ANCHOR IPFS Endpoints
+    ipfs = {
+        /**
+         * Get a cost quote for an IPFS operation without submitting a transaction.
+         *
+         * Use this to estimate costs and populate custom_charges before signing.
+         * The returned cost should be used as max_cost_dem in the transaction's
+         * custom_charges field.
+         *
+         * @param fileSizeBytes - Size of file in bytes
+         * @param operation - IPFS operation type ('IPFS_ADD', 'IPFS_PIN', or 'IPFS_UNPIN')
+         * @param durationBlocks - Optional duration in blocks (for PIN operations)
+         * @returns Cost quote with detailed breakdown
+         *
+         * @example
+         * ```typescript
+         * // Get quote for add operation
+         * const quote = await demos.ipfs.quote(content.length, 'IPFS_ADD')
+         * console.log(`Cost: ${quote.cost_dem} DEM`)
+         *
+         * // Use quote to build transaction with cost control
+         * const payload = IPFSOperations.createAddPayload(content, {
+         *   customCharges: IPFSOperations.quoteToCustomCharges(quote)
+         * })
+         * ```
+         */
+        quote: async (
+            fileSizeBytes: number,
+            operation: "IPFS_ADD" | "IPFS_PIN" | "IPFS_UNPIN" = "IPFS_ADD",
+            durationBlocks?: number,
+        ): Promise<{
+            cost_dem: string
+            file_size_bytes: number
+            is_genesis: boolean
+            breakdown: {
+                base_cost: string
+                size_cost: string
+                free_tier_bytes: number
+                chargeable_bytes: number
+            }
+            operation: string
+        }> => {
+            return await this.nodeCall("ipfsQuote", {
+                file_size_bytes: fileSizeBytes,
+                operation,
+                duration_blocks: durationBlocks,
+            })
+        },
     }
 
     xm = {

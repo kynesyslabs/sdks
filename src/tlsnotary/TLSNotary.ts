@@ -84,7 +84,29 @@ export class TLSNotary {
         this.config = {
             loggingLevel: "Info",
             ...config,
+            // Normalize notary URL: tlsn-js uses HTTP to fetch session URL
+            // Convert ws:// to http:// and wss:// to https://
+            notaryUrl: this.normalizeNotaryUrl(config.notaryUrl),
         }
+    }
+
+    /**
+     * Normalize notary URL for HTTP requests
+     *
+     * The NotaryServer.sessionUrl() method uses HTTP/HTTPS to fetch the session URL.
+     * If the notary URL is provided as ws:// or wss://, convert it to http:// or https://.
+     *
+     * @param url - The notary URL (may be ws://, wss://, http://, or https://)
+     * @returns The normalized URL using http:// or https://
+     */
+    private normalizeNotaryUrl(url: string): string {
+        if (url.startsWith("ws://")) {
+            return url.replace("ws://", "http://")
+        }
+        if (url.startsWith("wss://")) {
+            return url.replace("wss://", "https://")
+        }
+        return url
     }
 
     /**
@@ -104,7 +126,6 @@ export class TLSNotary {
                 // Create Web Worker for WASM operations
                 // Note: This requires a bundler that supports worker URLs (webpack, vite, etc.)
                 // Using .js extension for compatibility with compiled output
-                // @ts-expect-error - import.meta.url is browser-only and requires ESNext module
                 this.worker = new Worker(new URL("./worker.js", import.meta.url), {
                     type: "module",
                 })

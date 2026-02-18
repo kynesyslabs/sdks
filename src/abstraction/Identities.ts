@@ -22,6 +22,11 @@ import {
     UDIdentityPayload,
     AgentIdentityPayload,
     DemosOwnershipProof,
+    NomisWalletIdentity,
+    TLSNotaryPresentation,
+    TLSNIdentityContext,
+    InferFromTLSNPayload,
+    TLSNProofRanges,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -29,7 +34,6 @@ import { PQCAlgorithm } from "@/types/cryptography"
 import { Account, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
-import { EVM, SOLANA } from "@/multichain/core"
 
 export class Identities {
     formats = {
@@ -76,7 +80,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "agent",
+        context: "xm" | "web2" | "pqc" | "ud" | "agent" | "nomis" | "tlsn",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -134,7 +138,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "agent",
+        context: "xm" | "web2" | "pqc" | "ud" | "agent" | "nomis" | "tlsn",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -254,6 +258,67 @@ export class Identities {
         }
 
         return await this.inferIdentity(demos, "web2", githubPayload)
+    }
+
+    /**
+     * Add a Web2 identity via TLSNotary attestation.
+     *
+     * This generic method uses a cryptographic proof from TLSNotary to verify
+     * identity ownership. The context determines which platform's API was attested:
+     * - "github": api.github.com/user
+     * - "discord": discord.com/api/users/@me
+     * - "telegram": backend's /api/telegram/user
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param context The platform context ("github", "discord", or "telegram").
+     * @param proof The TLSNotary presentation (from attestResult.presentation).
+     * @param username Username from the proven response.
+     * @param userId User ID from the proven response.
+     * @param referralCode Optional referral code.
+     * @returns The response from the RPC call.
+     */
+    async addWeb2IdentityViaTLSN(
+        demos: Demos,
+        context: TLSNIdentityContext,
+        proof: TLSNotaryPresentation,
+        recvHash: string,
+        proofRanges: TLSNProofRanges,
+        revealedRecv: number[],
+        username: string,
+        userId: string | number,
+        referralCode?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        const payload: InferFromTLSNPayload = {
+            context: context,
+            proof: proof,
+            recvHash,
+            proofRanges,
+            revealedRecv,
+            username,
+            userId: String(userId),
+            referralCode,
+        }
+
+        return await this.inferIdentity(demos, "tlsn", payload)
+    }
+
+    /**
+     * Remove a Web2 identity that was added via TLSNotary.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param context The platform context ("github", "discord", or "telegram").
+     * @param username The username to remove.
+     * @returns The response from the RPC call.
+     */
+    async removeWeb2IdentityViaTLSN(
+        demos: Demos,
+        context: TLSNIdentityContext,
+        username: string,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "tlsn", {
+            context: context,
+            username: username,
+        })
     }
 
     /**
@@ -1385,5 +1450,75 @@ export class Identities {
         } catch (error) {
             return null
         }
+    }
+
+    /**
+     * Fetch a Nomis score for a wallet.
+     *
+     * Calls the `getNomisScore` GCR routine via the Demos RPC.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param walletAddress The wallet address to retrieve the Nomis score for.
+     * @param chain Optional blockchain type (e.g. "evm", "solana").
+     * @param subchain Optional subchain or network identifier.
+     * @param scoreType Optional Nomis score type identifier.
+     * @returns The RPC response containing the Nomis score data.
+     */
+    async getNomisScore(
+        demos: Demos,
+        walletAddress: string,
+        chain?: string,
+        subchain?: string,
+        scoreType?: number,
+    ) {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getNomisScore",
+                    params: [
+                        {
+                            walletAddress,
+                            chain,
+                            subchain,
+                            scoreType,
+                        },
+                    ],
+                },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Link a Nomis wallet identity to the GCR.
+     *
+     * Infers and persists the Nomis identity using the provided
+     * Nomis wallet identity payload.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Nomis wallet identity data to be linked.
+     * @returns The RPC response for the identity inference operation.
+     */
+    async addNomisIdentity(
+        demos: Demos,
+        payload: NomisWalletIdentity,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.inferIdentity(demos, "nomis", payload)
+    }
+
+    /**
+     * Remove a Nomis wallet identity from the GCR.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Nomis wallet identity data identifying the identity to remove.
+     * @returns The RPC response for the identity removal operation.
+     */
+    async removeNomisIdentity(
+        demos: Demos,
+        payload: NomisWalletIdentity,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "nomis", payload)
     }
 }

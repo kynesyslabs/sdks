@@ -12,8 +12,7 @@ export interface XMCoreTargetIdentityPayload {
 /**
  * The identity of the target address to bind to the Demos identity
  */
-export interface InferFromSignatureTargetIdentityPayload
-    extends XMCoreTargetIdentityPayload {
+export interface InferFromSignatureTargetIdentityPayload extends XMCoreTargetIdentityPayload {
     chainId: number | string
     signature: string
     targetAddress: string
@@ -25,8 +24,7 @@ export interface InferFromSignatureTargetIdentityPayload
 /**
  * The identity of the target address to bind to the Demos identity
  */
-export interface InferFromWriteTargetIdentityPayload
-    extends XMCoreTargetIdentityPayload {
+export interface InferFromWriteTargetIdentityPayload extends XMCoreTargetIdentityPayload {
     txHash: string
     chainId: number | string
     rpcUrl?: string
@@ -153,8 +151,7 @@ export interface TelegramSignedAttestation {
  */
 export type TelegramProof = TelegramSignedAttestation // JSON.stringify(TelegramSignedAttestation)
 
-export interface InferFromTelegramPayload
-    extends Web2CoreTargetIdentityPayload {
+export interface InferFromTelegramPayload extends Web2CoreTargetIdentityPayload {
     context: "telegram"
     username: string
     userId: string
@@ -263,6 +260,127 @@ export interface UDIdentityRemovePayload extends BaseUdIdentityPayload {
 export type UdIdentityPayload =
     | UDIdentityAssignPayload
     | UDIdentityRemovePayload
+// SECTION Nomis Identities
+export interface NomisWalletIdentity {
+    chain: string
+    subchain: string
+    address: string
+    score: number
+    scoreType: number
+    mintedScore?: number | null
+    lastSyncedAt: string
+    metadata?: {
+        referralCode?: string
+        referrerCode?: string
+        deadline?: number
+        nonce?: number
+        apiVersion?: string
+        [key: string]: unknown
+    }
+}
+
+export interface BaseNomisIdentityPayload {
+    context: "nomis"
+}
+
+export interface NomisIdentityAssignPayload extends BaseNomisIdentityPayload {
+    method: "nomis_identity_assign"
+    payload: NomisWalletIdentity
+}
+
+export interface NomisIdentityRemovePayload extends BaseNomisIdentityPayload {
+    method: "nomis_identity_remove"
+    payload: NomisWalletIdentity
+}
+
+export type NomisIdentityPayload =
+    | NomisIdentityAssignPayload
+    | NomisIdentityRemovePayload
+
+// SECTION TLSNotary Identities
+/**
+ * TLSNotary presentation format (from tlsn-js attestation)
+ *
+ * This is the proof structure returned by TLSNotary attestation.
+ * Contains cryptographically signed proof of an HTTPS request/response.
+ */
+export interface TLSNotaryPresentation {
+    /** TLSNotary version (e.g., "0.1.0-alpha.12") */
+    version: string
+    /** Hex-encoded proof data containing request/response and signatures */
+    data: string
+    /** Metadata about the attestation */
+    meta: {
+        notaryUrl?: string
+        websocketProxyUrl?: string
+    }
+}
+
+/**
+ * Supported TLSN identity contexts
+ */
+export type TLSNIdentityContext = "github" | "discord" | "telegram"
+
+/**
+ * Generic Web2 identity payload via TLSNotary
+ *
+ * Used for verifying any Web2 identity through TLSNotary attestation.
+ * The context determines which platform's API was attested.
+ */
+export interface InferFromTLSNPayload {
+    /** The platform context (github, discord, telegram) */
+    context: TLSNIdentityContext
+    /** The TLSNotary presentation proof */
+    proof: TLSNotaryPresentation
+    recvHash: string
+    /** Transcript byte ranges revealed in the proof */
+    proofRanges: TLSNProofRanges
+    /** Disclosed recv transcript bytes used for server-side hash check and identity extraction */
+    revealedRecv: number[]
+    /** Username from the proven response */
+    username: string
+    /** User ID from the proven response */
+    userId: string
+    /** Optional referral code */
+    referralCode?: string
+}
+
+export type TranscriptRange = { start: number; end: number }
+
+export type TLSNProofRanges = {
+    recv: TranscriptRange[]
+    sent: TranscriptRange[]
+}
+
+/**
+ * Base TLSN identity payload
+ */
+export interface BaseTLSNIdentityPayload {
+    context: "tlsn"
+}
+
+/**
+ * TLSN identity assign payload
+ */
+export interface TLSNIdentityAssignPayload extends BaseTLSNIdentityPayload {
+    method: "tlsn_identity_assign"
+    payload: InferFromTLSNPayload
+}
+
+/**
+ * TLSN identity remove payload
+ */
+export interface TLSNIdentityRemovePayload extends BaseTLSNIdentityPayload {
+    method: "tlsn_identity_remove"
+    payload: {
+        context: string
+        username: string
+    }
+}
+
+export type TLSNIdentityPayload =
+    | TLSNIdentityAssignPayload
+    | TLSNIdentityRemovePayload
 
 // SECTION ERC-8004 Agent Identities
 export interface BaseAgentIdentityPayload {
@@ -355,6 +473,8 @@ export type IdentityPayload =
     | PqcIdentityPayload
     | UdIdentityPayload
     | AgentIdentityPayloadType
+    | NomisIdentityPayload
+    | TLSNIdentityPayload
 export interface UserPoints {
     userId: string
     referralCode: string
@@ -369,6 +489,7 @@ export interface UserPoints {
         }
         udDomains?: { [domain: string]: number }
         agents?: { [agentId: string]: number }
+        nomisScores?: { [chain: string]: number }
         referrals: number
         demosFollow: number
     }
@@ -385,6 +506,7 @@ export interface UserPoints {
             timestamp: number
         }>
     }
+    linkedNomisIdentities: NomisWalletIdentity[]
     lastUpdated: Date
     flagged: boolean | null
     flaggedReason: string | null

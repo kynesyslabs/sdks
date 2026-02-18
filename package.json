@@ -1,6 +1,7 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.7.10",
+    "version": "2.10.2",
+    "type": "module",
     "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
     "types": "build/index.d.ts",
@@ -59,6 +60,7 @@
         "./tlsnotary": "./build/tlsnotary/index.js",
         "./tlsnotary/service": "./build/tlsnotary/service.js",
         "./tlsnotary/webpack": "./build/tlsnotary/webpack.js",
+        "./tlsnotary/auto-init": "./build/tlsnotary/auto-init.js",
         "./tlsnotary/wasm/*": "./build/tlsnotary/wasm/*"
     },
     "scripts": {
@@ -96,6 +98,7 @@
         "@cosmjs/proto-signing": "^0.32.4",
         "@cosmjs/stargate": "^0.32.4",
         "@cryptkeeperzk/snarkjs": "^0.7.2",
+        "@kynesyslabs/demosdk": "^2.8.22",
         "@metaplex-foundation/js": "^0.20.1",
         "@multiversx/sdk-core": "^13.17.2",
         "@multiversx/sdk-extension-provider": "^3.0.0",
@@ -106,6 +109,7 @@
         "@noble/post-quantum": "^0.4.1",
         "@project-serum/anchor": "^0.26.0",
         "@roamhq/wrtc": "^0.8.0",
+        "@scure/bip39": "^2.0.1",
         "@simplewebauthn/browser": "^11.0.0",
         "@simplewebauthn/server": "^11.0.0",
         "@solana/buffer-layout": "^4.0.1",
@@ -123,12 +127,14 @@
         "bitcoinjs-message": "^2.2.0",
         "bs58": "^5.0.0",
         "buffer": "^6.0.3",
+        "comlink": "^4.4.2",
         "dotenv": "^16.6.1",
         "ecpair": "^3.0.0",
         "ed25519-hd-key": "^1.3.0",
         "ethers": "^6.15.0",
         "falcon-js": "^1.0.0",
         "falcon-sign": "^1.0.4",
+        "js-sha256": "^0.11.1",
         "js-sha3": "^0.9.3",
         "libsodium-wrappers-sumo": "^0.7.15",
         "lodash": "^4.17.21",
@@ -147,11 +153,10 @@
         "socket.io-client": "^4.8.1",
         "sphincs": "^3.0.4",
         "superdilithium": "^2.0.6",
+        "tlsn-js": "0.1.0-alpha.12.0",
         "tronweb": "^6.0.0",
         "web3": "^4.16.0",
-        "xrpl": "^3.1.0",
-        "tlsn-js": "0.1.0-alpha.12.0",
-        "comlink": "^4.4.2"
+        "xrpl": "^3.1.0"
     },
     "devDependencies": {
         "@orbs-network/ton-access": "^2.3.3",

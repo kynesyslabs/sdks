@@ -10,7 +10,7 @@
  */
 
 import { UnifiedCrypto } from "@/encryption/unifiedCrypto";
-import * as forge from "node-forge";
+import forge from "node-forge";
 import { Hashing } from "@/encryption/Hashing";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
 import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
@@ -74,13 +74,13 @@ export interface L2PSEncryptedPayload {
 export default class L2PS {
     /** Static map of all L2PS instances, keyed by instance ID */
     private static instances: Map<string, L2PS> = new Map();
-    
+
     /** Private key used for AES encryption (32 bytes for AES-256) */
     private readonly privateKey: forge.Bytes;
-    
+
     /** Initialization vector for AES-GCM (12 bytes for optimal GCM performance) */
     private readonly iv: forge.Bytes;
-    
+
     /** Unique identifier for this L2PS instance (SHA-256 hash of private key) */
     private readonly id: string;
 
@@ -100,7 +100,7 @@ export default class L2PS {
         if (!privateKey || !iv) {
             throw new Error('Private key and IV are required');
         }
-        
+
         this.privateKey = privateKey;
         this.iv = iv;
         this.id = Hashing.sha256(privateKey);
@@ -198,10 +198,10 @@ export default class L2PS {
             const txString = JSON.stringify(tx);
             const txBuffer = forge.util.createBuffer(txString);
             const cipher = forge.cipher.createCipher('AES-GCM', this.privateKey);
-            
+
             cipher.start({ iv: this.iv });
             cipher.update(txBuffer);
-            
+
             if (!cipher.finish()) {
                 throw new Error('Failed to encrypt transaction');
             }
@@ -273,31 +273,31 @@ export default class L2PS {
             }
 
             const encryptedPayload = payload as L2PSEncryptedPayload;
-            
+
             if (encryptedPayload.l2ps_uid !== (this.config?.uid || this.id)) {
                 throw new Error('Transaction encrypted for different L2PS');
             }
-            
+
             // TODO Verify the signature of the encrypted transaction
 
             const encryptedData = forge.util.createBuffer(forge.util.decode64(encryptedPayload.encrypted_data));
             const tag = forge.util.createBuffer(forge.util.decode64(encryptedPayload.tag));
 
             const decipher = forge.cipher.createDecipher('AES-GCM', this.privateKey);
-            decipher.start({ 
+            decipher.start({
                 iv: this.iv,
                 tag: tag
             });
-            
+
             decipher.update(encryptedData);
-            
+
             if (!decipher.finish()) {
                 throw new Error('Failed to decrypt transaction - authentication failed');
             }
 
             const decryptedString = decipher.output.toString();
             const originalTx = JSON.parse(decryptedString) as Transaction;
-            
+
             if (originalTx.hash !== encryptedPayload.original_hash) {
                 throw new Error('Decrypted transaction hash mismatch');
             }

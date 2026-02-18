@@ -36,6 +36,7 @@ import {
     DemosOwnershipProof,
     ERC8004AgentCard,
     ERC8004Endpoint,
+    NomisWalletIdentity
 } from "@/types/abstraction"
 
 export {
@@ -69,4 +70,5 @@ export {
     DemosOwnershipProof,
     ERC8004AgentCard,
     ERC8004Endpoint,
+    NomisWalletIdentity
 }

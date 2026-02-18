@@ -20,5 +20,8 @@ export { required, _required } from "./utils/required"
 export { forgeToString, stringToForge } from "./utils/forge_converter"
 export * as skeletons from "./utils/skeletons"
 
+// Crypto utilities (useful for developers)
+export { uint8ArrayToHex, hexToUint8Array } from "../encryption/unifiedCrypto"
+
 // Bridge
 export { RubicBridge } from "./bridge"
