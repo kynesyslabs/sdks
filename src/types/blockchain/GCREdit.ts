@@ -1,7 +1,15 @@
 // TODO See handleGCR.ts for the execution of the GCREdit
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
-import { PqcIdentityRemovePayload, UDIdentityPayload, XMCoreTargetIdentityPayload, NomisWalletIdentity, HumanPassportIdentityData } from "../abstraction"
+import {
+    PqcIdentityRemovePayload,
+    UDIdentityPayload,
+    XMCoreTargetIdentityPayload,
+    NomisWalletIdentity,
+    HumanPassportIdentityData,
+    TLSNIdentityContext,
+    TLSNProofRanges,
+} from "../abstraction"
 import { SigningAlgorithm } from "../cryptography"
 
 export interface GCREditBalance {
@@ -72,6 +80,20 @@ export interface Web2GCRData {
     }
 }
 
+export interface Web2TLSNGCRData {
+    context: TLSNIdentityContext
+    data: {
+        username: string
+        proof: string
+        proofHash: string
+        userId: string
+        recvHash: string
+        proofRanges: TLSNProofRanges
+        revealedRecv: number[]
+        timestamp: number
+    }
+}
+
 export interface PQCIdentityGCREditData {
     algorithm: SigningAlgorithm
     address: string
@@ -86,10 +108,11 @@ export interface GCREditIdentity {
     type: "identity"
     isRollback: boolean
     account: string
-    context: "xm" | "web2" | "pqc" | "nomis" | "ud" | "humanpassport"
+    context: "xm" | "web2" | "pqc" | "nomis" | "ud" | "humanpassport" | "tlsn"
     operation: "add" | "remove"
     data:
     | Web2GCRData // web2 add or remove identity
+    | Web2TLSNGCRData // tlsn add identity
     | XmGCRIdentityData // xm add identity
     | XMCoreTargetIdentityPayload // xm remove identity
     | PQCIdentityGCREditData[] // pqc add identity
