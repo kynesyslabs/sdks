@@ -22,6 +22,10 @@ import {
     NomisWalletIdentity,
     EthosWalletIdentity,
     EthosIdentityRemoveData,
+    TLSNotaryPresentation,
+    TLSNIdentityContext,
+    InferFromTLSNPayload,
+    TLSNProofRanges,
 } from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
@@ -75,7 +79,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos" | "tlsn",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -133,7 +137,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos",
+        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos" | "tlsn",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -253,6 +257,67 @@ export class Identities {
         }
 
         return await this.inferIdentity(demos, "web2", githubPayload)
+    }
+
+    /**
+     * Add a Web2 identity via TLSNotary attestation.
+     *
+     * This generic method uses a cryptographic proof from TLSNotary to verify
+     * identity ownership. The context determines which platform's API was attested:
+     * - "github": api.github.com/user
+     * - "discord": discord.com/api/users/@me
+     * - "telegram": backend's /api/telegram/user
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param context The platform context ("github", "discord", or "telegram").
+     * @param proof The TLSNotary presentation (from attestResult.presentation).
+     * @param username Username from the proven response.
+     * @param userId User ID from the proven response.
+     * @param referralCode Optional referral code.
+     * @returns The response from the RPC call.
+     */
+    async addWeb2IdentityViaTLSN(
+        demos: Demos,
+        context: TLSNIdentityContext,
+        proof: TLSNotaryPresentation,
+        recvHash: string,
+        proofRanges: TLSNProofRanges,
+        revealedRecv: number[],
+        username: string,
+        userId: string | number,
+        referralCode?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        const payload: InferFromTLSNPayload = {
+            context: context,
+            proof: proof,
+            recvHash,
+            proofRanges,
+            revealedRecv,
+            username,
+            userId: String(userId),
+            referralCode,
+        }
+
+        return await this.inferIdentity(demos, "tlsn", payload)
+    }
+
+    /**
+     * Remove a Web2 identity that was added via TLSNotary.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param context The platform context ("github", "discord", or "telegram").
+     * @param username The username to remove.
+     * @returns The response from the RPC call.
+     */
+    async removeWeb2IdentityViaTLSN(
+        demos: Demos,
+        context: TLSNIdentityContext,
+        username: string,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "tlsn", {
+            context: context,
+            username: username,
+        })
     }
 
     /**
