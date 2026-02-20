@@ -13,6 +13,11 @@ const jestConfig: JestConfigWithTsJest = {
 	modulePaths: ['./'],
 	transform: { '^.+\\.(t|j)s?$': 'ts-jest' },
 
+	// Transform ESM-only packages from node_modules
+	transformIgnorePatterns: [
+		'node_modules/(?!(@scure|@noble)/)'
+	],
+
 	// INFO: Tests involving ledger lookups need this
 	testTimeout: 20_000,
 };
