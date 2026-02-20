@@ -109,6 +109,7 @@
         "@noble/curves": "1.9.4",
         "@noble/hashes": "1.8.0",
         "@noble/post-quantum": "^0.4.1",
+        "@project-serum/anchor": "^0.26.0",
         "@roamhq/wrtc": "^0.8.0",
         "@scure/bip39": "^2.0.1",
         "@simplewebauthn/browser": "^11.0.0",

@@ -88,6 +88,10 @@ describe("SOLANA CHAIN TESTS", () => {
     })
 
     test.only("Running anchor program", async () => {
+        // INFO: A program that stores a number in an account
+        const programId = "BLTXVno27Vc5geSn2FMxJ2yU6c3fVaUzESgDAfbYHJD6"
+
+        // INFO: Load program owner keypair
         const programOwner = Keypair.fromSecretKey(
             Buffer.from([
                 47, 72, 142, 251, 130, 2, 4, 156, 56, 97, 212, 198, 50, 46, 70,
@@ -98,25 +102,25 @@ describe("SOLANA CHAIN TESTS", () => {
             ]),
         )
         console.log("programOwner: ", programOwner.publicKey.toBase58())
-        const newAccountKeypair = new Keypair()
 
         // INFO: Defining the program parameters
+        const storageAccount = new Keypair()
         const programParams: SolanaRunAnchorProgramParams = {
             idl: idl,
             args: new BN(42),
             instruction: "initialize",
             accounts: {
-                newAccount: newAccountKeypair.publicKey,
+                newAccount: storageAccount.publicKey,
                 signer: programOwner.publicKey,
                 SystemProgram: SystemProgram.programId,
             },
             feePayer: programOwner.publicKey,
-            signers: [programOwner, newAccountKeypair],
+            signers: [programOwner, storageAccount],
         }
 
-        console.log("new account: ", newAccountKeypair.publicKey.toBase58())
+        console.log("storage account: ", storageAccount.publicKey.toBase58())
         const payload = await instance.runAnchorProgram(
-            "BLTXVno27Vc5geSn2FMxJ2yU6c3fVaUzESgDAfbYHJD6",
+            programId,
             programParams,
         )
 
@@ -134,30 +138,32 @@ describe("SOLANA CHAIN TESTS", () => {
         const res = await demos.broadcast(validityData)
         console.log("res", JSON.stringify(res, null, 2))
 
-        // const res = await localInstance.sendTransaction(tx)
+        expect(res.result).toBe(200)
+        expect(res.response["message"]).toBe("all_ops_ok")
 
-        // console.log("txhash: ", res.hash)
+        // Extract the first object's hash value from the results object
+        const firstResult = Object.values(res.response["results"])[0] as {
+            hash: string
+        }
+        const txhash = firstResult.hash
+        console.log("txhash: ", txhash)
+        expect(txhash).toBeDefined()
 
-        // expect(typeof res.hash).toBe("string")
+        // INFO: Wait for tx confirmation
+        await instance.provider.confirmTransaction(txhash, "finalized")
 
-        // // INFO: Wait for tx confirmation
-        // await instance.provider.confirmTransaction(res.hash, "finalized")
+        // INFO: Reading the account data
+        const acc = await instance.fetchAccount(
+            storageAccount.publicKey.toBase58(),
+            {
+                idl: idl,
+                name: "newAccount",
+            },
+        )
 
-        // // INFO: Reading the account data
-        // const acc = await instance.fetchAccount(
-        //     newAccountKeypair.publicKey.toBase58(),
-        //     {
-        //         idl: idl,
-        //         name: "newAccount",
-        //         // INFO: if programId is not provided, account owner will be fetched from the network
-        //         // programId: "BLTXVno27Vc5geSn2FMxJ2yU6c3fVaUzESgDAfbYHJD6",
-        //     },
-        // )
-
-        // // @ts-ignore
-        // console.log("data: ", acc.data.toNumber())
-        // // @ts-ignore
-        // expect(acc.data.toNumber()).toEqual(42)
+        console.log("data: ", (acc.data as any).toNumber())
+        expect((acc.data as any).toNumber()).toEqual(42)
+        console.log("account data checks out!")
     }, 25000)
 
     test("Reading program owned account data", async () => {
