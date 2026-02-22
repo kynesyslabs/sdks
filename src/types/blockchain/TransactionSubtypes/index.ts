@@ -14,6 +14,8 @@ export * from './ContractCallTransaction'
 export * from './D402PaymentTransaction'
 export * from './EscrowTransaction'
 export * from './IPFSTransaction'
+// REVIEW: Token transaction types
+export * from './TokenTransaction'
 
 // Re-export all transaction types as a union
 import { L2PSTransaction } from './L2PSTransaction'
@@ -32,6 +34,9 @@ import { ContractCallTransaction } from './ContractCallTransaction'
 import { D402PaymentTransaction } from './D402PaymentTransaction'
 import { EscrowTransaction } from './EscrowTransaction'
 import { IPFSTransaction } from './IPFSTransaction'
+// REVIEW: Token transaction types
+import { TokenCreationTransaction } from './TokenTransaction'
+import { TokenExecutionTransaction } from './TokenTransaction'
 
 export type SpecificTransaction =
     | L2PSTransaction
@@ -50,3 +55,6 @@ export type SpecificTransaction =
     | D402PaymentTransaction
     | EscrowTransaction
     | IPFSTransaction
+    // REVIEW: Token transaction types
+    | TokenCreationTransaction
+    | TokenExecutionTransaction
