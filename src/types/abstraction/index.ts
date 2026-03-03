@@ -332,7 +332,7 @@ export interface HumanPassportIdentityRemovePayload extends BaseHumanPassportIde
     }
 }
 
-export type HumanPassportIdentityPayload =
+export type HumanPassportIdentityTxPayload =
     | HumanPassportIdentityAssignPayload
     | HumanPassportIdentityRemovePayload
 
@@ -428,7 +428,7 @@ export type IdentityPayload =
     | PqcIdentityPayload
     | UdIdentityPayload
     | NomisIdentityPayload
-    | HumanPassportIdentityPayload
+    | HumanPassportIdentityTxPayload
     | TLSNIdentityPayload
 export interface UserPoints {
     userId: string

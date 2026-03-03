@@ -30,7 +30,7 @@ import {
     TelegramSignedAttestation,
     DiscordProof,
     NomisWalletIdentity,
-    HumanPassportIdentityPayload,
+    HumanPassportIdentityTxPayload,
     HumanPassportIdentityData
 } from "@/types/abstraction"
 
@@ -59,6 +59,6 @@ export {
     TelegramSignedAttestation,
     DiscordProof,
     NomisWalletIdentity,
-    HumanPassportIdentityPayload,
+    HumanPassportIdentityTxPayload,
     HumanPassportIdentityData
 }
