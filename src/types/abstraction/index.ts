@@ -382,6 +382,7 @@ export type TLSNIdentityPayload =
     | TLSNIdentityAssignPayload
     | TLSNIdentityRemovePayload
 
+// REVIEW: ERC-8004 Agent Identity types — new feature
 // SECTION ERC-8004 Agent Identities
 export interface BaseAgentIdentityPayload {
     context: "agent"
@@ -403,11 +404,12 @@ export interface ERC8004Endpoint {
 export interface DemosOwnershipProof {
     type: "demos-signature"
     message: string
-    signature: string | { type: string; data: string }
+    signature: { type: string; data: string }
     demosPublicKey: string
     agentId: string
     evmAddress: string
     timestamp: number
+    nonce: string
 }
 
 /**

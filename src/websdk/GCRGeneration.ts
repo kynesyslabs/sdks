@@ -383,7 +383,7 @@ export class HandleIdentityOperations {
                 edit.data = {
                     ...identityPayload.payload,
                     timestamp: tx.content.timestamp,
-                } as any
+                }
                 break
             }
 
