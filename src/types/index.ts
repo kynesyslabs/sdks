@@ -249,6 +249,10 @@ export {
     type TokenCreationParams,
     type TokenQueryResult,
     type TokenBalanceResult,
+    // REVIEW: Phase 4.1 - Script upgrade types
+    type TokenUpgradePayload,
+    type TokenUpgradeResult,
+    type TokenUpgradeTransaction,
     // Utility functions
     deriveTokenAddress,
     computeScriptHash,

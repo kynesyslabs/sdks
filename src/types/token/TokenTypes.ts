@@ -256,3 +256,55 @@ export interface TokenBalanceResult {
     decimals: number
     ticker: string
 }
+
+// SECTION: Token Upgrade Types
+
+/**
+ * Payload for upgrading a token's script.
+ * Used by SDK consumers to initiate script upgrades.
+ */
+export interface TokenUpgradePayload {
+    /** Address of the token to upgrade */
+    tokenAddress: string
+    /** New script code to replace existing script */
+    newScriptCode: string
+    /** Optional reason for the upgrade (for logging/auditing) */
+    upgradeReason?: string
+}
+
+/**
+ * Result of a script upgrade operation.
+ */
+export interface TokenUpgradeResult {
+    /** Whether the upgrade succeeded */
+    success: boolean
+    /** New script version after upgrade */
+    newVersion: number
+    /** Previous script version before upgrade */
+    previousVersion: number
+    /** Timestamp when the upgrade was applied */
+    upgradedAt: number
+    /** Hash of the new script code */
+    newCodeHash: string
+    /** Error message if upgrade failed */
+    error?: string
+}
+
+/**
+ * Token script upgrade transaction data.
+ * This is what gets sent to the network for consensus.
+ */
+export interface TokenUpgradeTransaction {
+    /** Transaction type identifier */
+    type: "tokenUpgrade"
+    /** Address of the token being upgraded */
+    tokenAddress: string
+    /** New script definition */
+    newScript: {
+        code: string
+        methods: TokenScriptMethod[]
+        hooks: TokenHookType[]
+    }
+    /** Optional upgrade reason for audit trail */
+    upgradeReason?: string
+}

@@ -64,6 +64,8 @@ export type TokenOperationType =
     | "unpause"
     | "transferOwnership"
     | "modifyACL"
+    | "grantPermission"
+    | "revokePermission"
     | "upgradeScript"
     | "custom" // For script-defined methods
 
@@ -91,6 +93,8 @@ export type TokenOperationArgs =
     | TokenPauseArgs
     | TokenOwnershipArgs
     | TokenACLArgs
+    | TokenGrantPermissionArgs
+    | TokenRevokePermissionArgs
     | TokenUpgradeArgs
     | TokenCustomArgs
 
@@ -156,12 +160,38 @@ export interface TokenOwnershipArgs {
 }
 
 /**
- * Arguments for ACL modification.
+ * Arguments for ACL modification (generic form).
  */
 export interface TokenACLArgs {
     type: "modifyACL"
     action: "grant" | "revoke"
     address: string
+    permissions: string[]
+}
+
+// REVIEW: Phase 4.2 - Dedicated Grant/Revoke Permission types
+
+/**
+ * Arguments for granting permissions to an address.
+ * This is a specialized form of modifyACL for clarity.
+ */
+export interface TokenGrantPermissionArgs {
+    type: "grantPermission"
+    /** Address to grant permissions to */
+    grantee: string
+    /** Permissions to grant */
+    permissions: string[]
+}
+
+/**
+ * Arguments for revoking permissions from an address.
+ * This is a specialized form of modifyACL for clarity.
+ */
+export interface TokenRevokePermissionArgs {
+    type: "revokePermission"
+    /** Address to revoke permissions from */
+    grantee: string
+    /** Permissions to revoke */
     permissions: string[]
 }
 
@@ -241,5 +271,117 @@ export function isTokenExecutionTransaction(tx: Transaction): tx is TokenExecuti
         tx.content.type === "tokenExecution" &&
         Array.isArray(tx.content.data) &&
         tx.content.data[0] === "tokenExecution"
+    )
+}
+
+// SECTION: Phase 4.2 - ACL Helper Payloads
+
+/**
+ * Payload for granting permissions to an address.
+ * Convenience type for SDK users to construct grant permission transactions.
+ */
+export interface GrantPermissionPayload {
+    /** Token address */
+    tokenAddress: string
+    /** Address to grant permissions to */
+    grantee: string
+    /** Permissions to grant */
+    permissions: string[]
+}
+
+/**
+ * Payload for revoking permissions from an address.
+ * Convenience type for SDK users to construct revoke permission transactions.
+ */
+export interface RevokePermissionPayload {
+    /** Token address */
+    tokenAddress: string
+    /** Address to revoke permissions from */
+    grantee: string
+    /** Permissions to revoke */
+    permissions: string[]
+}
+
+/**
+ * Transaction type for granting permissions.
+ * Uses tokenExecution with grantPermission operation.
+ */
+export type GrantPermissionTransaction = TokenExecutionTransaction & {
+    content: TokenExecutionTransactionContent & {
+        data: ["tokenExecution", TokenExecutionPayload & { args: TokenGrantPermissionArgs }]
+    }
+}
+
+/**
+ * Transaction type for revoking permissions.
+ * Uses tokenExecution with revokePermission operation.
+ */
+export type RevokePermissionTransaction = TokenExecutionTransaction & {
+    content: TokenExecutionTransactionContent & {
+        data: ["tokenExecution", TokenExecutionPayload & { args: TokenRevokePermissionArgs }]
+    }
+}
+
+/**
+ * Creates a TokenExecutionPayload for granting permissions.
+ *
+ * @param payload - Grant permission payload
+ * @returns TokenExecutionPayload ready for transaction creation
+ */
+export function createGrantPermissionPayload(payload: GrantPermissionPayload): TokenExecutionPayload {
+    return {
+        tokenAddress: payload.tokenAddress,
+        operation: "grantPermission",
+        args: {
+            type: "grantPermission",
+            grantee: payload.grantee,
+            permissions: payload.permissions,
+        },
+    }
+}
+
+/**
+ * Creates a TokenExecutionPayload for revoking permissions.
+ *
+ * @param payload - Revoke permission payload
+ * @returns TokenExecutionPayload ready for transaction creation
+ */
+export function createRevokePermissionPayload(payload: RevokePermissionPayload): TokenExecutionPayload {
+    return {
+        tokenAddress: payload.tokenAddress,
+        operation: "revokePermission",
+        args: {
+            type: "revokePermission",
+            grantee: payload.grantee,
+            permissions: payload.permissions,
+        },
+    }
+}
+
+/**
+ * Type guard for GrantPermissionPayload.
+ */
+export function isGrantPermissionPayload(payload: unknown): payload is GrantPermissionPayload {
+    if (typeof payload !== "object" || payload === null) return false
+    const p = payload as Record<string, unknown>
+    return (
+        typeof p.tokenAddress === "string" &&
+        typeof p.grantee === "string" &&
+        Array.isArray(p.permissions) &&
+        p.permissions.every((perm) => typeof perm === "string")
+    )
+}
+
+/**
+ * Type guard for RevokePermissionPayload.
+ */
+export function isRevokePermissionPayload(payload: unknown): payload is RevokePermissionPayload {
+    if (typeof payload !== "object" || payload === null) return false
+    const p = payload as Record<string, unknown>
+    return (
+        typeof p.tokenAddress === "string" &&
+        typeof p.grantee === "string" &&
+        Array.isArray(p.permissions) &&
+        p.permissions.every((perm) => typeof perm === "string")
     )
 }

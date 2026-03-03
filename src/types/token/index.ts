@@ -33,6 +33,10 @@ export type {
     TokenCreationParams,
     TokenQueryResult,
     TokenBalanceResult,
+    // Upgrade types
+    TokenUpgradePayload,
+    TokenUpgradeResult,
+    TokenUpgradeTransaction,
 } from "./TokenTypes"
 
 // Utility functions
