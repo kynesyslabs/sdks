@@ -2,6 +2,7 @@
 // This should be able to query and set the GCR identities for a Demos address
 
 import axios from "axios"
+import { ethers } from "ethers"
 import {
     XMCoreTargetIdentityPayload,
     Web2CoreTargetIdentityPayload,
@@ -19,6 +20,9 @@ import {
     FindDemosIdByWeb2IdentityQuery,
     FindDemosIdByWeb3IdentityQuery,
     UDIdentityPayload,
+    AgentIdentityPayload,
+    DemosOwnershipProof,
+    ERC8004AgentCard,
     NomisWalletIdentity,
     EthosWalletIdentity,
     EthosIdentityRemoveData,
@@ -79,7 +83,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos" | "tlsn",
+        context: "xm" | "web2" | "pqc" | "ud" | "agent" | "nomis" | "ethos" | "tlsn",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -95,9 +99,9 @@ export class Identities {
                 ) {
                     // construct informative error message
                     const errorMessage = `Invalid ${payload.context
-                    } proof format. Supported formats are: ${this.formats.web2[
-                        payload.context
-                    ].join(", ")}`
+                        } proof format. Supported formats are: ${this.formats.web2[
+                            payload.context
+                        ].join(", ")}`
                     throw new Error(errorMessage)
                 }
             }
@@ -137,7 +141,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos" | "tlsn",
+        context: "xm" | "web2" | "pqc" | "ud" | "agent" | "nomis" | "ethos" | "tlsn",
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -1022,7 +1026,7 @@ export class Identities {
 
         throw new Error(
             `Unrecognized address format: ${address}. ` +
-                `Expected EVM (0x...) or Solana (base58) address.`,
+            `Expected EVM (0x...) or Solana (base58) address.`,
         )
     }
 
@@ -1177,6 +1181,309 @@ export class Identities {
      */
     async getUDIdentities(demos: Demos, address?: string) {
         return await this.getIdentities(demos, "getUDIdentities", address)
+    }
+
+    // REVIEW: ERC-8004 Agent Identity — new feature
+    // SECTION: ERC-8004 Agent Identities
+
+    /**
+     * ERC-8004 IdentityRegistry contract address on Base Sepolia
+     */
+    static readonly AGENT_REGISTRY_ADDRESS =
+        "0x8004AA63c570c570eBF15376c0dB199918BFe9Fb"
+
+    /**
+     * Base Sepolia chain configuration for agent identity
+     */
+    static readonly AGENT_CHAIN_CONFIG = {
+        chainId: 84532,
+        chain: "base",
+        subchain: "sepolia",
+        rpc: "https://sepolia.base.org",
+    }
+
+    /**
+     * Generate the ownership proof message for ERC-8004 agent registration.
+     *
+     * This message must be signed by the user's Demos wallet to authorize
+     * linking an EVM address (which owns the agent NFT) to their Demos identity.
+     *
+     * @param demosPublicKey The user's Demos public key (hex string)
+     * @param agentId The ERC-8004 token ID being claimed
+     * @param evmAddress The EVM address that owns the agent NFT
+     * @returns Object containing the message and timestamp
+     */
+    generateAgentOwnershipMessage(
+        demosPublicKey: string,
+        agentId: string,
+        evmAddress: string,
+    ): { message: string; timestamp: number; nonce: string } {
+        const timestamp = Date.now()
+        const nonce = ethers.hexlify(ethers.randomBytes(16))
+        const message = [
+            "Demos GCR: link ERC-8004 agent identity",
+            `ChainId: ${Identities.AGENT_CHAIN_CONFIG.chainId}`,
+            `Registry: ${Identities.AGENT_REGISTRY_ADDRESS}`,
+            `AgentId: ${agentId}`,
+            `EvmOwner: ${evmAddress}`,
+            `DemosPublicKey: ${demosPublicKey}`,
+            `TimestampMs: ${timestamp}`,
+            `Nonce: ${nonce}`,
+        ].join("\n")
+        return { message, timestamp, nonce }
+    }
+
+    /**
+     * Create an ownership proof by signing the ownership message with the Demos wallet.
+     *
+     * @param demos A Demos instance to sign the message
+     * @param agentId The ERC-8004 token ID being claimed
+     * @param evmAddress The EVM address that owns the agent NFT
+     * @returns The complete ownership proof object
+     */
+    async createAgentOwnershipProof(
+        demos: Demos,
+        agentId: string,
+        evmAddress: string,
+    ): Promise<DemosOwnershipProof> {
+        const demosPublicKey = await demos.getEd25519Address()
+        const { message, timestamp, nonce } =
+            this.generateAgentOwnershipMessage(
+                demosPublicKey,
+                agentId,
+                evmAddress,
+            )
+
+        const signature = await demos.crypto.sign(
+            demos.algorithm,
+            new TextEncoder().encode(message),
+        )
+
+        return {
+            type: "demos-signature",
+            message,
+            signature: {
+                type: demos.algorithm,
+                data: uint8ArrayToHex(signature.signature),
+            },
+            demosPublicKey,
+            agentId,
+            evmAddress,
+            timestamp,
+            nonce,
+        }
+    }
+
+    /**
+     * Add an ERC-8004 agent identity to the GCR.
+     *
+     * This links an ERC-8004 agent NFT (registered on Base Sepolia) to a Demos identity.
+     *
+     * Requirements:
+     * - User must have an EVM wallet linked to their Demos identity
+     * - That EVM wallet must own the agent NFT
+     * - User must sign an ownership proof with their Demos wallet
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param payload The agent identity payload containing:
+     *   - agentId: The ERC-8004 token ID
+     *   - evmAddress: The EVM address owning the agent
+     *   - chain: The chain where agent is registered (e.g., "base.sepolia")
+     *   - txHash: The registration transaction hash
+     *   - tokenUri: The token URI pointing to agent card metadata
+     *   - proof: The ownership proof signed by Demos wallet
+     * @param referralCode Optional referral code for points
+     * @returns The validity data of the identity transaction
+     *
+     * @example
+     * ```typescript
+     * const identities = new Identities()
+     *
+     * // Create ownership proof
+     * const proof = await identities.createAgentOwnershipProof(demos, "123", "0x...")
+     *
+     * // Add agent identity
+     * await identities.addAgentIdentity(demos, {
+     *   agentId: "123",
+     *   evmAddress: "0x...",
+     *   chain: "base.sepolia",
+     *   txHash: "0x...",
+     *   tokenUri: "ipfs://...",
+     *   proof
+     * })
+     * ```
+     */
+    async addAgentIdentity(
+        demos: Demos,
+        payload: AgentIdentityPayload,
+        referralCode?: string,
+    ): Promise<RPCResponseWithValidityData> {
+        // Validate the payload
+        if (!payload.agentId) {
+            throw new Error("Agent ID is required")
+        }
+        if (!payload.evmAddress) {
+            throw new Error("EVM address is required")
+        }
+        if (!payload.proof) {
+            throw new Error("Ownership proof is required")
+        }
+
+        // Verify the EVM address format
+        const evmPattern = /^0x[0-9a-fA-F]{40}$/
+        if (!evmPattern.test(payload.evmAddress)) {
+            throw new Error(
+                `Invalid EVM address format: ${payload.evmAddress}`,
+            )
+        }
+
+        // Verify the proof contains the correct EVM address
+        if (
+            payload.proof.evmAddress.toLowerCase() !==
+            payload.evmAddress.toLowerCase()
+        ) {
+            throw new Error(
+                "Ownership proof EVM address doesn't match payload EVM address",
+            )
+        }
+
+        return await this.inferIdentity(demos, "agent", {
+            ...payload,
+            referralCode,
+        })
+    }
+
+    /**
+     * Remove an ERC-8004 agent identity from the GCR.
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param agentId The ERC-8004 token ID to remove
+     * @param chain The chain where the agent is registered (e.g., "base.sepolia")
+     * @returns The validity data response from the RPC
+     */
+    async removeAgentIdentity(
+        demos: Demos,
+        agentId: string,
+        chain: string = "base.sepolia",
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "agent", { agentId, chain })
+    }
+
+    /**
+     * Get the ERC-8004 agent identities associated with an address.
+     *
+     * @param demos A Demos instance to communicate with the RPC
+     * @param address The Demos address to get agent identities for.
+     *                Defaults to the connected wallet's address.
+     * @returns The agent identities associated with the address.
+     */
+    async getAgentIdentities(demos: Demos, address?: string) {
+        return await this.getIdentities(demos, "getAgentIdentities", address)
+    }
+
+    /**
+     * Verify that an EVM address owns a specific ERC-8004 agent NFT.
+     *
+     * This is a client-side helper to verify ownership before submitting
+     * the identity to the network. The node will also verify this.
+     *
+     * @param agentId The ERC-8004 token ID
+     * @param expectedOwner The expected EVM address owner
+     * @returns True if the address owns the agent, false otherwise
+     */
+    async verifyAgentOwnership(
+        agentId: string,
+        expectedOwner: string,
+    ): Promise<boolean> {
+        const registryAbi = [
+            "function ownerOf(uint256 tokenId) external view returns (address)",
+        ]
+
+        try {
+            const provider = new ethers.JsonRpcProvider(
+                Identities.AGENT_CHAIN_CONFIG.rpc,
+            )
+            const contract = new ethers.Contract(
+                Identities.AGENT_REGISTRY_ADDRESS,
+                registryAbi,
+                provider,
+            )
+
+            const owner = await contract.ownerOf(agentId)
+            return owner.toLowerCase() === expectedOwner.toLowerCase()
+        } catch (error: any) {
+            // Token doesn't exist or other error
+            return false
+        }
+    }
+
+    /**
+     * Fetch the agent card metadata from the token URI.
+     *
+     * @param agentId The ERC-8004 token ID
+     * @returns The agent card metadata or null if not found
+     */
+    /**
+     * Decode a base64 string to UTF-8, with cross-platform support.
+     */
+    private decodeBase64ToUtf8(base64: string): string {
+        if (typeof Buffer !== "undefined") {
+            return Buffer.from(base64, "base64").toString("utf-8")
+        }
+        if (typeof atob !== "undefined") {
+            const bin = atob(base64)
+            const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
+            return new TextDecoder().decode(bytes)
+        }
+        throw new Error("Base64 decoding not supported in this runtime")
+    }
+
+    async getAgentCard(agentId: string): Promise<ERC8004AgentCard | null> {
+        const registryAbi = [
+            "function tokenURI(uint256 tokenId) external view returns (string)",
+        ]
+
+        try {
+            const provider = new ethers.JsonRpcProvider(
+                Identities.AGENT_CHAIN_CONFIG.rpc,
+            )
+            const contract = new ethers.Contract(
+                Identities.AGENT_REGISTRY_ADDRESS,
+                registryAbi,
+                provider,
+            )
+
+            const tokenUri = await contract.tokenURI(agentId)
+
+            // Handle different URI formats
+            if (tokenUri.startsWith("data:application/json;base64,")) {
+                // Base64 encoded JSON (data URI)
+                const base64 = tokenUri.replace(
+                    "data:application/json;base64,",
+                    "",
+                )
+                const json = this.decodeBase64ToUtf8(base64)
+                return JSON.parse(json)
+            } else if (tokenUri.startsWith("ipfs://")) {
+                // IPFS URI - fetch via gateway
+                const ipfsHash = tokenUri.replace("ipfs://", "")
+                const response = await axios.get(
+                    `https://ipfs.io/ipfs/${ipfsHash}`,
+                    { timeout: 10_000 },
+                )
+                return response.data
+            } else if (tokenUri.startsWith("https://")) {
+                // HTTPS URI only — plain http is rejected for security
+                const response = await axios.get(tokenUri, {
+                    timeout: 10_000,
+                })
+                return response.data
+            }
+
+            return null
+        } catch (error) {
+            return null
+        }
     }
 
     /**

@@ -379,6 +379,14 @@ export class HandleIdentityOperations {
                 break
             }
 
+            case "agent_identity_assign": {
+                edit.data = {
+                    ...identityPayload.payload,
+                    timestamp: tx.content.timestamp,
+                }
+                break
+            }
+
             case "nomis_identity_assign": {
                 edit.data = identityPayload.payload
                 break
@@ -419,6 +427,7 @@ export class HandleIdentityOperations {
             case "web2_identity_remove":
             case "pqc_identity_remove":
             case "ud_identity_remove":
+            case "agent_identity_remove":
             case "nomis_identity_remove":
             case "ethos_identity_remove":
             case "tlsn_identity_remove": {
