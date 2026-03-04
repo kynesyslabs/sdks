@@ -384,6 +384,12 @@ export class HandleIdentityOperations {
                 break
             }
 
+            case "humanpassport_identity_assign": {
+                edit.data = identityPayload.payload
+                edit.referralCode = identityPayload.payload.referralCode
+                break
+            }
+
             case "ethos_identity_assign": {
                 edit.data = identityPayload.payload
                 break
@@ -420,6 +426,7 @@ export class HandleIdentityOperations {
             case "pqc_identity_remove":
             case "ud_identity_remove":
             case "nomis_identity_remove":
+            case "humanpassport_identity_remove":
             case "ethos_identity_remove":
             case "tlsn_identity_remove": {
                 // INFO: Passthrough the payload

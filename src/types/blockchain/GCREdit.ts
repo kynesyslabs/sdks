@@ -6,6 +6,7 @@ import {
     UDIdentityPayload,
     XMCoreTargetIdentityPayload,
     NomisWalletIdentity,
+    HumanPassportIdentityData,
     EthosWalletIdentity,
     TLSNIdentityContext,
     TLSNProofRanges,
@@ -103,11 +104,12 @@ export interface PQCIdentityGCREditData {
 
 export type UdGCRData = UDIdentityPayload
 
+
 export interface GCREditIdentity {
     type: "identity"
     isRollback: boolean
     account: string
-    context: "xm" | "web2" | "pqc" | "nomis" | "ud" | "ethos" | "tlsn"
+    context: "xm" | "web2" | "pqc" | "nomis" | "ud" | "humanpassport" | "ethos" | "tlsn"
     operation: "add" | "remove"
     data:
     | Web2GCRData // web2 add or remove identity
@@ -119,6 +121,8 @@ export interface GCREditIdentity {
     | UdGCRData // ud add identity
     | { domain: string } // ud remove identity
     | NomisWalletIdentity // nomis add/remove identity
+    | HumanPassportIdentityData // humanpassport add identity
+    | { address: string } // humanpassport remove identity
     | EthosWalletIdentity // ethos add/remove identity
     txhash: string
     referralCode?: string

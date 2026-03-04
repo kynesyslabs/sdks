@@ -297,6 +297,45 @@ export type NomisIdentityPayload =
     | NomisIdentityAssignPayload
     | NomisIdentityRemovePayload
 
+// SECTION Human Passport Identities (Proof of Personhood)
+export interface BaseHumanPassportIdentityPayload {
+    context: "humanpassport"
+}
+
+/**
+ * Human Passport identity verification payload
+ * Contains minimal data needed for node-side verification
+ * Node will fetch fresh score from Human Passport API
+ */
+export interface HumanPassportIdentityData {
+    /** EVM address to verify */
+    address: string
+    /** Signature proving address ownership (optional, for enhanced verification) */
+    signature?: string
+    /** Verification method: API or onchain */
+    verificationMethod: "api" | "onchain"
+    /** Chain ID for onchain verification */
+    chainId?: number
+    /** Optional referral code */
+    referralCode?: string
+}
+
+export interface HumanPassportIdentityAssignPayload extends BaseHumanPassportIdentityPayload {
+    method: "humanpassport_identity_assign"
+    payload: HumanPassportIdentityData
+}
+
+export interface HumanPassportIdentityRemovePayload extends BaseHumanPassportIdentityPayload {
+    method: "humanpassport_identity_remove"
+    payload: {
+        address: string
+    }
+}
+
+export type HumanPassportIdentityTxPayload =
+    | HumanPassportIdentityAssignPayload
+    | HumanPassportIdentityRemovePayload
+
 export interface EthosWalletIdentity {
     chain: string
     subchain: string
@@ -310,6 +349,7 @@ export interface EthosWalletIdentity {
         [key: string]: unknown
     }
 }
+
 
 // SECTION TLSNotary Identities
 /**
@@ -431,6 +471,7 @@ export type IdentityPayload =
     | PqcIdentityPayload
     | UdIdentityPayload
     | NomisIdentityPayload
+    | HumanPassportIdentityTxPayload
     | EthosIdentityPayload
     | TLSNIdentityPayload
 export interface UserPoints {
@@ -447,6 +488,7 @@ export interface UserPoints {
         }
         udDomains?: { [domain: string]: number }
         nomisScores?: { [chain: string]: number }
+        humanPassport?: number
         ethosScores?: { [chain: string]: number }
         referrals: number
         demosFollow: number
@@ -457,6 +499,11 @@ export interface UserPoints {
         [network: string]: string[]
     }
     linkedNomisIdentities: NomisWalletIdentity[]
+    linkedHumanPassport?: {
+        address: string
+        score: number
+        passingScore: boolean
+    }[]
     linkedEthosIdentities?: EthosWalletIdentity[]
     lastUpdated: Date
     flagged: boolean | null

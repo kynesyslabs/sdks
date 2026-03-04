@@ -26,13 +26,19 @@ import {
     TLSNIdentityContext,
     InferFromTLSNPayload,
     TLSNProofRanges,
+    HumanPassportIdentityData,
 } from "@/types/abstraction"
+import {
+    SavedHumanPassportIdentity,
+} from "@/abstraction/types/HumanPassportTypes"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
-import { Account, RPCResponseWithValidityData } from "@/types"
+import { Account, RPCResponse, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
+
+type IdentityContext = "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn"
 
 export class Identities {
     formats = {
@@ -79,7 +85,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos" | "tlsn",
+        context: IdentityContext,
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -95,9 +101,9 @@ export class Identities {
                 ) {
                     // construct informative error message
                     const errorMessage = `Invalid ${payload.context
-                    } proof format. Supported formats are: ${this.formats.web2[
-                        payload.context
-                    ].join(", ")}`
+                        } proof format. Supported formats are: ${this.formats.web2[
+                            payload.context
+                        ].join(", ")}`
                     throw new Error(errorMessage)
                 }
             }
@@ -115,7 +121,7 @@ export class Identities {
             data: [
                 "identity",
                 {
-                    context: context,
+                    context: context as any,
                     method: (context + "_identity_assign") as any,
                     payload: payload,
                 },
@@ -137,7 +143,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "ethos" | "tlsn",
+        context: IdentityContext,
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -153,7 +159,7 @@ export class Identities {
             data: [
                 "identity",
                 {
-                    context: context,
+                    context: context as any,
                     method: (context + "_identity_remove") as any,
                     payload: payload,
                 },
@@ -1022,7 +1028,7 @@ export class Identities {
 
         throw new Error(
             `Unrecognized address format: ${address}. ` +
-                `Expected EVM (0x...) or Solana (base58) address.`,
+            `Expected EVM (0x...) or Solana (base58) address.`,
         )
     }
 
@@ -1248,6 +1254,114 @@ export class Identities {
     ): Promise<RPCResponseWithValidityData> {
         return await this.removeIdentity(demos, "nomis", payload)
     }
+
+    // ==================== Human Passport Identity ====================
+
+    /**
+     * Fetch Human Passport score for an address.
+     *
+     * Calls the `getHumanPassportScore` GCR routine via the Demos RPC.
+     * This fetches the score from the node's cached data, not directly from Human Passport API.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param address The EVM address to retrieve the Human Passport score for.
+     * @returns The RPC response containing the Human Passport score data.
+     */
+    async getHumanPassportScore(
+        demos: Demos,
+        address: string,
+    ): Promise<RPCResponseWithValidityData> {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getHumanPassportScore",
+                    params: [address],
+                },
+            ],
+        }
+
+        return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Get Human Passport identities for a Demos address.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param demosAddress The Demos address to get identities for.
+     * @returns The RPC response containing the Human Passport identities.
+     */
+    async getHumanPassportIdentities(
+        demos: Demos,
+        demosAddress: string,
+    ): Promise<SavedHumanPassportIdentity[]> {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getHumanPassportIdentities",
+                    params: [demosAddress],
+                },
+            ],
+        }
+
+        const response = await demos.rpcCall(request, true)
+        const rpcError = (response as RPCResponse & { error?: { message: string } }).error
+        if (rpcError) {
+            throw new Error(`Failed to get Human Passport identities: ${rpcError.message}`)
+        }
+
+        if (response.result !== 200) {
+            throw new Error(`Failed to get Human Passport identities: unexpected status ${response.result}`)
+        }
+
+        return response.response || []
+    }
+
+    /**
+     * Link a Human Passport identity to the GCR.
+     *
+     * Verifies the Human Passport score via the node and persists
+     * the identity if the score meets the threshold (default: 20).
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param payload The Human Passport identity data to be linked.
+     * @returns The RPC response for the identity inference operation.
+     *
+     * @example
+     * ```typescript
+     * const result = await identities.addHumanPassportIdentity(demos, {
+     *     address: "0x...",
+     *     verificationMethod: "api"
+     * })
+     * ```
+     */
+    async addHumanPassportIdentity(
+        demos: Demos,
+        payload: HumanPassportIdentityData,
+    ): Promise<RPCResponseWithValidityData> {
+        if (payload.verificationMethod === 'onchain' && payload.chainId == null) {
+            throw new Error('chainId must be provided for onchain verification')
+        }
+
+        return await this.inferIdentity(demos, "humanpassport", payload)
+    }
+
+    /**
+     * Remove a Human Passport identity from the GCR.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param address The EVM address of the Human Passport identity to remove.
+     * @returns The RPC response for the identity removal operation.
+     */
+    async removeHumanPassportIdentity(
+        demos: Demos,
+        address: string,
+    ): Promise<RPCResponseWithValidityData> {
+        return await this.removeIdentity(demos, "humanpassport", { address })
+    }
+
+    // ==================== Ethos Identity ====================
 
     /**
      * Retrieve the Ethos reputation score for a given wallet address.
