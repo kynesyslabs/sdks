@@ -26,19 +26,19 @@ import {
     TLSNIdentityContext,
     InferFromTLSNPayload,
     TLSNProofRanges,
+    HumanPassportIdentityData,
 } from "@/types/abstraction"
 import {
     SavedHumanPassportIdentity,
 } from "@/abstraction/types/HumanPassportTypes"
-import {
-    HumanPassportIdentityData,
-} from "@/types/abstraction"
 import { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import { Demos } from "@/websdk/demosclass"
 import { PQCAlgorithm } from "@/types/cryptography"
-import { Account, RPCResponseWithValidityData } from "@/types"
+import { Account, RPCResponse, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
+
+type IdentityContext = "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn"
 
 export class Identities {
     formats = {
@@ -85,7 +85,7 @@ export class Identities {
      */
     private async inferIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn",
+        context: IdentityContext,
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
@@ -143,7 +143,7 @@ export class Identities {
      */
     private async removeIdentity(
         demos: Demos,
-        context: "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn",
+        context: IdentityContext,
         payload: any,
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
@@ -1270,7 +1270,7 @@ export class Identities {
     async getHumanPassportScore(
         demos: Demos,
         address: string,
-    ) {
+    ): Promise<RPCResponseWithValidityData> {
         const request = {
             method: "gcr_routine",
             params: [
@@ -1306,8 +1306,9 @@ export class Identities {
         }
 
         const response = await demos.rpcCall(request, true)
-        if ((response as any).error) {
-            throw new Error(`Failed to get Human Passport identities: ${(response as any).error.message}`)
+        const rpcError = (response as RPCResponse & { error?: { message: string } }).error
+        if (rpcError) {
+            throw new Error(`Failed to get Human Passport identities: ${rpcError.message}`)
         }
 
         if (response.result !== 200) {

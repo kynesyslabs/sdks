@@ -195,11 +195,11 @@ export class HumanPassportClient {
     private transformScoreResponse(data: RawScoreResponse): HumanPassportScore {
         return {
             address: data.address,
-            score: parseFloat(data.score) ?? 0,
+            score: Number(data.score) || 0,
             passingScore: data.passing_score,
             lastScoreTimestamp: data.last_score_timestamp,
             expirationTimestamp: data.expiration_timestamp,
-            threshold: parseFloat(data.threshold) ?? 20,
+            threshold: Number(data.threshold) || 20,
             stamps: data.stamps ?? {},
             error: data.error
         }
