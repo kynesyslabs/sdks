@@ -22,6 +22,7 @@ import {
     UDIdentityPayload,
     AgentIdentityPayload,
     DemosOwnershipProof,
+    ERC8004AgentCard,
     NomisWalletIdentity,
     EthosWalletIdentity,
     EthosIdentityRemoveData,
@@ -1182,6 +1183,7 @@ export class Identities {
         return await this.getIdentities(demos, "getUDIdentities", address)
     }
 
+    // REVIEW: ERC-8004 Agent Identity — new feature
     // SECTION: ERC-8004 Agent Identities
 
     /**
@@ -1215,10 +1217,20 @@ export class Identities {
         demosPublicKey: string,
         agentId: string,
         evmAddress: string,
-    ): { message: string; timestamp: number } {
+    ): { message: string; timestamp: number; nonce: string } {
         const timestamp = Date.now()
-        const message = `I authorize EVM address ${evmAddress} to register ERC-8004 agent #${agentId} for Demos identity ${demosPublicKey}. Timestamp: ${timestamp}`
-        return { message, timestamp }
+        const nonce = ethers.hexlify(ethers.randomBytes(16))
+        const message = [
+            "Demos GCR: link ERC-8004 agent identity",
+            `ChainId: ${Identities.AGENT_CHAIN_CONFIG.chainId}`,
+            `Registry: ${Identities.AGENT_REGISTRY_ADDRESS}`,
+            `AgentId: ${agentId}`,
+            `EvmOwner: ${evmAddress}`,
+            `DemosPublicKey: ${demosPublicKey}`,
+            `TimestampMs: ${timestamp}`,
+            `Nonce: ${nonce}`,
+        ].join("\n")
+        return { message, timestamp, nonce }
     }
 
     /**
@@ -1235,11 +1247,12 @@ export class Identities {
         evmAddress: string,
     ): Promise<DemosOwnershipProof> {
         const demosPublicKey = await demos.getEd25519Address()
-        const { message, timestamp } = this.generateAgentOwnershipMessage(
-            demosPublicKey,
-            agentId,
-            evmAddress,
-        )
+        const { message, timestamp, nonce } =
+            this.generateAgentOwnershipMessage(
+                demosPublicKey,
+                agentId,
+                evmAddress,
+            )
 
         const signature = await demos.crypto.sign(
             demos.algorithm,
@@ -1257,6 +1270,7 @@ export class Identities {
             agentId,
             evmAddress,
             timestamp,
+            nonce,
         }
     }
 
@@ -1286,7 +1300,7 @@ export class Identities {
      * const identities = new Identities()
      *
      * // Create ownership proof
-     * const proof = await identities.createAgentOwnershipProof(demos, evmAddress)
+     * const proof = await identities.createAgentOwnershipProof(demos, "123", "0x...")
      *
      * // Add agent identity
      * await identities.addAgentIdentity(demos, {
@@ -1409,7 +1423,22 @@ export class Identities {
      * @param agentId The ERC-8004 token ID
      * @returns The agent card metadata or null if not found
      */
-    async getAgentCard(agentId: string): Promise<any | null> {
+    /**
+     * Decode a base64 string to UTF-8, with cross-platform support.
+     */
+    private decodeBase64ToUtf8(base64: string): string {
+        if (typeof Buffer !== "undefined") {
+            return Buffer.from(base64, "base64").toString("utf-8")
+        }
+        if (typeof atob !== "undefined") {
+            const bin = atob(base64)
+            const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
+            return new TextDecoder().decode(bytes)
+        }
+        throw new Error("Base64 decoding not supported in this runtime")
+    }
+
+    async getAgentCard(agentId: string): Promise<ERC8004AgentCard | null> {
         const registryAbi = [
             "function tokenURI(uint256 tokenId) external view returns (string)",
         ]
@@ -1433,18 +1462,21 @@ export class Identities {
                     "data:application/json;base64,",
                     "",
                 )
-                const json = Buffer.from(base64, "base64").toString("utf-8")
+                const json = this.decodeBase64ToUtf8(base64)
                 return JSON.parse(json)
             } else if (tokenUri.startsWith("ipfs://")) {
                 // IPFS URI - fetch via gateway
                 const ipfsHash = tokenUri.replace("ipfs://", "")
                 const response = await axios.get(
                     `https://ipfs.io/ipfs/${ipfsHash}`,
+                    { timeout: 10_000 },
                 )
                 return response.data
-            } else if (tokenUri.startsWith("http")) {
-                // HTTP(S) URI
-                const response = await axios.get(tokenUri)
+            } else if (tokenUri.startsWith("https://")) {
+                // HTTPS URI only — plain http is rejected for security
+                const response = await axios.get(tokenUri, {
+                    timeout: 10_000,
+                })
                 return response.data
             }
 
