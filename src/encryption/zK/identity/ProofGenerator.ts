@@ -10,7 +10,7 @@
  */
 
 // REVIEW: Phase 10.1 - Production cryptographic implementation
-import * as snarkjs from '@cryptkeeperzk/snarkjs'
+import * as snarkjs from 'snarkjs'
 
 export interface ZKProof {
     pi_a: string[]
