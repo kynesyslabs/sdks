@@ -7,6 +7,7 @@ import { SOLANA as SC } from "@/multichain/localsdk"
 import { BN } from "@project-serum/anchor"
 import { wallets } from "../utils/wallets"
 import chainProviders from "./chainProviders"
+import { Demos, prepareXMPayload, prepareXMScript } from "@/websdk"
 
 const idl = {
     version: "0.1.0",
@@ -56,10 +57,16 @@ const idl = {
 }
 
 describe("SOLANA CHAIN TESTS", () => {
+    const demos = new Demos()
     const instance = new SOLANA(chainProviders.solana.testnet)
     const localInstance = new SC(chainProviders.solana.testnet)
 
     beforeAll(async () => {
+        await demos.connect("http://localhost:53550")
+        await demos.connectWallet(
+            "polar scale globe beauty stock employ rail exercise goat into sample embark",
+        )
+
         const connected = await instance.connect()
         await instance.connectWallet(wallets.solana.privateKey)
         expect(connected).toBe(true)
@@ -80,7 +87,11 @@ describe("SOLANA CHAIN TESTS", () => {
         expect(signature.length).toBeGreaterThan(80)
     })
 
-    test.skip("Running anchor program", async () => {
+    test.only("Running anchor program", async () => {
+        // INFO: A program that stores a number in an account
+        const programId = "BLTXVno27Vc5geSn2FMxJ2yU6c3fVaUzESgDAfbYHJD6"
+
+        // INFO: Load program owner keypair
         const programOwner = Keypair.fromSecretKey(
             Buffer.from([
                 47, 72, 142, 251, 130, 2, 4, 156, 56, 97, 212, 198, 50, 46, 70,
@@ -91,51 +102,68 @@ describe("SOLANA CHAIN TESTS", () => {
             ]),
         )
         console.log("programOwner: ", programOwner.publicKey.toBase58())
-        const newAccountKeypair = new Keypair()
 
         // INFO: Defining the program parameters
+        const storageAccount = new Keypair()
         const programParams: SolanaRunAnchorProgramParams = {
             idl: idl,
             args: new BN(42),
             instruction: "initialize",
             accounts: {
-                newAccount: newAccountKeypair.publicKey,
+                newAccount: storageAccount.publicKey,
                 signer: programOwner.publicKey,
                 SystemProgram: SystemProgram.programId,
             },
             feePayer: programOwner.publicKey,
-            signers: [programOwner, newAccountKeypair],
+            signers: [programOwner, storageAccount],
         }
 
-        console.log("new account: ", newAccountKeypair.publicKey.toBase58())
-        const tx = await instance.runAnchorProgram(
-            "BLTXVno27Vc5geSn2FMxJ2yU6c3fVaUzESgDAfbYHJD6",
+        console.log("storage account: ", storageAccount.publicKey.toBase58())
+        const payload = await instance.runAnchorProgram(
+            programId,
             programParams,
         )
-        const res = await localInstance.sendTransaction(tx)
 
-        console.log("txhash: ", res.hash)
+        const xmscript = prepareXMScript({
+            chain: "solana",
+            subchain: "devnet",
+            signedPayloads: [payload],
+            type: "contract_write",
+        })
 
-        expect(typeof res.hash).toBe("string")
+        const tx = await prepareXMPayload(xmscript, demos)
+        const validityData = await demos.confirm(tx)
+        console.log("validityData", validityData)
+
+        const res = await demos.broadcast(validityData)
+        console.log("res", JSON.stringify(res, null, 2))
+
+        expect(res.result).toBe(200)
+        expect(res.response["message"]).toBe("all_ops_ok")
+
+        // Extract the first object's hash value from the results object
+        const firstResult = Object.values(res.response["results"])[0] as {
+            hash: string
+        }
+        const txhash = firstResult.hash
+        console.log("txhash: ", txhash)
+        expect(txhash).toBeDefined()
 
         // INFO: Wait for tx confirmation
-        await instance.provider.confirmTransaction(res.hash, "finalized")
+        await instance.provider.confirmTransaction(txhash, "finalized")
 
         // INFO: Reading the account data
         const acc = await instance.fetchAccount(
-            newAccountKeypair.publicKey.toBase58(),
+            storageAccount.publicKey.toBase58(),
             {
                 idl: idl,
                 name: "newAccount",
-                // INFO: if programId is not provided, account owner will be fetched from the network
-                // programId: "BLTXVno27Vc5geSn2FMxJ2yU6c3fVaUzESgDAfbYHJD6",
             },
         )
 
-        // @ts-ignore
-        console.log("data: ", acc.data.toNumber())
-        // @ts-ignore
-        expect(acc.data.toNumber()).toEqual(42)
+        console.log("data: ", (acc.data as any).toNumber())
+        expect((acc.data as any).toNumber()).toEqual(42)
+        console.log("account data checks out!")
     }, 25000)
 
     test("Reading program owned account data", async () => {

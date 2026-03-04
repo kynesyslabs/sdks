@@ -390,6 +390,11 @@ export class HandleIdentityOperations {
                 break
             }
 
+            case "ethos_identity_assign": {
+                edit.data = identityPayload.payload
+                break
+            }
+
             case "tlsn_identity_assign": {
                 // TLSN identity uses TLSNotary proof for verification
                 // The proof contains cryptographically verified data from the target API
@@ -422,6 +427,7 @@ export class HandleIdentityOperations {
             case "ud_identity_remove":
             case "nomis_identity_remove":
             case "humanpassport_identity_remove":
+            case "ethos_identity_remove":
             case "tlsn_identity_remove": {
                 // INFO: Passthrough the payload
                 edit.data = identityPayload.payload as any

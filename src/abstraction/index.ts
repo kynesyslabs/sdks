@@ -31,7 +31,11 @@ import {
     DiscordProof,
     NomisWalletIdentity,
     HumanPassportIdentityPayload,
-    HumanPassportIdentityData
+    HumanPassportIdentityData,
+    EthosWalletIdentity,
+    EthosIdentityRemoveData,
+    EthosIdentityAssignPayload,
+    EthosIdentityRemovePayload
 } from "@/types/abstraction"
 
 export {
@@ -60,5 +64,9 @@ export {
     DiscordProof,
     NomisWalletIdentity,
     HumanPassportIdentityPayload,
-    HumanPassportIdentityData
+    HumanPassportIdentityData,
+    EthosWalletIdentity,
+    EthosIdentityRemoveData,
+    EthosIdentityAssignPayload,
+    EthosIdentityRemovePayload
 }

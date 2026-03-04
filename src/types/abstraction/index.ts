@@ -336,6 +336,21 @@ export type HumanPassportIdentityPayload =
     | HumanPassportIdentityAssignPayload
     | HumanPassportIdentityRemovePayload
 
+export interface EthosWalletIdentity {
+    chain: string
+    subchain: string
+    address: string
+    score: number
+    profileId?: number
+    lastSyncedAt: string
+    metadata?: {
+        displayName?: string
+        username?: string
+        [key: string]: unknown
+    }
+}
+
+
 // SECTION TLSNotary Identities
 /**
  * TLSNotary presentation format (from tlsn-js attestation)
@@ -354,6 +369,34 @@ export interface TLSNotaryPresentation {
         websocketProxyUrl?: string
     }
 }
+
+/**
+ * Minimal payload for Ethos identity removal.
+ * Only includes identifying fields (chain, subchain, address).
+ */
+export interface EthosIdentityRemoveData {
+    chain: string
+    subchain: string
+    address: string
+}
+
+export interface BaseEthosIdentityPayload {
+    context: "ethos"
+}
+
+export interface EthosIdentityAssignPayload extends BaseEthosIdentityPayload {
+    method: "ethos_identity_assign"
+    payload: EthosWalletIdentity
+}
+
+export interface EthosIdentityRemovePayload extends BaseEthosIdentityPayload {
+    method: "ethos_identity_remove"
+    payload: EthosIdentityRemoveData
+}
+
+export type EthosIdentityPayload =
+    | EthosIdentityAssignPayload
+    | EthosIdentityRemovePayload
 
 /**
  * Supported TLSN identity contexts
@@ -429,6 +472,7 @@ export type IdentityPayload =
     | UdIdentityPayload
     | NomisIdentityPayload
     | HumanPassportIdentityPayload
+    | EthosIdentityPayload
     | TLSNIdentityPayload
 export interface UserPoints {
     userId: string
@@ -445,6 +489,7 @@ export interface UserPoints {
         udDomains?: { [domain: string]: number }
         nomisScores?: { [chain: string]: number }
         humanPassport?: number
+        ethosScores?: { [chain: string]: number }
         referrals: number
         demosFollow: number
     }
@@ -459,6 +504,7 @@ export interface UserPoints {
         score: number
         passingScore: boolean
     }[]
+    linkedEthosIdentities?: EthosWalletIdentity[]
     lastUpdated: Date
     flagged: boolean | null
     flaggedReason: string | null
