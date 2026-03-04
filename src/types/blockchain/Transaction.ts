@@ -19,6 +19,7 @@ import { ContractCallPayload } from "./TransactionSubtypes/ContractCallTransacti
 import { D402PaymentPayload } from "./TransactionSubtypes/D402PaymentTransaction"
 import { EscrowPayload } from "./TransactionSubtypes/EscrowTransaction"
 import { IPFSPayload } from "./TransactionSubtypes/IPFSTransaction"
+import { TokenCreationPayload, TokenExecutionPayload } from "./TransactionSubtypes/TokenTransaction"
 import { CustomCharges } from "./CustomCharges"
 
 // TODO Implement multisignature transactions
@@ -46,6 +47,8 @@ export type TransactionContentData =
     | ["d402_payment", D402PaymentPayload]
     | ["escrow", EscrowPayload]
     | ["ipfs", IPFSPayload]
+    | ["tokenCreation", TokenCreationPayload]
+    | ["tokenExecution", TokenExecutionPayload]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
@@ -70,6 +73,8 @@ export interface TransactionContent {
     | "d402_payment"
     | "escrow"
     | "ipfs"
+    | "tokenCreation"
+    | "tokenExecution"
     from: string
     from_ed25519_address: string
     to: string

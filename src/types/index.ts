@@ -219,3 +219,56 @@ export {
     type UDResolutionConfig,
     type AddressTypeInfo,
 } from "../abstraction/types/UDResolution"
+
+// REVIEW: Token types for Demos Network tokens with scripting support
+export {
+    // Access Control
+    type TokenPermission,
+    type TokenACLEntry,
+    type TokenAccessControl,
+    // Metadata
+    type TokenMetadata,
+    // State
+    type TokenBalances,
+    type TokenAllowances,
+    type TokenCustomState,
+    type TokenState,
+    // Script
+    type TokenHookType,
+    type TokenScriptMethod,
+    type TokenScript,
+    // Complete structure
+    type TokenData,
+    // Holder reference
+    type TokenHolderReference,
+    // Script execution
+    type StateMutation,
+    type ScriptContext,
+    type ScriptExecutionResult,
+    // Utility types
+    type TokenCreationParams,
+    type TokenQueryResult,
+    type TokenBalanceResult,
+    // REVIEW: Phase 4.1 - Script upgrade types
+    type TokenUpgradePayload,
+    type TokenUpgradeResult,
+    type TokenUpgradeTransaction,
+    // Utility functions
+    deriveTokenAddress,
+    computeScriptHash,
+    serializeTokenData,
+    deserializeTokenData,
+    balanceToString,
+    stringToBalance,
+    createInitialTokenState,
+    createInitialAccessControl,
+    createTokenMetadata,
+    createHolderReference,
+    isValidTicker,
+    isValidTokenName,
+    isValidDecimals,
+    isValidBalance,
+    validateTokenCreationParams,
+    applyMutations,
+    hasPermission,
+} from "./token"
