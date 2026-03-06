@@ -25,3 +25,6 @@ export { uint8ArrayToHex, hexToUint8Array } from "../encryption/unifiedCrypto"
 
 // Bridge
 export { RubicBridge } from "./bridge"
+
+// REVIEW: Token operations utility class
+export { DemosTokens, createTokensClient } from "./DemosTokens"

@@ -1,6 +1,7 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "2.9.0",
+    "version": "2.11.2",
+    "type": "module",
     "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
     "types": "build/index.d.ts",
@@ -73,6 +74,7 @@
         "setup:hooks": "bun run setup:pre-push && bun run setup:pre-commit",
         "test:multichain": "rm -rf build && jest --testMatch '**/tests/**/evm.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:tx": "rm -rf build && jest --testMatch '**/tests/multichain**/fulltx*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
+        "test:solana": "rm -rf build && jest --testMatch '**/tests/multichain**/solana.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:demoswork": "rm -rf build && jest --testMatch '**/tests/**/demoswork*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:identities": "rm -rf build && jest --testMatch '**/tests/**/identities.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:identities:pqc": "rm -rf build && jest --testMatch '**/tests/**/identities.pqc.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
@@ -94,6 +96,7 @@
     "dependencies": {
         "@aptos-labs/ts-sdk": "^1.39.0",
         "@bitcoinerlab/secp256k1": "^1.2.0",
+        "@coral-xyz/anchor": "^0.32.1",
         "@cosmjs/proto-signing": "^0.32.4",
         "@cosmjs/stargate": "^0.32.4",
         "snarkjs": "^0.7.5",
