@@ -65,7 +65,8 @@
     },
     "scripts": {
         "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",
-        "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src && npm run build:copy-wasm",
+        "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src && npm run build:fix-esm && npm run build:copy-wasm",
+        "build:fix-esm": "python3 scripts/fix-esm-imports.py build",
         "build:copy-wasm": "mkdir -p build/tlsnotary/wasm && cp node_modules/tlsn-js/build/*.wasm build/tlsnotary/wasm/ && cp node_modules/tlsn-js/build/*.js build/tlsnotary/wasm/ && cp -r node_modules/tlsn-js/build/snippets build/tlsnotary/wasm/",
         "typedoc": "typedoc",
         "test": "jest",
