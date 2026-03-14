@@ -464,6 +464,47 @@ export type TLSNIdentityPayload =
     | TLSNIdentityAssignPayload
     | TLSNIdentityRemovePayload
 
+// SECTION ZK Identities
+export interface IdentityCommitmentPayload {
+    commitment_hash: string
+    provider: string
+    timestamp: number
+}
+
+export interface Groth16Proof {
+    pi_a: string[]
+    pi_b: string[][]
+    pi_c: string[]
+    protocol: string
+    curve?: string
+}
+
+export interface IdentityAttestationPayload {
+    nullifier_hash: string
+    merkle_root: string
+    proof: Groth16Proof
+    public_signals: string[]
+    provider: string
+}
+
+export interface BaseZkIdentityPayload {
+    context: "zk"
+}
+
+export interface ZkCommitmentAddPayload extends BaseZkIdentityPayload {
+    method: "zk_commitmentadd"
+    payload: IdentityCommitmentPayload[]
+}
+
+export interface ZkAttestationAddPayload extends BaseZkIdentityPayload {
+    method: "zk_attestationadd"
+    payload: IdentityAttestationPayload[]
+}
+
+export type ZkIdentityPayload =
+    | ZkCommitmentAddPayload
+    | ZkAttestationAddPayload
+
 // SECTION Final payload type
 export type IdentityPayload =
     | XmIdentityPayload
@@ -474,6 +515,7 @@ export type IdentityPayload =
     | HumanPassportIdentityTxPayload
     | EthosIdentityPayload
     | TLSNIdentityPayload
+    | ZkIdentityPayload
 export interface UserPoints {
     userId: string
     referralCode: string

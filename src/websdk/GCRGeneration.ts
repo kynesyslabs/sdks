@@ -7,6 +7,8 @@ import {
 } from "@/types/blockchain/GCREdit"
 import {
     IdentityPayload,
+    IdentityAttestationPayload,
+    IdentityCommitmentPayload,
     InferFromSignaturePayload,
     TelegramSignedAttestation,
     Web2CoreTargetIdentityPayload,
@@ -290,14 +292,13 @@ export class HandleIdentityOperations {
         const identityPayloadData: ["identity", IdentityPayload] = tx.content
             .data as ["identity", IdentityPayload]
         const identityPayload: IdentityPayload = identityPayloadData[1]
+        const operation = this.getIdentityOperation(identityPayload.method)
 
         // INFO: Create the GCR edit skeleton
         const edit: GCREditIdentity = {
             account: tx.content.from_ed25519_address,
             type: "identity",
-            operation: identityPayload.method.endsWith("assign")
-                ? "add"
-                : "remove",
+            operation,
             txhash: tx.hash,
             isRollback: false,
             context: identityPayload.context,
@@ -421,6 +422,25 @@ export class HandleIdentityOperations {
                 break
             }
 
+            case "zk_commitmentadd": {
+                edit.data = (
+                    identityPayload.payload as IdentityCommitmentPayload[]
+                ).map(payload => ({
+                    ...payload,
+                    timestamp: payload.timestamp ?? tx.content.timestamp,
+                }))
+                break
+            }
+
+            case "zk_attestationadd": {
+                edit.data = (
+                    identityPayload.payload as IdentityAttestationPayload[]
+                ).map(payload => ({
+                    ...payload,
+                }))
+                break
+            }
+
             case "xm_identity_remove":
             case "web2_identity_remove":
             case "pqc_identity_remove":
@@ -446,6 +466,40 @@ export class HandleIdentityOperations {
         edits.push(edit)
 
         return edits
+    }
+
+    private static getIdentityOperation(
+        method: IdentityPayload["method"],
+    ): GCREditIdentity["operation"] {
+        switch (method) {
+            case "zk_commitmentadd":
+            case "zk_attestationadd":
+                return method
+            case "xm_identity_assign":
+            case "web2_identity_assign":
+            case "pqc_identity_assign":
+            case "ud_identity_assign":
+            case "nomis_identity_assign":
+            case "humanpassport_identity_assign":
+            case "ethos_identity_assign":
+            case "tlsn_identity_assign":
+                return "add"
+            case "xm_identity_remove":
+            case "web2_identity_remove":
+            case "pqc_identity_remove":
+            case "ud_identity_remove":
+            case "nomis_identity_remove":
+            case "humanpassport_identity_remove":
+            case "ethos_identity_remove":
+            case "tlsn_identity_remove":
+                return "remove"
+            default: {
+                const _exhaustiveCheck: never = method
+                throw new Error(
+                    `Unknown identity operation: ${_exhaustiveCheck as string}`,
+                )
+            }
+        }
     }
 }
 

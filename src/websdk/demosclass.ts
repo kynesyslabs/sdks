@@ -828,12 +828,21 @@ export class Demos {
      * @param address - The address
      */
     async getAddressNonce(address: string): Promise<number> {
-        const nonce = await this.nodeCall("getAddressNonce", {
+        const nonceResponse = await this.nodeCall("getAddressNonce", {
             address,
         })
 
-        if (nonce) {
-            return nonce as number
+        const nonceValue = nonceResponse?.response
+
+        if (typeof nonceValue === "number" && Number.isFinite(nonceValue)) {
+            return nonceValue
+        }
+
+        if (typeof nonceValue === "string") {
+            const parsed = Number.parseInt(nonceValue, 10)
+            if (Number.isFinite(parsed)) {
+                return parsed
+            }
         }
 
         return 0

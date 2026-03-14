@@ -2,6 +2,8 @@
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
 import {
+    IdentityAttestationPayload,
+    IdentityCommitmentPayload,
     PqcIdentityRemovePayload,
     UDIdentityPayload,
     XMCoreTargetIdentityPayload,
@@ -103,14 +105,16 @@ export interface PQCIdentityGCREditData {
 }
 
 export type UdGCRData = UDIdentityPayload
+export type ZkCommitmentGCRData = IdentityCommitmentPayload
+export type ZkAttestationGCRData = IdentityAttestationPayload
 
 
 export interface GCREditIdentity {
     type: "identity"
     isRollback: boolean
     account: string
-    context: "xm" | "web2" | "pqc" | "nomis" | "ud" | "humanpassport" | "ethos" | "tlsn"
-    operation: "add" | "remove"
+    context: "xm" | "web2" | "pqc" | "nomis" | "ud" | "humanpassport" | "ethos" | "tlsn" | "zk"
+    operation: "add" | "remove" | "zk_commitmentadd" | "zk_attestationadd"
     data:
     | Web2GCRData // web2 add or remove identity
     | Web2TLSNGCRData // tlsn add identity
@@ -124,6 +128,8 @@ export interface GCREditIdentity {
     | HumanPassportIdentityData // humanpassport add identity
     | { address: string } // humanpassport remove identity
     | EthosWalletIdentity // ethos add/remove identity
+    | ZkCommitmentGCRData[] // zk commitment add identity
+    | ZkAttestationGCRData[] // zk attestation add identity
     txhash: string
     referralCode?: string
 }
