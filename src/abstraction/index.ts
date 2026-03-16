@@ -35,7 +35,9 @@ import {
     EthosWalletIdentity,
     EthosIdentityRemoveData,
     EthosIdentityAssignPayload,
-    EthosIdentityRemovePayload
+    EthosIdentityRemovePayload,
+    IdentityAttestationPayload,
+    IdentityCommitmentPayload,
 } from "@/types/abstraction"
 
 export {
@@ -68,5 +70,7 @@ export {
     EthosWalletIdentity,
     EthosIdentityRemoveData,
     EthosIdentityAssignPayload,
-    EthosIdentityRemovePayload
+    EthosIdentityRemovePayload,
+    IdentityAttestationPayload,
+    IdentityCommitmentPayload,
 }
