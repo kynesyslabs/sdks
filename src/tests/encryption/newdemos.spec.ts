@@ -4,6 +4,84 @@ import { Demos, DemosWebAuth } from "@/websdk"
 import * as bip39 from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english.js"
 
+// REVIEW: Regression tests for multi-instance wallet identity isolation (myc #32, #33)
+describe("Multi-instance identity isolation", () => {
+    test("sequential Demos instances maintain distinct identities", async () => {
+        const demosA = new Demos()
+        const demosB = new Demos()
+        const mnemonicA = demosA.newMnemonic(256)
+        const mnemonicB = demosB.newMnemonic(256)
+
+        await demosA.connectWallet(mnemonicA)
+        await demosB.connectWallet(mnemonicB)
+
+        const addrA = await demosA.getEd25519Address()
+        const addrB = await demosB.getEd25519Address()
+
+        expect(addrA).not.toBe(addrB)
+        // Re-probe A to ensure B didn't overwrite it
+        const addrA2 = await demosA.getEd25519Address()
+        expect(addrA2).toBe(addrA)
+    })
+
+    test("concurrent connectWallet preserves per-instance identity", async () => {
+        const demosA = new Demos()
+        const demosB = new Demos()
+        const mnemonicA = demosA.newMnemonic(256)
+        const mnemonicB = demosB.newMnemonic(256)
+
+        await Promise.all([
+            demosA.connectWallet(mnemonicA),
+            demosB.connectWallet(mnemonicB),
+        ])
+
+        const addrA = await demosA.getEd25519Address()
+        const addrB = await demosB.getEd25519Address()
+
+        expect(addrA).not.toBe(addrB)
+    })
+
+    test("signing uses per-instance keys, not shared state", async () => {
+        const demosA = new Demos()
+        const demosB = new Demos()
+        await demosA.connectWallet(demosA.newMnemonic(256))
+        await demosB.connectWallet(demosB.newMnemonic(256))
+
+        const sigA = await demosA.signMessage("test")
+        const sigB = await demosB.signMessage("test")
+
+        // Same message, different keys → different signatures
+        expect(sigA.data).not.toBe(sigB.data)
+    })
+
+    test("6 concurrent instances all have unique identities", async () => {
+        const instances = Array.from({ length: 6 }, () => new Demos())
+
+        await Promise.all(
+            instances.map(d => d.connectWallet(d.newMnemonic(256)))
+        )
+
+        const addresses = await Promise.all(
+            instances.map(d => d.getEd25519Address())
+        )
+
+        const unique = new Set(addresses)
+        expect(unique.size).toBe(6)
+    })
+
+    test("disconnect cleans up crypto instance from multiton map", async () => {
+        const { UnifiedCrypto } = await import("@/encryption/unifiedCrypto")
+        const beforeCount = UnifiedCrypto.getInstanceIds().length
+
+        const demos = new Demos()
+        await demos.connectWallet(demos.newMnemonic(256))
+        expect(UnifiedCrypto.getInstanceIds().length).toBe(beforeCount + 1)
+
+        demos.disconnect()
+        expect(UnifiedCrypto.getInstanceIds().length).toBe(beforeCount)
+    })
+})
+
 describe("New Demos", () => {
     test.skip("Send Native tokens", async () => {
         // const rpc = "https://node2.demos.sh"

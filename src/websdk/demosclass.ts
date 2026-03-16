@@ -49,6 +49,8 @@ export class Demos {
     algorithm: SigningAlgorithm = "ed25519"
     crypto: UnifiedCrypto = null
     private static _instance: Demos | null = null
+    // REVIEW: Unique instance ID for per-instance crypto isolation (fixes multi-instance identity bleed)
+    private readonly _cryptoInstanceId = crypto.randomUUID()
 
     /** The RPC URL of the demos node */
     private rpc_url: string = null
@@ -85,7 +87,7 @@ export class Demos {
     }
 
     constructor() {
-        this.crypto = UnifiedCrypto.getInstance()
+        this.crypto = UnifiedCrypto.getInstance(this._cryptoInstanceId)
     }
 
     static get instance() {
@@ -855,9 +857,10 @@ export class Demos {
         // remove rpc_url and wallet connection
         this.rpc_url = null
         this.dual_sign = false
-        // this.keypair = null
 
         this.connected = false
+        // Clean up the per-instance crypto from the multiton map
+        UnifiedCrypto.removeInstance(this._cryptoInstanceId)
         this.crypto = null
         this.algorithm = "ed25519"
     }
