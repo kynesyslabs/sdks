@@ -25,7 +25,7 @@ import { CrosschainTransaction } from './CrosschainTransaction'
 import { NativeTransaction } from './NativeTransaction'
 import { DemosworkTransaction } from './DemosworkTransaction'
 import { IdentityTransaction } from './IdentityTransaction'
-import { InstantMessagingTransaction } from './InstantMessagingTransaction'
+import { InstantMessagingTransaction, L2PSInstantMessagingTransaction } from './InstantMessagingTransaction'
 import { NativeBridgeTransaction } from './NativeBridgeTransaction'
 import { StorageTransaction } from './StorageTransaction'
 import { StorageProgramTransaction } from './StorageProgramTransaction'
@@ -47,6 +47,7 @@ export type SpecificTransaction =
     | DemosworkTransaction
     | IdentityTransaction
     | InstantMessagingTransaction
+    | L2PSInstantMessagingTransaction
     | NativeBridgeTransaction
     | StorageTransaction
     | StorageProgramTransaction
