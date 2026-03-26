@@ -55,9 +55,22 @@ interface OutgoingFrame {
     requestId?: string
 }
 
+/** Discriminated union of all server→client payloads */
+type ServerPayload =
+    | RegisteredResponse["payload"]
+    | IncomingMessage["payload"]
+    | MessageSentResponse["payload"]
+    | MessageQueuedResponse["payload"]
+    | HistoryResponse["payload"]
+    | DiscoverResponse["payload"]
+    | PublicKeyResponse["payload"]
+    | PeerJoinedNotification["payload"]
+    | PeerLeftNotification["payload"]
+    | ErrorResponse["payload"]
+
 interface IncomingFrame {
     type: ServerMessageType
-    payload: any
+    payload: ServerPayload
     timestamp: number
     requestId?: string
 }
@@ -76,9 +89,10 @@ export class L2PSMessagingPeer {
     private connectionStateHandlers: Set<L2PSConnectionStateHandler> = new Set()
 
     // Pending request-response waiters
+    // REVIEW: resolve accepts ServerPayload (widened from generic T) because the map is homogeneous
     private pendingResponses: Map<
         string,
-        { resolve: (value: any) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }
+        { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout; _meta?: PendingMeta }
     > = new Map()
 
     // State
@@ -361,7 +375,10 @@ export class L2PSMessagingPeer {
                     this.flushQueue()
                     this.isReconnecting = false
                 } catch (err) {
-                    // Re-registration failed, close and retry
+                    // Re-registration failed — notify error handlers and retry
+                    this.errorHandlers.forEach(h =>
+                        h({ code: "INTERNAL_ERROR" as ErrorCode, message: "Re-registration failed after reconnect", details: String(err) }),
+                    )
                     this._isConnected = false
                     this._isRegistered = false
                     this.notifyConnectionState("disconnected")
@@ -391,7 +408,7 @@ export class L2PSMessagingPeer {
 
         this.ws.onerror = (event) => {
             this.errorHandlers.forEach(h =>
-                h({ code: "INTERNAL_ERROR" as ErrorCode, message: "WebSocket error", details: String(event) }),
+                h({ code: "INTERNAL_ERROR" as ErrorCode, message: "WebSocket error", details: event instanceof Error ? event.message : "unknown" }),
             )
         }
 
@@ -460,7 +477,7 @@ export class L2PSMessagingPeer {
         // First, check if any pending response matches by requestId
         if (frame.requestId && this.pendingResponses.has(frame.requestId)) {
             const pending = this.pendingResponses.get(frame.requestId)!
-            const meta = (pending as any)._meta as PendingMeta | undefined
+            const meta = pending._meta
             if (meta && meta.types.includes(frame.type)) {
                 clearTimeout(pending.timer)
                 this.pendingResponses.delete(frame.requestId)
@@ -474,26 +491,34 @@ export class L2PSMessagingPeer {
             const pending = this.pendingResponses.get(frame.requestId)!
             clearTimeout(pending.timer)
             this.pendingResponses.delete(frame.requestId)
-            pending.reject(new Error(frame.payload?.message || "Server error"))
+            pending.reject(new Error((frame.payload as ErrorResponse["payload"])?.message || "Server error"))
             return
         }
 
         // Then dispatch to event handlers
         switch (frame.type) {
-            case "message":
-                this.messageHandlers.forEach(h => h(frame.payload))
+            case "message": {
+                const p = frame.payload as IncomingMessage["payload"]
+                this.messageHandlers.forEach(h => h(p))
                 break
-            case "peer_joined":
-                this.onlinePeers.add(frame.payload.publicKey)
-                this.peerJoinedHandlers.forEach(h => h(frame.payload.publicKey))
+            }
+            case "peer_joined": {
+                const p = frame.payload as PeerJoinedNotification["payload"]
+                this.onlinePeers.add(p.publicKey)
+                this.peerJoinedHandlers.forEach(h => h(p.publicKey))
                 break
-            case "peer_left":
-                this.onlinePeers.delete(frame.payload.publicKey)
-                this.peerLeftHandlers.forEach(h => h(frame.payload.publicKey))
+            }
+            case "peer_left": {
+                const p = frame.payload as PeerLeftNotification["payload"]
+                this.onlinePeers.delete(p.publicKey)
+                this.peerLeftHandlers.forEach(h => h(p.publicKey))
                 break
-            case "error":
-                this.errorHandlers.forEach(h => h(frame.payload))
+            }
+            case "error": {
+                const p = frame.payload as ErrorResponse["payload"]
+                this.errorHandlers.forEach(h => h(p))
                 break
+            }
             default:
                 // message_sent, message_queued etc. without a waiter — ignore
                 break
@@ -513,10 +538,12 @@ export class L2PSMessagingPeer {
                 reject(new Error(`Timeout waiting for ${expectedTypes.join("|")} (${timeoutMs}ms)`))
             }, timeoutMs)
 
-            const entry = { resolve, reject, timer }
-            // Attach metadata for matching
-            ;(entry as any)._meta = { types: expectedTypes } as PendingMeta
-            this.pendingResponses.set(requestId, entry)
+            this.pendingResponses.set(requestId, {
+                resolve: resolve as (value: unknown) => void,
+                reject,
+                timer,
+                _meta: { types: expectedTypes },
+            })
         })
     }
 
@@ -557,7 +584,7 @@ export class L2PSMessagingPeer {
     }
 
     private generateRequestId(): string {
-        return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        return `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
     }
 }
 
