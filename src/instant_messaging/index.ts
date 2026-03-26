@@ -1,3 +1,16 @@
+// Legacy signaling server client (port 3005)
+// For L2PS messaging, use L2PSMessagingPeer instead
+
+export { L2PSMessagingPeer } from "./L2PSMessagingPeer"
+export type {
+    L2PSMessagingConfig,
+    L2PSMessageHandler,
+    L2PSErrorHandler,
+    L2PSPeerHandler,
+    L2PSConnectionStateHandler,
+} from "./L2PSMessagingPeer"
+export * from "./l2ps_types"
+
 // FIXME Integrate with l2ps.ts
 
 /**

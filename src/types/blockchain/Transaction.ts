@@ -8,7 +8,7 @@ import { GCREdit } from "./GCREdit"
 import { INativePayload } from "../native"
 // import { SubnetPayload } from "../../l2ps" // Obsolete - using new L2PS implementation
 import { IdentityPayload } from "../abstraction"
-import { InstantMessagingPayload } from "../instantMessaging"
+import { InstantMessagingPayload, L2PSInstantMessagingPayload } from "../instantMessaging"
 import { BridgeOperationCompiled, NativeBridgeTxPayload } from "@/bridge/nativeBridgeTypes"
 import { L2PSEncryptedPayload } from "@/l2ps"
 import { StoragePayload } from "./TransactionSubtypes/StorageTransaction"
@@ -38,6 +38,7 @@ export type TransactionContentData =
     | ["l2psEncryptedTx", L2PSEncryptedPayload]
     | ["identity", IdentityPayload]
     | ["instantMessaging", InstantMessagingPayload]
+    | ["l2psInstantMessaging", L2PSInstantMessagingPayload]
     | ["nativeBridge", NativeBridgeTxPayload]
     | ["storage", StoragePayload]
     | ["storageProgram", StorageProgramPayload]
@@ -63,6 +64,7 @@ export interface TransactionContent {
     | "NODE_ONLINE"
     | "identity"
     | "instantMessaging"
+    | "l2psInstantMessaging"
     | "nativeBridge"
     | "l2psEncryptedTx"
     | "storage"
