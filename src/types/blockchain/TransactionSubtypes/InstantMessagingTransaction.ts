@@ -12,8 +12,8 @@ export interface InstantMessagingTransaction extends Omit<Transaction, 'content'
 
 /** L2PS-backed instant messaging transaction */
 export type L2PSInstantMessagingTransactionContent = Omit<TransactionContent, 'type' | 'data'> & {
-    type: 'instantMessaging'
-    data: ['instantMessaging', L2PSInstantMessagingPayload]
+    type: 'l2psInstantMessaging'
+    data: ['l2psInstantMessaging', L2PSInstantMessagingPayload]
 }
 
 export interface L2PSInstantMessagingTransaction extends Omit<Transaction, 'content'> {

@@ -67,6 +67,8 @@ export interface ProtocolFrame<T extends string = string> {
     type: T
     payload: Record<string, unknown>
     timestamp: number
+    /** Request correlation ID for request/response flows */
+    requestId?: string
 }
 
 // ─── Client → Server Messages ────────────────────────────────────

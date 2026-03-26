@@ -38,7 +38,7 @@ export type TransactionContentData =
     | ["l2psEncryptedTx", L2PSEncryptedPayload]
     | ["identity", IdentityPayload]
     | ["instantMessaging", InstantMessagingPayload]
-    | ["instantMessaging", L2PSInstantMessagingPayload]
+    | ["l2psInstantMessaging", L2PSInstantMessagingPayload]
     | ["nativeBridge", NativeBridgeTxPayload]
     | ["storage", StoragePayload]
     | ["storageProgram", StorageProgramPayload]
@@ -64,6 +64,7 @@ export interface TransactionContent {
     | "NODE_ONLINE"
     | "identity"
     | "instantMessaging"
+    | "l2psInstantMessaging"
     | "nativeBridge"
     | "l2psEncryptedTx"
     | "storage"

@@ -52,12 +52,14 @@ interface OutgoingFrame {
     type: ClientMessageType
     payload: Record<string, unknown>
     timestamp: number
+    requestId?: string
 }
 
 interface IncomingFrame {
     type: ServerMessageType
     payload: any
     timestamp: number
+    requestId?: string
 }
 
 // ─── Client Class ────────────────────────────────────────────────
@@ -91,6 +93,7 @@ export class L2PSMessagingPeer {
     private baseReconnectDelay = 1000
     private reconnectTimeout: NodeJS.Timeout | null = null
     private shouldReconnect = true
+    private isReconnecting = false
 
     constructor(config: L2PSMessagingConfig) {
         this.config = config
@@ -118,7 +121,16 @@ export class L2PSMessagingPeer {
      */
     async connect(): Promise<RegisteredResponse["payload"]> {
         return new Promise((resolve, reject) => {
+            let checkOpen: NodeJS.Timeout | null = null
+
             const timeout = setTimeout(() => {
+                if (checkOpen) {
+                    clearInterval(checkOpen)
+                }
+                this.shouldReconnect = false
+                if (this.ws) {
+                    this.ws.close()
+                }
                 reject(new Error("Connection timeout (10s)"))
             }, 10000)
 
@@ -126,9 +138,9 @@ export class L2PSMessagingPeer {
             this.connectWebSocket()
 
             // Wait for WS open, then register
-            const checkOpen = setInterval(() => {
+            checkOpen = setInterval(() => {
                 if (this._isConnected) {
-                    clearInterval(checkOpen)
+                    clearInterval(checkOpen!)
                     this.register()
                         .then(response => {
                             clearTimeout(timeout)
@@ -183,19 +195,19 @@ export class L2PSMessagingPeer {
     ): Promise<MessageSentResponse["payload"] | MessageQueuedResponse["payload"]> {
         this.ensureRegistered()
 
+        const requestId = this.generateRequestId()
         this.sendFrame({
             type: "send",
             payload: { to, encrypted, messageHash },
             timestamp: Date.now(),
+            requestId,
         })
 
         // Wait for either message_sent or message_queued
         return this.waitForResponse<MessageSentResponse["payload"] | MessageQueuedResponse["payload"]>(
-            `send:${messageHash}`,
+            requestId,
             ["message_sent", "message_queued"],
             15000,
-            (frame: IncomingFrame) =>
-                frame.payload?.messageHash === messageHash,
         )
     }
 
@@ -215,6 +227,7 @@ export class L2PSMessagingPeer {
         const proofString = `history:${peerKey}:${timestamp}`
         const proof = await this.config.signFn(proofString)
 
+        const requestId = this.generateRequestId()
         this.sendFrame({
             type: "history",
             payload: {
@@ -224,10 +237,11 @@ export class L2PSMessagingPeer {
                 proof,
             },
             timestamp,
+            requestId,
         })
 
         return this.waitForResponse<HistoryResponse["payload"]>(
-            `history:${peerKey}`,
+            requestId,
             ["history_response"],
             10000,
         )
@@ -240,14 +254,16 @@ export class L2PSMessagingPeer {
     async discover(): Promise<string[]> {
         this.ensureRegistered()
 
+        const requestId = this.generateRequestId()
         this.sendFrame({
             type: "discover",
             payload: {},
             timestamp: Date.now(),
+            requestId,
         })
 
         const response = await this.waitForResponse<DiscoverResponse["payload"]>(
-            "discover",
+            requestId,
             ["discover_response"],
             10000,
         )
@@ -264,17 +280,18 @@ export class L2PSMessagingPeer {
     async requestPublicKey(targetId: string): Promise<string | null> {
         this.ensureRegistered()
 
+        const requestId = this.generateRequestId()
         this.sendFrame({
             type: "request_public_key",
             payload: { targetId },
             timestamp: Date.now(),
+            requestId,
         })
 
         const response = await this.waitForResponse<PublicKeyResponse["payload"]>(
-            `pubkey:${targetId}`,
+            requestId,
             ["public_key_response"],
             10000,
-            (frame: IncomingFrame) => frame.payload?.targetId === targetId,
         )
 
         return response.publicKey
@@ -332,11 +349,34 @@ export class L2PSMessagingPeer {
         this.ws = new WebSocket(this.config.serverUrl)
         this.notifyConnectionState("reconnecting")
 
-        this.ws.onopen = () => {
+        this.ws.onopen = async () => {
             this._isConnected = true
             this.reconnectAttempts = 0
-            this.notifyConnectionState("connected")
-            this.flushQueue()
+
+            // Attempt re-registration if this is a reconnection (not initial connection)
+            if (this.isReconnecting) {
+                try {
+                    await this.register()
+                    this.notifyConnectionState("connected")
+                    this.flushQueue()
+                    this.isReconnecting = false
+                } catch (err) {
+                    // Re-registration failed, close and retry
+                    this._isConnected = false
+                    this._isRegistered = false
+                    this.notifyConnectionState("disconnected")
+                    if (this.ws) {
+                        this.ws.close()
+                    }
+                    if (this.shouldReconnect) {
+                        this.attemptReconnect()
+                    }
+                }
+            } else {
+                // Initial connection, registration will be handled by connect()
+                this.notifyConnectionState("connected")
+                this.flushQueue()
+            }
         }
 
         this.ws.onclose = () => {
@@ -372,6 +412,7 @@ export class L2PSMessagingPeer {
             return
         }
 
+        this.isReconnecting = true
         const delay = Math.min(
             this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
             30000,
@@ -390,6 +431,7 @@ export class L2PSMessagingPeer {
         const proofString = `register:${this.config.publicKey}:${timestamp}`
         const proof = await this.config.signFn(proofString)
 
+        const requestId = this.generateRequestId()
         this.sendFrame({
             type: "register",
             payload: {
@@ -398,10 +440,11 @@ export class L2PSMessagingPeer {
                 proof,
             },
             timestamp,
+            requestId,
         })
 
         const response = await this.waitForResponse<RegisteredResponse["payload"]>(
-            "register",
+            requestId,
             ["registered"],
             10000,
         )
@@ -414,17 +457,25 @@ export class L2PSMessagingPeer {
     // ─── Private: Frame Handling ─────────────────────────────────
 
     private handleFrame(frame: IncomingFrame): void {
-        // First, check if any pending response matches
-        for (const [key, pending] of this.pendingResponses) {
+        // First, check if any pending response matches by requestId
+        if (frame.requestId && this.pendingResponses.has(frame.requestId)) {
+            const pending = this.pendingResponses.get(frame.requestId)!
             const meta = (pending as any)._meta as PendingMeta | undefined
             if (meta && meta.types.includes(frame.type)) {
-                if (!meta.filterFn || meta.filterFn(frame)) {
-                    clearTimeout(pending.timer)
-                    this.pendingResponses.delete(key)
-                    pending.resolve(frame.payload)
-                    return
-                }
+                clearTimeout(pending.timer)
+                this.pendingResponses.delete(frame.requestId)
+                pending.resolve(frame.payload)
+                return
             }
+        }
+
+        // Handle error frames with requestId
+        if (frame.type === "error" && frame.requestId && this.pendingResponses.has(frame.requestId)) {
+            const pending = this.pendingResponses.get(frame.requestId)!
+            clearTimeout(pending.timer)
+            this.pendingResponses.delete(frame.requestId)
+            pending.reject(new Error(frame.payload?.message || "Server error"))
+            return
         }
 
         // Then dispatch to event handlers
@@ -452,21 +503,20 @@ export class L2PSMessagingPeer {
     // ─── Private: Request-Response ───────────────────────────────
 
     private waitForResponse<T>(
-        key: string,
+        requestId: string,
         expectedTypes: ServerMessageType[],
         timeoutMs: number,
-        filterFn?: (frame: IncomingFrame) => boolean,
     ): Promise<T> {
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
-                this.pendingResponses.delete(key)
+                this.pendingResponses.delete(requestId)
                 reject(new Error(`Timeout waiting for ${expectedTypes.join("|")} (${timeoutMs}ms)`))
             }, timeoutMs)
 
             const entry = { resolve, reject, timer }
             // Attach metadata for matching
-            ;(entry as any)._meta = { types: expectedTypes, filterFn } as PendingMeta
-            this.pendingResponses.set(key, entry)
+            ;(entry as any)._meta = { types: expectedTypes } as PendingMeta
+            this.pendingResponses.set(requestId, entry)
         })
     }
 
@@ -505,10 +555,13 @@ export class L2PSMessagingPeer {
     private notifyConnectionState(state: "connected" | "disconnected" | "reconnecting"): void {
         this.connectionStateHandlers.forEach(h => h(state))
     }
+
+    private generateRequestId(): string {
+        return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    }
 }
 
 /** Internal metadata attached to pending response entries */
 interface PendingMeta {
     types: ServerMessageType[]
-    filterFn?: (frame: IncomingFrame) => boolean
 }
