@@ -377,7 +377,7 @@ export class L2PSMessagingPeer {
                 } catch (err) {
                     // Re-registration failed — notify error handlers and retry
                     this.errorHandlers.forEach(h =>
-                        h({ code: "INTERNAL_ERROR" as ErrorCode, message: "Re-registration failed after reconnect", details: String(err) }),
+                        h({ code: "INTERNAL_ERROR" as ErrorCode, message: "Re-registration failed after reconnect", details: err instanceof Error ? err.message : "unknown" }),
                     )
                     this._isConnected = false
                     this._isRegistered = false
