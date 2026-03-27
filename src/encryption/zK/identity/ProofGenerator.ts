@@ -4,13 +4,181 @@
  * REVIEW: Phase 9 - SDK Integration
  * REVIEW: Phase 10.1 - Production Implementation (Real snarkjs proof generation)
  * REVIEW: Phase 10.4 - CDN Integration (Production-ready with CDN URLs)
+ * REVIEW: Phase 10.5 - Hybrid Environment Detection (Auto-detect service worker context)
  *
  * Generates Groth16 ZK-SNARK proofs for identity attestations using snarkjs.
  * Circuit artifacts (WASM, proving key, verification key) are loaded from CDN.
+ *
+ * Environment Compatibility:
+ * - Automatically detects Chrome MV3 service workers and uses single-threaded mode
+ * - Uses parallel Web Workers in standard browser/Node.js contexts for better performance
+ * - Can be manually overridden via ProofGeneratorConfig
  */
 
 // REVIEW: Phase 10.1 - Production cryptographic implementation
-import * as snarkjs from '@cryptkeeperzk/snarkjs'
+import * as snarkjs from 'snarkjs'
+
+// Type augmentation for snarkjs - @types/snarkjs@0.7.9 doesn't include proverOptions for groth16.prove
+declare module 'snarkjs' {
+    namespace groth16 {
+        interface ProverOptions {
+            singleThread?: boolean
+        }
+        interface Groth16Proof {
+            pi_a: string[]
+            pi_b: string[][]
+            pi_c: string[]
+            protocol: string
+            curve: string
+        }
+        // groth16.prove accepts proverOptions (including singleThread)
+        function prove(
+            zkeyFileName: string | Uint8Array,
+            wtnsFileName: Uint8Array | { type: string; data: Uint8Array },
+            logger?: object,
+            proverOptions?: ProverOptions
+        ): Promise<{ proof: Groth16Proof; publicSignals: string[] }>
+    }
+    namespace wtns {
+        // Calculate witness from circuit inputs
+        function calculate(
+            input: object,
+            wasmFile: string | Uint8Array,
+            wtnsFileName: { type: string; data?: Uint8Array }
+        ): Promise<{ type: string; data: Uint8Array }>
+    }
+}
+
+// Narrow interface for environment detection globals
+interface RestrictedEnvGlobals {
+    ServiceWorkerGlobalScope?: { new(): unknown }
+    caches?: unknown
+    window?: unknown
+    document?: unknown
+    HTMLRewriter?: unknown
+    Bun?: unknown
+}
+
+/**
+ * Detect if running in a restricted environment that doesn't support Web Workers
+ *
+ * Restricted environments include:
+ * - Chrome MV3 Service Workers (cannot spawn nested Web Workers)
+ * - Cloudflare Workers
+ * - Bun runtime (limited Worker support)
+ * - SES (Secure EcmaScript) sandboxes
+ * - Runtimes without Worker constructor
+ *
+ * @returns true if Web Workers are not available or unreliable
+ */
+function isRestrictedWorkerEnvironment(): boolean {
+    // Early check: if Worker constructor doesn't exist, it's restricted
+    if (typeof Worker === 'undefined') {
+        return true
+    }
+
+    const g = globalThis as typeof globalThis & RestrictedEnvGlobals
+
+    // Check for Service Worker context (Chrome MV3 extensions)
+    if ('ServiceWorkerGlobalScope' in g &&
+        typeof g.ServiceWorkerGlobalScope !== 'undefined' &&
+        typeof self !== 'undefined' &&
+        self instanceof g.ServiceWorkerGlobalScope) {
+        return true
+    }
+
+    // Check for Cloudflare Workers (no window, has caches API, has HTMLRewriter)
+    if ('caches' in g && typeof g.caches !== 'undefined' &&
+        !('window' in g) && !('document' in g)) {
+        // Could be Cloudflare Worker or Service Worker - check for CF-specific globals
+        if ('HTMLRewriter' in g && typeof g.HTMLRewriter !== 'undefined') {
+            return true
+        }
+    }
+
+    // Check if Worker constructor is a stub/polyfill
+    // A valid Worker implementation should have standard methods on its prototype
+    const workerProto = Worker.prototype
+    if (!workerProto || typeof workerProto.postMessage !== 'function' || typeof workerProto.terminate !== 'function') {
+        return true // Likely a stub Worker
+    }
+
+    // Check for Bun runtime (limited Worker support)
+    if ('Bun' in g && typeof g.Bun !== 'undefined') {
+        return true
+    }
+
+    // Default: assume Workers are available
+    return false
+}
+
+// REVIEW: Phase 10.5 - Global Configuration API (configure, getConfig, willUseSingleThread)
+
+/**
+ * Configuration options for proof generation
+ */
+export interface ProofGeneratorConfig {
+    /**
+     * Force single-threaded mode regardless of environment detection.
+     * Useful for debugging or when you know Workers won't work.
+     * @default undefined (auto-detect)
+     */
+    forceSingleThread?: boolean
+
+    /**
+     * Custom logger for proof generation progress
+     * @default undefined (no logging)
+     */
+    logger?: {
+        debug?: (msg: string) => void
+        info?: (msg: string) => void
+        warn?: (msg: string) => void
+        error?: (msg: string) => void
+    }
+}
+
+// Global configuration (can be set once for all proof operations)
+let globalConfig: ProofGeneratorConfig = {}
+
+/**
+ * Configure the ProofGenerator globally
+ *
+ * @param config - Configuration options
+ *
+ * @example
+ * ```typescript
+ * // Force single-threaded mode globally
+ * ProofGenerator.configure({ forceSingleThread: true })
+ *
+ * // Add logging
+ * ProofGenerator.configure({
+ *     logger: { info: console.log, error: console.error }
+ * })
+ * ```
+ */
+export function configure(config: ProofGeneratorConfig): void {
+    globalConfig = { ...globalConfig, ...config }
+}
+
+/**
+ * Get current configuration
+ */
+export function getConfig(): ProofGeneratorConfig {
+    return { ...globalConfig }
+}
+
+/**
+ * Check if proof generation will use single-threaded mode
+ *
+ * @returns true if single-threaded mode will be used
+ */
+export function willUseSingleThread(): boolean {
+    if (globalConfig.forceSingleThread !== undefined) {
+        return globalConfig.forceSingleThread
+    }
+
+    return isRestrictedWorkerEnvironment()
+}
 
 export interface ZKProof {
     pi_a: string[]
@@ -82,11 +250,28 @@ export async function generateIdentityProof(
     const wasmPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle.wasm'
     const zkeyPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle_final.zkey'
 
+    // REVIEW: Phase 10.5 - Hybrid environment detection
+    // Automatically use singleThread in restricted environments (service workers, etc.)
+    // Use parallel workers in standard browser/Node.js for better performance
+    const useSingleThread = willUseSingleThread()
+
+    if (globalConfig.logger?.info) {
+        globalConfig.logger.info(
+            `[ProofGenerator] Using ${useSingleThread ? 'single-threaded' : 'parallel'} mode`
+        )
+    }
+
     // REVIEW: Phase 10.1 - Production-ready proof generation using snarkjs
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-        circuitInputs,
-        wasmPath,
+    // Step 1: Calculate witness from circuit inputs
+    const wtnsBuffer = { type: 'mem' as const, data: undefined as Uint8Array | undefined }
+    await snarkjs.wtns.calculate(circuitInputs, wasmPath, wtnsBuffer)
+
+    // Step 2: Generate proof using groth16.prove (supports singleThread option)
+    const { proof, publicSignals } = await snarkjs.groth16.prove(
         zkeyPath,
+        wtnsBuffer as { type: string; data: Uint8Array },
+        globalConfig.logger,
+        useSingleThread ? { singleThread: true } : undefined, // proverOptions - auto-detect environment
     )
 
     // Convert proof to our ZKProof format
@@ -146,6 +331,7 @@ export async function verifyProof(
             pi_b: proof.pi_b,
             pi_c: proof.pi_c,
             protocol: proof.protocol,
+            curve: 'bn128', // Standard curve for Groth16 proofs
         }
 
         return await snarkjs.groth16.verify(vkey, publicSignals, snarkjsProof)
