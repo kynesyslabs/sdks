@@ -3,8 +3,8 @@ import { Identities } from "@/abstraction"
 
 describe("Web2 Identities", () => {
     // const rpc = "http://node2.demos.sh:53560"
-    const rpc = "https://node2.demos.sh"
     // const rpc = "https://node2.demos.sh"
+    const rpc = "http://localhost:53550"
 
     const demos = new Demos()
     const identities = new Identities()
@@ -29,7 +29,7 @@ describe("Web2 Identities", () => {
         console.log(res)
     })
 
-    test.skip("Remove Twitter Identity", async () => {
+    test.only("Remove Twitter Identity", async () => {
         const payload = {
             context: "twitter",
             username: "cwilvxi",

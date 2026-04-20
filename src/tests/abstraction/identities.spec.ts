@@ -23,7 +23,8 @@ import { uint8ArrayToHex } from "@/encryption"
 
 describe.only("IDENTITIES V2", () => {
     // const rpc = "http://node2.demos.sh:53560"
-    const rpc = "https://node2.demos.sh"
+    // const rpc = "https://node2.demos.sh"
+    const rpc = "http://localhost:53550"
     let demos: Demos
 
     beforeAll(async () => {
@@ -53,7 +54,7 @@ describe.only("IDENTITIES V2", () => {
         expect(verified).toBe(true)
     })
 
-    test.only("EVM ADD IDENTITY v2", async () => {
+    test.skip("EVM ADD IDENTITY v2", async () => {
         const count = 1
 
         for (let i = 0; i < count; i++) {
@@ -61,7 +62,7 @@ describe.only("IDENTITIES V2", () => {
             const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
 
             const instance = await EVM.create(chainProviders.eth.mainnet)
-            await instance.connectWallet(demos.newMnemonic())
+            await instance.connectWallet(wallets.evm.privateKey)
 
             const signature = await instance.signMessage(ed25519_address)
             const verified = await instance.verifyMessage(
@@ -135,7 +136,7 @@ describe.only("IDENTITIES V2", () => {
         expect(res["result"]).toBe(200)
     })
 
-    test.skip("EVM REMOVE IDENTITY v2", async () => {
+    test.only("EVM REMOVE IDENTITY v2", async () => {
         const instance = await EVM.create()
         await instance.connectWallet(wallets.evm.privateKey)
 
@@ -143,7 +144,7 @@ describe.only("IDENTITIES V2", () => {
         const payload: XMCoreTargetIdentityPayload = {
             chain: "evm",
             isEVM: true,
-            subchain: "sepolia",
+            subchain: "mainnet",
             targetAddress: instance.getAddress(),
         }
 

@@ -9,6 +9,13 @@ import {
 } from "@/websdk"
 
 describe("DEMOS Transaction", () => {
+    const mnemonic = process.env.FUNDED_MNEMONIC
+
+    if (!mnemonic) {
+        console.error("FUNDED_MNEMONIC is not set")
+        process.exit(0)
+    }
+
     test("Classic XM Transaction", async () => {
         const evm = await EVM.create(chainProviders.eth.sepolia)
         await evm.connectWallet(wallets.evm.privateKey)
@@ -36,22 +43,23 @@ describe("DEMOS Transaction", () => {
             type: "pay",
         })
 
-        const rpc = "https://node2.demos.sh"
+        // const rpc = "https://node2.demos.sh"
+        const rpc = "http://localhost:53550"
 
         const demos = new Demos()
 
         await demos.connect(rpc)
-        await demos.connectWallet("polar scale globe beauty stock employ rail exercise goat into sample embark")
+        await demos.connectWallet(mnemonic)
 
         const tx = await prepareXMPayload(xmscript, demos)
         const validityData = await demos.confirm(tx)
         console.log("validityData", validityData)
 
         const res = await demos.broadcast(validityData)
-        console.log("res", res)
+        console.log("res", JSON.stringify(res, null, 2))
     })
 
-    test.only("XRPL Send tokens", async () => {
+    test.skip("XRPL Send tokens", async () => {
         // 1. Create XRPL SDK instance
         const sdk = await XRPL.create(chainProviders.xrpl.testnet)
         await sdk.connectWallet(wallets.xrpl.privateKey)
@@ -81,10 +89,13 @@ describe("DEMOS Transaction", () => {
 
         // 5. Connect to the DEMOS node
         await demos.connect(rpc)
-        await demos.connectWallet("polar scale globe beauty stock employ rail exercise goat into sample embark", {
-            algorithm: "falcon",
-            dual_sign: true,
-        })
+        await demos.connectWallet(
+            "polar scale globe beauty stock employ rail exercise goat into sample embark",
+            {
+                algorithm: "falcon",
+                dual_sign: true,
+            },
+        )
 
         // 6. Convert the XMScript to a DEMOS transaction
         const tx = await prepareXMPayload(xmscript, demos)

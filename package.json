@@ -80,6 +80,7 @@
         "test:identities:pqc": "rm -rf build && jest --testMatch '**/tests/**/identities.pqc.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:identities:web2": "rm -rf build && jest --testMatch '**/tests/**/identities.web2*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose --setupFiles dotenv/config",
         "test:identities:ud": "rm -rf build && jest --testMatch '**/tests/**/identities.ud.spec*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose --setupFiles dotenv/config",
+        "test:storageprograms": "rm -rf build && jest --testMatch '**/tests/storagePrograms*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:native": "rm -rf build && jest --testMatch '**/tests/native*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:web2": "rm -rf build && jest --testMatch '**/tests/web2*.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",
         "test:demos": "rm -rf build && jest --testMatch '**/newdemos.spec.ts' --testPathIgnorePatterns **/tests/**/chainProvider* **/tests/utils/* **/tests/**/template*  --verbose",

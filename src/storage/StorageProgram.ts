@@ -53,7 +53,7 @@ export interface StorageProgramListItem {
 /**
  * Response from storage program RPC endpoints
  */
-interface StorageProgramResponse {
+export interface StorageProgramResponse {
     success: boolean
     storageAddress?: string
     owner?: string
