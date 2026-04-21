@@ -6,11 +6,11 @@ import { sleep } from "@/utils"
 describe("Native transactions", () => {
     const rpcs = [
         //  NOTE: Local testnet RPCs
-        "http://localhost:53550",
+        // "http://localhost:53550",
         // "http://localhost:53552",
-        "http://localhost:53554",
+        // "http://localhost:53554",
         //
-        // "https://node2.demos.sh",
+        "https://node2.demos.sh",
         // "https://node3.demos.sh",
         //
         //  NOTE: Testnet RPCs
@@ -84,10 +84,7 @@ describe("Native transactions", () => {
         const mademos = await Promise.all(demoss)
 
         async function sendTx(demos: Demos) {
-            await demos.connectWallet(
-                "sausage audit iron upper jazz dignity cliff size donate nature during ranch vote spot tourist crash police canoe dawn wild gossip transfer plastic view",
-            )
-
+            await demos.connectWallet(mnemonic)
             const receiver = DemosWebAuth.getInstance()
             await receiver.create()
 

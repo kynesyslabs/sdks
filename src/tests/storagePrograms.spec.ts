@@ -6,7 +6,7 @@ describe("Storage Programs", () => {
     const rpc = "http://localhost:53550"
 
     const nonce = 2
-    const programName = "myFirstProgram"
+    const programName = "myProgram"
 
     const mnemonic = process.env.FUNDED_MNEMONIC
     const demos = new Demos()
@@ -22,7 +22,6 @@ describe("Storage Programs", () => {
     })
 
     test.only("Create Storage Program", async () => {
-        const programName = "myFirstProgram"
         const deployerAddress = demos.getAddress()
 
         const address = StorageProgram.deriveStorageAddress(
