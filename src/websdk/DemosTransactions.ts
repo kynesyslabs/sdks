@@ -6,6 +6,7 @@ import * as skeletons from "./utils/skeletons"
 
 import type { SigningAlgorithm, Transaction } from "@/types"
 import type { L2PSHashPayload } from "@/types/blockchain/TransactionSubtypes/L2PSHashTransaction"
+import type { NetworkParameters } from "@/types/blockchain/NetworkParameters"
 import { IKeyPair } from "./types/KeyPair"
 import { GCRGeneration } from "./GCRGeneration"
 import { _required as required } from "./utils/required"
@@ -333,6 +334,151 @@ export const DemosTransactions = {
 
         return await demos.sign(tx)
     },
-    
+
     // NOTE Subnet transactions methods are imported and exposed in demos.ts from the l2ps.ts file.
+
+    // SECTION Validator staking (Phase 0 — upgradable_network track)
+
+    /**
+     * Create a signed `validatorStake` transaction. Used both for initial
+     * validator registration and to top up an existing stake.
+     *
+     * @param amount - Stake amount in base-unit DEMOS, encoded as a bigint string.
+     * @param connectionUrl - Validator's public endpoint (required on first stake;
+     *                        subsequent top-ups may overwrite it).
+     * @param demos - The demos instance (for nonce + signing).
+     */
+    async stake(amount: string, connectionUrl: string, demos: Demos) {
+        required(demos.keypair, "Wallet not connected")
+
+        const tx = DemosTransactions.empty()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
+
+        // Staking txs are reflexive — the sender operates on their own
+        // validator record. `to` must still pass sign()'s 0x64-hex check.
+        tx.content.to = publicKeyHex
+        tx.content.nonce = nonce + 1
+        tx.content.amount = 0
+        tx.content.type = "validatorStake"
+        tx.content.timestamp = Date.now()
+        tx.content.data = ["validatorStake", { amount, connectionUrl }]
+
+        return await demos.sign(tx)
+    },
+
+    /**
+     * Create a signed `validatorUnstake` transaction. Arms the unstake lock
+     * period; after `UNSTAKE_LOCK_BLOCKS` have elapsed the validator may call
+     * `validatorExit`.
+     */
+    async unstake(demos: Demos) {
+        required(demos.keypair, "Wallet not connected")
+
+        const tx = DemosTransactions.empty()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
+
+        tx.content.to = publicKeyHex
+        tx.content.nonce = nonce + 1
+        tx.content.amount = 0
+        tx.content.type = "validatorUnstake"
+        tx.content.timestamp = Date.now()
+        tx.content.data = ["validatorUnstake", {}]
+
+        return await demos.sign(tx)
+    },
+
+    /**
+     * Create a signed `validatorExit` transaction. Only accepted by the
+     * network once `unstake_available_at <= currentBlock`.
+     */
+    async validatorExit(demos: Demos) {
+        required(demos.keypair, "Wallet not connected")
+
+        const tx = DemosTransactions.empty()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
+
+        tx.content.to = publicKeyHex
+        tx.content.nonce = nonce + 1
+        tx.content.amount = 0
+        tx.content.type = "validatorExit"
+        tx.content.timestamp = Date.now()
+        tx.content.data = ["validatorExit", {}]
+
+        return await demos.sign(tx)
+    },
+
+    // SECTION Stackable-genesis governance (Phase 1 — upgradable_network track)
+
+    /**
+     * Create a signed `networkUpgrade` proposal transaction.
+     *
+     * Only active validators may propose. The node rejects proposals whose
+     * `proposedParameters` violate safety bounds (≤50% change, absolute
+     * floor/ceiling) or overlap keys with other pending/activating proposals.
+     *
+     * @param params.proposalId - UUID. Also used as lexicographic activation-order tiebreaker.
+     * @param params.proposedParameters - Subset of NetworkParameters to change.
+     * @param params.rationale - Human-readable reason, ≤1024 bytes.
+     * @param params.effectiveAtBlock - Activation block. Must be ≥ tallyBlock + grace period.
+     */
+    async proposeNetworkUpgrade(
+        params: {
+            proposalId: string
+            proposedParameters: Partial<NetworkParameters>
+            rationale: string
+            effectiveAtBlock: number
+        },
+        demos: Demos,
+    ) {
+        required(demos.keypair, "Wallet not connected")
+
+        const tx = DemosTransactions.empty()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
+
+        tx.content.to = publicKeyHex
+        tx.content.nonce = nonce + 1
+        tx.content.amount = 0
+        tx.content.type = "networkUpgrade"
+        tx.content.timestamp = Date.now()
+        tx.content.data = ["networkUpgrade", params]
+
+        return await demos.sign(tx)
+    },
+
+    /**
+     * Create a signed `networkUpgradeVote` transaction.
+     *
+     * The voter must be in the validator snapshot taken at the proposal's
+     * confirmation block, and may cast exactly one vote per proposal (final,
+     * non-revocable).
+     */
+    async voteOnUpgrade(
+        proposalId: string,
+        approve: boolean,
+        demos: Demos,
+    ) {
+        required(demos.keypair, "Wallet not connected")
+
+        const tx = DemosTransactions.empty()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await demos.getAddressNonce(publicKeyHex)
+
+        tx.content.to = publicKeyHex
+        tx.content.nonce = nonce + 1
+        tx.content.amount = 0
+        tx.content.type = "networkUpgradeVote"
+        tx.content.timestamp = Date.now()
+        tx.content.data = ["networkUpgradeVote", { proposalId, approve }]
+
+        return await demos.sign(tx)
+    },
 }

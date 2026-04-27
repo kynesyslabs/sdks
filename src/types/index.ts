@@ -54,6 +54,18 @@ export {
     // REVIEW: DEM-481 - Pin expiration extension
     isIPFSExtendPinPayload,
     isIPFSPayload,
+    // Validator staking (Phase 0 / upgradable_network)
+    ValidatorStakeTransaction,
+    ValidatorStakePayload,
+    ValidatorUnstakeTransaction,
+    ValidatorUnstakePayload,
+    ValidatorExitTransaction,
+    ValidatorExitPayload,
+    // Stackable-genesis governance (Phase 1 / upgradable_network)
+    NetworkUpgradeTransaction,
+    NetworkUpgradePayload,
+    NetworkUpgradeVoteTransaction,
+    NetworkUpgradeVotePayload,
 } from "./blockchain/TransactionSubtypes"
 
 // L2PSEncryptedPayload removed to avoid circular dependency - import directly from @/l2ps
@@ -176,10 +188,24 @@ export {
     GCREditNonce,
     GCREditSubnetsTx,
     GCREditStorageProgram,
+    GCREditValidatorStake,
+    GCREditNetworkUpgrade,
+    GCREditNetworkUpgradeVote,
     Web2GCRData,
     XmGCRData,
     XmGCRIdentityData,
 } from "./blockchain/GCREdit"
+export {
+    type ValidatorInfo,
+    type ValidatorStatus,
+} from "./validator/ValidatorTypes"
+export {
+    type NetworkParameters,
+    type NetworkParameterKey,
+    type NetworkUpgradeProposal,
+    type ProposalStatus,
+    type ProposalVoteInfo,
+} from "./blockchain/NetworkParameters"
 export { BridgeTradePayload } from "./bridge/bridgeTradePayload"
 export {
     ChainProviders,

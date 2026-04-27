@@ -23,6 +23,12 @@ import {
     XMScript,
 } from "@/types"
 import { AddressInfo } from "@/types/blockchain/address"
+import type { ValidatorInfo } from "@/types/validator/ValidatorTypes"
+import type {
+    NetworkParameters,
+    NetworkUpgradeProposal,
+    ProposalVoteInfo,
+} from "@/types/blockchain/NetworkParameters"
 import {
     RPCRequest,
     RPCResponse,
@@ -967,6 +973,77 @@ export class Demos {
         }
 
         return 0
+    }
+
+    /**
+     * Get a validator's current record (stake, status, unstake timestamps).
+     * Returns null if the address is not (and never was) a validator.
+     */
+    async getValidatorInfo(address: string): Promise<ValidatorInfo | null> {
+        return (await this.nodeCall("getValidatorInfo", {
+            address,
+        })) as ValidatorInfo | null
+    }
+
+    /**
+     * List validators at a given block (defaults to the current head). Only
+     * returns validators whose `valid_at` block is <= the queried block and
+     * whose status is still active.
+     */
+    async getValidators(blockNumber?: number): Promise<ValidatorInfo[]> {
+        return ((await this.nodeCall("getValidators", {
+            blockNumber,
+        })) ?? []) as ValidatorInfo[]
+    }
+
+    /**
+     * Convenience: return a single validator's current staked amount as a
+     * bigint-encoded string. Returns `"0"` for non-validators.
+     */
+    async getStakedAmount(address: string): Promise<string> {
+        const v = await this.nodeCall("getStakedAmount", { address })
+        return typeof v === "string" ? v : "0"
+    }
+
+    // SECTION Governance (stackable-genesis, Phase 1)
+
+    /**
+     * Returns the currently-active NetworkParameters — the result of folding
+     * every `active` NetworkUpgrade over the genesis defaults.
+     */
+    async getNetworkParameters(): Promise<NetworkParameters | null> {
+        return (await this.nodeCall(
+            "getNetworkParameters",
+        )) as NetworkParameters | null
+    }
+
+    /**
+     * Lists currently-open proposals (pending tally or activating after
+     * approval). Rejected/active historical proposals are not included.
+     */
+    async getActiveProposals(): Promise<NetworkUpgradeProposal[]> {
+        return ((await this.nodeCall("getActiveProposals")) ??
+            []) as NetworkUpgradeProposal[]
+    }
+
+    /**
+     * Returns the live vote tally for a specific proposal — total snapshot
+     * weight, approve/reject breakdowns, per-validator votes, threshold, and
+     * a `passed` flag.
+     */
+    async getProposalVotes(proposalId: string): Promise<ProposalVoteInfo | null> {
+        return (await this.nodeCall("getProposalVotes", {
+            proposalId,
+        })) as ProposalVoteInfo | null
+    }
+
+    /**
+     * Returns the ordered history of proposals whose status has reached
+     * `active`. Ordered by `effectiveAtBlock` ASC, then `proposalId` ASC.
+     */
+    async getUpgradeHistory(): Promise<NetworkUpgradeProposal[]> {
+        return ((await this.nodeCall("getUpgradeHistory")) ??
+            []) as NetworkUpgradeProposal[]
     }
 
     /**

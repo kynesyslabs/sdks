@@ -77,6 +77,96 @@ export class GCRGeneration {
                 gcrEdits.push(...storageProgramEdits)
                 break
             }
+            // Phase 0 staking — synthesize a GCREditValidatorStake from
+            // the tx payload. Server-side handleStakingTx still validates
+            // policy (sender is validator, lock elapsed, etc.) but does
+            // NOT mutate gcr_edits — this generator runs identically on
+            // both sides so the hash comparison in handleValidateTransaction
+            // matches.
+            case "validatorStake": {
+                const p = (content.data as any)?.[1] as
+                    | { amount?: string; connectionUrl?: string }
+                    | undefined
+                gcrEdits.push({
+                    type: "validatorStake",
+                    isRollback,
+                    account: content.from_ed25519_address,
+                    operation: "stake",
+                    amount: typeof p?.amount === "string" ? p.amount : "0",
+                    connectionUrl:
+                        typeof p?.connectionUrl === "string"
+                            ? p.connectionUrl
+                            : "",
+                    txhash: tx.hash,
+                })
+                break
+            }
+            case "validatorUnstake": {
+                gcrEdits.push({
+                    type: "validatorStake",
+                    isRollback,
+                    account: content.from_ed25519_address,
+                    operation: "unstake",
+                    amount: "0",
+                    txhash: tx.hash,
+                })
+                break
+            }
+            case "validatorExit": {
+                gcrEdits.push({
+                    type: "validatorStake",
+                    isRollback,
+                    account: content.from_ed25519_address,
+                    operation: "exit",
+                    amount: "0",
+                    txhash: tx.hash,
+                })
+                break
+            }
+            // Phase 1 governance — proposal + vote. Server-derived
+            // fields (version, snapshotBlock, tallyBlock, weight,
+            // blockNumber) are filled at apply time by
+            // GCRNetworkUpgradeRoutines so the edit shape stays
+            // deterministic from tx content alone.
+            case "networkUpgrade": {
+                const p = (content.data as any)?.[1] as
+                    | {
+                          proposalId?: string
+                          proposedParameters?: Record<string, unknown>
+                          rationale?: string
+                          effectiveAtBlock?: number
+                      }
+                    | undefined
+                gcrEdits.push({
+                    type: "networkUpgrade",
+                    isRollback,
+                    account: content.from_ed25519_address,
+                    proposalId: typeof p?.proposalId === "string" ? p.proposalId : "",
+                    proposedParameters:
+                        (p?.proposedParameters as Record<string, unknown>) ?? {},
+                    rationale: typeof p?.rationale === "string" ? p.rationale : "",
+                    effectiveAtBlock:
+                        typeof p?.effectiveAtBlock === "number"
+                            ? p.effectiveAtBlock
+                            : 0,
+                    txhash: tx.hash,
+                })
+                break
+            }
+            case "networkUpgradeVote": {
+                const p = (content.data as any)?.[1] as
+                    | { proposalId?: string; approve?: boolean }
+                    | undefined
+                gcrEdits.push({
+                    type: "networkUpgradeVote",
+                    isRollback,
+                    account: content.from_ed25519_address,
+                    proposalId: typeof p?.proposalId === "string" ? p.proposalId : "",
+                    approve: p?.approve === true,
+                    txhash: tx.hash,
+                })
+                break
+            }
         }
 
         // SECTION Operations valid for all tx types
