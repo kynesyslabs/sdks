@@ -86,6 +86,9 @@ export class Demos {
     /** Cached TLSNotary instance */
     private _tlsnotaryInstance: TLSNotary | null = null
 
+    private _cachedNetworkParameters: NetworkParameters | null = null
+    private _cachedNetworkParametersAt = 0
+
     /** Connection status of the RPC URL */
     connected: boolean = false
     dual_sign: boolean = false
@@ -465,14 +468,29 @@ export class Demos {
 
         raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
 
-        // We derive the network fee from GCR edits (sum of sender balance removals minus `amount`).
-        // This is a pragmatic interim approach; ideally the node should authoritatively return fees
-        // to avoid drift between SDK and node logic.
+        // Node is source of truth for governance-driven fees; edits-derived
+        // calc kicks in only if RPC is unreachable or endpoint is missing.
+        let appliedFromNode = false
         try {
-            raw_tx = this._calculateAndApplyGasFee(raw_tx)
-        } catch (e) {
-            // Non-fatal: if fee derivation fails, continue without modifying fees
-            console.warn("[demos] fee derivation skipped:", e)
+            const params = await this._getNetworkParametersCached()
+            if (params && typeof params.networkFee === "number") {
+                raw_tx.content.transaction_fee = {
+                    network_fee: params.networkFee,
+                    rpc_fee:
+                        typeof params.rpcFee === "number" ? params.rpcFee : 0,
+                    additional_fee: 0,
+                }
+                appliedFromNode = true
+            }
+        } catch {
+            /* fall through */
+        }
+        if (!appliedFromNode) {
+            try {
+                raw_tx = this._calculateAndApplyGasFee(raw_tx)
+            } catch (e) {
+                console.warn("[demos] fee derivation skipped:", e)
+            }
         }
 
         raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
@@ -1015,6 +1033,25 @@ export class Demos {
         return (await this.nodeCall(
             "getNetworkParameters",
         )) as NetworkParameters | null
+    }
+
+    private async _getNetworkParametersCached(
+        ttlMs = 30_000,
+    ): Promise<NetworkParameters | null> {
+        if (!this.rpc_url) return null
+        const now = Date.now()
+        if (
+            this._cachedNetworkParameters &&
+            now - this._cachedNetworkParametersAt < ttlMs
+        ) {
+            return this._cachedNetworkParameters
+        }
+        const fresh = await this.getNetworkParameters()
+        if (fresh) {
+            this._cachedNetworkParameters = fresh
+            this._cachedNetworkParametersAt = now
+        }
+        return fresh
     }
 
     /**
