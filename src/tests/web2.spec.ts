@@ -14,7 +14,7 @@ describe("Web2", () => {
         const identity = DemosWebAuth.getInstance()
         await identity.create()
 
-        // const rpc = "https://demosnode.discus.sh"
+        // const rpc = "https://node3.demos.sh"
         // const rpc = "https://node2.demos.sh"
         const rpc = "http://localhost:53550"
         const demos = new Demos()

@@ -166,7 +166,7 @@ describe("New Demos", () => {
         const mnemonic = "clock coffee open foam tell price urban deposit stadium motor since cover cushion recall chat master fabric arrange embrace zebra kind congress scene dutch"
         const demos = new Demos()
         await demos.connectWallet(mnemonic)
-        // await demos.connect("https://demosnode.discus.sh")
+        // await demos.connect("https://node3.demos.sh")
         await demos.connect("https://node2.demos.sh")
 
         const campaignData = await demos.call("getCampaignData", null)

@@ -82,7 +82,7 @@ describe("DEMOS Transaction", () => {
         // const identity = DemosWebAuth.getInstance()
         // await identity.create()
 
-        // const rpc = "https://demosnode.discus.sh"
+        // const rpc = "https://node3.demos.sh"
         const rpc = "https://node2.demos.sh"
         // const rpc = "https://node2.demos.sh"
         const demos = new Demos()

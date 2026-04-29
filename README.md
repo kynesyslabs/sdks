@@ -90,7 +90,7 @@ import { Demos } from "@kynesyslabs/demosdk/websdk"
 const demos = new Demos()
 
 // 2. Connect to the network
-const rpc = "https://demosnode.discus.sh"
+const rpc = "https://node3.demos.sh"
 await demos.connect(rpc)
 
 // 3. Generate a new mnemonic or use existing one

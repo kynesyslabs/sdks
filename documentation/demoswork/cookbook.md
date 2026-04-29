@@ -227,7 +227,7 @@ import { demos } from "@kynesyslabs/demosdk/websdk"
 // ...
 
 // Connecting to the DEMOS network
-const rpc_url = "https://demosnode.discus.sh"
+const rpc_url = "https://node3.demos.sh"
 
 await demos.connect(rpc_url)
 await demos.connectWallet(identity.keypair.privateKey)
