@@ -28,6 +28,27 @@ import {
  * Note that the node will be responsible for checking if the gas can be paid.
  */
 export class GCRGeneration {
+    // Fail-fast payload extractor — throws explicitly instead of silently
+    // defaulting missing/wrong-typed fields, which can flip semantics
+    // (e.g. a vote without `approve` would become an implicit reject).
+    private static requirePayload<T>(
+        content: TransactionContent,
+        expectedType: TransactionContent["type"],
+    ): T {
+        const tuple = content.data as unknown
+        if (
+            !Array.isArray(tuple) ||
+            tuple[0] !== expectedType ||
+            tuple[1] == null ||
+            typeof tuple[1] !== "object"
+        ) {
+            throw new Error(
+                `[GCRGeneration] Invalid payload for ${expectedType} transaction`,
+            )
+        }
+        return tuple[1] as T
+    }
+
     static async generate(
         tx: Transaction,
         isRollback: boolean = false,
@@ -84,19 +105,27 @@ export class GCRGeneration {
             // both sides so the hash comparison in handleValidateTransaction
             // matches.
             case "validatorStake": {
-                const p = (content.data as any)?.[1] as
-                    | { amount?: string; connectionUrl?: string }
-                    | undefined
+                const p = this.requirePayload<{
+                    amount: string
+                    connectionUrl: string
+                }>(content, "validatorStake")
+                if (typeof p.amount !== "string" || !/^\d+$/.test(p.amount)) {
+                    throw new Error(
+                        "[GCRGeneration] validatorStake.amount must be a non-negative bigint string",
+                    )
+                }
+                if (typeof p.connectionUrl !== "string") {
+                    throw new Error(
+                        "[GCRGeneration] validatorStake.connectionUrl must be a string",
+                    )
+                }
                 gcrEdits.push({
                     type: "validatorStake",
                     isRollback,
                     account: content.from_ed25519_address,
                     operation: "stake",
-                    amount: typeof p?.amount === "string" ? p.amount : "0",
-                    connectionUrl:
-                        typeof p?.connectionUrl === "string"
-                            ? p.connectionUrl
-                            : "",
+                    amount: p.amount,
+                    connectionUrl: p.connectionUrl,
                     txhash: tx.hash,
                 })
                 break
@@ -129,40 +158,73 @@ export class GCRGeneration {
             // GCRNetworkUpgradeRoutines so the edit shape stays
             // deterministic from tx content alone.
             case "networkUpgrade": {
-                const p = (content.data as any)?.[1] as
-                    | {
-                          proposalId?: string
-                          proposedParameters?: Record<string, unknown>
-                          rationale?: string
-                          effectiveAtBlock?: number
-                      }
-                    | undefined
+                const p = this.requirePayload<{
+                    proposalId: string
+                    proposedParameters: Record<string, unknown>
+                    rationale: string
+                    effectiveAtBlock: number
+                }>(content, "networkUpgrade")
+                if (typeof p.proposalId !== "string" || !p.proposalId) {
+                    throw new Error(
+                        "[GCRGeneration] networkUpgrade.proposalId must be a non-empty string",
+                    )
+                }
+                if (
+                    typeof p.proposedParameters !== "object" ||
+                    p.proposedParameters === null ||
+                    Array.isArray(p.proposedParameters)
+                ) {
+                    throw new Error(
+                        "[GCRGeneration] networkUpgrade.proposedParameters must be a plain object",
+                    )
+                }
+                if (typeof p.rationale !== "string") {
+                    throw new Error(
+                        "[GCRGeneration] networkUpgrade.rationale must be a string",
+                    )
+                }
+                if (
+                    typeof p.effectiveAtBlock !== "number" ||
+                    !Number.isInteger(p.effectiveAtBlock) ||
+                    p.effectiveAtBlock < 0
+                ) {
+                    throw new Error(
+                        "[GCRGeneration] networkUpgrade.effectiveAtBlock must be a non-negative integer",
+                    )
+                }
                 gcrEdits.push({
                     type: "networkUpgrade",
                     isRollback,
                     account: content.from_ed25519_address,
-                    proposalId: typeof p?.proposalId === "string" ? p.proposalId : "",
-                    proposedParameters:
-                        (p?.proposedParameters as Record<string, unknown>) ?? {},
-                    rationale: typeof p?.rationale === "string" ? p.rationale : "",
-                    effectiveAtBlock:
-                        typeof p?.effectiveAtBlock === "number"
-                            ? p.effectiveAtBlock
-                            : 0,
+                    proposalId: p.proposalId,
+                    proposedParameters: p.proposedParameters,
+                    rationale: p.rationale,
+                    effectiveAtBlock: p.effectiveAtBlock,
                     txhash: tx.hash,
                 })
                 break
             }
             case "networkUpgradeVote": {
-                const p = (content.data as any)?.[1] as
-                    | { proposalId?: string; approve?: boolean }
-                    | undefined
+                const p = this.requirePayload<{
+                    proposalId: string
+                    approve: boolean
+                }>(content, "networkUpgradeVote")
+                if (typeof p.proposalId !== "string" || !p.proposalId) {
+                    throw new Error(
+                        "[GCRGeneration] networkUpgradeVote.proposalId must be a non-empty string",
+                    )
+                }
+                if (typeof p.approve !== "boolean") {
+                    throw new Error(
+                        "[GCRGeneration] networkUpgradeVote.approve must be a boolean",
+                    )
+                }
                 gcrEdits.push({
                     type: "networkUpgradeVote",
                     isRollback,
                     account: content.from_ed25519_address,
-                    proposalId: typeof p?.proposalId === "string" ? p.proposalId : "",
-                    approve: p?.approve === true,
+                    proposalId: p.proposalId,
+                    approve: p.approve,
                     txhash: tx.hash,
                 })
                 break

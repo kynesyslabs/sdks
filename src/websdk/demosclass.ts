@@ -88,6 +88,7 @@ export class Demos {
 
     private _cachedNetworkParameters: NetworkParameters | null = null
     private _cachedNetworkParametersAt = 0
+    private _cachedNetworkParametersRpcUrl: string | null = null
 
     /** Connection status of the RPC URL */
     connected: boolean = false
@@ -258,19 +259,17 @@ export class Demos {
     // !SECTION Connection and listeners
 
     /**
-     * Generates a random MUID.
-     *
-     * @returns The MUID
+     * Generates a random MUID using a CSPRNG. Math.random() is forbidden
+     * here — the value flows into security-sensitive paths and a
+     * predictable PRNG would let an attacker pre-compute MUIDs.
      */
     generateMuid() {
-        const number_1 =
-            Math.random().toString(36).substring(2, 15) +
-            Math.random().toString(36).substring(2, 15)
-        const number_2 =
-            Math.random().toString(36).substring(2, 15) +
-            Math.random().toString(36).substring(2, 15)
-        const muid = number_1 + number_2
-        return muid
+        const buf = new Uint8Array(24)
+        // Browser + Node 19+ + Bun
+        crypto.getRandomValues(buf)
+        let s = ""
+        for (const b of buf) s += b.toString(36)
+        return s.slice(0, 52)
     }
 
     /**
@@ -1040,8 +1039,12 @@ export class Demos {
     ): Promise<NetworkParameters | null> {
         if (!this.rpc_url) return null
         const now = Date.now()
+        // Reuse the cached entry only if the underlying node hasn't changed.
+        // Without the rpc-url guard, switching networks within TTL applies
+        // the previous chain's fees to the new one's signed transactions.
         if (
             this._cachedNetworkParameters &&
+            this._cachedNetworkParametersRpcUrl === this.rpc_url &&
             now - this._cachedNetworkParametersAt < ttlMs
         ) {
             return this._cachedNetworkParameters
@@ -1050,6 +1053,7 @@ export class Demos {
         if (fresh) {
             this._cachedNetworkParameters = fresh
             this._cachedNetworkParametersAt = now
+            this._cachedNetworkParametersRpcUrl = this.rpc_url
         }
         return fresh
     }

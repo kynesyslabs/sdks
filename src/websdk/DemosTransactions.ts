@@ -350,6 +350,31 @@ export const DemosTransactions = {
      */
     async stake(amount: string, connectionUrl: string, demos: Demos) {
         required(demos.keypair, "Wallet not connected")
+        required(amount, "Stake amount is required")
+        if (typeof amount !== "string" || !/^\d+$/.test(amount)) {
+            throw new Error(
+                "Invalid stake amount: expected a non-negative bigint-encoded string",
+            )
+        }
+        try {
+            if (BigInt(amount) <= 0n) {
+                throw new Error("Stake amount must be > 0")
+            }
+        } catch (e) {
+            throw new Error(
+                e instanceof Error
+                    ? `Invalid stake amount: ${e.message}`
+                    : "Invalid stake amount",
+            )
+        }
+        required(connectionUrl, "Connection URL is required")
+        try {
+            new URL(connectionUrl)
+        } catch {
+            throw new Error(
+                "Invalid connectionUrl: expected an absolute URL (e.g. https://node.example)",
+            )
+        }
 
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
@@ -437,6 +462,30 @@ export const DemosTransactions = {
         demos: Demos,
     ) {
         required(demos.keypair, "Wallet not connected")
+        required(params?.proposalId?.trim(), "proposalId is required")
+        required(
+            params?.rationale != null && typeof params.rationale === "string",
+            "rationale is required (use empty string if none)",
+        )
+        if (
+            typeof params?.effectiveAtBlock !== "number" ||
+            !Number.isInteger(params.effectiveAtBlock) ||
+            params.effectiveAtBlock < 0
+        ) {
+            throw new Error(
+                "effectiveAtBlock must be a non-negative integer block number",
+            )
+        }
+        if (
+            !params?.proposedParameters ||
+            typeof params.proposedParameters !== "object" ||
+            Array.isArray(params.proposedParameters) ||
+            Object.keys(params.proposedParameters).length === 0
+        ) {
+            throw new Error(
+                "proposedParameters must be a non-empty plain object",
+            )
+        }
 
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
@@ -466,6 +515,10 @@ export const DemosTransactions = {
         demos: Demos,
     ) {
         required(demos.keypair, "Wallet not connected")
+        required(proposalId?.trim(), "proposalId is required")
+        if (typeof approve !== "boolean") {
+            throw new Error("approve must be a boolean (true=yes, false=no)")
+        }
 
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
