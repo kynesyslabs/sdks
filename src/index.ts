@@ -4,6 +4,10 @@ export * as types from "./types"
 export * as encryption from "./encryption"
 export * as utils from "./utils"
 
+// REVIEW: P0 foundation — DEM/OS denomination utilities. Dormant exports;
+// not yet consumed by any other SDK module.
+export * as denomination from "./denomination"
+
 //  Specific features of the SDK
 export * as xmlocalsdk from "./multichain/localsdk"
 export * as xmwebsdk from "./multichain/websdk"
