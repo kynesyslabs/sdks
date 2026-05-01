@@ -1,15 +1,46 @@
 import pprint from "@/utils/pprint"
 import { Identities } from "@/abstraction"
-import { Demos, DemosWebAuth } from "@/websdk"
+import { Demos, DemosWebAuth, hexToUint8Array } from "@/websdk"
 import { sleep } from "@/utils"
 
 describe("Native transactions", () => {
-    const RPC = "https://demosnode.discus.sh"
-    // const RPC = "https://node2.demos.sh"
+    const rpcs = [
+        //  NOTE: Local testnet RPCs
+        // "http://localhost:53550",
+        // "http://localhost:53552",
+        // "http://localhost:53554",
+        //
+        "https://node2.demos.sh",
+        // "https://node3.demos.sh",
+        //
+        //  NOTE: Testnet RPCs
+        // "http://node2.demos.sh:53560",
+        // "http://node3.demos.sh:53560",
+        // "http://node2.demos.sh:53562",
+        // "http://node3.demos.sh:53562",
+        //
+        //  NOTE: Fixnet RPCs
+        // "http://node2.demos.sh:60001",
+        // "http://node3.demos.sh:60001",
+        // "http://node3.demos.sh:20002",
+        // "http://mungaist.com:60001",
+        // "http://65.7.20.194:53550",
+        // "http://5.189.144.254:53550",
+        // "http://107.131.170.202:53550",
+        // "http://84.32.22.26:53550"
+    ]
+    const RPC = rpcs[0]
 
     let demos: Demos = new Demos()
     let senderWebAuth = new DemosWebAuth()
     let recepientWebAuth = new DemosWebAuth()
+
+    const mnemonic = process.env.FUNDED_MNEMONIC
+
+    if (!mnemonic) {
+        console.error("FUNDED_MNEMONIC is not set")
+        process.exit(0)
+    }
 
     beforeAll(async () => {
         // NOTE: Replace with funded account on PROD
@@ -20,12 +51,7 @@ describe("Native transactions", () => {
         await recepientWebAuth.create()
 
         await demos.connect(RPC)
-        await demos.connectWallet(
-            senderWebAuth.keypair.privateKey as Uint8Array,
-            {
-                algorithm: "falcon",
-            },
-        )
+        await demos.connectWallet(mnemonic)
     })
 
     test.skip("Pay", async () => {
@@ -49,34 +75,6 @@ describe("Native transactions", () => {
         // NOTE: To increase the number of concurrent transactions,
         // run multiple instances of this test at the same time.
 
-        // INFO: Local testnet RPCs
-        // const rpcs = [
-        //     "https://node2.demos.sh",
-        //     "http://localhost:53551",
-        //     "http://localhost:53552",
-        //     "http://localhost:53553",
-        // ]
-
-        // INFO: Private testnet RPCs
-        // const rpcs = [
-        //     "https://node2.demos.sh",
-        //     "http://node2.demos.sh:53560",
-        //     "http://node3.demos.sh:53560",
-        // ]
-
-        const rpcs = [
-            "http://node2.demos.sh:40002",
-            "http://node2.demos.sh:60001",
-            "http://node3.demos.sh:60001",
-            "http://node3.demos.sh:20002",
-        ]
-
-        // INFO: Public testnet RPCs
-        // const rpcs = [
-        //     "https://demosnode.discus.sh",
-        //     "https://node2.demos.sh",
-        // ]
-
         const demoss = rpcs.map(async rpc => {
             const demos = new Demos()
             await demos.connect(rpc)
@@ -86,13 +84,7 @@ describe("Native transactions", () => {
         const mademos = await Promise.all(demoss)
 
         async function sendTx(demos: Demos) {
-            const sender = DemosWebAuth.getInstance()
-
-            await sender.create()
-            await demos.connectWallet(
-                "educate upset find what salmon ritual bless include normal apple try firm",
-            )
-
+            await demos.connectWallet(mnemonic)
             const receiver = DemosWebAuth.getInstance()
             await receiver.create()
 
@@ -111,14 +103,38 @@ describe("Native transactions", () => {
             }
         }
 
-        const TXCOUNT = 100
+        const TXCOUNT = 1000
+        const BATCH_SIZE = 10
+        const BATCHES = Math.ceil(TXCOUNT / BATCH_SIZE)
+
+        for (let batch = 0; batch < BATCHES; batch++) {
+            const promises: Promise<void>[] = []
+            for (let i = 0; i < BATCH_SIZE; i++) {
+                const txIndex = batch * BATCH_SIZE + i
+                if (txIndex >= TXCOUNT) break
+                const randomDemos =
+                    mademos[Math.floor(Math.random() * mademos.length)]
+                promises.push(
+                    (async () => {
+                        try {
+                            await sendTx(randomDemos)
+                        } catch (err) {
+                            console.error("Error in sendTx", err)
+                        }
+                    })(),
+                )
+            }
+            await Promise.all(promises)
+            await sleep(10)
+        }
 
         // 2. Create a transaction
-        for (let i = 0; i < TXCOUNT; i++) {
-            const randomDemos = mademos[Math.floor(Math.random() * mademos.length)]
-            await sleep(100)
-            await sendTx(randomDemos)
-        }
+        // for (let i = 0; i < TXCOUNT; i++) {
+        //     const randomDemos =
+        //         mademos[Math.floor(Math.random() * mademos.length)]
+        //     // await sleep(10)
+        //     await sendTx(randomDemos)
+        // }
 
         // 4. Broadcast the transaction
     }, 10000000)
@@ -145,5 +161,12 @@ describe("Native transactions", () => {
         )
 
         console.log("identity: ", identity)
+    })
+
+    test.skip("Storage transaction test", async () => {
+        const tx = await demos.store(hexToUint8Array(demos.getAddress()))
+        const validityData = await demos.confirm(tx)
+        const broadcastRes = await demos.broadcast(validityData)
+        console.log("Broadcast result", broadcastRes)
     })
 })

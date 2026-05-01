@@ -13,7 +13,15 @@ import { DemosTransactions } from "./DemosTransactions"
 import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 
-import { Block, IPeer, RawTransaction, SigningAlgorithm, Transaction, TransactionContent, XMScript } from "@/types"
+import {
+    Block,
+    IPeer,
+    RawTransaction,
+    SigningAlgorithm,
+    Transaction,
+    TransactionContent,
+    XMScript,
+} from "@/types"
 import { AddressInfo } from "@/types/blockchain/address"
 import {
     RPCRequest,
@@ -25,7 +33,11 @@ import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
-import { hexToUint8Array, uint8ArrayToHex, UnifiedCrypto } from "@/encryption/unifiedCrypto"
+import {
+    hexToUint8Array,
+    uint8ArrayToHex,
+    UnifiedCrypto,
+} from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import * as bip39 from "@scure/bip39"
@@ -33,8 +45,18 @@ import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
 // TLSNotary is dynamically imported to avoid bundling issues with webpack
 // The worker.js reference and WASM dependencies break static bundling
-import type { TLSNotary, TLSNotaryConfig, TLSNotaryDiscoveryInfo } from "@/tlsnotary"
+import type {
+    TLSNotary,
+    TLSNotaryConfig,
+    TLSNotaryDiscoveryInfo,
+} from "@/tlsnotary"
 import { wordList } from "@/encryption/PQC/falconts"
+import {
+    StorageProgram,
+    StorageProgramData,
+    StorageProgramPayload,
+} from "@/storage"
+import { StorageProgramResponse } from "@/storage/StorageProgram"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -132,24 +154,26 @@ export class Demos {
      * @param algorithm - The algorithm to use for the wallet
      * @param options - The options for the wallet connection
      * @param options.algorithm - The algorithm to use for the wallet
-     * @param options.dual_sign - Whether to include the ed25519 signature along with the PQC signature, when 
+     * @param options.dual_sign - Whether to include the ed25519 signature along with the PQC signature, when
      * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
-     * 
+     *
      * @returns The public key of the wallet
      */
     async connectWallet(
         masterSeed: string | Uint8Array,
         options?: {
-            algorithm?: SigningAlgorithm,
+            algorithm?: SigningAlgorithm
             /**
-             * Whether to include the ed25519 signature along with the PQC signature, when 
+             * Whether to include the ed25519 signature along with the PQC signature, when
              * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
              */
             dual_sign?: boolean
         },
     ) {
         if (!masterSeed) {
-            throw new Error("Master seed is required. Use `demos.newMnemonic()` to generate a new mnemonic.")
+            throw new Error(
+                "Master seed is required. Use `demos.newMnemonic()` to generate a new mnemonic.",
+            )
         }
 
         let seed: Uint8Array = null
@@ -157,8 +181,13 @@ export class Demos {
         this.dual_sign = options?.dual_sign || false
         // TODO: Convert masterSeed to 128 bytes
 
-        if (typeof masterSeed !== "string" && !(masterSeed instanceof Uint8Array)) {
-            throw new Error("Invalid master seed: must be a string or a Uint8Array")
+        if (
+            typeof masterSeed !== "string" &&
+            !(masterSeed instanceof Uint8Array)
+        ) {
+            throw new Error(
+                "Invalid master seed: must be a string or a Uint8Array",
+            )
         }
 
         let hashable: string | Uint8Array = null
@@ -176,7 +205,7 @@ export class Demos {
         // NOTE: Reverted this bug to keep generating the same keypair
         // with the same mnemonic for mnemonics added to testnet during the incentives campaign.
         // TODO: Put back the "else" when we clear the testnet database.
-        /* else */  if (masterSeed.length !== 128) {
+        /* else */ if (masterSeed.length !== 128) {
             hashable = masterSeed
         }
 
@@ -266,12 +295,62 @@ export class Demos {
      * Data is stored in the sender's account.
      *
      * @param bytes - The binary data to store
-     * 
+     *
      * @returns The signed storage transaction.
      */
     store(bytes: Uint8Array) {
         required(this.keypair, "Wallet not connected")
         return DemosTransactions.store(bytes, this)
+    }
+
+    storagePrograms = {
+        /**
+         * Creates and signs a storage program transaction given a payload.
+         *
+         * @param payload - The payload to sign
+         * @returns The signed transaction
+         *
+         */
+        sign: async (payload: StorageProgramPayload): Promise<Transaction> => {
+            required(this.keypair, "Wallet not connected")
+            required(
+                payload.storageAddress,
+                "Storage address Not found in payload",
+            )
+
+            const tx = DemosTransactions.empty()
+            tx.content.to = payload.storageAddress
+            tx.content.type = "storageProgram"
+            tx.content.data = ["storageProgram", payload]
+            return await this.sign(tx)
+        },
+        /**
+         * Reads a storage program by address.
+         *
+         * @param address - The address of the storage program to read
+         * @returns The response from the node
+         *
+         */
+        read: async (address: string): Promise<StorageProgramResponse> => {
+            const headers = {
+                "Content-Type": "application/json",
+            }
+
+            if (this.walletConnected) {
+                const { data } = await this.signMessage(this.getAddress(), {
+                    algorithm: "ed25519",
+                })
+                headers["identity"] = `ed25519:${this.getAddress()}`
+                headers["signature"] = data
+            }
+
+            const response = await axios.get<StorageProgramResponse>(
+                this.rpc_url + "/storage-program/" + address,
+                { headers },
+            )
+
+            return response.data
+        },
     }
 
     /**
@@ -297,7 +376,7 @@ export class Demos {
     /**
      * Signs a transaction.
      *
-     * @param raw_tx - The transaction to sign  
+     * @param raw_tx - The transaction to sign
      * @param options - The dual-signing options
      * @returns The signed transaction
      */
@@ -308,20 +387,33 @@ export class Demos {
         }
 
         // INFO: Use the connected algorithm's public key as the sender
-        raw_tx.content.from = uint8ArrayToHex(this.keypair.publicKey as Uint8Array)
+        raw_tx.content.from = uint8ArrayToHex(
+            this.keypair.publicKey as Uint8Array,
+        )
 
         // INFO: If no ed25519 address is provided, use the connected master seed's ed25519 address
         if (!raw_tx.content.from_ed25519_address) {
             const { publicKey } = await this.crypto.getIdentity("ed25519")
-            raw_tx.content.from_ed25519_address = uint8ArrayToHex(publicKey as Uint8Array)
+            raw_tx.content.from_ed25519_address = uint8ArrayToHex(
+                publicKey as Uint8Array,
+            )
         }
 
         // INFO: Client-side enforcement of reflexive transactions
-        const reflexive: TransactionContent['type'][] = ["identity", "crosschainOperation", "web2Request", "nativeBridge"]
+        const reflexive: TransactionContent["type"][] = [
+            "identity",
+            "crosschainOperation",
+            "web2Request",
+            "nativeBridge",
+        ]
 
         if (reflexive.includes(raw_tx.content.type)) {
             if (raw_tx.content.from_ed25519_address !== raw_tx.content.to) {
-                throw new Error("Transaction of type: " + raw_tx.content.type + " must have the same from and to addresses")
+                throw new Error(
+                    "Transaction of type: " +
+                        raw_tx.content.type +
+                        " must have the same from and to addresses",
+                )
             }
         }
 
@@ -334,12 +426,16 @@ export class Demos {
         if (isStorageTransaction) {
             // Storage transactions must use stor- address format
             if (!isStorageAddress) {
-                throw new Error(`Invalid storage address format: ${raw_tx.content.to}. Expected: stor-{40 hex chars}`)
+                throw new Error(
+                    `Invalid storage address format: ${raw_tx.content.to}. Expected: stor-{40 hex chars}`,
+                )
             }
         } else {
             // Non-storage transactions must use 0x address format
             if (isStorageAddress) {
-                throw new Error(`Storage address format not allowed for transaction type: ${raw_tx.content.type}`)
+                throw new Error(
+                    `Storage address format not allowed for transaction type: ${raw_tx.content.type}`,
+                )
             }
             // Add 0x prefix to regular addresses if not present
             if (!raw_tx.content.to.startsWith("0x")) {
@@ -353,7 +449,8 @@ export class Demos {
         }
 
         if (!raw_tx.content.from_ed25519_address.startsWith("0x")) {
-            raw_tx.content.from_ed25519_address = "0x" + raw_tx.content.from_ed25519_address
+            raw_tx.content.from_ed25519_address =
+                "0x" + raw_tx.content.from_ed25519_address
         }
 
         if (!raw_tx.content.from.startsWith("0x")) {
@@ -386,7 +483,9 @@ export class Demos {
                 "ed25519",
                 new TextEncoder().encode(raw_tx.hash),
             )
-            raw_tx.ed25519_signature = uint8ArrayToHex(ed25519_signature.signature)
+            raw_tx.ed25519_signature = uint8ArrayToHex(
+                ed25519_signature.signature,
+            )
         }
 
         raw_tx.signature = {
@@ -405,7 +504,10 @@ export class Demos {
      * @param options.algorithm - The algorithm to use for the message signing. Defaults to the connected wallet's algorithm.
      * @returns The signature of the message
      */
-    async signMessage(message: string | Buffer, options?: { algorithm?: SigningAlgorithm }): Promise<{ type: SigningAlgorithm, data: string }> {
+    async signMessage(
+        message: string | Buffer,
+        options?: { algorithm?: SigningAlgorithm },
+    ): Promise<{ type: SigningAlgorithm; data: string }> {
         const algorithm = options?.algorithm || this.algorithm
 
         const keypair = await this.crypto.getIdentity(algorithm)
@@ -421,10 +523,7 @@ export class Demos {
             messageBuffer = message
         }
 
-        const signature = await this.crypto.sign(
-            algorithm,
-            messageBuffer,
-        )
+        const signature = await this.crypto.sign(algorithm, messageBuffer)
 
         return { type: algorithm, data: uint8ArrayToHex(signature.signature) }
     }
@@ -437,10 +536,15 @@ export class Demos {
      * @param publicKey - The public key of the message
      * @param options - The options for the message verification
      * @param options.algorithm - The algorithm to use for the message verification. Defaults to the connected wallet's algorithm or ed25519 if no wallet is connected.
-     * 
+     *
      * @returns Whether the message is verified
      */
-    async verifyMessage(message: string | Buffer, signature: string, publicKey: string, options?: { algorithm?: SigningAlgorithm }): Promise<boolean> {
+    async verifyMessage(
+        message: string | Buffer,
+        signature: string,
+        publicKey: string,
+        options?: { algorithm?: SigningAlgorithm },
+    ): Promise<boolean> {
         const algorithm = options?.algorithm || this.algorithm
 
         let messageBuffer: Uint8Array = null
@@ -501,11 +605,18 @@ export class Demos {
         }, 0)
 
         const txAmt = Number(raw_tx.content.amount ?? 0)
-        const calculatedFee = Math.max(totalRemoved - (Number.isFinite(txAmt) ? txAmt : 0), 0)
+        const calculatedFee = Math.max(
+            totalRemoved - (Number.isFinite(txAmt) ? txAmt : 0),
+            0,
+        )
 
         // INFO: This logic handles both initial fee creation and accumulation for re-signed transactions.
         // To avoid fee accumulation, a new transaction object should be created for each signing.
-        const existing = raw_tx.content.transaction_fee ?? { network_fee: 0, rpc_fee: 0, additional_fee: 0 }
+        const existing = raw_tx.content.transaction_fee ?? {
+            network_fee: 0,
+            rpc_fee: 0,
+            additional_fee: 0,
+        }
         const totalExisting =
             (Number(existing.network_fee) || 0) +
             (Number(existing.rpc_fee) || 0) +
@@ -764,8 +875,16 @@ export class Demos {
      *
      * @returns A list of transaction ordered from the most recent to the oldest.
      */
-    async getTransactionHistory(address: string, type: TransactionContent["type"] | "all" = "all", options: { start?: number, limit?: number } = {}): Promise<Transaction[]> {
-        return await this.nodeCall("getTransactionHistory", { address, type, ...options })
+    async getTransactionHistory(
+        address: string,
+        type: TransactionContent["type"] | "all" = "all",
+        options: { start?: number; limit?: number } = {},
+    ): Promise<Transaction[]> {
+        return await this.nodeCall("getTransactionHistory", {
+            address,
+            type,
+            ...options,
+        })
     }
 
     /**
@@ -921,7 +1040,9 @@ export class Demos {
                 )
             }
 
-            const info = (await this.nodeCall("tlsnotary.getInfo")) as TLSNotaryDiscoveryInfo
+            const info = (await this.nodeCall(
+                "tlsnotary.getInfo",
+            )) as TLSNotaryDiscoveryInfo
 
             if (!info || !info.notaryUrl) {
                 throw new Error(
@@ -955,16 +1076,28 @@ export class Demos {
         createDahr: async () => {
             return await web2Calls.createDahr(this)
         },
-        getTweet: async (tweetUrl: string): Promise<{ success: boolean, tweet: TweetSimplified, error?: string }> => {
+        getTweet: async (
+            tweetUrl: string,
+        ): Promise<{
+            success: boolean
+            tweet: TweetSimplified
+            error?: string
+        }> => {
             return await this.nodeCall("getTweet", {
                 tweetUrl,
             })
         },
-        getDiscordMessage: async (discordUrl: string): Promise<{ success: boolean, message: GetDiscordMessageResult, error?: string }> => {
+        getDiscordMessage: async (
+            discordUrl: string,
+        ): Promise<{
+            success: boolean
+            message: GetDiscordMessageResult
+            error?: string
+        }> => {
             return await this.nodeCall("getDiscordMessage", {
                 discordUrl,
             })
-        }
+        },
     }
 
     // REVIEW: Phase 9 - IPFS cost estimation endpoints
@@ -1037,9 +1170,7 @@ export class Demos {
          *
          * @param raw_tx - The transaction to be signed.
          */
-        sign: (
-            raw_tx: Transaction,
-        ) => {
+        sign: (raw_tx: Transaction) => {
             return this.sign(raw_tx)
         },
     }
