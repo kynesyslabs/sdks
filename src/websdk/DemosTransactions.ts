@@ -14,6 +14,17 @@ import { Cryptography } from "@/encryption"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { Enigma } from "@/encryption/PQC/enigma"
 import { BroadcastTimeoutError } from "./BroadcastTimeoutError"
+import { BroadcastFailedError } from "./BroadcastFailedError"
+
+// Connection-error codes indicating the request never reached the node.
+// HTTP 5xx is intentionally NOT in this set: a 5xx means the server did
+// answer, so the broadcast may have landed even if the response was lost.
+const NO_SERVER_CONTACT_CODES = new Set([
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "ECONNRESET",
+    "ETIMEDOUT",
+])
 
 export const DemosTransactions = {
     // REVIEW All this part
@@ -254,23 +265,37 @@ export const DemosTransactions = {
      * the last observed state, and the elapsed time so the caller can
      * resume polling.
      *
+     * When `opts.failFastOnBroadcastError` is true, also throws
+     * `BroadcastFailedError` synchronously when the broadcast itself can't
+     * reach the node (e.g., ECONNREFUSED, ENOTFOUND). HTTP 5xx responses
+     * are NOT considered fail-fast cases - the server did answer, so the
+     * tx may still have landed and polling should run. Defaults to false
+     * for one release to preserve current callers' behavior.
+     *
      * @param validationData - The validity data of the transaction (from `confirm`)
      * @param demos - The demos instance
      * @param opts.timeoutMs - Total time to wait for inclusion. Defaults to 30_000.
      * @param opts.pollIntervalMs - Delay between status polls. Defaults to 500.
+     * @param opts.failFastOnBroadcastError - If true, throw `BroadcastFailedError`
+     *   immediately when the broadcast can't contact the node. Defaults to false.
      *
      * @returns The original broadcast response and the terminal status.
      */
     broadcastAndWait: async function (
         validationData: RPCResponseWithValidityData,
         demos: Demos,
-        opts?: { timeoutMs?: number; pollIntervalMs?: number },
+        opts?: {
+            timeoutMs?: number
+            pollIntervalMs?: number
+            failFastOnBroadcastError?: boolean
+        },
     ): Promise<{
         broadcast: RPCResponse
         status: { state: "included" | "failed"; blockNumber?: number }
     }> {
         const timeout = opts?.timeoutMs ?? 30_000
         const pollInterval = opts?.pollIntervalMs ?? 500
+        const failFast = opts?.failFastOnBroadcastError ?? false
 
         // Extract the tx hash from the validity data before broadcasting so
         // we can include it in any timeout error.
@@ -283,6 +308,33 @@ export const DemosTransactions = {
             validationData,
             demos,
         )
+
+        // 1a. (Opt-in) If the broadcast never reached the node, surface that
+        //     immediately rather than waiting out the full timeout. We detect
+        //     this via the back-compat envelope produced by `demos.call` on
+        //     transport failure: { result: 500, response: <error>, require_reply, ... }.
+        //     Only "no server contact" codes are fail-fast; HTTP 5xx means the
+        //     server did answer and the tx may still have landed, so polling runs.
+        if (failFast) {
+            const isTransportFailureEnvelope =
+                broadcastRes &&
+                typeof broadcastRes === "object" &&
+                (broadcastRes as any).result === 500 &&
+                "require_reply" in broadcastRes
+            if (isTransportFailureEnvelope) {
+                const cause = (broadcastRes as any).response
+                const code: string | undefined = (cause as any)?.code
+                const sawServer =
+                    typeof (cause as any)?.response?.status === "number"
+                const noServerContact =
+                    !sawServer &&
+                    typeof code === "string" &&
+                    NO_SERVER_CONTACT_CODES.has(code)
+                if (noServerContact) {
+                    throw new BroadcastFailedError({ txHash, cause })
+                }
+            }
+        }
 
         const start = Date.now()
         let attempt = 0
