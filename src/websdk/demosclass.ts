@@ -7,6 +7,7 @@ This library contains all the functions that are used to interact with the demos
 import axios from "axios"
 import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
+import { TransportError } from "./TransportError"
 
 // NOTE Including custom libraries from Demos
 import { DemosTransactions } from "./DemosTransactions"
@@ -635,6 +636,103 @@ export class Demos {
 
     // L2PS calls are defined here
 
+    /**
+     * Single transport wrapper for axios.post against the Demos RPC node.
+     *
+     * Retries:
+     *   - connection-level errors: ECONNRESET, ECONNREFUSED, ETIMEDOUT, ENOTFOUND
+     *   - HTTP 502, 503, 504
+     * Never retries on 4xx (those are client errors, including the node-side
+     * 404 "Unknown message" introduced by Phase 1 item 1).
+     *
+     * Backoff is exponential (baseSleepMs * 2^attempt), capped at 8s. A
+     * Retry-After response header (numeric seconds, or HTTP-date) overrides
+     * the computed backoff for that attempt.
+     *
+     * On terminal failure, throws a TransportError carrying the underlying
+     * cause and the total number of attempts. Callers that need the legacy
+     * "never throws, returns {result: 500, response: error}" behavior should
+     * wrap this in their own try/catch (see `call` below).
+     */
+    private async _doPost<T = RPCResponse>(
+        url: string,
+        request: any,
+        headers: Record<string, string | undefined>,
+        opts: { retries?: number; baseSleepMs?: number } = {},
+    ): Promise<{ data: T }> {
+        const maxRetries = opts.retries ?? 4
+        const baseSleepMs = opts.baseSleepMs ?? 250
+        const RETRYABLE_CODES = new Set([
+            "ECONNRESET",
+            "ECONNREFUSED",
+            "ETIMEDOUT",
+            "ENOTFOUND",
+        ])
+        const RETRYABLE_STATUSES = new Set([502, 503, 504])
+        const MAX_BACKOFF_MS = 8000
+
+        let lastError: unknown = null
+
+        // attempt 0 is the initial try; we then retry up to maxRetries times.
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await axios.post<T>(url, request, { headers })
+                return { data: response.data }
+            } catch (error: any) {
+                lastError = error
+
+                const code: string | undefined = error?.code
+                const status: number | undefined = error?.response?.status
+
+                const isConnError =
+                    typeof code === "string" && RETRYABLE_CODES.has(code)
+                const isRetryableStatus =
+                    typeof status === "number" &&
+                    RETRYABLE_STATUSES.has(status)
+
+                const shouldRetry =
+                    (isConnError || isRetryableStatus) && attempt < maxRetries
+
+                if (!shouldRetry) {
+                    break
+                }
+
+                // Honor Retry-After if present. Conservative parsing: numeric
+                // seconds first, then HTTP-date via Date.parse, else fallback
+                // to exponential backoff.
+                let waitMs = Math.min(
+                    baseSleepMs * Math.pow(2, attempt),
+                    MAX_BACKOFF_MS,
+                )
+                const retryAfter: string | undefined =
+                    error?.response?.headers?.["retry-after"]
+                if (typeof retryAfter === "string" && retryAfter.length > 0) {
+                    if (/^\d+$/.test(retryAfter.trim())) {
+                        waitMs = parseInt(retryAfter, 10) * 1000
+                    } else {
+                        const parsed = Date.parse(retryAfter)
+                        if (!Number.isNaN(parsed)) {
+                            waitMs = Math.max(0, parsed - Date.now())
+                        }
+                    }
+                }
+
+                await sleep(waitMs)
+            }
+        }
+
+        const attempts = maxRetries + 1
+        const reason =
+            (lastError as any)?.code ??
+            (lastError as any)?.response?.status ??
+            (lastError as any)?.message ??
+            "unknown"
+        throw new TransportError(
+            `Demos RPC POST to ${url} failed after ${attempts} attempt(s): ${reason}`,
+            { cause: lastError, attempts },
+        )
+    }
+
     async rpcCall(
         request: RPCRequest,
         isAuthenticated: boolean = false,
@@ -654,17 +752,24 @@ export class Demos {
             signature = uint8ArrayToHex(_signature.signature)
         }
 
+        const headers = {
+            "Content-Type": "application/json",
+            identity: this.algorithm + ":" + publicKey,
+            signature: signature,
+        }
+
+        // Map the legacy `retries`/`sleepTime` knobs onto _doPost's opts so
+        // existing callers keep working unchanged. Note: the legacy retry
+        // semantics retried on *application-level* non-200 RPC results; the
+        // new transport retries on *connection/5xx* failures. We preserve the
+        // legacy "retry until result==200 or budget exhausted" loop here in
+        // addition to the transport-level retries handled by _doPost.
         try {
-            const response = await axios.post<RPCResponse>(
+            const response = await this._doPost<RPCResponse>(
                 this.rpc_url,
                 request,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        identity: this.algorithm + ":" + publicKey,
-                        signature: signature,
-                    },
-                },
+                headers,
+                { retries, baseSleepMs: sleepTime },
             )
 
             if (
@@ -687,6 +792,9 @@ export class Demos {
 
             return response.data
         } catch (error) {
+            // Preserve legacy not-throwing behavior on terminal transport
+            // failure. Callers that want the typed TransportError can use
+            // _doPost directly.
             console.error(error)
             return {
                 result: 500,
@@ -750,16 +858,20 @@ export class Demos {
             pubkey_signature = uint8ArrayToHex(signature.signature)
         }
 
+        // BACK-COMPAT: existing callers (DemosTransactions.confirm/broadcast,
+        // Web2Calls, contract helpers) rely on `call` never throwing - on
+        // failure they expect `{result: 500, response: <error>}`. We keep that
+        // contract here by catching TransportError (and any unexpected error)
+        // from _doPost. Callers that want the typed TransportError can use
+        // _doPost directly.
         try {
-            const response = await axios.post<RPCResponse>(
+            const response = await this._doPost<RPCResponse>(
                 this.rpc_url,
                 request,
                 {
-                    headers: {
-                        "Content-Type": "application/json",
-                        identity: pubkey_string,
-                        signature: pubkey_signature,
-                    },
+                    "Content-Type": "application/json",
+                    identity: pubkey_string,
+                    signature: pubkey_signature,
                 },
             )
 
