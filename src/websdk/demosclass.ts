@@ -375,6 +375,25 @@ export class Demos {
     }
 
     /**
+     * Broadcast a confirmed transaction and wait until it lands on chain
+     * (or fails) by polling the node's `getTransactionStatus` RPC.
+     *
+     * Throws `BroadcastTimeoutError` if no terminal state is observed
+     * before the timeout elapses. Use plain `broadcast()` if you want to
+     * handle async confirmation yourself.
+     *
+     * @param validationData - The validity data of the transaction
+     * @param opts.timeoutMs - Total time to wait. Defaults to 30_000.
+     * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
+     */
+    broadcastAndWait(
+        validationData: RPCResponseWithValidityData,
+        opts?: { timeoutMs?: number; pollIntervalMs?: number },
+    ) {
+        return DemosTransactions.broadcastAndWait(validationData, this, opts)
+    }
+
+    /**
      * Signs a transaction.
      *
      * @param raw_tx - The transaction to sign

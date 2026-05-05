@@ -9,10 +9,11 @@ import type { L2PSHashPayload } from "@/types/blockchain/TransactionSubtypes/L2P
 import { IKeyPair } from "./types/KeyPair"
 import { GCRGeneration } from "./GCRGeneration"
 import { _required as required } from "./utils/required"
-import { RPCResponseWithValidityData } from "@/types/communication/rpc"
+import { RPCResponse, RPCResponseWithValidityData } from "@/types/communication/rpc"
 import { Cryptography } from "@/encryption"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { Enigma } from "@/encryption/PQC/enigma"
+import { BroadcastTimeoutError } from "./BroadcastTimeoutError"
 
 export const DemosTransactions = {
     // REVIEW All this part
@@ -238,7 +239,114 @@ export const DemosTransactions = {
             return res
         }
     },
-    
+
+    /**
+     * Broadcast a confirmed transaction and wait for inclusion.
+     *
+     * Polls the node's `getTransactionStatus` RPC until the tx is observed
+     * `included` or `failed`, or until `opts.timeoutMs` elapses (default 30s).
+     *
+     * Use this when you want a single call with a deterministic outcome.
+     * Use plain `broadcast()` when you want to handle async confirmation
+     * yourself.
+     *
+     * On timeout, throws `BroadcastTimeoutError` carrying the tx hash,
+     * the last observed state, and the elapsed time so the caller can
+     * resume polling.
+     *
+     * @param validationData - The validity data of the transaction (from `confirm`)
+     * @param demos - The demos instance
+     * @param opts.timeoutMs - Total time to wait for inclusion. Defaults to 30_000.
+     * @param opts.pollIntervalMs - Delay between status polls. Defaults to 500.
+     *
+     * @returns The original broadcast response and the terminal status.
+     */
+    broadcastAndWait: async function (
+        validationData: RPCResponseWithValidityData,
+        demos: Demos,
+        opts?: { timeoutMs?: number; pollIntervalMs?: number },
+    ): Promise<{
+        broadcast: RPCResponse
+        status: { state: "included" | "failed"; blockNumber?: number }
+    }> {
+        const timeout = opts?.timeoutMs ?? 30_000
+        const pollInterval = opts?.pollIntervalMs ?? 500
+
+        // Extract the tx hash from the validity data before broadcasting so
+        // we can include it in any timeout error.
+        const txHash = validationData?.response?.data?.transaction?.hash
+        required(txHash, "Could not find transaction hash on validationData")
+
+        // 1. Broadcast first - reuses existing semantics so any failure here
+        //    surfaces exactly the same way as a plain broadcast() call.
+        const broadcastRes = await DemosTransactions.broadcast(
+            validationData,
+            demos,
+        )
+
+        const start = Date.now()
+        let attempt = 0
+        let lastState: string = "unknown"
+
+        // 2. Poll until terminal state or timeout. Mirrors KeyServerClient's
+        //    pollOAuth pattern: skip the initial sleep on the first attempt
+        //    so a tx that lands instantly returns quickly.
+        while (Date.now() - start < timeout) {
+            attempt++
+
+            if (attempt > 1) {
+                await new Promise(r => setTimeout(r, pollInterval))
+            }
+
+            const statusRes = await demos.call(
+                "nodeCall",
+                "",
+                { hash: txHash },
+                "getTransactionStatus",
+            )
+
+            // `Demos.call("nodeCall", ...)` normally returns the inner
+            // `response` payload directly (e.g. `{ state, blockNumber? }`).
+            // On a terminal transport failure it returns the back-compat
+            // envelope `{ result: 500, response: <error> }`. Tolerate that
+            // as a transient hiccup and keep polling - we don't want a
+            // single 5xx blip to break the wait.
+            const isTransportFailureEnvelope =
+                statusRes &&
+                typeof statusRes === "object" &&
+                "result" in statusRes &&
+                (statusRes as any).result === 500 &&
+                "require_reply" in statusRes
+
+            if (isTransportFailureEnvelope) {
+                continue
+            }
+
+            const state: string | undefined =
+                statusRes && typeof statusRes === "object"
+                    ? (statusRes as any).state
+                    : undefined
+
+            if (typeof state === "string") {
+                lastState = state
+                if (state === "included" || state === "failed") {
+                    const blockNumber: number | undefined =
+                        (statusRes as any).blockNumber
+                    return {
+                        broadcast: broadcastRes,
+                        status: { state, blockNumber },
+                    }
+                }
+            }
+        }
+
+        throw new BroadcastTimeoutError({
+            txHash,
+            lastSeenState: lastState,
+            elapsedMs: Date.now() - start,
+        })
+    },
+
     /**
      * Create a signed DEMOS transaction to store binary data on the blockchain.
      * Data is stored in the sender's account.
