@@ -691,9 +691,10 @@ export class Demos {
         const MAX_BACKOFF_MS = 8000
 
         let lastError: unknown = null
+        let attempt = 0
 
         // attempt 0 is the initial try; we then retry up to maxRetries times.
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        for (; attempt <= maxRetries; attempt++) {
             try {
                 const response = await axios.post<T>(url, request, { headers })
                 return { data: response.data }
@@ -718,7 +719,9 @@ export class Demos {
 
                 // Honor Retry-After if present. Conservative parsing: numeric
                 // seconds first, then HTTP-date via Date.parse, else fallback
-                // to exponential backoff.
+                // to exponential backoff. All branches are clamped to
+                // MAX_BACKOFF_MS so a misbehaving node can't stall a single
+                // request indefinitely.
                 let waitMs = Math.min(
                     baseSleepMs * Math.pow(2, attempt),
                     MAX_BACKOFF_MS,
@@ -727,11 +730,17 @@ export class Demos {
                     error?.response?.headers?.["retry-after"]
                 if (typeof retryAfter === "string" && retryAfter.length > 0) {
                     if (/^\d+$/.test(retryAfter.trim())) {
-                        waitMs = parseInt(retryAfter, 10) * 1000
+                        waitMs = Math.min(
+                            parseInt(retryAfter, 10) * 1000,
+                            MAX_BACKOFF_MS,
+                        )
                     } else {
                         const parsed = Date.parse(retryAfter)
                         if (!Number.isNaN(parsed)) {
-                            waitMs = Math.max(0, parsed - Date.now())
+                            waitMs = Math.min(
+                                Math.max(0, parsed - Date.now()),
+                                MAX_BACKOFF_MS,
+                            )
                         }
                     }
                 }
@@ -740,7 +749,10 @@ export class Demos {
             }
         }
 
-        const attempts = maxRetries + 1
+        // attempt is incremented past the last successful iteration on natural
+        // loop exit, and equals the break-point on early exit. Clamp to the
+        // budget so the reported count never exceeds maxRetries+1.
+        const attempts = Math.min(attempt + 1, maxRetries + 1)
         const reason =
             (lastError as any)?.code ??
             (lastError as any)?.response?.status ??
