@@ -2,6 +2,9 @@
 export { demos } from "./demos"
 export { Demos } from "./demosclass"
 export { DemosTransactions } from "./DemosTransactions"
+export { TransportError } from "./TransportError"
+export { BroadcastTimeoutError } from "./BroadcastTimeoutError"
+export { BroadcastFailedError } from "./BroadcastFailedError"
 
 export { RSA } from "./rsa"
 export { DemosWebAuth } from "./DemosWebAuth"
