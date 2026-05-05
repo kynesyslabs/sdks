@@ -789,18 +789,20 @@ export class Demos {
             signature: signature,
         }
 
-        // Map the legacy `retries`/`sleepTime` knobs onto _doPost's opts so
-        // existing callers keep working unchanged. Note: the legacy retry
-        // semantics retried on *application-level* non-200 RPC results; the
-        // new transport retries on *connection/5xx* failures. We preserve the
-        // legacy "retry until result==200 or budget exhausted" loop here in
-        // addition to the transport-level retries handled by _doPost.
+        // The legacy `retries`/`sleepTime` knobs are application-level: they
+        // retry on non-200 RPC *results*. _doPost's retries are a separate
+        // transport-level budget covering connection errors and 5xx. We do
+        // NOT forward `retries` into _doPost - forwarding would (a) disable
+        // transport retries entirely when callers pass the default of 0, and
+        // (b) couple the two layers, multiplying total attempts. _doPost
+        // keeps its own internal default; baseSleepMs is shared because both
+        // layers want the same backoff base.
         try {
             const response = await this._doPost<RPCResponse>(
                 this.rpc_url,
                 request,
                 headers,
-                { retries, baseSleepMs: sleepTime },
+                { baseSleepMs: sleepTime },
             )
 
             if (
