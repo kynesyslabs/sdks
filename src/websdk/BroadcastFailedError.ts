@@ -13,7 +13,7 @@
  */
 export class BroadcastFailedError extends Error {
     public readonly txHash: string
-    public override readonly cause: unknown
+    public readonly cause: unknown
 
     constructor(opts: { txHash: string; cause: unknown; message?: string }) {
         const causeMessage =
