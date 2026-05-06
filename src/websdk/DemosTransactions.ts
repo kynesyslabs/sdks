@@ -641,10 +641,11 @@ export const DemosTransactions = {
         // Drop undefined-valued keys before counting + signing — JSON.stringify
         // would silently strip them, so a tx with only-undefined values would
         // sign as `{}` and get rejected at the node.
-        const cleanedParams: Record<string, unknown> = {}
-        for (const [k, v] of Object.entries(params.proposedParameters)) {
-            if (v !== undefined) cleanedParams[k] = v
-        }
+        // Preserves Partial<NetworkParameters> typing for downstream consumers.
+        const cleanedParams = Object.fromEntries(
+            Object.entries(params.proposedParameters)
+                .filter(([, v]) => v !== undefined)
+        ) as Partial<NetworkParameters>
         if (Object.keys(cleanedParams).length === 0) {
             throw new Error(
                 "proposedParameters must contain at least one defined value",
