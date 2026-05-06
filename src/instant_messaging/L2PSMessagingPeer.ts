@@ -584,7 +584,12 @@ export class L2PSMessagingPeer {
     }
 
     private generateRequestId(): string {
-        return `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+        const buf = new Uint8Array(5)
+        crypto.getRandomValues(buf)
+        const rand = Array.from(buf, b =>
+            b.toString(16).padStart(2, "0"),
+        ).join("")
+        return `req_${Date.now()}_${rand}`
     }
 }
 

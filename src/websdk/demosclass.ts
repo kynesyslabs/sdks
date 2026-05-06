@@ -259,17 +259,15 @@ export class Demos {
     // !SECTION Connection and listeners
 
     /**
-     * Generates a random MUID using a CSPRNG. Math.random() is forbidden
-     * here — the value flows into security-sensitive paths and a
-     * predictable PRNG would let an attacker pre-compute MUIDs.
+     * Generates a random MUID using a CSPRNG. Math.random is unsafe in any
+     * security-sensitive path (a predictable PRNG lets an attacker
+     * pre-compute MUIDs). 26 bytes → 52 hex chars, same length range as the
+     * legacy MUID format.
      */
     generateMuid() {
-        const buf = new Uint8Array(24)
-        // Browser + Node 19+ + Bun
+        const buf = new Uint8Array(26)
         crypto.getRandomValues(buf)
-        let s = ""
-        for (const b of buf) s += b.toString(36)
-        return s.slice(0, 52)
+        return Array.from(buf, b => b.toString(16).padStart(2, "0")).join("")
     }
 
     /**

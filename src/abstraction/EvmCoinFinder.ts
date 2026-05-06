@@ -82,8 +82,20 @@ export class EvmCoinFinder {
             throw new Error(`No providers found for chain ${chainId}`)
         }
 
-        // Shuffle RPC URLs to try them in random order
-        const shuffledUrls = [...rpcUrls].sort(() => Math.random() - 0.5)
+        // Fisher-Yates with CSPRNG. Plain Math.random() trips CodeQL's
+        // taint analysis in any file shared with the security-sensitive
+        // SDK paths, so use crypto.getRandomValues even though this
+        // shuffle itself isn't security-critical.
+        const shuffledUrls = [...rpcUrls]
+        const randBuf = new Uint32Array(shuffledUrls.length)
+        crypto.getRandomValues(randBuf)
+        for (let i = shuffledUrls.length - 1; i > 0; i--) {
+            const j = randBuf[i] % (i + 1)
+            ;[shuffledUrls[i], shuffledUrls[j]] = [
+                shuffledUrls[j],
+                shuffledUrls[i],
+            ]
+        }
 
         // Try each RPC until one works
         for (const rpcUrl of shuffledUrls) {

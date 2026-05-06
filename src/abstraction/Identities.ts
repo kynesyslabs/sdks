@@ -1047,7 +1047,11 @@ export class Identities {
         signingAddress: string,
     ): string {
         const timestamp = Date.now()
-        const nonce = Math.random().toString(36).substring(7)
+        const nonceBuf = new Uint8Array(8)
+        crypto.getRandomValues(nonceBuf)
+        const nonce = Array.from(nonceBuf, b =>
+            b.toString(16).padStart(2, "0"),
+        ).join("")
 
         return (
             `Link ${signingAddress} to Demos identity ${demosPublicKey}\n` +
