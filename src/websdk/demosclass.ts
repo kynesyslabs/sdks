@@ -1177,6 +1177,15 @@ export class Demos {
         )) as NetworkParameters | null
     }
 
+    /**
+     * Returns network parameters with a short-lived TTL cache to reduce RPC
+     * calls during signing. Cache is scoped to the active `rpc_url` — a
+     * network change within TTL invalidates the entry.
+     *
+     * @param ttlMs - Cache TTL in milliseconds (default: 30_000).
+     * @returns The cached `NetworkParameters`, or `null` if not connected /
+     *   the response shape is invalid.
+     */
     private async _getNetworkParametersCached(
         ttlMs = 30_000,
     ): Promise<NetworkParameters | null> {

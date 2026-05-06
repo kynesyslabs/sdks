@@ -516,16 +516,8 @@ export const DemosTransactions = {
                 "Invalid stake amount: expected a non-negative bigint-encoded string",
             )
         }
-        try {
-            if (BigInt(amount) <= 0n) {
-                throw new Error("Stake amount must be > 0")
-            }
-        } catch (e) {
-            throw new Error(
-                e instanceof Error
-                    ? `Invalid stake amount: ${e.message}`
-                    : "Invalid stake amount",
-            )
+        if (BigInt(amount) <= 0n) {
+            throw new Error("Stake amount must be greater than 0")
         }
         required(connectionUrl, "Connection URL is required")
         try {
