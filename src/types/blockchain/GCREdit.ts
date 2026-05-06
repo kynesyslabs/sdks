@@ -221,6 +221,62 @@ export interface GCREditTLSNotary {
     isRollback: boolean
 }
 
+/**
+ * Validator-staking GCR edit. Emitted by validatorStake / validatorUnstake /
+ * validatorExit transactions. Applied against the Validators table.
+ */
+export interface GCREditValidatorStake {
+    type: "validatorStake"
+    isRollback: boolean
+    account: string                  // validator ed25519 pubkey hex
+    operation: "stake" | "unstake" | "exit"
+    amount: string                   // bigint-as-string; "0" for unstake/exit
+    connectionUrl?: string           // only meaningful for the initial stake
+    txhash: string
+}
+
+/**
+ * Stackable-genesis governance GCR edit — proposal lifecycle.
+ * Emitted by `networkUpgrade` transactions. Applied to the
+ * `network_upgrades` table at block-confirmation time on every node.
+ *
+ * Carries only client-derivable fields. Server-derived fields
+ * (`version`, `snapshotBlock`, `tallyBlock`) are filled at apply time
+ * by `GCRNetworkUpgradeRoutines.applyProposal` so the edit hash is
+ * deterministic from tx content alone (matches between SDK
+ * `GCRGeneration.generate()` and node-side `handleValidateTransaction`
+ * comparison).
+ */
+export interface GCREditNetworkUpgrade {
+    type: "networkUpgrade"
+    isRollback: boolean
+    account: string                  // proposer ed25519 pubkey hex
+    proposalId: string
+    proposedParameters: Record<string, unknown>  // Partial<NetworkParameters>
+    rationale: string
+    effectiveAtBlock: number
+    txhash: string
+}
+
+/**
+ * Stackable-genesis governance GCR edit — vote.
+ * Emitted by `networkUpgradeVote` transactions. Applied to the
+ * `network_upgrade_votes` table at block-confirmation time on every node.
+ *
+ * `weight` and `blockNumber` are server-derived at apply time —
+ * voter's snapshotted staked amount + the block number being confirmed.
+ * Keeping them out of the signed edit means the edit hash is
+ * deterministic from tx content alone and matches across SDK + server.
+ */
+export interface GCREditNetworkUpgradeVote {
+    type: "networkUpgradeVote"
+    isRollback: boolean
+    account: string                  // voter ed25519 pubkey hex
+    proposalId: string
+    approve: boolean
+    txhash: string
+}
+
 export type GCREdit =
     | GCREditBalance
     | GCREditNonce
@@ -232,3 +288,6 @@ export type GCREdit =
     | GCREditStorageProgram
     | GCREditEscrow
     | GCREditTLSNotary
+    | GCREditValidatorStake
+    | GCREditNetworkUpgrade
+    | GCREditNetworkUpgradeVote

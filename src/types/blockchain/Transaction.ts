@@ -20,6 +20,11 @@ import { D402PaymentPayload } from "./TransactionSubtypes/D402PaymentTransaction
 import { EscrowPayload } from "./TransactionSubtypes/EscrowTransaction"
 import { IPFSPayload } from "./TransactionSubtypes/IPFSTransaction"
 import { TokenCreationPayload, TokenExecutionPayload } from "./TransactionSubtypes/TokenTransaction"
+import { ValidatorStakePayload } from "./TransactionSubtypes/ValidatorStakeTransaction"
+import { ValidatorUnstakePayload } from "./TransactionSubtypes/ValidatorUnstakeTransaction"
+import { ValidatorExitPayload } from "./TransactionSubtypes/ValidatorExitTransaction"
+import { NetworkUpgradePayload } from "./TransactionSubtypes/NetworkUpgradeTransaction"
+import { NetworkUpgradeVotePayload } from "./TransactionSubtypes/NetworkUpgradeVoteTransaction"
 import { CustomCharges } from "./CustomCharges"
 
 // TODO Implement multisignature transactions
@@ -50,6 +55,11 @@ export type TransactionContentData =
     | ["ipfs", IPFSPayload]
     | ["tokenCreation", TokenCreationPayload]
     | ["tokenExecution", TokenExecutionPayload]
+    | ["validatorStake", ValidatorStakePayload]
+    | ["validatorUnstake", ValidatorUnstakePayload]
+    | ["validatorExit", ValidatorExitPayload]
+    | ["networkUpgrade", NetworkUpgradePayload]
+    | ["networkUpgradeVote", NetworkUpgradeVotePayload]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
@@ -77,6 +87,11 @@ export interface TransactionContent {
     | "ipfs"
     | "tokenCreation"
     | "tokenExecution"
+    | "validatorStake"
+    | "validatorUnstake"
+    | "validatorExit"
+    | "networkUpgrade"
+    | "networkUpgradeVote"
     from: string
     from_ed25519_address: string
     to: string

@@ -24,6 +24,12 @@ import {
     XMScript,
 } from "@/types"
 import { AddressInfo } from "@/types/blockchain/address"
+import type { ValidatorInfo } from "@/types/validator/ValidatorTypes"
+import type {
+    NetworkParameters,
+    NetworkUpgradeProposal,
+    ProposalVoteInfo,
+} from "@/types/blockchain/NetworkParameters"
 import {
     RPCRequest,
     RPCResponse,
@@ -80,6 +86,10 @@ export class Demos {
 
     /** Cached TLSNotary instance */
     private _tlsnotaryInstance: TLSNotary | null = null
+
+    private _cachedNetworkParameters: NetworkParameters | null = null
+    private _cachedNetworkParametersAt = 0
+    private _cachedNetworkParametersRpcUrl: string | null = null
 
     /** Connection status of the RPC URL */
     connected: boolean = false
@@ -250,19 +260,15 @@ export class Demos {
     // !SECTION Connection and listeners
 
     /**
-     * Generates a random MUID.
-     *
-     * @returns The MUID
+     * Generates a random MUID using a CSPRNG. Math.random is unsafe in any
+     * security-sensitive path (a predictable PRNG lets an attacker
+     * pre-compute MUIDs). 26 bytes → 52 hex chars, same length range as the
+     * legacy MUID format.
      */
     generateMuid() {
-        const number_1 =
-            Math.random().toString(36).substring(2, 15) +
-            Math.random().toString(36).substring(2, 15)
-        const number_2 =
-            Math.random().toString(36).substring(2, 15) +
-            Math.random().toString(36).substring(2, 15)
-        const muid = number_1 + number_2
-        return muid
+        const buf = new Uint8Array(26)
+        crypto.getRandomValues(buf)
+        return Array.from(buf, b => b.toString(16).padStart(2, "0")).join("")
     }
 
     /**
@@ -479,14 +485,29 @@ export class Demos {
 
         raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
 
-        // We derive the network fee from GCR edits (sum of sender balance removals minus `amount`).
-        // This is a pragmatic interim approach; ideally the node should authoritatively return fees
-        // to avoid drift between SDK and node logic.
+        // Node is source of truth for governance-driven fees; edits-derived
+        // calc kicks in only if RPC is unreachable or endpoint is missing.
+        let appliedFromNode = false
         try {
-            raw_tx = this._calculateAndApplyGasFee(raw_tx)
-        } catch (e) {
-            // Non-fatal: if fee derivation fails, continue without modifying fees
-            console.warn("[demos] fee derivation skipped:", e)
+            const params = await this._getNetworkParametersCached()
+            if (params && typeof params.networkFee === "number") {
+                raw_tx.content.transaction_fee = {
+                    network_fee: params.networkFee,
+                    rpc_fee:
+                        typeof params.rpcFee === "number" ? params.rpcFee : 0,
+                    additional_fee: 0,
+                }
+                appliedFromNode = true
+            }
+        } catch {
+            /* fall through */
+        }
+        if (!appliedFromNode) {
+            try {
+                raw_tx = this._calculateAndApplyGasFee(raw_tx)
+            } catch (e) {
+                console.warn("[demos] fee derivation skipped:", e)
+            }
         }
 
         raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
@@ -1112,6 +1133,119 @@ export class Demos {
         }
 
         return 0
+    }
+
+    /**
+     * Get a validator's current record (stake, status, unstake timestamps).
+     * Returns null if the address is not (and never was) a validator.
+     */
+    async getValidatorInfo(address: string): Promise<ValidatorInfo | null> {
+        return (await this.nodeCall("getValidatorInfo", {
+            address,
+        })) as ValidatorInfo | null
+    }
+
+    /**
+     * List validators at a given block (defaults to the current head). Only
+     * returns validators whose `valid_at` block is <= the queried block and
+     * whose status is still active.
+     */
+    async getValidators(blockNumber?: number): Promise<ValidatorInfo[]> {
+        return ((await this.nodeCall("getValidators", {
+            blockNumber,
+        })) ?? []) as ValidatorInfo[]
+    }
+
+    /**
+     * Convenience: return a single validator's current staked amount as a
+     * bigint-encoded string. Returns `"0"` for non-validators.
+     */
+    async getStakedAmount(address: string): Promise<string> {
+        const v = await this.nodeCall("getStakedAmount", { address })
+        return typeof v === "string" ? v : "0"
+    }
+
+    // SECTION Governance (stackable-genesis, Phase 1)
+
+    /**
+     * Returns the currently-active NetworkParameters — the result of folding
+     * every `active` NetworkUpgrade over the genesis defaults.
+     */
+    async getNetworkParameters(): Promise<NetworkParameters | null> {
+        return (await this.nodeCall(
+            "getNetworkParameters",
+        )) as NetworkParameters | null
+    }
+
+    /**
+     * Returns network parameters with a short-lived TTL cache to reduce RPC
+     * calls during signing. Cache is scoped to the active `rpc_url` — a
+     * network change within TTL invalidates the entry.
+     *
+     * @param ttlMs - Cache TTL in milliseconds (default: 30_000).
+     * @returns The cached `NetworkParameters`, or `null` if not connected /
+     *   the response shape is invalid.
+     */
+    private async _getNetworkParametersCached(
+        ttlMs = 30_000,
+    ): Promise<NetworkParameters | null> {
+        if (!this.rpc_url) return null
+        const now = Date.now()
+        // Reuse the cached entry only if the underlying node hasn't changed.
+        // Without the rpc-url guard, switching networks within TTL applies
+        // the previous chain's fees to the new one's signed transactions.
+        if (
+            this._cachedNetworkParameters &&
+            this._cachedNetworkParametersRpcUrl === this.rpc_url &&
+            now - this._cachedNetworkParametersAt < ttlMs
+        ) {
+            return this._cachedNetworkParameters
+        }
+        const fresh = await this.getNetworkParameters()
+        // Validate shape before caching: nodeCall() can return a truthy
+        // RPC error envelope on transient failures; caching that would
+        // freeze the SDK on locally-derived fees for the full TTL.
+        if (
+            fresh &&
+            typeof fresh === "object" &&
+            typeof (fresh as NetworkParameters).networkFee === "number" &&
+            typeof (fresh as NetworkParameters).rpcFee === "number"
+        ) {
+            this._cachedNetworkParameters = fresh
+            this._cachedNetworkParametersAt = now
+            this._cachedNetworkParametersRpcUrl = this.rpc_url
+            return fresh
+        }
+        return null
+    }
+
+    /**
+     * Lists currently-open proposals (pending tally or activating after
+     * approval). Rejected/active historical proposals are not included.
+     */
+    async getActiveProposals(): Promise<NetworkUpgradeProposal[]> {
+        return ((await this.nodeCall("getActiveProposals")) ??
+            []) as NetworkUpgradeProposal[]
+    }
+
+    /**
+     * Returns the live vote tally for a specific proposal — total snapshot
+     * weight, approve/reject breakdowns, per-validator votes, threshold, and
+     * a `passed` flag.
+     */
+    async getProposalVotes(proposalId: string): Promise<ProposalVoteInfo | null> {
+        return (await this.nodeCall("getProposalVotes", {
+            proposalId,
+        })) as ProposalVoteInfo | null
+    }
+
+    /**
+     * Returns the ordered history of proposals whose status has reached
+     * `active`. Ordered by `effectiveAtBlock` ASC, then `proposalId` ASC.
+     */
+    async getUpgradeHistory(): Promise<NetworkUpgradeProposal[]> {
+        return ((await this.nodeCall("getUpgradeHistory")) ??
+            []) as NetworkUpgradeProposal[]
     }
 
     /**

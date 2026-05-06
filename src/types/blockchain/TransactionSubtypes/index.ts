@@ -16,6 +16,13 @@ export * from './EscrowTransaction'
 export * from './IPFSTransaction'
 // REVIEW: Token transaction types
 export * from './TokenTransaction'
+// Validator staking (Phase 0 / upgradable_network)
+export * from './ValidatorStakeTransaction'
+export * from './ValidatorUnstakeTransaction'
+export * from './ValidatorExitTransaction'
+// Stackable-genesis governance (Phase 1 / upgradable_network)
+export * from './NetworkUpgradeTransaction'
+export * from './NetworkUpgradeVoteTransaction'
 
 // Re-export all transaction types as a union
 import { L2PSTransaction } from './L2PSTransaction'
@@ -37,6 +44,11 @@ import { IPFSTransaction } from './IPFSTransaction'
 // REVIEW: Token transaction types
 import { TokenCreationTransaction } from './TokenTransaction'
 import { TokenExecutionTransaction } from './TokenTransaction'
+import { ValidatorStakeTransaction } from './ValidatorStakeTransaction'
+import { ValidatorUnstakeTransaction } from './ValidatorUnstakeTransaction'
+import { ValidatorExitTransaction } from './ValidatorExitTransaction'
+import { NetworkUpgradeTransaction } from './NetworkUpgradeTransaction'
+import { NetworkUpgradeVoteTransaction } from './NetworkUpgradeVoteTransaction'
 
 export type SpecificTransaction =
     | L2PSTransaction
@@ -59,3 +71,8 @@ export type SpecificTransaction =
     // REVIEW: Token transaction types
     | TokenCreationTransaction
     | TokenExecutionTransaction
+    | ValidatorStakeTransaction
+    | ValidatorUnstakeTransaction
+    | ValidatorExitTransaction
+    | NetworkUpgradeTransaction
+    | NetworkUpgradeVoteTransaction

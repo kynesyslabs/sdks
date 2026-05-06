@@ -32,8 +32,12 @@ export class Verifier {
     }
 
     generateChallenge(commitment: any): number {
+        // CSPRNG: a predictable challenge breaks the soundness of the
+        // interactive ZK proof.
         this.commitment = commitment
-        return Math.round(Math.random())
+        const buf = new Uint8Array(1)
+        crypto.getRandomValues(buf)
+        return buf[0] & 1
     }
 
     verifyResponse(response: any, challenge: number): boolean {
