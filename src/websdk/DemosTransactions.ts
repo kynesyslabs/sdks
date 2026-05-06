@@ -622,7 +622,8 @@ export const DemosTransactions = {
         demos: Demos,
     ) {
         required(demos.keypair, "Wallet not connected")
-        required(params?.proposalId?.trim(), "proposalId is required")
+        const trimmedProposalId = params?.proposalId?.trim()
+        required(trimmedProposalId, "proposalId is required")
         required(
             params?.rationale != null && typeof params.rationale === "string",
             "rationale is required (use empty string if none)",
@@ -639,11 +640,22 @@ export const DemosTransactions = {
         if (
             !params?.proposedParameters ||
             typeof params.proposedParameters !== "object" ||
-            Array.isArray(params.proposedParameters) ||
-            Object.keys(params.proposedParameters).length === 0
+            Array.isArray(params.proposedParameters)
         ) {
             throw new Error(
                 "proposedParameters must be a non-empty plain object",
+            )
+        }
+        // Drop undefined-valued keys before counting + signing — JSON.stringify
+        // would silently strip them, so a tx with only-undefined values would
+        // sign as `{}` and get rejected at the node.
+        const cleanedParams: Record<string, unknown> = {}
+        for (const [k, v] of Object.entries(params.proposedParameters)) {
+            if (v !== undefined) cleanedParams[k] = v
+        }
+        if (Object.keys(cleanedParams).length === 0) {
+            throw new Error(
+                "proposedParameters must contain at least one defined value",
             )
         }
 
@@ -657,7 +669,17 @@ export const DemosTransactions = {
         tx.content.amount = 0
         tx.content.type = "networkUpgrade"
         tx.content.timestamp = Date.now()
-        tx.content.data = ["networkUpgrade", params]
+        // Sign the trimmed/cleaned values — keep the wire format consistent
+        // with what the validation guards above accepted.
+        tx.content.data = [
+            "networkUpgrade",
+            {
+                proposalId: trimmedProposalId,
+                proposedParameters: cleanedParams,
+                rationale: params.rationale,
+                effectiveAtBlock: params.effectiveAtBlock,
+            },
+        ]
 
         return await demos.sign(tx)
     },
@@ -675,7 +697,8 @@ export const DemosTransactions = {
         demos: Demos,
     ) {
         required(demos.keypair, "Wallet not connected")
-        required(proposalId?.trim(), "proposalId is required")
+        const trimmedProposalId = proposalId?.trim()
+        required(trimmedProposalId, "proposalId is required")
         if (typeof approve !== "boolean") {
             throw new Error("approve must be a boolean (true=yes, false=no)")
         }
@@ -690,7 +713,10 @@ export const DemosTransactions = {
         tx.content.amount = 0
         tx.content.type = "networkUpgradeVote"
         tx.content.timestamp = Date.now()
-        tx.content.data = ["networkUpgradeVote", { proposalId, approve }]
+        tx.content.data = [
+            "networkUpgradeVote",
+            { proposalId: trimmedProposalId, approve },
+        ]
 
         return await demos.sign(tx)
     },

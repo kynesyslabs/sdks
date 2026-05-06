@@ -1193,12 +1193,21 @@ export class Demos {
             return this._cachedNetworkParameters
         }
         const fresh = await this.getNetworkParameters()
-        if (fresh) {
+        // Validate shape before caching: nodeCall() can return a truthy
+        // RPC error envelope on transient failures; caching that would
+        // freeze the SDK on locally-derived fees for the full TTL.
+        if (
+            fresh &&
+            typeof fresh === "object" &&
+            typeof (fresh as NetworkParameters).networkFee === "number" &&
+            typeof (fresh as NetworkParameters).rpcFee === "number"
+        ) {
             this._cachedNetworkParameters = fresh
             this._cachedNetworkParametersAt = now
             this._cachedNetworkParametersRpcUrl = this.rpc_url
+            return fresh
         }
-        return fresh
+        return null
     }
 
     /**
