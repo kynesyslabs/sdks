@@ -5,7 +5,7 @@ import { OS_PER_DEM } from "./constants"
 
 // REVIEW: P4 commit 3 — public-API guard tests. The actual
 // `Demos.getNetworkInfo` / `_isPostForkCached` round-trip is exercised
-// in src/tests/forkDetection.test.ts because it needs the full Demos
+// in src/tests/forkDetection.spec.ts because it needs the full Demos
 // class wired with a stubbed nodeCall.
 
 describe("SubDemPrecisionError", () => {

@@ -106,7 +106,11 @@ export default class Wallet {
      * @param amount - DEM `number` (legacy) or OS `bigint`.
      * @param demos - Demos client used to sign and submit.
      */
-    async transfer(to: Address, amount: number | bigint, demos: websdk.Demos) {
+    async transfer(
+        to: Address,
+        amount: number | bigint,
+        demos: websdk.Demos,
+    ): Promise<RPCResponseWithValidityData> {
         // Delegate to demos.pay so we get the sub-DEM guard, the
         // serializerGate, and the canonical native-send tx shape (with
         // nonce, timestamp, gcr_edits, fee derivation) for free.
