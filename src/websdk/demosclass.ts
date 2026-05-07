@@ -104,12 +104,26 @@ export class Demos {
 
     // P4 commit 3: per-instance cached fork status. `null` after a failed
     // detection attempt (`_cachedNetworkInfoFailed = true`) means we have
-    // already assumed pre-fork; we keep this state for the instance's
-    // lifetime to avoid hammering an unreachable node, and warn exactly
-    // once.
+    // already assumed pre-fork; we keep this state until the rpc_url
+    // changes or the failed-cache TTL elapses, to avoid hammering an
+    // unreachable node, and warn exactly once.
+    //
+    // PR-86 myc#18 — keyed by rpc_url, mirroring `_cachedNetworkParametersRpcUrl`.
+    // Without this, a single Demos instance reused across two RPCs (one
+    // pre-fork, one post-fork) would lock onto the first answer and sign
+    // transactions with the wrong wire shape against the second.
     private _cachedNetworkInfo: NetworkInfo | null = null
+    private _cachedNetworkInfoRpcUrl: string | null = null
     private _cachedNetworkInfoFailed: boolean = false
+    private _cachedNetworkInfoFailedAt: number = 0
     private _cachedNetworkInfoWarned: boolean = false
+    /**
+     * TTL for the failed-detection memo. After this elapses we re-attempt
+     * `getNetworkInfo` so a transient outage doesn't poison the instance
+     * forever. The warn-once flag is sticky across retries — operators
+     * still see the warning exactly once per instance lifetime.
+     */
+    private static readonly _NETWORK_INFO_FAILURE_TTL_MS = 30_000
 
     /** Connection status of the RPC URL */
     connected: boolean = false
@@ -171,6 +185,17 @@ export class Demos {
         const response = await axios.get(rpc_url)
 
         if (response.status == 200) {
+            // PR-86 myc#18: a fresh connect (or reconnect to a different
+            // RPC) must drop the per-rpc cached fork status so the next
+            // sign() re-detects against the new node. Don't reset the
+            // warn-once flag — operators have already seen the warning
+            // for this instance's lifetime.
+            if (this.rpc_url !== rpc_url) {
+                this._cachedNetworkInfo = null
+                this._cachedNetworkInfoRpcUrl = null
+                this._cachedNetworkInfoFailed = false
+                this._cachedNetworkInfoFailedAt = 0
+            }
             this.rpc_url = rpc_url
         }
 
@@ -1370,8 +1395,38 @@ export class Demos {
      * @returns The fork-status payload, or `null` if the RPC failed.
      */
     async getNetworkInfo(): Promise<NetworkInfo | null> {
-        if (this._cachedNetworkInfo) return this._cachedNetworkInfo
-        if (this._cachedNetworkInfoFailed) return null
+        // PR-86 myc#18: cache is keyed by rpc_url. A stale entry from a
+        // previously-connected RPC must not satisfy a lookup against
+        // the current one. Switch detection happens here (rather than
+        // only in connect()) so callers that mutate rpc_url via other
+        // paths still see correct behaviour.
+        if (
+            this._cachedNetworkInfo &&
+            this._cachedNetworkInfoRpcUrl === this.rpc_url
+        ) {
+            return this._cachedNetworkInfo
+        }
+        if (
+            this._cachedNetworkInfo &&
+            this._cachedNetworkInfoRpcUrl !== this.rpc_url
+        ) {
+            // RPC has changed since we cached — invalidate before re-fetching.
+            this._cachedNetworkInfo = null
+            this._cachedNetworkInfoRpcUrl = null
+            this._cachedNetworkInfoFailed = false
+            this._cachedNetworkInfoFailedAt = 0
+        }
+        // Honour the failed-cache TTL so a transient outage doesn't lock
+        // the instance into pre-fork mode forever. After the TTL we'll
+        // retry; the warn-once flag is sticky regardless.
+        if (
+            this._cachedNetworkInfoFailed &&
+            this._cachedNetworkInfoRpcUrl === this.rpc_url &&
+            Date.now() - this._cachedNetworkInfoFailedAt <
+                Demos._NETWORK_INFO_FAILURE_TTL_MS
+        ) {
+            return null
+        }
 
         let fresh: unknown = null
         try {
@@ -1391,12 +1446,19 @@ export class Demos {
                 "boolean"
         ) {
             this._cachedNetworkInfo = fresh as NetworkInfo
+            this._cachedNetworkInfoRpcUrl = this.rpc_url
+            // A successful detection clears any stale failure memo for
+            // the current rpc_url.
+            this._cachedNetworkInfoFailed = false
+            this._cachedNetworkInfoFailedAt = 0
             return this._cachedNetworkInfo
         }
 
-        // Cache the failure so we don't hammer an unreachable / pre-P3c
-        // node on every sign(). Warn once.
+        // Cache the failure (with TTL) so we don't hammer an unreachable /
+        // pre-P3c node on every sign(). Warn once per instance.
         this._cachedNetworkInfoFailed = true
+        this._cachedNetworkInfoFailedAt = Date.now()
+        this._cachedNetworkInfoRpcUrl = this.rpc_url
         if (!this._cachedNetworkInfoWarned) {
             this._cachedNetworkInfoWarned = true
             console.warn(
@@ -1424,7 +1486,9 @@ export class Demos {
      */
     _resetForkStatusCacheForTesting(): void {
         this._cachedNetworkInfo = null
+        this._cachedNetworkInfoRpcUrl = null
         this._cachedNetworkInfoFailed = false
+        this._cachedNetworkInfoFailedAt = 0
         this._cachedNetworkInfoWarned = false
     }
 
