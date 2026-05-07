@@ -567,9 +567,21 @@ export class Demos {
         // the cached result. On RPC failure the cache stays in
         // "assume pre-fork" mode for the instance's lifetime.
         const isPostFork = await this._isPostForkCached()
-        raw_tx.hash = Hashing.sha256(
-            serializeTransactionContent(raw_tx.content, isPostFork),
+        const serialized = serializeTransactionContent(
+            raw_tx.content,
+            isPostFork,
         )
+        raw_tx.hash = Hashing.sha256(serialized)
+        // Normalise content to the wire shape the hash committed to.
+        // Without this, internal `bigint` carriers in `tx.content.amount`,
+        // `tx.content.transaction_fee.*`, and `gcr_edits[].amount` would
+        // leak into downstream `JSON.stringify` (axios body serialisation
+        // in confirm/broadcast), throwing TypeError on bigint or sending
+        // a different byte-shape than the one we just signed (which the
+        // node rejects as InvalidSignature). `JSON.parse(serialized)`
+        // round-trips through the canonical post-fork-or-pre-fork shape
+        // and matches the bytes hashed.
+        raw_tx.content = JSON.parse(serialized) as TransactionContent
         const signature = await this.crypto.sign(
             this.algorithm,
             new TextEncoder().encode(raw_tx.hash),

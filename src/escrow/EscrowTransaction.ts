@@ -181,11 +181,15 @@ export class EscrowTransaction {
      * `bigint` OS) into both forms. Used at every boundary that needs
      * dual-shape support during the pre-/post-fork rollout.
      *
-     * - `number` input: treated as DEM, multiplied to OS via `OS_PER_DEM`.
+     * - `number` input: must be a non-negative integer DEM amount;
+     *   converted to OS via `OS_PER_DEM`. Fractional DEM `number` is
+     *   rejected — silently flooring (the previous behaviour) discarded
+     *   up to ~10^9 OS per call. Callers who need sub-DEM precision
+     *   must pass a `bigint` OS amount (e.g. `denomination.demToOs("1.5")`).
      * - `bigint` input: treated as OS; DEM form is the integer division
-     *   `amountOs / OS_PER_DEM`. Rejects with a clear error if the OS
-     *   amount has sub-DEM precision (would silently truncate when
-     *   serialised against a pre-fork node).
+     *   `amountOs / OS_PER_DEM`. The pre-fork sub-DEM precision rejection
+     *   lives in `Demos._assertAmountAcceptableOnTargetNode` (called by
+     *   `sendToIdentity` before this helper runs).
      *
      * @internal Exposed only to keep the migration paths discoverable.
      */
@@ -200,9 +204,10 @@ export class EscrowTransaction {
             }
             const amountOs = amount
             // Sub-DEM precision is allowed at the bigint level — the
-            // public API rejection lives in P4 commit 3, gated on
-            // pre-fork node detection. For commit 1 we floor to whole
-            // DEM for the legacy wire shape.
+            // public API rejection lives in `_assertAmountAcceptableOnTargetNode`,
+            // gated on pre-fork node detection. The `amountDem` returned
+            // here is integer-truncated; callers that need exact DEM
+            // should branch on `amountOs % OS_PER_DEM === 0n` first.
             const amountDem = Number(amountOs / OS_PER_DEM)
             return { amountDem, amountOs }
         }
@@ -211,7 +216,12 @@ export class EscrowTransaction {
                 `[EscrowTransaction] amount must be a non-negative finite number or bigint, got ${amount}`,
             )
         }
-        const amountOs = BigInt(Math.floor(amount)) * OS_PER_DEM
+        if (!Number.isInteger(amount)) {
+            throw new Error(
+                `[EscrowTransaction] fractional DEM not supported on the number path (got ${amount}); pass a bigint OS amount via denomination.demToOs("${amount}") instead`,
+            )
+        }
+        const amountOs = BigInt(amount) * OS_PER_DEM
         return { amountDem: amount, amountOs }
     }
 

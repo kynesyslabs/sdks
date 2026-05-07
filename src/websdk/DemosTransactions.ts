@@ -17,6 +17,7 @@ import { Enigma } from "@/encryption/PQC/enigma"
 import { BroadcastTimeoutError } from "./BroadcastTimeoutError"
 import { BroadcastFailedError } from "./BroadcastFailedError"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
+import { OS_PER_DEM } from "@/denomination"
 
 // Connection-error codes indicating the request never reached the node.
 // HTTP 5xx is intentionally NOT in this set: a 5xx means the server did
@@ -70,10 +71,24 @@ export const DemosTransactions = {
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
         const nonce = await demos.getAddressNonce(publicKeyHex)
 
+        if (typeof amount === "bigint" && amount < 0n) {
+            throw new Error(
+                `[DemosTransactions.pay] amountOs must be non-negative, got ${amount}`,
+            )
+        }
         const amountOs: bigint =
             typeof amount === "bigint"
                 ? amount
                 : DemosTransactions._demNumberToOsBigint(amount)
+
+        // Sub-DEM precision guard. Demos.pay already runs this before
+        // delegating, but DemosTransactions.pay is also a public entry
+        // point (callers can import it directly). Run the same guard so
+        // every path that reaches the wire is symmetric — without this,
+        // a direct caller could submit a sub-DEM bigint to a pre-fork
+        // node and silently truncate via `wireAmount` below.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (demos as any)._assertAmountAcceptableOnTargetNode(amountOs)
 
         // Resolve the fork status now so we can emit the correct wire
         // shape into `tx.content.data` — the node's serializer does not
@@ -85,7 +100,7 @@ export const DemosTransactions = {
         const isPostFork: boolean = await (demos as any)._isPostForkCached()
         const wireAmount: number | string = isPostFork
             ? amountOs.toString()
-            : Number(amountOs / 1_000_000_000n)
+            : Number(amountOs / OS_PER_DEM)
 
         tx.content.to = to
         tx.content.nonce = nonce + 1
@@ -109,9 +124,15 @@ export const DemosTransactions = {
     },
     /**
      * Convert a legacy DEM `number` input to an OS `bigint` for internal
-     * carrying. Pre-floors to whole DEM to match the v2 wire (which was
-     * always whole DEM); explicit fractional inputs use `bigint` plus
-     * `denomination.demToOs` instead.
+     * carrying. Only whole-DEM `number` inputs are accepted on this
+     * legacy path — fractional DEM is rejected with a clear error
+     * directing callers to the bigint OS path (`denomination.demToOs`).
+     *
+     * Rationale: silently flooring (the previous behaviour) discarded up
+     * to ~10^9 OS per call without warning. The migration period
+     * tolerates legacy `number` callers, but only at exact DEM
+     * granularity — anything sub-DEM must come in as `bigint` so the
+     * caller has explicitly opted into OS arithmetic.
      *
      * @internal
      */
@@ -121,7 +142,12 @@ export const DemosTransactions = {
                 `[DemosTransactions] amount must be a non-negative finite number or bigint, got ${amountDem}`,
             )
         }
-        return BigInt(Math.floor(amountDem)) * 1_000_000_000n
+        if (!Number.isInteger(amountDem)) {
+            throw new Error(
+                `[DemosTransactions] fractional DEM not supported on the number path (got ${amountDem}); pass a bigint OS amount via denomination.demToOs("${amountDem}") instead`,
+            )
+        }
+        return BigInt(amountDem) * OS_PER_DEM
     },
     /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
@@ -182,9 +208,14 @@ export const DemosTransactions = {
         // (legacy wire). Callers that need post-fork compatibility should
         // use `demos.sign(tx)`, which threads the cached fork status from
         // `getNetworkInfo`.
-        raw_tx.hash = await sha256(
-            serializeTransactionContent(raw_tx.content, false),
-        )
+        const serialized = serializeTransactionContent(raw_tx.content, false)
+        raw_tx.hash = await sha256(serialized)
+        // Normalise content to the wire shape the hash committed to so
+        // downstream JSON.stringify (axios body serialisation) does not
+        // see internal bigint carriers and so the broadcast bytes match
+        // the bytes we just signed. See the equivalent block in
+        // `Demos.sign` for the full rationale (myc#13).
+        raw_tx.content = JSON.parse(serialized) as Transaction["content"]
         raw_tx.signature = await DemosTransactions.signWithAlgorithm(
             raw_tx.hash,
             keypair,
