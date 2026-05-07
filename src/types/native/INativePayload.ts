@@ -2,7 +2,12 @@
 
 interface INativeSend {
     nativeOperation: "send"
-    args: [string, number] // [to, amount]
+    /**
+     * `[to, amount]`. P4 dual-shape: `amount` may be a JS `number` (pre-fork
+     * DEM) or decimal `string` (post-fork OS). Internal arithmetic uses
+     * `bigint` OS via `denomination` utilities.
+     */
+    args: [string, number | string] // [to, amount]
 }
 
 // REVIEW: TLSNotary attestation request

@@ -497,20 +497,28 @@ export class StorageProgram {
     }
 
     /**
-     * Calculate storage fee based on data size
+     * Calculate storage fee based on data size.
      *
-     * Pricing: 1 DEM per 10KB (minimum 1 DEM)
+     * Pricing: 1 DEM per 10KB chunk (minimum 1 DEM).
      *
-     * @param data - Data to calculate fee for (JSON object or base64 string)
-     * @param encoding - Encoding type ("json" or "binary")
-     * @returns Fee in DEM (bigint)
+     * P4: returns the fee in **OS** (smallest unit, 1 DEM = 10^9 OS) as
+     * a `bigint`. Pre-P4 this constant was off by 10^9 (the
+     * `FEE_PER_CHUNK` was `1n` ≈ 1 OS instead of `OS_PER_DEM` ≈ 1 DEM);
+     * fixing the SDK side here means storage txs now charge the
+     * intended 1 DEM/chunk. Matching node-side constant alignment is
+     * tracked for P5.
+     *
+     * @param data - Data to calculate fee for (JSON object or base64 string).
+     * @param encoding - Encoding type ("json" or "binary").
+     * @returns Fee in OS as a `bigint`.
      *
      * @example
      * ```typescript
-     * const fee = StorageProgram.calculateStorageFee({ key: 'value' }, 'json')
-     * console.log(`Storage fee: ${fee} DEM`)
+     * const feeOs = StorageProgram.calculateStorageFee({ key: 'value' }, 'json')
+     * import { denomination } from '@kynesyslabs/demosdk'
+     * console.log(`Storage fee: ${denomination.osToDem(feeOs)} DEM`)
      *
-     * // Examples:
+     * // Examples (DEM):
      * // 5KB -> 1 DEM
      * // 15KB -> 2 DEM
      * // 100KB -> 10 DEM

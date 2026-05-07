@@ -10,6 +10,62 @@ import type {
     D402VerificationResult,
     CachedPayment
 } from './types'
+import { demToOs, parseOsString } from '@/denomination'
+
+/**
+ * Normalise a D402 dual-shape amount carrier to OS `bigint`.
+ *
+ * The carrier widened in P4 to `number | string` so a single requirement
+ * object can be served by both pre-fork (DEM `number`) and post-fork
+ * (OS decimal `string`) nodes. Naïve `<` comparison on this union is
+ * unsafe: string-vs-string is lexicographic ("5000000000" < "5" === true)
+ * and number/string mixes coerce through `Number(...)` which loses
+ * precision above 2^53. Both failure modes can wrongly accept
+ * underpayment or reject valid payment.
+ *
+ * - `number` input: treated as DEM (legacy wire) and converted to OS
+ *   via `demToOs`. Negative or non-finite numbers throw.
+ * - `string` input: treated as a canonical OS decimal-integer string
+ *   and parsed via `parseOsString`. Non-canonical strings (whitespace,
+ *   leading zeros, signed prefix) throw.
+ *
+ * The throw is intentional — D402 amount fields cross a trust boundary
+ * (the requirement set by the merchant, the verified amount returned
+ * by the node) and a malformed value is a configuration error, not a
+ * silent default.
+ *
+ * @internal exported for tests; not part of the public D402 API.
+ */
+export function _normalizeD402AmountToOsBigint(
+    value: number | string | bigint,
+): bigint {
+    if (typeof value === 'bigint') {
+        if (value < 0n) {
+            throw new Error(
+                `[D402Server] amount must be non-negative, got ${value}`,
+            )
+        }
+        return value
+    }
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value) || value < 0) {
+            throw new Error(
+                `[D402Server] amount must be a non-negative finite number, got ${value}`,
+            )
+        }
+        // demToOs accepts integer or fractional DEM; for D402 a fractional
+        // DEM number is valid (the legacy wire allowed sub-DEM numerics
+        // in some indexer paths) so we don't add an extra is-integer guard
+        // here.
+        return demToOs(value)
+    }
+    if (typeof value === 'string') {
+        return parseOsString(value)
+    }
+    throw new Error(
+        `[D402Server] amount must be number | string | bigint, got ${typeof value}`,
+    )
+}
 
 export class D402Server {
     private rpcUrl: string
@@ -153,8 +209,25 @@ export class D402Server {
             return false
         }
 
-        // Check amount matches (or exceeds)
-        if (verification.verified_amount < requirement.amount) {
+        // Check amount matches (or exceeds). BigInt-normalise both sides
+        // so the dual-shape (number DEM | string OS) carrier works
+        // correctly: lexicographic string compare and Number() coercion
+        // both produce wrong answers on real-world OS magnitudes.
+        // A malformed amount here is a configuration / RPC-corruption
+        // bug — fail closed and return false rather than throwing the
+        // exception across the middleware.
+        try {
+            const verifiedOs = _normalizeD402AmountToOsBigint(
+                verification.verified_amount as number | string | bigint,
+            )
+            const requiredOs = _normalizeD402AmountToOsBigint(
+                requirement.amount as number | string | bigint,
+            )
+            if (verifiedOs < requiredOs) {
+                return false
+            }
+        } catch (err) {
+            console.error('[D402Server] amount comparison failed:', err)
             return false
         }
 

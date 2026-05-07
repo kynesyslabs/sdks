@@ -16,6 +16,8 @@ import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { Enigma } from "@/encryption/PQC/enigma"
 import { BroadcastTimeoutError } from "./BroadcastTimeoutError"
 import { BroadcastFailedError } from "./BroadcastFailedError"
+import { serializeTransactionContent } from "@/denomination/serializerGate"
+import { OS_PER_DEM } from "@/denomination"
 
 // Connection-error codes indicating the request never reached the node.
 // HTTP 5xx is intentionally NOT in this set: a 5xx means the server did
@@ -46,13 +48,21 @@ export const DemosTransactions = {
     /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
      *
+     * P4 dual-input:
+     *  - `bigint`: OS amount (preferred — 1 DEM = 10^9 OS).
+     *  - `number`: DEM amount (legacy, deprecated). Auto-converted to OS.
+     *
+     * Internal carrier in `tx.content.amount` is bigint OS; the
+     * serializerGate (run from `demos.sign`) emits the right wire shape
+     * per the connected node's fork status.
+     *
      * @param to - The reciever
-     * @param amount - The amount in DEM
+     * @param amount - DEM `number` (legacy) or OS `bigint`.
      * @param demos - The demos instance (for getting the address nonce)
      *
      * @returns The signed transaction.
      */
-    async pay(to: string, amount: number, demos: Demos) {
+    async pay(to: string, amount: number | bigint, demos: Demos) {
         required(demos.keypair, "Wallet not connected")
 
         let tx = DemosTransactions.empty()
@@ -61,32 +71,97 @@ export const DemosTransactions = {
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
         const nonce = await demos.getAddressNonce(publicKeyHex)
 
-        // tx.content.from_ed25519_address = publicKeyHex
-        // REVIEW Get the address nonce
-        // tx.content.from = from
+        if (typeof amount === "bigint" && amount < 0n) {
+            throw new Error(
+                `[DemosTransactions.pay] amountOs must be non-negative, got ${amount}`,
+            )
+        }
+        const amountOs: bigint =
+            typeof amount === "bigint"
+                ? amount
+                : DemosTransactions._demNumberToOsBigint(amount)
+
+        // Sub-DEM precision guard. Demos.pay already runs this before
+        // delegating, but DemosTransactions.pay is also a public entry
+        // point (callers can import it directly). Run the same guard so
+        // every path that reaches the wire is symmetric — without this,
+        // a direct caller could submit a sub-DEM bigint to a pre-fork
+        // node and silently truncate via `wireAmount` below.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (demos as any)._assertAmountAcceptableOnTargetNode(amountOs)
+
+        // Resolve the fork status now so we can emit the correct wire
+        // shape into `tx.content.data` — the node's serializer does not
+        // walk `data`, so the construction site is the source of truth
+        // for the bytes inside it. `_isPostForkCached` is private; we
+        // reach in via `any` because P4 internals haven't been promoted
+        // to the public surface.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const isPostFork: boolean = await (demos as any)._isPostForkCached()
+        const wireAmount: number | string = isPostFork
+            ? amountOs.toString()
+            : Number(amountOs / OS_PER_DEM)
 
         tx.content.to = to
         tx.content.nonce = nonce + 1
-        tx.content.amount = amount
+        // Internal carrier on `content.amount` is bigint OS — the
+        // serializerGate normalises it at hash time.
+        tx.content.amount = amountOs as unknown as number | string
         tx.content.type = "native"
         tx.content.timestamp = Date.now()
         tx.content.data = [
             "native",
-            { nativeOperation: "send", args: [to, amount] },
+            {
+                nativeOperation: "send",
+                // The serializer doesn't walk `data`, so emit the
+                // wire shape directly. INativeSend.args[1] was widened
+                // in commit 1 to accept OS string alongside DEM number.
+                args: [to, wireAmount],
+            },
         ]
 
         return await demos.sign(tx)
     },
     /**
+     * Convert a legacy DEM `number` input to an OS `bigint` for internal
+     * carrying. Only whole-DEM `number` inputs are accepted on this
+     * legacy path — fractional DEM is rejected with a clear error
+     * directing callers to the bigint OS path (`denomination.demToOs`).
+     *
+     * Rationale: silently flooring (the previous behaviour) discarded up
+     * to ~10^9 OS per call without warning. The migration period
+     * tolerates legacy `number` callers, but only at exact DEM
+     * granularity — anything sub-DEM must come in as `bigint` so the
+     * caller has explicitly opted into OS arithmetic.
+     *
+     * @internal
+     */
+    _demNumberToOsBigint(amountDem: number): bigint {
+        if (!Number.isFinite(amountDem) || amountDem < 0) {
+            throw new Error(
+                `[DemosTransactions] amount must be a non-negative finite number or bigint, got ${amountDem}`,
+            )
+        }
+        if (!Number.isInteger(amountDem)) {
+            throw new Error(
+                `[DemosTransactions] fractional DEM not supported on the number path (got ${amountDem}); pass a bigint OS amount via denomination.demToOs("${amountDem}") instead`,
+            )
+        }
+        return BigInt(amountDem) * OS_PER_DEM
+    },
+    /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
      *
+     * Alias of {@link pay}. Same dual-input semantics — `bigint` OS
+     * preferred, `number` DEM accepted as the deprecated path.
+     *
      * @param to - The reciever
-     * @param amount - The amount in DEM
+     * @param amount - DEM `number` (legacy) or OS `bigint`.
      * @param demos - The demos instance (for getting the address nonce)
      *
      * @returns The signed transaction.
      */
-    transfer(to: string, amount: number, demos: Demos) {
+    transfer(to: string, amount: number | bigint, demos: Demos) {
         return DemosTransactions.pay(to, amount, demos)
     },
     // NOTE Signing a transaction after hashing it
@@ -126,8 +201,21 @@ export const DemosTransactions = {
         // NOTE They are created without the tx hash, which is added in the node
         raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
 
-        // Hash the content of the transaction
-        raw_tx.hash = await sha256(JSON.stringify(raw_tx.content))
+        // Hash the content of the transaction.
+        // P4 commit 2: route through the dual-format serializerGate. This
+        // deprecated signer has no `Demos` instance available so it
+        // cannot consult cached fork status — defaults to pre-fork
+        // (legacy wire). Callers that need post-fork compatibility should
+        // use `demos.sign(tx)`, which threads the cached fork status from
+        // `getNetworkInfo`.
+        const serialized = serializeTransactionContent(raw_tx.content, false)
+        raw_tx.hash = await sha256(serialized)
+        // Normalise content to the wire shape the hash committed to so
+        // downstream JSON.stringify (axios body serialisation) does not
+        // see internal bigint carriers and so the broadcast bytes match
+        // the bytes we just signed. See the equivalent block in
+        // `Demos.sign` for the full rationale (myc#13).
+        raw_tx.content = JSON.parse(serialized) as Transaction["content"]
         raw_tx.signature = await DemosTransactions.signWithAlgorithm(
             raw_tx.hash,
             keypair,

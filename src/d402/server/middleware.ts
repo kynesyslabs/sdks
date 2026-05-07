@@ -7,11 +7,14 @@ import { D402Server } from './D402Server'
 import type { D402PaymentRequirement } from './types'
 
 /**
- * Middleware configuration options
+ * Middleware configuration options.
+ *
+ * P4 dual-shape: `amount` may be a JS `number` (pre-fork DEM) or a
+ * decimal-`string` (post-fork OS).
  */
 export interface D402MiddlewareOptions {
-    /** Payment amount in smallest unit */
-    amount: number
+    /** Payment amount: pre-fork `number` DEM or post-fork `string` OS. */
+    amount: number | string
     /** Resource identifier (included in memo validation) */
     resourceId: string
     /** Demos Network RPC URL */
@@ -34,7 +37,7 @@ export interface D402Request {
     d402Payment?: {
         from: string
         to: string
-        amount: number
+        amount: number | string
         txHash: string
     }
 }

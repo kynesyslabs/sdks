@@ -47,6 +47,17 @@ import {
 } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
+import {
+    OS_PER_DEM,
+    demToOs,
+    parseOsString,
+} from "@/denomination"
+import { serializeTransactionContent } from "@/denomination/serializerGate"
+import {
+    SubDemPrecisionError,
+    type ForkStatus,
+    type NetworkInfo,
+} from "@/denomination/networkInfo"
 import * as bip39 from "@scure/bip39"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
@@ -90,6 +101,29 @@ export class Demos {
     private _cachedNetworkParameters: NetworkParameters | null = null
     private _cachedNetworkParametersAt = 0
     private _cachedNetworkParametersRpcUrl: string | null = null
+
+    // P4 commit 3: per-instance cached fork status. `null` after a failed
+    // detection attempt (`_cachedNetworkInfoFailed = true`) means we have
+    // already assumed pre-fork; we keep this state until the rpc_url
+    // changes or the failed-cache TTL elapses, to avoid hammering an
+    // unreachable node, and warn exactly once.
+    //
+    // PR-86 myc#18 — keyed by rpc_url, mirroring `_cachedNetworkParametersRpcUrl`.
+    // Without this, a single Demos instance reused across two RPCs (one
+    // pre-fork, one post-fork) would lock onto the first answer and sign
+    // transactions with the wrong wire shape against the second.
+    private _cachedNetworkInfo: NetworkInfo | null = null
+    private _cachedNetworkInfoRpcUrl: string | null = null
+    private _cachedNetworkInfoFailed: boolean = false
+    private _cachedNetworkInfoFailedAt: number = 0
+    private _cachedNetworkInfoWarned: boolean = false
+    /**
+     * TTL for the failed-detection memo. After this elapses we re-attempt
+     * `getNetworkInfo` so a transient outage doesn't poison the instance
+     * forever. The warn-once flag is sticky across retries — operators
+     * still see the warning exactly once per instance lifetime.
+     */
+    private static readonly _NETWORK_INFO_FAILURE_TTL_MS = 30_000
 
     /** Connection status of the RPC URL */
     connected: boolean = false
@@ -151,6 +185,17 @@ export class Demos {
         const response = await axios.get(rpc_url)
 
         if (response.status == 200) {
+            // PR-86 myc#18: a fresh connect (or reconnect to a different
+            // RPC) must drop the per-rpc cached fork status so the next
+            // sign() re-detects against the new node. Don't reset the
+            // warn-once flag — operators have already seen the warning
+            // for this instance's lifetime.
+            if (this.rpc_url !== rpc_url) {
+                this._cachedNetworkInfo = null
+                this._cachedNetworkInfoRpcUrl = null
+                this._cachedNetworkInfoFailed = false
+                this._cachedNetworkInfoFailedAt = 0
+            }
             this.rpc_url = rpc_url
         }
 
@@ -274,27 +319,58 @@ export class Demos {
     /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
      *
-     * @param to - The reciever
-     * @param amount - The amount in DEM
+     * P4 dual-input:
+     *  - `bigint` (preferred, post-v3): amount in OS (smallest unit;
+     *    1 DEM = 10^9 OS). Use `denomination.demToOs(...)` to convert
+     *    a human-readable DEM input.
+     *  - `number` (deprecated, v2 callers): amount in DEM. Auto-converted
+     *    to OS internally via `OS_PER_DEM`. Will be removed in v4.
      *
+     * Sub-DEM precision is rejected with `SubDemPrecisionError` when
+     * the connected node is pre-fork — its legacy DEM-`number` wire
+     * cannot carry < 1 DEM and silent truncation is unacceptable. The
+     * caller can either round to a whole DEM or upgrade the target
+     * node.
+     *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * await demos.pay("0x...", denomination.demToOs(100))   // 100 DEM
+     * await demos.pay("0x...", 100_000_000_000n)             // raw OS
+     * await demos.pay("0x...", 100)                          // legacy DEM number (deprecated)
+     * ```
+     *
+     * @param to - The receiver address (0x-prefixed hex).
+     * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
      * @returns The signed transaction.
      */
-    pay(to: string, amount: number) {
+    async pay(to: string, amount: number | bigint) {
         required(this.keypair, "Wallet not connected")
-        return DemosTransactions.pay(to, amount, this)
+        const amountOs =
+            typeof amount === "bigint" ? amount : demToOs(amount)
+        await this._assertAmountAcceptableOnTargetNode(amountOs)
+        return DemosTransactions.pay(to, amountOs, this)
     }
 
     /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
      *
-     * @param to - The reciever
-     * @param amount - The amount in DEM
+     * Alias of {@link pay}. Same dual-input semantics — `bigint` is the
+     * preferred OS shape; `number` is the deprecated legacy DEM shape.
      *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * await demos.transfer("0x...", denomination.demToOs("1.5"))  // 1.5 DEM
+     * await demos.transfer("0x...", 1_500_000_000n)                // raw OS
+     * ```
+     *
+     * @param to - The receiver address (0x-prefixed hex).
+     * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
      * @returns The signed transaction.
      */
-    transfer(to: string, amount: number) {
-        required(this.keypair, "Wallet not connected")
-        return DemosTransactions.pay(to, amount, this)
+    async transfer(to: string, amount: number | bigint) {
+        return this.pay(to, amount)
     }
 
     /**
@@ -510,7 +586,27 @@ export class Demos {
             }
         }
 
-        raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
+        // P4 commit 3: route hashing through the dual-format serializerGate
+        // with the cached fork status. The first `sign()` call after
+        // `connect()` triggers `getNetworkInfo`; subsequent signs reuse
+        // the cached result. On RPC failure the cache stays in
+        // "assume pre-fork" mode for the instance's lifetime.
+        const isPostFork = await this._isPostForkCached()
+        const serialized = serializeTransactionContent(
+            raw_tx.content,
+            isPostFork,
+        )
+        raw_tx.hash = Hashing.sha256(serialized)
+        // Normalise content to the wire shape the hash committed to.
+        // Without this, internal `bigint` carriers in `tx.content.amount`,
+        // `tx.content.transaction_fee.*`, and `gcr_edits[].amount` would
+        // leak into downstream `JSON.stringify` (axios body serialisation
+        // in confirm/broadcast), throwing TypeError on bigint or sending
+        // a different byte-shape than the one we just signed (which the
+        // node rejects as InvalidSignature). `JSON.parse(serialized)`
+        // round-trips through the canonical post-fork-or-pre-fork shape
+        // and matches the bytes hashed.
+        raw_tx.content = JSON.parse(serialized) as TransactionContent
         const signature = await this.crypto.sign(
             this.algorithm,
             new TextEncoder().encode(raw_tx.hash),
@@ -608,12 +704,24 @@ export class Demos {
     /**
      * @private
      * Calculates and applies the gas fee for a transaction (SDK-level fallback).
-     * NOTE: We infer the fee by analyzing the generated GCR (Gas Consumption Record) edits:
-     * - Sum all "balance" edits with operation "remove" for the sender
-     * - Subtract the declared transaction `amount`
-     * The remainder is treated as the network fee. If a fee already exists on the tx, we only raise
-     * `network_fee` if the newly inferred fee is higher (prevents double-charging on re-sign).
-     * This is an interim approach; the preferred design is for the node to return fees explicitly.
+     *
+     * NOTE: We infer the fee by analyzing the generated GCR (Gas Consumption
+     * Record) edits:
+     * - Sum all "balance" edits with operation "remove" for the sender.
+     * - Subtract the declared transaction `amount`.
+     * The remainder is treated as the network fee. If a fee already exists on
+     * the tx, we only raise `network_fee` if the newly inferred fee is higher
+     * (prevents double-charging on re-sign). This is an interim approach; the
+     * preferred design is for the node to return fees explicitly.
+     *
+     * P4: arithmetic uses `bigint` internally so OS-magnitude amounts
+     * (~10^19 OS for whole-network supply) don't overflow JS `number`'s
+     * 2^53 safe-integer ceiling. The function tolerates legacy `number`
+     * (DEM) and post-fork `string` (OS) inputs in any field, normalises
+     * to OS-bigint via `_coerceWireAmountToOs`, then writes the
+     * derived fee back in DEM-`number` (legacy wire) — the
+     * serializerGate (P4 commit 2) re-encodes to OS at hash time when
+     * the connected node is post-fork.
      *
      * @param raw_tx - The transaction for which to calculate the fee.
      * @returns The updated transaction with the fee applied.
@@ -628,7 +736,8 @@ export class Demos {
         // INFO: The gas fee is calculated by summing up all "remove" balance edits for the sender's account
         // and then subtracting the actual transaction amount. This gives the value of the fee.
         const sender = (raw_tx.content.from_ed25519_address ?? "").toLowerCase()
-        const totalRemoved = edits.reduce((sum, edit: any) => {
+        let totalRemovedOs = 0n
+        for (const edit of edits as any[]) {
             try {
                 if (
                     edit.type === "balance" &&
@@ -636,20 +745,22 @@ export class Demos {
                     typeof edit.account === "string" &&
                     edit.account.toLowerCase() === sender
                 ) {
-                    const amt = Number(edit.amount)
-                    return sum + (Number.isFinite(amt) ? amt : 0)
+                    totalRemovedOs += Demos._coerceWireAmountToOs(edit.amount)
                 }
             } catch {
                 // skip malformed entries
             }
-            return sum
-        }, 0)
+        }
 
-        const txAmt = Number(raw_tx.content.amount ?? 0)
-        const calculatedFee = Math.max(
-            totalRemoved - (Number.isFinite(txAmt) ? txAmt : 0),
-            0,
-        )
+        let txAmtOs = 0n
+        try {
+            txAmtOs = Demos._coerceWireAmountToOs(raw_tx.content.amount ?? 0)
+        } catch {
+            txAmtOs = 0n
+        }
+
+        const calculatedFeeOs =
+            totalRemovedOs > txAmtOs ? totalRemovedOs - txAmtOs : 0n
 
         // INFO: This logic handles both initial fee creation and accumulation for re-signed transactions.
         // To avoid fee accumulation, a new transaction object should be created for each signing.
@@ -658,20 +769,51 @@ export class Demos {
             rpc_fee: 0,
             additional_fee: 0,
         }
-        const totalExisting =
-            (Number(existing.network_fee) || 0) +
-            (Number(existing.rpc_fee) || 0) +
-            (Number(existing.additional_fee) || 0)
+        const totalExistingOs =
+            Demos._coerceWireAmountToOs(existing.network_fee ?? 0) +
+            Demos._coerceWireAmountToOs(existing.rpc_fee ?? 0) +
+            Demos._coerceWireAmountToOs(existing.additional_fee ?? 0)
 
-        // Only set the fee if no fees are already applied
-        if (totalExisting === 0) {
+        // Only set the fee if no fees are already applied. We emit the
+        // legacy DEM-number wire shape; the serializerGate normalises to
+        // OS-string post-fork. Convert OS bigint back to DEM number,
+        // assuming the inferred fee is a whole multiple of OS_PER_DEM
+        // (true for current 1-DEM gas + 1-DEM-per-KB storage formulas).
+        if (totalExistingOs === 0n) {
+            const feeDem = Number(calculatedFeeOs / OS_PER_DEM)
             raw_tx.content.transaction_fee = {
-                network_fee: calculatedFee,
+                network_fee: feeDem,
                 rpc_fee: 0,
                 additional_fee: 0,
             }
         }
         return raw_tx
+    }
+
+    /**
+     * Coerce a wire-format amount/fee value (legacy DEM `number`,
+     * post-fork OS decimal `string`, or in-flight `bigint`) to an OS
+     * `bigint`. Used by `_calculateAndApplyGasFee` and other internal
+     * arithmetic paths to stay in OS-bigint regardless of which wire
+     * shape the caller produced. Mirrors the node's `toOsBigint` helper
+     * in `forks/serializerGate.ts`.
+     *
+     * @internal
+     */
+    static _coerceWireAmountToOs(value: number | string | bigint): bigint {
+        if (typeof value === "bigint") {
+            return value
+        }
+        if (typeof value === "string") {
+            // Already on the wire as OS decimal string.
+            return parseOsString(value)
+        }
+        if (typeof value === "number") {
+            if (!Number.isFinite(value)) return 0n
+            // Pre-fork DEM number → OS bigint.
+            return demToOs(value)
+        }
+        return 0n
     }
 
     // L2PS calls are defined here
@@ -1088,6 +1230,18 @@ export class Demos {
     /**
      * Get information about an address.
      *
+     * P4: `balance` is `bigint` in **OS** (smallest unit, 1 DEM = 10^9 OS).
+     * Use `denomination.osToDem(info.balance)` for display.
+     *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * const info = await demos.getAddressInfo("0x...")
+     * if (info) {
+     *     console.log("balance:", denomination.osToDem(info.balance), "DEM")
+     * }
+     * ```
+     *
      * @param address - The address
      */
     async getAddressInfo(address: string): Promise<AddressInfo | null> {
@@ -1096,13 +1250,13 @@ export class Demos {
         })
 
         if (info) {
-            // REVIEW Fix for when the balance is 0 (see FIXME below)
-            if (!info.balance) {
-                info.balance = 0
-            }
+            // Balance can come back as `null`/`undefined`/`0`/`"0"`/
+            // bigint-string. `BigInt(null)` throws, so coalesce to 0
+            // before parsing.
+            const rawBalance = info.balance ?? 0
             return {
                 ...info,
-                balance: BigInt(info.balance), // FIXME This fails when the balance is 0
+                balance: BigInt(rawBalance),
             } as AddressInfo
         }
 
@@ -1217,6 +1371,146 @@ export class Demos {
             return fresh
         }
         return null
+    }
+
+    // SECTION Fork detection (P4 commit 3)
+
+    /**
+     * Fetches the connected node's per-fork activation status.
+     *
+     * Mirrors the node's `getNetworkInfo` `nodeCall`
+     * (`libs/network/handlers/forkHandlers.ts`). The response carries
+     * activation height, current chain head, and the `activated` boolean
+     * for every known fork.
+     *
+     * Caches the result on this `Demos` instance for the instance's
+     * lifetime (no TTL). To re-fetch after a node upgrade, construct a
+     * fresh `Demos` instance.
+     *
+     * On RPC failure (404, malformed response, network error), this
+     * method returns `null` and the SDK assumes pre-fork wire format.
+     * A `console.warn` is emitted exactly once per `Demos` instance
+     * recommending the operator upgrade the target node.
+     *
+     * @returns The fork-status payload, or `null` if the RPC failed.
+     */
+    async getNetworkInfo(): Promise<NetworkInfo | null> {
+        // PR-86 myc#18: cache is keyed by rpc_url. A stale entry from a
+        // previously-connected RPC must not satisfy a lookup against
+        // the current one. Switch detection happens here (rather than
+        // only in connect()) so callers that mutate rpc_url via other
+        // paths still see correct behaviour.
+        if (
+            this._cachedNetworkInfo &&
+            this._cachedNetworkInfoRpcUrl === this.rpc_url
+        ) {
+            return this._cachedNetworkInfo
+        }
+        if (
+            this._cachedNetworkInfo &&
+            this._cachedNetworkInfoRpcUrl !== this.rpc_url
+        ) {
+            // RPC has changed since we cached — invalidate before re-fetching.
+            this._cachedNetworkInfo = null
+            this._cachedNetworkInfoRpcUrl = null
+            this._cachedNetworkInfoFailed = false
+            this._cachedNetworkInfoFailedAt = 0
+        }
+        // Honour the failed-cache TTL so a transient outage doesn't lock
+        // the instance into pre-fork mode forever. After the TTL we'll
+        // retry; the warn-once flag is sticky regardless.
+        if (
+            this._cachedNetworkInfoFailed &&
+            this._cachedNetworkInfoRpcUrl === this.rpc_url &&
+            Date.now() - this._cachedNetworkInfoFailedAt <
+                Demos._NETWORK_INFO_FAILURE_TTL_MS
+        ) {
+            return null
+        }
+
+        let fresh: unknown = null
+        try {
+            fresh = await this.nodeCall("getNetworkInfo")
+        } catch {
+            // call() already swallows transport errors, but be defensive
+            // in case future nodeCall() rewrites surface them.
+            fresh = null
+        }
+
+        if (
+            fresh &&
+            typeof fresh === "object" &&
+            (fresh as NetworkInfo).forks &&
+            (fresh as NetworkInfo).forks.osDenomination &&
+            typeof (fresh as NetworkInfo).forks.osDenomination.activated ===
+                "boolean"
+        ) {
+            this._cachedNetworkInfo = fresh as NetworkInfo
+            this._cachedNetworkInfoRpcUrl = this.rpc_url
+            // A successful detection clears any stale failure memo for
+            // the current rpc_url.
+            this._cachedNetworkInfoFailed = false
+            this._cachedNetworkInfoFailedAt = 0
+            return this._cachedNetworkInfo
+        }
+
+        // Cache the failure (with TTL) so we don't hammer an unreachable /
+        // pre-P3c node on every sign(). Warn once per instance.
+        this._cachedNetworkInfoFailed = true
+        this._cachedNetworkInfoFailedAt = Date.now()
+        this._cachedNetworkInfoRpcUrl = this.rpc_url
+        if (!this._cachedNetworkInfoWarned) {
+            this._cachedNetworkInfoWarned = true
+            console.warn(
+                "getNetworkInfo unavailable on target node — assuming pre-fork wire format. Upgrade the node to a post-fork-aware version (>= the version that ships with forkHandlers). This fallback path is deprecated and will be removed in v4.",
+            )
+        }
+        return null
+    }
+
+    /**
+     * @internal
+     * Cached fork-status accessor. Returns `osDenomination` activation
+     * status as a boolean. `false` is the safe default (legacy wire
+     * format) when the node is unreachable or pre-P3c.
+     */
+    private async _isPostForkCached(): Promise<boolean> {
+        const info = await this.getNetworkInfo()
+        return Boolean(info?.forks?.osDenomination?.activated)
+    }
+
+    /**
+     * @internal
+     * Reset the cached fork status. Intended for tests; production code
+     * should construct a fresh `Demos` instance instead.
+     */
+    _resetForkStatusCacheForTesting(): void {
+        this._cachedNetworkInfo = null
+        this._cachedNetworkInfoRpcUrl = null
+        this._cachedNetworkInfoFailed = false
+        this._cachedNetworkInfoFailedAt = 0
+        this._cachedNetworkInfoWarned = false
+    }
+
+    /**
+     * @internal
+     * Sub-DEM precision guard. Run by every public-API entry point that
+     * takes a user-supplied OS amount before tx construction. Throws
+     * `SubDemPrecisionError` when the connected node is pre-fork and
+     * the amount carries sub-DEM precision (would silently truncate on
+     * the legacy DEM-`number` wire).
+     *
+     * @param amountOs - The OS amount the caller is sending.
+     */
+    private async _assertAmountAcceptableOnTargetNode(
+        amountOs: bigint,
+    ): Promise<void> {
+        const isPostFork = await this._isPostForkCached()
+        if (isPostFork) return
+        const remainder = amountOs % OS_PER_DEM
+        if (remainder !== 0n) {
+            throw new SubDemPrecisionError(amountOs, remainder)
+        }
     }
 
     /**
@@ -1385,9 +1679,12 @@ export class Demos {
         /**
          * Get a cost quote for an IPFS operation without submitting a transaction.
          *
-         * Use this to estimate costs and populate custom_charges before signing.
-         * The returned cost should be used as max_cost_dem in the transaction's
-         * custom_charges field.
+         * Use this to estimate costs and populate `custom_charges` before signing.
+         * Pipe the response through `IPFSOperations.quoteToCustomCharges`
+         * (or `createCustomCharges`) to obtain a `max_cost_os` decimal-string
+         * suitable for the transaction's `custom_charges.ipfs.max_cost_os`
+         * field. The helpers handle both pre-fork (`cost_dem`) and
+         * post-fork (`cost_os`) node response shapes.
          *
          * @param fileSizeBytes - Size of file in bytes
          * @param operation - IPFS operation type ('IPFS_ADD', 'IPFS_PIN', or 'IPFS_UNPIN')
@@ -1398,7 +1695,6 @@ export class Demos {
          * ```typescript
          * // Get quote for add operation
          * const quote = await demos.ipfs.quote(content.length, 'IPFS_ADD')
-         * console.log(`Cost: ${quote.cost_dem} DEM`)
          *
          * // Use quote to build transaction with cost control
          * const payload = IPFSOperations.createAddPayload(content, {
@@ -1411,7 +1707,10 @@ export class Demos {
             operation: "IPFS_ADD" | "IPFS_PIN" | "IPFS_UNPIN" = "IPFS_ADD",
             durationBlocks?: number,
         ): Promise<{
-            cost_dem: string
+            /** Pre-fork node: cost in DEM as decimal string. */
+            cost_dem?: string
+            /** Post-fork node: cost in OS as decimal string. */
+            cost_os?: string
             file_size_bytes: number
             is_genesis: boolean
             breakdown: {

@@ -4,11 +4,14 @@
  */
 
 /**
- * Payment requirement from 402 response
+ * Payment requirement from 402 response.
+ *
+ * P4 dual-shape: `amount` may be a JS `number` (pre-fork DEM) or a
+ * decimal-`string` (post-fork OS).
  */
 export interface D402PaymentRequirement {
-    /** Payment amount in smallest unit */
-    amount: number
+    /** Payment amount: pre-fork `number` DEM or post-fork `string` OS. */
+    amount: number | string
     /** Merchant/recipient address */
     recipient: string
     /** Resource identifier */

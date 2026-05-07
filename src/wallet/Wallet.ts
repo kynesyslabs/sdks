@@ -80,23 +80,41 @@ export default class Wallet {
     /* SECTION Basic writes */
     // NOTE All the writes return a validity object that needs to be confirmed and broadcasted
 
-    async transfer(to: Address, amount: number, demos: websdk.Demos) {
-        let tx = DemosTransactions.empty()
-        // Putting the right data in the transaction
-        // tx.content.from = keypair.publicKey.toString("hex")
-        tx.content.from = demos.keypair.publicKey.toString("hex")
-        // tx.content.to = to
-        tx.content.type = "native"
-        tx.content.data = [
-            "native",
-            {
-                nativeOperation: "send",
-                args: [to, amount],
-            },
-        ]
-        // tx.content.amount = amount
-        tx = await demos.sign(tx)
-        // Sending the transaction and getting the validity data
+    /**
+     * Transfer native DEM tokens to a recipient address.
+     *
+     * P4 dual-input:
+     *  - `bigint` (preferred, post-v3): OS amount. 1 DEM = 10^9 OS.
+     *  - `number` (deprecated, v2 callers): DEM amount, auto-converted.
+     *
+     * Internal carrier is OS bigint; the serializerGate (run from
+     * `demos.sign`) chooses pre-fork vs post-fork wire encoding from
+     * the cached `getNetworkInfo` fork status. Sub-DEM precision
+     * against a pre-fork node throws `SubDemPrecisionError` from
+     * `demos.pay` before any tx construction happens — we delegate to
+     * `demos.pay` which carries the guard.
+     *
+     * @example
+     * ```ts
+     * import { denomination, websdk, wallet } from "@kynesyslabs/demosdk"
+     * const w = wallet.default.getInstance("alice")
+     * await w.transfer("0x...", denomination.demToOs(100), demos)
+     * await w.transfer("0x...", 100_000_000_000n, demos)  // raw OS
+     * ```
+     *
+     * @param to - Recipient address (0x-prefixed hex).
+     * @param amount - DEM `number` (legacy) or OS `bigint`.
+     * @param demos - Demos client used to sign and submit.
+     */
+    async transfer(
+        to: Address,
+        amount: number | bigint,
+        demos: websdk.Demos,
+    ): Promise<RPCResponseWithValidityData> {
+        // Delegate to demos.pay so we get the sub-DEM guard, the
+        // serializerGate, and the canonical native-send tx shape (with
+        // nonce, timestamp, gcr_edits, fee derivation) for free.
+        const tx = await demos.pay(to, amount)
         return await demos.confirm(tx)
     }
 

@@ -4,11 +4,15 @@
  */
 
 /**
- * Payment requirements sent in 402 response
+ * Payment requirements sent in 402 response.
+ *
+ * P4 dual-shape: `amount` may be a JS `number` (pre-fork DEM) or a
+ * decimal-`string` (post-fork OS). SDK consumers should normalise via
+ * `BigInt(...)` before arithmetic.
  */
 export interface D402PaymentRequirement {
-    /** Payment amount in smallest unit */
-    amount: number
+    /** Payment amount in DEM (number) or OS (decimal string). */
+    amount: number | string
     /** Merchant/recipient address */
     recipient: string
     /** Resource identifier (used in memo validation) */
@@ -18,13 +22,16 @@ export interface D402PaymentRequirement {
 }
 
 /**
- * Payment verification result from RPC
+ * Payment verification result from RPC.
+ *
+ * P4 dual-shape: `verified_amount` may arrive as a JS `number` (pre-fork
+ * DEM) or a decimal-`string` (post-fork OS).
  */
 export interface D402VerificationResult {
     valid: boolean
     verified_from?: string
     verified_to?: string
-    verified_amount?: number
+    verified_amount?: number | string
     verified_memo?: string
     timestamp: number
 }
@@ -40,13 +47,14 @@ export interface D402ServerConfig {
 }
 
 /**
- * Cached payment data
+ * Cached payment data. `amount` follows the dual-shape rule (number DEM
+ * pre-fork, decimal-string OS post-fork).
  */
 export interface CachedPayment {
     txHash: string
     from: string
     to: string
-    amount: number
+    amount: number | string
     memo: string
     timestamp: number
     expiresAt: number

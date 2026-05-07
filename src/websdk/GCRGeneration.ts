@@ -21,6 +21,7 @@ import {
     StorageProgramPayload,
     STORAGE_PROGRAM_CONSTANTS,
 } from "@/types/blockchain/TransactionSubtypes/StorageProgramTransaction"
+import { OS_PER_DEM } from "@/denomination"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -720,11 +721,24 @@ export class HandleD402Operations {
  */
 export class HandleStorageProgramOperations {
     /**
-     * Calculate the storage fee based on data size
-     * Pricing: 1 DEM per 10KB (rounded up)
+     * Calculate the storage fee based on data size.
+     *
+     * Pricing: 1 DEM per 10KB chunk (rounded up, minimum 1 DEM).
+     *
+     * P4: arithmetic in `bigint` OS (the smallest unit). Returned as a
+     * pair `{ feeOs, feeDem }` so callers can write the legacy DEM-number
+     * shape onto the wire while retaining bigint OS internally for
+     * future post-fork serializer use. The DEM number is exact whenever
+     * the OS amount is a whole multiple of `OS_PER_DEM`, which it
+     * always is for this fee schedule.
      */
-    private static calculateStorageFee(data: Record<string, any> | string | undefined, encoding: "json" | "binary" = "json"): number {
-        if (!data) return 1 // Minimum 1 DEM
+    private static calculateStorageFee(
+        data: Record<string, any> | string | undefined,
+        encoding: "json" | "binary" = "json",
+    ): { feeOs: bigint; feeDem: number } {
+        if (!data) {
+            return { feeOs: OS_PER_DEM, feeDem: 1 }
+        }
 
         let sizeBytes: number
         if (encoding === "binary") {
@@ -737,10 +751,16 @@ export class HandleStorageProgramOperations {
             sizeBytes = new TextEncoder().encode(jsonString).length
         }
 
-        const chunks = Math.ceil(sizeBytes / STORAGE_PROGRAM_CONSTANTS.PRICING_CHUNK_BYTES)
-        // FEE_PER_CHUNK is bigint in constants, convert to number for GCREdit compatibility
-        const feePerChunk = Number(STORAGE_PROGRAM_CONSTANTS.FEE_PER_CHUNK)
-        return Math.max(1, chunks) * feePerChunk
+        const chunks = Math.max(
+            1,
+            Math.ceil(sizeBytes / STORAGE_PROGRAM_CONSTANTS.PRICING_CHUNK_BYTES),
+        )
+        const feeOs =
+            BigInt(chunks) * STORAGE_PROGRAM_CONSTANTS.FEE_PER_CHUNK
+        // OS_PER_DEM divides feeOs cleanly because FEE_PER_CHUNK ===
+        // OS_PER_DEM (P4) and `chunks` is a finite positive integer.
+        const feeDem = Number(feeOs / OS_PER_DEM)
+        return { feeOs, feeDem }
     }
 
     static async handle(
@@ -758,8 +778,11 @@ export class HandleStorageProgramOperations {
 
         switch (operation) {
             case "CREATE_STORAGE_PROGRAM": {
-                // Calculate and burn the storage fee
-                const fee = this.calculateStorageFee(data, encoding)
+                // Calculate and burn the storage fee. Emit DEM-number on
+                // the wire (legacy shape); P4 commit 2's serializerGate
+                // will re-encode to OS-string when the connected node is
+                // post-fork.
+                const { feeDem } = this.calculateStorageFee(data, encoding)
 
                 const burnFeeEdit: GCREdit = {
                     type: "balance",
@@ -767,7 +790,7 @@ export class HandleStorageProgramOperations {
                     isRollback: isRollback,
                     account: tx.content.from_ed25519_address,
                     txhash: tx.hash,
-                    amount: fee,
+                    amount: feeDem,
                 }
                 edits.push(burnFeeEdit)
 
@@ -791,8 +814,9 @@ export class HandleStorageProgramOperations {
             }
 
             case "WRITE_STORAGE": {
-                // Calculate and burn the storage fee for the new data
-                const fee = this.calculateStorageFee(data, encoding)
+                // Calculate and burn the storage fee for the new data.
+                // Same legacy-DEM-number wire shape as CREATE_STORAGE_PROGRAM.
+                const { feeDem } = this.calculateStorageFee(data, encoding)
 
                 const burnFeeEdit: GCREdit = {
                     type: "balance",
@@ -800,7 +824,7 @@ export class HandleStorageProgramOperations {
                     isRollback: isRollback,
                     account: tx.content.from_ed25519_address,
                     txhash: tx.hash,
-                    amount: fee,
+                    amount: feeDem,
                 }
                 edits.push(burnFeeEdit)
 
