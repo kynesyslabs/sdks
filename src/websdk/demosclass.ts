@@ -53,6 +53,11 @@ import {
     parseOsString,
 } from "@/denomination"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
+import {
+    SubDemPrecisionError,
+    type ForkStatus,
+    type NetworkInfo,
+} from "@/denomination/networkInfo"
 import * as bip39 from "@scure/bip39"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
@@ -96,6 +101,15 @@ export class Demos {
     private _cachedNetworkParameters: NetworkParameters | null = null
     private _cachedNetworkParametersAt = 0
     private _cachedNetworkParametersRpcUrl: string | null = null
+
+    // P4 commit 3: per-instance cached fork status. `null` after a failed
+    // detection attempt (`_cachedNetworkInfoFailed = true`) means we have
+    // already assumed pre-fork; we keep this state for the instance's
+    // lifetime to avoid hammering an unreachable node, and warn exactly
+    // once.
+    private _cachedNetworkInfo: NetworkInfo | null = null
+    private _cachedNetworkInfoFailed: boolean = false
+    private _cachedNetworkInfoWarned: boolean = false
 
     /** Connection status of the RPC URL */
     connected: boolean = false
@@ -280,27 +294,58 @@ export class Demos {
     /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
      *
-     * @param to - The reciever
-     * @param amount - The amount in DEM
+     * P4 dual-input:
+     *  - `bigint` (preferred, post-v3): amount in OS (smallest unit;
+     *    1 DEM = 10^9 OS). Use `denomination.demToOs(...)` to convert
+     *    a human-readable DEM input.
+     *  - `number` (deprecated, v2 callers): amount in DEM. Auto-converted
+     *    to OS internally via `OS_PER_DEM`. Will be removed in v4.
      *
+     * Sub-DEM precision is rejected with `SubDemPrecisionError` when
+     * the connected node is pre-fork — its legacy DEM-`number` wire
+     * cannot carry < 1 DEM and silent truncation is unacceptable. The
+     * caller can either round to a whole DEM or upgrade the target
+     * node.
+     *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * await demos.pay("0x...", denomination.demToOs(100))   // 100 DEM
+     * await demos.pay("0x...", 100_000_000_000n)             // raw OS
+     * await demos.pay("0x...", 100)                          // legacy DEM number (deprecated)
+     * ```
+     *
+     * @param to - The receiver address (0x-prefixed hex).
+     * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
      * @returns The signed transaction.
      */
-    pay(to: string, amount: number) {
+    async pay(to: string, amount: number | bigint) {
         required(this.keypair, "Wallet not connected")
-        return DemosTransactions.pay(to, amount, this)
+        const amountOs =
+            typeof amount === "bigint" ? amount : demToOs(amount)
+        await this._assertAmountAcceptableOnTargetNode(amountOs)
+        return DemosTransactions.pay(to, amountOs, this)
     }
 
     /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
      *
-     * @param to - The reciever
-     * @param amount - The amount in DEM
+     * Alias of {@link pay}. Same dual-input semantics — `bigint` is the
+     * preferred OS shape; `number` is the deprecated legacy DEM shape.
      *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * await demos.transfer("0x...", denomination.demToOs("1.5"))  // 1.5 DEM
+     * await demos.transfer("0x...", 1_500_000_000n)                // raw OS
+     * ```
+     *
+     * @param to - The receiver address (0x-prefixed hex).
+     * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
      * @returns The signed transaction.
      */
-    transfer(to: string, amount: number) {
-        required(this.keypair, "Wallet not connected")
-        return DemosTransactions.pay(to, amount, this)
+    async transfer(to: string, amount: number | bigint) {
+        return this.pay(to, amount)
     }
 
     /**
@@ -516,14 +561,14 @@ export class Demos {
             }
         }
 
-        // P4 commit 2: route hashing through the dual-format serializerGate.
-        // `isPostFork` defaults to false (legacy wire) until P4 commit 3
-        // wires up `getNetworkInfo` fork detection. The pre-fork branch is
-        // bit-identical to the legacy `JSON.stringify(raw_tx.content)` for
-        // any content the SDK constructs today (no internal bigints leak
-        // into the wire pre-fork).
+        // P4 commit 3: route hashing through the dual-format serializerGate
+        // with the cached fork status. The first `sign()` call after
+        // `connect()` triggers `getNetworkInfo`; subsequent signs reuse
+        // the cached result. On RPC failure the cache stays in
+        // "assume pre-fork" mode for the instance's lifetime.
+        const isPostFork = await this._isPostForkCached()
         raw_tx.hash = Hashing.sha256(
-            serializeTransactionContent(raw_tx.content, false),
+            serializeTransactionContent(raw_tx.content, isPostFork),
         )
         const signature = await this.crypto.sign(
             this.algorithm,
@@ -1277,6 +1322,107 @@ export class Demos {
             return fresh
         }
         return null
+    }
+
+    // SECTION Fork detection (P4 commit 3)
+
+    /**
+     * Fetches the connected node's per-fork activation status.
+     *
+     * Mirrors the node's `getNetworkInfo` `nodeCall`
+     * (`libs/network/handlers/forkHandlers.ts`). The response carries
+     * activation height, current chain head, and the `activated` boolean
+     * for every known fork.
+     *
+     * Caches the result on this `Demos` instance for the instance's
+     * lifetime (no TTL). To re-fetch after a node upgrade, construct a
+     * fresh `Demos` instance.
+     *
+     * On RPC failure (404, malformed response, network error), this
+     * method returns `null` and the SDK assumes pre-fork wire format.
+     * A `console.warn` is emitted exactly once per `Demos` instance
+     * recommending the operator upgrade the target node.
+     *
+     * @returns The fork-status payload, or `null` if the RPC failed.
+     */
+    async getNetworkInfo(): Promise<NetworkInfo | null> {
+        if (this._cachedNetworkInfo) return this._cachedNetworkInfo
+        if (this._cachedNetworkInfoFailed) return null
+
+        let fresh: unknown = null
+        try {
+            fresh = await this.nodeCall("getNetworkInfo")
+        } catch {
+            // call() already swallows transport errors, but be defensive
+            // in case future nodeCall() rewrites surface them.
+            fresh = null
+        }
+
+        if (
+            fresh &&
+            typeof fresh === "object" &&
+            (fresh as NetworkInfo).forks &&
+            (fresh as NetworkInfo).forks.osDenomination &&
+            typeof (fresh as NetworkInfo).forks.osDenomination.activated ===
+                "boolean"
+        ) {
+            this._cachedNetworkInfo = fresh as NetworkInfo
+            return this._cachedNetworkInfo
+        }
+
+        // Cache the failure so we don't hammer an unreachable / pre-P3c
+        // node on every sign(). Warn once.
+        this._cachedNetworkInfoFailed = true
+        if (!this._cachedNetworkInfoWarned) {
+            this._cachedNetworkInfoWarned = true
+            console.warn(
+                "getNetworkInfo unavailable on target node — assuming pre-fork wire format. Upgrade the node to a post-fork-aware version (>= the version that ships with forkHandlers). This fallback path is deprecated and will be removed in v4.",
+            )
+        }
+        return null
+    }
+
+    /**
+     * @internal
+     * Cached fork-status accessor. Returns `osDenomination` activation
+     * status as a boolean. `false` is the safe default (legacy wire
+     * format) when the node is unreachable or pre-P3c.
+     */
+    private async _isPostForkCached(): Promise<boolean> {
+        const info = await this.getNetworkInfo()
+        return Boolean(info?.forks?.osDenomination?.activated)
+    }
+
+    /**
+     * @internal
+     * Reset the cached fork status. Intended for tests; production code
+     * should construct a fresh `Demos` instance instead.
+     */
+    _resetForkStatusCacheForTesting(): void {
+        this._cachedNetworkInfo = null
+        this._cachedNetworkInfoFailed = false
+        this._cachedNetworkInfoWarned = false
+    }
+
+    /**
+     * @internal
+     * Sub-DEM precision guard. Run by every public-API entry point that
+     * takes a user-supplied OS amount before tx construction. Throws
+     * `SubDemPrecisionError` when the connected node is pre-fork and
+     * the amount carries sub-DEM precision (would silently truncate on
+     * the legacy DEM-`number` wire).
+     *
+     * @param amountOs - The OS amount the caller is sending.
+     */
+    private async _assertAmountAcceptableOnTargetNode(
+        amountOs: bigint,
+    ): Promise<void> {
+        const isPostFork = await this._isPostForkCached()
+        if (isPostFork) return
+        const remainder = amountOs % OS_PER_DEM
+        if (remainder !== 0n) {
+            throw new SubDemPrecisionError(amountOs, remainder)
+        }
     }
 
     /**

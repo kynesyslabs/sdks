@@ -38,24 +38,34 @@ export class EscrowTransaction {
     }
 
     /**
-     * Creates a transaction to send DEM to a social identity escrow
+     * Creates a transaction to send DEM to a social identity escrow.
+     *
+     * P4 dual-input:
+     *  - `bigint` (preferred, post-v3): OS amount.
+     *  - `number` (deprecated, v2 callers): DEM amount, auto-converted.
+     *
+     * Internal carrier in `tx.content.amount` and `gcr_edits[].amount`
+     * is bigint OS; the serializerGate (called from `demos.sign`)
+     * picks the wire shape per fork status. Sub-DEM precision against
+     * a pre-fork node throws `SubDemPrecisionError`.
      *
      * @example
      * ```typescript
+     * import { denomination } from "@kynesyslabs/demosdk"
      * const tx = await EscrowTransaction.sendToIdentity(
      *   demos,
      *   "twitter",
      *   "@bob",
-     *   100,
+     *   denomination.demToOs(100),  // 100 DEM
      *   { expiryDays: 30, message: "Welcome to Demos!" }
      * )
-     * await demos.submitTransaction(tx)
+     * await demos.confirm(tx)
      * ```
      *
      * @param demos - Demos SDK instance (must have keypair set)
      * @param platform - Social platform ("twitter", "github", "telegram")
      * @param username - Username on that platform
-     * @param amount - Amount of DEM to send (number)
+     * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
      * @param options - Optional parameters
      * @returns Signed transaction ready to submit
      */
@@ -69,12 +79,20 @@ export class EscrowTransaction {
             message?: string     // Optional memo
         }
     ): Promise<Transaction> {
-        // P4: normalise the input amount to two parallel forms — bigint OS
-        // for internal arithmetic / future post-fork wire emission, and
-        // a JS number in DEM for the current pre-fork wire shape. The
-        // serializerGate (P4 commit 2) is the boundary that picks one
-        // when computing the signing hash.
-        const { amountDem, amountOs } = EscrowTransaction.normalizeAmountInput(amount)
+        // P4 commit 3: bigint OS is the canonical internal carrier; the
+        // serializerGate (run via demos.sign) emits the right wire shape
+        // per the connected node's fork status.
+        const { amountOs } = EscrowTransaction.normalizeAmountInput(amount)
+
+        // Sub-DEM precision guard — runs before tx construction so the
+        // caller never produces a tx that a pre-fork node will silently
+        // truncate. Calls into the cached `getNetworkInfo` fork status.
+        // The helper is `private` on Demos but reachable at runtime;
+        // cast through `any` to bypass the access modifier (escrow is
+        // package-internal — the alternative is to widen Demos's
+        // public surface, which we don't want).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (demos as any)._assertAmountAcceptableOnTargetNode(amountOs)
 
         // Get sender address from demos instance
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
@@ -95,13 +113,19 @@ export class EscrowTransaction {
         // (flagged in SPEC_P4 §2.1). Kept type-correct so they still
         // match the (now-widened) `GCREditBalance.amount` type if/when
         // the dead-code path is wired up.
+        //
+        // P4 commit 3: edits carry bigint OS internally. The
+        // serializerGate normalises them to the right wire shape per
+        // fork status. The `GCREditBalance.amount` static type is
+        // `number | string`; bigints are passed through `unknown` to
+        // satisfy TS — the runtime serializer handles all three shapes.
         const gcrEdits: GCREdit[] = [
             // 1. Deduct from sender's balance
             {
                 type: "balance",
                 operation: "remove",
                 account: sender,
-                amount: amountDem,
+                amount: amountOs as unknown as number,
                 txhash: "",
                 isRollback: false,
             },
@@ -115,7 +139,7 @@ export class EscrowTransaction {
                     sender,
                     platform,
                     username,
-                    amount: amountDem,
+                    amount: amountOs as unknown as number,
                     expiryDays: options?.expiryDays || 30,
                     message: options?.message,
                 },
@@ -124,11 +148,13 @@ export class EscrowTransaction {
             },
         ]
 
-        // Fill transaction content
+        // Fill transaction content. Internal carrier is bigint OS; the
+        // serializerGate emits the right wire shape (DEM number pre-fork,
+        // OS string post-fork) when `demos.sign` hashes.
         tx.content.from = sender
         tx.content.to = escrowAddress
         tx.content.nonce = nonce + 1
-        tx.content.amount = amountDem // legacy wire shape; serializerGate handles post-fork
+        tx.content.amount = amountOs as unknown as number
         tx.content.type = "escrow"
         tx.content.timestamp = Date.now()
         tx.content.gcr_edits = gcrEdits

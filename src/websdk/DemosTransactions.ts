@@ -47,13 +47,21 @@ export const DemosTransactions = {
     /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
      *
+     * P4 dual-input:
+     *  - `bigint`: OS amount (preferred — 1 DEM = 10^9 OS).
+     *  - `number`: DEM amount (legacy, deprecated). Auto-converted to OS.
+     *
+     * Internal carrier in `tx.content.amount` is bigint OS; the
+     * serializerGate (run from `demos.sign`) emits the right wire shape
+     * per the connected node's fork status.
+     *
      * @param to - The reciever
-     * @param amount - The amount in DEM
+     * @param amount - DEM `number` (legacy) or OS `bigint`.
      * @param demos - The demos instance (for getting the address nonce)
      *
      * @returns The signed transaction.
      */
-    async pay(to: string, amount: number, demos: Demos) {
+    async pay(to: string, amount: number | bigint, demos: Demos) {
         required(demos.keypair, "Wallet not connected")
 
         let tx = DemosTransactions.empty()
@@ -62,32 +70,62 @@ export const DemosTransactions = {
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
         const nonce = await demos.getAddressNonce(publicKeyHex)
 
-        // tx.content.from_ed25519_address = publicKeyHex
-        // REVIEW Get the address nonce
-        // tx.content.from = from
+        const amountOs: bigint =
+            typeof amount === "bigint"
+                ? amount
+                : DemosTransactions._demNumberToOsBigint(amount)
 
         tx.content.to = to
         tx.content.nonce = nonce + 1
-        tx.content.amount = amount
+        // Internal carrier is bigint OS. The widened
+        // `TransactionContent.amount: number | string` type does not
+        // statically include `bigint`; we cast through `unknown`
+        // because the serializerGate normalises bigints to the right
+        // wire shape at hash time.
+        tx.content.amount = amountOs as unknown as number | string
         tx.content.type = "native"
         tx.content.timestamp = Date.now()
         tx.content.data = [
             "native",
-            { nativeOperation: "send", args: [to, amount] },
+            {
+                nativeOperation: "send",
+                // INativeSend.args[1] was widened in commit 1 to accept
+                // OS bigint / OS string alongside the legacy DEM number.
+                args: [to, amountOs as unknown as number | string],
+            },
         ]
 
         return await demos.sign(tx)
     },
     /**
+     * Convert a legacy DEM `number` input to an OS `bigint` for internal
+     * carrying. Pre-floors to whole DEM to match the v2 wire (which was
+     * always whole DEM); explicit fractional inputs use `bigint` plus
+     * `denomination.demToOs` instead.
+     *
+     * @internal
+     */
+    _demNumberToOsBigint(amountDem: number): bigint {
+        if (!Number.isFinite(amountDem) || amountDem < 0) {
+            throw new Error(
+                `[DemosTransactions] amount must be a non-negative finite number or bigint, got ${amountDem}`,
+            )
+        }
+        return BigInt(Math.floor(amountDem)) * 1_000_000_000n
+    },
+    /**
      * Create a signed DEMOS transaction to send native tokens to a given address.
      *
+     * Alias of {@link pay}. Same dual-input semantics — `bigint` OS
+     * preferred, `number` DEM accepted as the deprecated path.
+     *
      * @param to - The reciever
-     * @param amount - The amount in DEM
+     * @param amount - DEM `number` (legacy) or OS `bigint`.
      * @param demos - The demos instance (for getting the address nonce)
      *
      * @returns The signed transaction.
      */
-    transfer(to: string, amount: number, demos: Demos) {
+    transfer(to: string, amount: number | bigint, demos: Demos) {
         return DemosTransactions.pay(to, amount, demos)
     },
     // NOTE Signing a transaction after hashing it

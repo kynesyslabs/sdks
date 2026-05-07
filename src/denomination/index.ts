@@ -23,3 +23,14 @@ export {
     toOsString,
     formatDem,
 } from "./conversion"
+
+// REVIEW: P4 commit 2 — dual-format serializer (internal infrastructure).
+// Exported through `denomination` so consumers can compute SDK-shaped
+// hashes for off-line workflows; the primary use is internal to
+// `Demos.sign`.
+export { serializeTransactionContent } from "./serializerGate"
+
+// REVIEW: P4 commit 3 — fork-detection types mirroring the node's
+// `forkHandlers.ts` response shape.
+export type { ForkStatus, NetworkInfo } from "./networkInfo"
+export { SubDemPrecisionError } from "./networkInfo"
