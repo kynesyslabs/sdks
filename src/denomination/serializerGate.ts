@@ -231,7 +231,13 @@ function transformToPostFork(content: TransactionContent): TransactionContent {
 
     if (content.transaction_fee) {
         const fee = content.transaction_fee
-        const transformedFee: TxFee = {
+        // PR-86 myc#19: spread the source fee object first so source
+        // insertion order is preserved (consensus-critical) and any
+        // extra fields the SDK doesn't know about pass through. Then
+        // overwrite the three known carriers in place — `{...fee, ...}`
+        // does not change the position of pre-existing keys.
+        transformed.transaction_fee = {
+            ...fee,
             network_fee: toPostForkWireString(
                 fee.network_fee as number | string | bigint,
             ),
@@ -241,8 +247,7 @@ function transformToPostFork(content: TransactionContent): TransactionContent {
             additional_fee: toPostForkWireString(
                 fee.additional_fee as number | string | bigint,
             ),
-        }
-        transformed.transaction_fee = transformedFee
+        } as TxFee
     }
 
     if (Array.isArray(content.gcr_edits)) {
@@ -277,7 +282,10 @@ function transformToPreFork(content: TransactionContent): TransactionContent {
 
     if (content.transaction_fee) {
         const fee = content.transaction_fee
-        const transformedFee: TxFee = {
+        // PR-86 myc#19: spread to preserve source key order; see the
+        // matching block in `transformToPostFork` for the rationale.
+        transformed.transaction_fee = {
+            ...fee,
             network_fee: toPreForkWireNumber(
                 fee.network_fee as number | string | bigint,
             ),
@@ -287,8 +295,7 @@ function transformToPreFork(content: TransactionContent): TransactionContent {
             additional_fee: toPreForkWireNumber(
                 fee.additional_fee as number | string | bigint,
             ),
-        }
-        transformed.transaction_fee = transformedFee
+        } as TxFee
     }
 
     if (Array.isArray(content.gcr_edits)) {

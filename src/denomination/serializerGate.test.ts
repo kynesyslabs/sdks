@@ -213,3 +213,55 @@ describe("serializerGate — input invariance", () => {
         expect(JSON.stringify(content)).toBe(before)
     })
 })
+
+describe("serializerGate — transaction_fee key order (myc#19)", () => {
+    test("post-fork preserves non-canonical fee insertion order", () => {
+        const content = buildFixture()
+        // Construct fee with `additional_fee` first to break the old
+        // hard-coded literal order.
+        content.transaction_fee = {
+            additional_fee: 0,
+            rpc_fee: 0,
+            network_fee: 1,
+        } as any
+        const out = serializeTransactionContent(content, true)
+        const parsed = JSON.parse(out)
+        expect(Object.keys(parsed.transaction_fee)).toEqual([
+            "additional_fee",
+            "rpc_fee",
+            "network_fee",
+        ])
+    })
+
+    test("pre-fork preserves non-canonical fee insertion order", () => {
+        const content = buildFixture()
+        content.transaction_fee = {
+            additional_fee: 0,
+            rpc_fee: 0,
+            network_fee: 1,
+        } as any
+        const out = serializeTransactionContent(content, false)
+        const parsed = JSON.parse(out)
+        expect(Object.keys(parsed.transaction_fee)).toEqual([
+            "additional_fee",
+            "rpc_fee",
+            "network_fee",
+        ])
+    })
+
+    test("post-fork passes through unknown extra fee fields verbatim", () => {
+        const content = buildFixture()
+        content.transaction_fee = {
+            network_fee: 1,
+            rpc_fee: 0,
+            additional_fee: 0,
+            // Future extension field the SDK doesn't know about — must
+            // not be dropped (consensus would diverge if the node knows
+            // it and we strip it).
+            future_field: "abc",
+        } as any
+        const out = serializeTransactionContent(content, true)
+        const parsed = JSON.parse(out)
+        expect(parsed.transaction_fee.future_field).toBe("abc")
+    })
+})
