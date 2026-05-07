@@ -1193,6 +1193,18 @@ export class Demos {
     /**
      * Get information about an address.
      *
+     * P4: `balance` is `bigint` in **OS** (smallest unit, 1 DEM = 10^9 OS).
+     * Use `denomination.osToDem(info.balance)` for display.
+     *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * const info = await demos.getAddressInfo("0x...")
+     * if (info) {
+     *     console.log("balance:", denomination.osToDem(info.balance), "DEM")
+     * }
+     * ```
+     *
      * @param address - The address
      */
     async getAddressInfo(address: string): Promise<AddressInfo | null> {
@@ -1201,13 +1213,13 @@ export class Demos {
         })
 
         if (info) {
-            // REVIEW Fix for when the balance is 0 (see FIXME below)
-            if (!info.balance) {
-                info.balance = 0
-            }
+            // Balance can come back as `null`/`undefined`/`0`/`"0"`/
+            // bigint-string. `BigInt(null)` throws, so coalesce to 0
+            // before parsing.
+            const rawBalance = info.balance ?? 0
             return {
                 ...info,
-                balance: BigInt(info.balance), // FIXME This fails when the balance is 0
+                balance: BigInt(rawBalance),
             } as AddressInfo
         }
 

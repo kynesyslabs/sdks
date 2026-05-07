@@ -75,13 +75,22 @@ export const DemosTransactions = {
                 ? amount
                 : DemosTransactions._demNumberToOsBigint(amount)
 
+        // Resolve the fork status now so we can emit the correct wire
+        // shape into `tx.content.data` — the node's serializer does not
+        // walk `data`, so the construction site is the source of truth
+        // for the bytes inside it. `_isPostForkCached` is private; we
+        // reach in via `any` because P4 internals haven't been promoted
+        // to the public surface.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const isPostFork: boolean = await (demos as any)._isPostForkCached()
+        const wireAmount: number | string = isPostFork
+            ? amountOs.toString()
+            : Number(amountOs / 1_000_000_000n)
+
         tx.content.to = to
         tx.content.nonce = nonce + 1
-        // Internal carrier is bigint OS. The widened
-        // `TransactionContent.amount: number | string` type does not
-        // statically include `bigint`; we cast through `unknown`
-        // because the serializerGate normalises bigints to the right
-        // wire shape at hash time.
+        // Internal carrier on `content.amount` is bigint OS — the
+        // serializerGate normalises it at hash time.
         tx.content.amount = amountOs as unknown as number | string
         tx.content.type = "native"
         tx.content.timestamp = Date.now()
@@ -89,9 +98,10 @@ export const DemosTransactions = {
             "native",
             {
                 nativeOperation: "send",
-                // INativeSend.args[1] was widened in commit 1 to accept
-                // OS bigint / OS string alongside the legacy DEM number.
-                args: [to, amountOs as unknown as number | string],
+                // The serializer doesn't walk `data`, so emit the
+                // wire shape directly. INativeSend.args[1] was widened
+                // in commit 1 to accept OS string alongside DEM number.
+                args: [to, wireAmount],
             },
         ]
 
