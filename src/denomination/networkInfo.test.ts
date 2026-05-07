@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect } from "@jest/globals"
 
 import { SubDemPrecisionError } from "./networkInfo"
 import { OS_PER_DEM } from "./constants"

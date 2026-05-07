@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect } from "@jest/globals"
 
 import { serializeTransactionContent } from "./serializerGate"
 import { demToOs, parseOsString, toOsString } from "./conversion"
