@@ -8,6 +8,7 @@ import { PasskeyGenerator } from "./passkeys/passkeys"
 import { Cryptography } from "@/encryption/Cryptography"
 import { Address } from "@/types/blockchain/WalletTypes"
 import { RPCResponseWithValidityData } from "@/types/communication/rpc"
+import { OS_PER_DEM as OS_PER_DEM_BI } from "@/denomination"
 
 export default class Wallet {
     // A wallet class is a singleton class, so we need to make sure that only one instance per id is created.
@@ -80,18 +81,42 @@ export default class Wallet {
     /* SECTION Basic writes */
     // NOTE All the writes return a validity object that needs to be confirmed and broadcasted
 
-    async transfer(to: Address, amount: number, demos: websdk.Demos) {
+    /**
+     * Transfer native DEM tokens to a recipient address.
+     *
+     * P4 dual-shape:
+     *   - Pre-fork production node: pass a `number` in DEM (legacy).
+     *   - Post-fork node: pass a `bigint` in OS (new canonical form).
+     *
+     * The SDK's `serializerGate` (P4 commit 2) translates internally so
+     * calling code can stay on either form during the rollout window.
+     * Sub-DEM precision (`amountOs % OS_PER_DEM !== 0n`) sent against a
+     * pre-fork node is rejected by the public API guard introduced in
+     * P4 commit 3.
+     *
+     * @param to - Recipient address (0x-prefixed hex).
+     * @param amount - DEM amount as legacy `number` or OS `bigint`.
+     * @param demos - Demos client used to sign and submit.
+     */
+    async transfer(to: Address, amount: number | bigint, demos: websdk.Demos) {
         let tx = DemosTransactions.empty()
         // Putting the right data in the transaction
         // tx.content.from = keypair.publicKey.toString("hex")
         tx.content.from = demos.keypair.publicKey.toString("hex")
         // tx.content.to = to
         tx.content.type = "native"
+        // Pre-fork wire shape: `amount` is a DEM `number` in the native-send
+        // args. P4 commit 3 will switch to OS-string post-fork via the
+        // serializerGate; for commit 1 we coerce bigint OS → DEM number.
+        const amountWire =
+            typeof amount === "bigint"
+                ? Number(amount / OS_PER_DEM_BI)
+                : amount
         tx.content.data = [
             "native",
             {
                 nativeOperation: "send",
-                args: [to, amount],
+                args: [to, amountWire],
             },
         ]
         // tx.content.amount = amount

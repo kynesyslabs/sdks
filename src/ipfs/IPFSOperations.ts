@@ -38,6 +38,7 @@ import type {
     IPFSCustomCharges,
     IPFSCostBreakdown,
 } from "../types/blockchain/CustomCharges"
+import { demToOs, toOsString } from "../denomination"
 
 // REVIEW: IPFS Operations class for Demos Network SDK
 
@@ -150,11 +151,28 @@ export interface IPFSPinsResponse {
  * Response from ipfsQuote nodeCall
  *
  * Provides cost estimation before transaction is built and signed.
- * Use this to populate custom_charges in the transaction.
+ * Use this to populate `custom_charges` in the transaction.
+ *
+ * P4 dual-shape compatibility:
+ * - Pre-fork node returns `cost_dem` (decimal string, DEM).
+ * - Post-fork node returns `cost_os` (decimal string, OS).
+ *
+ * SDK helpers (`quoteToCustomCharges`, `createCustomCharges`) prefer
+ * `cost_os` when present and otherwise convert `cost_dem` via
+ * `denomination.demToOs`. Likewise `breakdown.{base_cost,size_cost}` is
+ * shape-stable across the fork.
  */
 export interface IpfsQuoteResponse {
-    /** Estimated cost in DEM (as string for BigInt safety) */
-    cost_dem: string
+    /**
+     * Estimated cost in DEM as a decimal string (legacy/pre-fork shape).
+     * Kept for back-compat with current node responses.
+     */
+    cost_dem?: string
+    /**
+     * Estimated cost in OS as a decimal string (post-fork shape).
+     * Preferred when present.
+     */
+    cost_os?: string
     /** File size used for calculation */
     file_size_bytes: number
     /** Whether sender is a genesis account */
@@ -180,8 +198,8 @@ export interface IpfsQuoteResponse {
 export interface AddOptionsWithCharges extends AddOptions {
     /** Optional custom charges configuration for cost control */
     customCharges?: {
-        /** Maximum cost user agrees to pay (from ipfsQuote response) */
-        maxCostDem: string
+        /** Maximum cost user agrees to pay, decimal-string OS (from ipfsQuote response). */
+        maxCostOs: string
         /** Optional cost breakdown for reference */
         estimatedBreakdown?: IPFSCostBreakdown
     }
@@ -195,8 +213,8 @@ export interface PinOptionsWithCharges extends PinOptions {
     fileSize?: number
     /** Optional custom charges configuration for cost control */
     customCharges?: {
-        /** Maximum cost user agrees to pay (from ipfsQuote response) */
-        maxCostDem: string
+        /** Maximum cost user agrees to pay, decimal-string OS (from ipfsQuote response). */
+        maxCostOs: string
         /** Optional cost breakdown for reference */
         estimatedBreakdown?: IPFSCostBreakdown
     }
@@ -264,7 +282,7 @@ export class IPFSOperations {
      *   content,
      *   {
      *     filename: 'data.json',
-     *     customCharges: { maxCostDem: quote.cost_dem }
+     *     customCharges: IPFSOperations.quoteToCustomCharges(quote)
      *   }
      * )
      * ```
@@ -294,10 +312,10 @@ export class IPFSOperations {
         }
 
         // REVIEW: Phase 9 - Add custom_charges if provided
-        if (options.customCharges?.maxCostDem) {
+        if (options.customCharges?.maxCostOs) {
             payload.custom_charges = {
                 ipfs: {
-                    max_cost_dem: options.customCharges.maxCostDem,
+                    max_cost_os: options.customCharges.maxCostOs,
                     file_size_bytes: contentSize,
                     operation: "IPFS_ADD",
                     estimated_breakdown: options.customCharges.estimatedBreakdown,
@@ -332,7 +350,7 @@ export class IPFSOperations {
      * const quote = await demos.ipfs.quote(fileSize, 'IPFS_PIN')
      * const chargedPayload = IPFSOperations.createPinPayload('QmExample...', {
      *   fileSize: 1024,
-     *   customCharges: { maxCostDem: quote.cost_dem }
+     *   customCharges: IPFSOperations.quoteToCustomCharges(quote)
      * })
      * ```
      */
@@ -353,10 +371,10 @@ export class IPFSOperations {
         }
 
         // REVIEW: Phase 9 - Add custom_charges if provided
-        if (options.customCharges?.maxCostDem && options.fileSize !== undefined) {
+        if (options.customCharges?.maxCostOs && options.fileSize !== undefined) {
             payload.custom_charges = {
                 ipfs: {
-                    max_cost_dem: options.customCharges.maxCostDem,
+                    max_cost_os: options.customCharges.maxCostOs,
                     file_size_bytes: options.fileSize,
                     operation: "IPFS_PIN",
                     duration_blocks: options.duration,
@@ -555,16 +573,41 @@ export class IPFSOperations {
      * ```
      */
     static quoteToCustomCharges(quote: IpfsQuoteResponse): {
-        maxCostDem: string
+        maxCostOs: string
         estimatedBreakdown: IPFSCostBreakdown
     } {
+        // Prefer post-fork `cost_os`. Fall back to pre-fork `cost_dem` and
+        // apply the DEM→OS conversion so callers always end up with an
+        // OS-denominated string (the canonical wire form post-fork).
+        const maxCostOs = IPFSOperations._normalizeQuoteCostOs(quote)
         return {
-            maxCostDem: quote.cost_dem,
+            maxCostOs,
             estimatedBreakdown: {
                 base_cost: quote.breakdown.base_cost,
                 size_cost: quote.breakdown.size_cost,
             },
         }
+    }
+
+    /**
+     * Normalise an `IpfsQuoteResponse` into a single canonical OS-decimal
+     * cost string. Prefers `cost_os` (post-fork) over `cost_dem`
+     * (pre-fork). Throws if neither is present or both are unparseable.
+     *
+     * Exposed as a private static helper so internal payload builders and
+     * the public `quoteToCustomCharges` / `createCustomCharges` helpers
+     * share one implementation.
+     */
+    private static _normalizeQuoteCostOs(quote: IpfsQuoteResponse): string {
+        if (typeof quote.cost_os === "string" && quote.cost_os.length > 0) {
+            return quote.cost_os
+        }
+        if (typeof quote.cost_dem === "string" && quote.cost_dem.length > 0) {
+            return toOsString(demToOs(quote.cost_dem))
+        }
+        throw new Error(
+            "[IPFSOperations] ipfsQuote response missing both cost_os and cost_dem; cannot derive max_cost_os",
+        )
     }
 
     /**
@@ -593,7 +636,7 @@ export class IPFSOperations {
         durationBlocks?: number,
     ): IPFSCustomCharges {
         return {
-            max_cost_dem: quote.cost_dem,
+            max_cost_os: IPFSOperations._normalizeQuoteCostOs(quote),
             file_size_bytes: quote.file_size_bytes,
             operation,
             duration_blocks: durationBlocks,

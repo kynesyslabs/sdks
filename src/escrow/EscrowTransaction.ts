@@ -15,6 +15,7 @@ import { Hashing } from "@/encryption/Hashing"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import * as skeletons from "@/websdk/utils/skeletons"
 import { sha256 } from "@/websdk/utils/sha256"
+import { OS_PER_DEM } from "@/denomination"
 
 /**
  * High-level API for creating escrow transactions
@@ -62,12 +63,19 @@ export class EscrowTransaction {
         demos: Demos,
         platform: "twitter" | "github" | "telegram",
         username: string,
-        amount: number,
+        amount: number | bigint,
         options?: {
             expiryDays?: number  // Default: 30 days
             message?: string     // Optional memo
         }
     ): Promise<Transaction> {
+        // P4: normalise the input amount to two parallel forms — bigint OS
+        // for internal arithmetic / future post-fork wire emission, and
+        // a JS number in DEM for the current pre-fork wire shape. The
+        // serializerGate (P4 commit 2) is the boundary that picks one
+        // when computing the signing hash.
+        const { amountDem, amountOs } = EscrowTransaction.normalizeAmountInput(amount)
+
         // Get sender address from demos instance
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const sender = uint8ArrayToHex(publicKey as Uint8Array)
@@ -81,14 +89,19 @@ export class EscrowTransaction {
         // Create empty transaction
         let tx = structuredClone(skeletons.transaction)
 
-        // Build GCREdits
+        // Build GCREdits. NOTE: `demos.sign()` calls `GCRGeneration.generate`
+        // which currently overwrites `gcr_edits` with edits derived from
+        // the tx content; the inline edits here are dead code today
+        // (flagged in SPEC_P4 §2.1). Kept type-correct so they still
+        // match the (now-widened) `GCREditBalance.amount` type if/when
+        // the dead-code path is wired up.
         const gcrEdits: GCREdit[] = [
             // 1. Deduct from sender's balance
             {
                 type: "balance",
                 operation: "remove",
                 account: sender,
-                amount: amount,
+                amount: amountDem,
                 txhash: "",
                 isRollback: false,
             },
@@ -102,7 +115,7 @@ export class EscrowTransaction {
                     sender,
                     platform,
                     username,
-                    amount: amount,
+                    amount: amountDem,
                     expiryDays: options?.expiryDays || 30,
                     message: options?.message,
                 },
@@ -115,7 +128,7 @@ export class EscrowTransaction {
         tx.content.from = sender
         tx.content.to = escrowAddress
         tx.content.nonce = nonce + 1
-        tx.content.amount = amount
+        tx.content.amount = amountDem // legacy wire shape; serializerGate handles post-fork
         tx.content.type = "escrow"
         tx.content.timestamp = Date.now()
         tx.content.gcr_edits = gcrEdits
@@ -124,13 +137,56 @@ export class EscrowTransaction {
             {
                 platform,
                 username,
-                amount: amount.toString(),
+                // The escrow payload's `amount` is a free-form string here;
+                // emit canonical OS for forward compatibility with the
+                // post-fork node's escrow handler. Pre-fork node tolerates
+                // arbitrary strings on this nested field.
+                amount: amountOs.toString(),
                 operation: "deposit",
             },
         ]
 
         // Sign transaction
         return await demos.sign(tx)
+    }
+
+    /**
+     * Normalise a public-API amount input (`number` legacy DEM or
+     * `bigint` OS) into both forms. Used at every boundary that needs
+     * dual-shape support during the pre-/post-fork rollout.
+     *
+     * - `number` input: treated as DEM, multiplied to OS via `OS_PER_DEM`.
+     * - `bigint` input: treated as OS; DEM form is the integer division
+     *   `amountOs / OS_PER_DEM`. Rejects with a clear error if the OS
+     *   amount has sub-DEM precision (would silently truncate when
+     *   serialised against a pre-fork node).
+     *
+     * @internal Exposed only to keep the migration paths discoverable.
+     */
+    static normalizeAmountInput(
+        amount: number | bigint,
+    ): { amountDem: number; amountOs: bigint } {
+        if (typeof amount === "bigint") {
+            if (amount < 0n) {
+                throw new Error(
+                    `[EscrowTransaction] amount must be non-negative, got ${amount}`,
+                )
+            }
+            const amountOs = amount
+            // Sub-DEM precision is allowed at the bigint level — the
+            // public API rejection lives in P4 commit 3, gated on
+            // pre-fork node detection. For commit 1 we floor to whole
+            // DEM for the legacy wire shape.
+            const amountDem = Number(amountOs / OS_PER_DEM)
+            return { amountDem, amountOs }
+        }
+        if (!Number.isFinite(amount) || amount < 0) {
+            throw new Error(
+                `[EscrowTransaction] amount must be a non-negative finite number or bigint, got ${amount}`,
+            )
+        }
+        const amountOs = BigInt(Math.floor(amount)) * OS_PER_DEM
+        return { amountDem: amount, amountOs }
     }
 
     /**

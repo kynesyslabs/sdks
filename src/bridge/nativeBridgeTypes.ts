@@ -5,7 +5,12 @@ export const supportedChains = ["EVM", "SOLANA"] as const
 export const supportedStablecoins = ["USDC"] as const
 
 // Types for the operation
-// NOTE: This will be sent from the client to the node
+// NOTE: This will be sent from the client to the node.
+//
+// P4 note: `amount` here is the **stablecoin** amount on the source
+// foreign chain (USDC etc.), not DEM. It is **not** subject to OS
+// conversion. The string-typing was already in place for BigInt safety
+// against EVM `uint256` values. Semantics unchanged by P4.
 export type BridgeOperation = {
     demoAddress: string
     originChainType: SupportedChain
@@ -14,24 +19,31 @@ export type BridgeOperation = {
     destinationChain: SupportedEVMChain | SupportedNonEVMChain
     originAddress: string
     destinationAddress: string
+    /** Stablecoin amount on the source foreign chain (NOT DEM/OS). */
     amount: string
     token: SupportedStablecoin
     txHash: string
     status: "empty" | "pending" | "completed" | "failed"
 }
 
-// Tank data types for different chain types
+// Tank data types for different chain types.
+//
+// `amountExpected` is the **foreign-chain stablecoin** amount in that
+// chain's smallest unit (wei for EVM, lamports for Solana). It is **not**
+// DEM and is **not** subject to OS conversion. P4 widens to
+// `number | string` only so callers can pass BigInt-safe decimal strings
+// for the very-large-integer values typical of EVM wei.
 export type EVMTankData = {
     type: "evm"
     abi: string[]
     address: string
-    amountExpected: number
+    amountExpected: number | string
 }
 
 export type SolanaTankData = {
     type: "solana"
     address: string
-    amountExpected: number
+    amountExpected: number | string
 }
 
 // Compiled content structure with bridge ID
@@ -59,11 +71,15 @@ export type NativeBridgeTxPayload = {
     bridgeId: string
 }
 
-// Legacy type for backwards compatibility
+// Legacy type for backwards compatibility.
+//
+// Same `amountExpected` semantics as `EVMTankData`/`SolanaTankData`:
+// foreign-chain smallest-unit, **not** DEM/OS. Widened to `number | string`
+// for BigInt-safe input only.
 export type BridgeOperationCompiledLegacy = {
     content: {
         operation: BridgeOperation
-        amountExpected: number // Amount of tokens expected to be received
+        amountExpected: number | string // Foreign-chain smallest unit, not DEM
         validUntil: number // Block number until which the operation is valid
     } & (
         | {

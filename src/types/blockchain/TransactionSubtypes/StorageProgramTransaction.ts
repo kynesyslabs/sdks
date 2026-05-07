@@ -7,8 +7,17 @@ import { Transaction, TransactionContent } from "../Transaction"
 // ============================================================================
 
 /**
- * Storage Program constants for validation and pricing
+ * Storage Program constants for validation and pricing.
+ *
+ * P4 fix: prior to this revision `FEE_PER_CHUNK` was hard-coded as `1n`,
+ * which represented "1 OS" (the smallest unit) — off by `10^9` from the
+ * intended "1 DEM per chunk" pricing. Now expressed as `OS_PER_DEM` to
+ * make the unit explicit and the pricing correct on the SDK side. (Note:
+ * the node's matching constant must be aligned by P5 to avoid SDK/node
+ * fee-schedule drift — flagged for follow-up.)
  */
+import { OS_PER_DEM } from "../../../denomination"
+
 export const STORAGE_PROGRAM_CONSTANTS = {
     /** Maximum storage size in bytes (1MB) */
     MAX_SIZE_BYTES: 1048576,
@@ -16,8 +25,12 @@ export const STORAGE_PROGRAM_CONSTANTS = {
     /** Size chunk for pricing in bytes (10KB) */
     PRICING_CHUNK_BYTES: 10240,
 
-    /** Fee per chunk in DEM */
-    FEE_PER_CHUNK: 1n,
+    /**
+     * Fee per chunk, expressed in OS (= 1 DEM = 10^9 OS).
+     * Use bigint arithmetic at every call site; the SDK never widens
+     * back to JS `number`, which loses precision above 2^53.
+     */
+    FEE_PER_CHUNK: OS_PER_DEM,
 
     /** Maximum nesting depth for JSON encoding */
     MAX_JSON_NESTING_DEPTH: 64,

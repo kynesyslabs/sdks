@@ -40,7 +40,9 @@
 import type { Demos } from "@/websdk/demosclass"
 import { DemosTransactions } from "@/websdk/DemosTransactions"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
+import { OS_PER_DEM, osToDem } from "@/denomination"
 import { TLSNotary } from "./TLSNotary"
+import { calculateStorageFee } from "./helpers"
 import type { StatusCallback } from "./types"
 
 /**
@@ -60,13 +62,16 @@ export interface AttestationTokenResponse {
 }
 
 /**
- * Response from storeProof
+ * Response from storeProof.
+ *
+ * P4: `storageFee` is now a `bigint` in OS (smallest-unit). Convert via
+ * `denomination.osToDem(storageFee)` for display.
  */
 export interface StoreProofResponse {
     /** Transaction hash of the storage transaction */
     txHash: string
-    /** Total fee burned for storage (in DEM) */
-    storageFee: number
+    /** Total fee burned for storage as a `bigint` in OS. */
+    storageFee: bigint
     /** HTTP status code from broadcast (200 = success) */
     broadcastStatus: number
     /** Response message from the node */
@@ -114,15 +119,18 @@ export interface StoreProofOptions {
 }
 
 /**
- * Transaction details for user confirmation
+ * Transaction details for user confirmation.
+ *
+ * P4: `amount` is the **OS** (smallest-unit) burn amount as a `bigint`.
+ * Convert to DEM via `denomination.osToDem(amount)` for display.
  */
 export interface TransactionDetails {
     /** The signed transaction object */
     transaction: any
     /** Transaction hash */
     txHash: string
-    /** Amount in DEM being burned/spent */
-    amount: number
+    /** OS amount being burned/spent (`bigint`). */
+    amount: bigint
     /** Description of what this transaction does */
     description: string
     /** Target URL for attestation requests */
@@ -315,7 +323,7 @@ export class TLSNotaryService {
         const details: TransactionDetails = {
             transaction: tx,
             txHash: tx.hash,
-            amount: 1,
+            amount: OS_PER_DEM, // 1 DEM expressed in OS
             description: "TLSNotary attestation request (burns 1 DEM)",
             targetUrl,
         }
@@ -691,7 +699,7 @@ export class TLSNotaryService {
             transaction: tx,
             txHash: tx.hash,
             amount: storageFee,
-            description: `Store TLSNotary proof ${storage === 'onchain' ? 'on-chain' : 'on IPFS'} (burns ${storageFee} DEM)`,
+            description: `Store TLSNotary proof ${storage === 'onchain' ? 'on-chain' : 'on IPFS'} (burns ${osToDem(storageFee)} DEM)`,
             tokenId,
         }
 
@@ -736,8 +744,10 @@ export class TLSNotaryService {
      * const fee = service.calculateStorageFee(5); // 6 DEM for 5KB proof
      * ```
      */
-    calculateStorageFee(proofSizeKB: number): number {
-        return 1 + proofSizeKB // 1 DEM base + 1 DEM per KB
+    calculateStorageFee(proofSizeKB: number): bigint {
+        // Delegates to the standalone helper so the bigint OS arithmetic
+        // is the single source of truth.
+        return calculateStorageFee(proofSizeKB)
     }
 
     /**
@@ -800,10 +810,12 @@ export class TLSNotaryService {
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
         const nonce = await this.demos.getAddressNonce(publicKeyHex)
 
-        // Self-directed transaction (burns tokens)
+        // Self-directed transaction (burns tokens). Pre-fork wire format:
+        // 1 DEM as JS number. The serializerGate (P4 commit 2) will
+        // re-encode to OS string when talking to a post-fork node.
         tx.content.to = publicKeyHex
         tx.content.nonce = nonce + 1
-        tx.content.amount = 1 // 1 DEM fee for attestation request
+        tx.content.amount = 1 // 1 DEM fee for attestation request (legacy wire shape)
         tx.content.type = "native"
         tx.content.timestamp = Date.now()
         tx.content.data = [
@@ -818,14 +830,19 @@ export class TLSNotaryService {
     }
 
     /**
-     * Create a TLSN_STORE native transaction
+     * Create a TLSN_STORE native transaction.
+     *
+     * `fee` is the bigint OS storage fee (from `calculateStorageFee`).
+     * Internally we coerce to a DEM `number` for the legacy wire shape;
+     * the serializerGate (P4 commit 2) handles post-fork OS-string
+     * encoding when applicable.
      * @internal
      */
     private async createTlsnStoreTransaction(
         tokenId: string,
         proof: string,
         storageType: "onchain" | "ipfs",
-        fee: number,
+        fee: bigint,
     ) {
         const tx = DemosTransactions.empty()
 
@@ -833,10 +850,15 @@ export class TLSNotaryService {
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
         const nonce = await this.demos.getAddressNonce(publicKeyHex)
 
+        // Pre-fork wire shape: DEM as JS number. Convert OS fee to DEM
+        // assuming the fee is a whole multiple of OS_PER_DEM (true for
+        // calculateStorageFee). Post-fork serializer will re-encode.
+        const feeDem = Number(fee / OS_PER_DEM)
+
         // Self-directed transaction (burns tokens)
         tx.content.to = publicKeyHex
         tx.content.nonce = nonce + 1
-        tx.content.amount = fee // Storage fee
+        tx.content.amount = feeDem // Storage fee in DEM (legacy wire shape)
         tx.content.type = "native"
         tx.content.timestamp = Date.now()
         tx.content.data = [

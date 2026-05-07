@@ -18,6 +18,15 @@ interface Extended {
     tokens: any[]
 }
 
+/**
+ * Snapshot of an address's on-chain state.
+ *
+ * P4: `balance` is `bigint` in **OS** (smallest unit, 1 DEM = 10^9 OS).
+ * Convert via `denomination.osToDem(balance)` for display. Pre-fork
+ * `getAddressInfo` returns DEM-magnitude `bigint` (multiplied by 10^9
+ * client-side via `osToDem` for backward compatibility); post-fork the
+ * node already returns OS magnitudes.
+ */
 export interface AddressInfo {
     pubkey: string
     assignedTxs: string[]
@@ -26,5 +35,6 @@ export interface AddressInfo {
         web2: Map<string, string[]>
     }
     nonce: number
+    /** Address balance, `bigint` in OS (smallest unit). */
     balance: bigint
 }

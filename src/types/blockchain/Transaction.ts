@@ -95,7 +95,20 @@ export interface TransactionContent {
     from: string
     from_ed25519_address: string
     to: string
-    amount: number
+    /**
+     * Native DEM amount transferred by this transaction.
+     *
+     * Wire-format compatibility:
+     * - Pre-fork node: encoded as JS `number` in DEM.
+     * - Post-fork node: encoded as a decimal `string` in OS (1 DEM = 10^9 OS).
+     *
+     * Both shapes are accepted on input; the SDK's `serializerGate`
+     * (P4 commit 2) normalises to the right wire shape per fork status
+     * before signing. SDK-internal arithmetic always uses `bigint` OS via
+     * `denomination` utilities — never raw `number`, which loses precision
+     * above 2^53 OS (~9 million DEM).
+     */
+    amount: number | string
     // TODO Replace below with data: XMPayload | Web2Payload | NativePayload when ready
     data: TransactionContentData
     // REVIEW Operation structure

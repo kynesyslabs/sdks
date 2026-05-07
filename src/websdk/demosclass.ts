@@ -47,6 +47,11 @@ import {
 } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
+import {
+    OS_PER_DEM,
+    demToOs,
+    parseOsString,
+} from "@/denomination"
 import * as bip39 from "@scure/bip39"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
@@ -608,12 +613,24 @@ export class Demos {
     /**
      * @private
      * Calculates and applies the gas fee for a transaction (SDK-level fallback).
-     * NOTE: We infer the fee by analyzing the generated GCR (Gas Consumption Record) edits:
-     * - Sum all "balance" edits with operation "remove" for the sender
-     * - Subtract the declared transaction `amount`
-     * The remainder is treated as the network fee. If a fee already exists on the tx, we only raise
-     * `network_fee` if the newly inferred fee is higher (prevents double-charging on re-sign).
-     * This is an interim approach; the preferred design is for the node to return fees explicitly.
+     *
+     * NOTE: We infer the fee by analyzing the generated GCR (Gas Consumption
+     * Record) edits:
+     * - Sum all "balance" edits with operation "remove" for the sender.
+     * - Subtract the declared transaction `amount`.
+     * The remainder is treated as the network fee. If a fee already exists on
+     * the tx, we only raise `network_fee` if the newly inferred fee is higher
+     * (prevents double-charging on re-sign). This is an interim approach; the
+     * preferred design is for the node to return fees explicitly.
+     *
+     * P4: arithmetic uses `bigint` internally so OS-magnitude amounts
+     * (~10^19 OS for whole-network supply) don't overflow JS `number`'s
+     * 2^53 safe-integer ceiling. The function tolerates legacy `number`
+     * (DEM) and post-fork `string` (OS) inputs in any field, normalises
+     * to OS-bigint via `_coerceWireAmountToOs`, then writes the
+     * derived fee back in DEM-`number` (legacy wire) — the
+     * serializerGate (P4 commit 2) re-encodes to OS at hash time when
+     * the connected node is post-fork.
      *
      * @param raw_tx - The transaction for which to calculate the fee.
      * @returns The updated transaction with the fee applied.
@@ -628,7 +645,8 @@ export class Demos {
         // INFO: The gas fee is calculated by summing up all "remove" balance edits for the sender's account
         // and then subtracting the actual transaction amount. This gives the value of the fee.
         const sender = (raw_tx.content.from_ed25519_address ?? "").toLowerCase()
-        const totalRemoved = edits.reduce((sum, edit: any) => {
+        let totalRemovedOs = 0n
+        for (const edit of edits as any[]) {
             try {
                 if (
                     edit.type === "balance" &&
@@ -636,20 +654,22 @@ export class Demos {
                     typeof edit.account === "string" &&
                     edit.account.toLowerCase() === sender
                 ) {
-                    const amt = Number(edit.amount)
-                    return sum + (Number.isFinite(amt) ? amt : 0)
+                    totalRemovedOs += Demos._coerceWireAmountToOs(edit.amount)
                 }
             } catch {
                 // skip malformed entries
             }
-            return sum
-        }, 0)
+        }
 
-        const txAmt = Number(raw_tx.content.amount ?? 0)
-        const calculatedFee = Math.max(
-            totalRemoved - (Number.isFinite(txAmt) ? txAmt : 0),
-            0,
-        )
+        let txAmtOs = 0n
+        try {
+            txAmtOs = Demos._coerceWireAmountToOs(raw_tx.content.amount ?? 0)
+        } catch {
+            txAmtOs = 0n
+        }
+
+        const calculatedFeeOs =
+            totalRemovedOs > txAmtOs ? totalRemovedOs - txAmtOs : 0n
 
         // INFO: This logic handles both initial fee creation and accumulation for re-signed transactions.
         // To avoid fee accumulation, a new transaction object should be created for each signing.
@@ -658,20 +678,51 @@ export class Demos {
             rpc_fee: 0,
             additional_fee: 0,
         }
-        const totalExisting =
-            (Number(existing.network_fee) || 0) +
-            (Number(existing.rpc_fee) || 0) +
-            (Number(existing.additional_fee) || 0)
+        const totalExistingOs =
+            Demos._coerceWireAmountToOs(existing.network_fee ?? 0) +
+            Demos._coerceWireAmountToOs(existing.rpc_fee ?? 0) +
+            Demos._coerceWireAmountToOs(existing.additional_fee ?? 0)
 
-        // Only set the fee if no fees are already applied
-        if (totalExisting === 0) {
+        // Only set the fee if no fees are already applied. We emit the
+        // legacy DEM-number wire shape; the serializerGate normalises to
+        // OS-string post-fork. Convert OS bigint back to DEM number,
+        // assuming the inferred fee is a whole multiple of OS_PER_DEM
+        // (true for current 1-DEM gas + 1-DEM-per-KB storage formulas).
+        if (totalExistingOs === 0n) {
+            const feeDem = Number(calculatedFeeOs / OS_PER_DEM)
             raw_tx.content.transaction_fee = {
-                network_fee: calculatedFee,
+                network_fee: feeDem,
                 rpc_fee: 0,
                 additional_fee: 0,
             }
         }
         return raw_tx
+    }
+
+    /**
+     * Coerce a wire-format amount/fee value (legacy DEM `number`,
+     * post-fork OS decimal `string`, or in-flight `bigint`) to an OS
+     * `bigint`. Used by `_calculateAndApplyGasFee` and other internal
+     * arithmetic paths to stay in OS-bigint regardless of which wire
+     * shape the caller produced. Mirrors the node's `toOsBigint` helper
+     * in `forks/serializerGate.ts`.
+     *
+     * @internal
+     */
+    static _coerceWireAmountToOs(value: number | string | bigint): bigint {
+        if (typeof value === "bigint") {
+            return value
+        }
+        if (typeof value === "string") {
+            // Already on the wire as OS decimal string.
+            return parseOsString(value)
+        }
+        if (typeof value === "number") {
+            if (!Number.isFinite(value)) return 0n
+            // Pre-fork DEM number → OS bigint.
+            return demToOs(value)
+        }
+        return 0n
     }
 
     // L2PS calls are defined here
@@ -1385,9 +1436,12 @@ export class Demos {
         /**
          * Get a cost quote for an IPFS operation without submitting a transaction.
          *
-         * Use this to estimate costs and populate custom_charges before signing.
-         * The returned cost should be used as max_cost_dem in the transaction's
-         * custom_charges field.
+         * Use this to estimate costs and populate `custom_charges` before signing.
+         * Pipe the response through `IPFSOperations.quoteToCustomCharges`
+         * (or `createCustomCharges`) to obtain a `max_cost_os` decimal-string
+         * suitable for the transaction's `custom_charges.ipfs.max_cost_os`
+         * field. The helpers handle both pre-fork (`cost_dem`) and
+         * post-fork (`cost_os`) node response shapes.
          *
          * @param fileSizeBytes - Size of file in bytes
          * @param operation - IPFS operation type ('IPFS_ADD', 'IPFS_PIN', or 'IPFS_UNPIN')
@@ -1398,7 +1452,6 @@ export class Demos {
          * ```typescript
          * // Get quote for add operation
          * const quote = await demos.ipfs.quote(content.length, 'IPFS_ADD')
-         * console.log(`Cost: ${quote.cost_dem} DEM`)
          *
          * // Use quote to build transaction with cost control
          * const payload = IPFSOperations.createAddPayload(content, {
@@ -1411,7 +1464,10 @@ export class Demos {
             operation: "IPFS_ADD" | "IPFS_PIN" | "IPFS_UNPIN" = "IPFS_ADD",
             durationBlocks?: number,
         ): Promise<{
-            cost_dem: string
+            /** Pre-fork node: cost in DEM as decimal string. */
+            cost_dem?: string
+            /** Post-fork node: cost in OS as decimal string. */
+            cost_os?: string
             file_size_bytes: number
             is_genesis: boolean
             breakdown: {

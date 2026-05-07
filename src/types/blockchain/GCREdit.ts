@@ -15,14 +15,33 @@ import {
 } from "../abstraction"
 import { SigningAlgorithm } from "../cryptography"
 
+/**
+ * Balance-mutation GCR edit — adds to or subtracts from a sender/receiver
+ * balance, or burns a fee.
+ *
+ * Wire-format compatibility (P4): `amount` may be either a JS `number`
+ * (pre-fork node, DEM) or a decimal `string` in OS (post-fork node). The
+ * SDK's `GCRGeneration` populates the field with whichever shape matches
+ * the connected node's fork status.
+ *
+ * Important: the node's post-fork serializer (`forks/serializerGate.ts`)
+ * does **not** re-encode `gcr_edits[].amount`. Whatever the SDK puts here
+ * **is** the wire format and contributes directly to the transaction
+ * hash. Construction-site correctness is the contract.
+ */
 export interface GCREditBalance {
     type: "balance"
     isRollback: boolean
     operation: "add" | "remove"
     account: string
-    amount: number
+    amount: number | string
     txhash: string
 }
+/**
+ * Nonce-increment GCR edit. `amount` is a counter delta, not a token
+ * amount — always `1` in current code. Kept as `number` because the fork
+ * does not change its encoding. Do **not** confuse with `GCREditBalance.amount`.
+ */
 export interface GCREditNonce {
     type: "nonce"
     isRollback: boolean
@@ -186,7 +205,12 @@ export interface GCREditEscrow {
         sender?: string           // Ed25519 pubkey of sender
         platform?: "twitter" | "github" | "telegram"
         username?: string         // Social username (e.g., "@bob")
-        amount?: number
+        /**
+         * Escrow deposit amount. Wire format follows the same pre-fork /
+         * post-fork rule as `GCREditBalance.amount`: `number` DEM
+         * pre-fork, decimal `string` OS post-fork.
+         */
+        amount?: number | string
         expiryDays?: number       // Optional, default 30
         message?: string          // Optional memo
 
