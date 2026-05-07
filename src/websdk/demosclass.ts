@@ -52,6 +52,7 @@ import {
     demToOs,
     parseOsString,
 } from "@/denomination"
+import { serializeTransactionContent } from "@/denomination/serializerGate"
 import * as bip39 from "@scure/bip39"
 import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
@@ -515,7 +516,15 @@ export class Demos {
             }
         }
 
-        raw_tx.hash = Hashing.sha256(JSON.stringify(raw_tx.content))
+        // P4 commit 2: route hashing through the dual-format serializerGate.
+        // `isPostFork` defaults to false (legacy wire) until P4 commit 3
+        // wires up `getNetworkInfo` fork detection. The pre-fork branch is
+        // bit-identical to the legacy `JSON.stringify(raw_tx.content)` for
+        // any content the SDK constructs today (no internal bigints leak
+        // into the wire pre-fork).
+        raw_tx.hash = Hashing.sha256(
+            serializeTransactionContent(raw_tx.content, false),
+        )
         const signature = await this.crypto.sign(
             this.algorithm,
             new TextEncoder().encode(raw_tx.hash),

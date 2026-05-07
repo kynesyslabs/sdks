@@ -16,6 +16,7 @@ import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { Enigma } from "@/encryption/PQC/enigma"
 import { BroadcastTimeoutError } from "./BroadcastTimeoutError"
 import { BroadcastFailedError } from "./BroadcastFailedError"
+import { serializeTransactionContent } from "@/denomination/serializerGate"
 
 // Connection-error codes indicating the request never reached the node.
 // HTTP 5xx is intentionally NOT in this set: a 5xx means the server did
@@ -126,8 +127,16 @@ export const DemosTransactions = {
         // NOTE They are created without the tx hash, which is added in the node
         raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
 
-        // Hash the content of the transaction
-        raw_tx.hash = await sha256(JSON.stringify(raw_tx.content))
+        // Hash the content of the transaction.
+        // P4 commit 2: route through the dual-format serializerGate. This
+        // deprecated signer has no `Demos` instance available so it
+        // cannot consult cached fork status — defaults to pre-fork
+        // (legacy wire). Callers that need post-fork compatibility should
+        // use `demos.sign(tx)`, which threads the cached fork status from
+        // `getNetworkInfo`.
+        raw_tx.hash = await sha256(
+            serializeTransactionContent(raw_tx.content, false),
+        )
         raw_tx.signature = await DemosTransactions.signWithAlgorithm(
             raw_tx.hash,
             keypair,
