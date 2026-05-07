@@ -38,7 +38,7 @@ import type {
     IPFSCustomCharges,
     IPFSCostBreakdown,
 } from "../types/blockchain/CustomCharges"
-import { demToOs, toOsString } from "../denomination"
+import { demToOs, parseOsString, toOsString } from "../denomination"
 
 // REVIEW: IPFS Operations class for Demos Network SDK
 
@@ -600,7 +600,14 @@ export class IPFSOperations {
      */
     private static _normalizeQuoteCostOs(quote: IpfsQuoteResponse): string {
         if (typeof quote.cost_os === "string" && quote.cost_os.length > 0) {
-            return quote.cost_os
+            // Re-parse and re-emit through the canonical OS pipeline so a
+            // misbehaving node returning a non-canonical value (`"00100"`,
+            // `" 100 "`, `"1.5e9"`) cannot leak into `max_cost_os` — the
+            // serializerGate does not re-normalise nested `data` fields,
+            // so non-canonical bytes here would diverge from the node's
+            // post-fork hash. Mirrors the cost_dem path which already
+            // round-trips through `toOsString(demToOs(...))`.
+            return toOsString(parseOsString(quote.cost_os))
         }
         if (typeof quote.cost_dem === "string" && quote.cost_dem.length > 0) {
             return toOsString(demToOs(quote.cost_dem))
