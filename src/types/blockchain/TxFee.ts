@@ -15,4 +15,21 @@ export interface TxFee {
     network_fee: number | string
     rpc_fee: number | string
     additional_fee: number | string
+    /**
+     * Ed25519 public key (lowercase hex, `0x` + 64 hex chars = 66 chars
+     * total) of the RPC node that validated this transaction.
+     *
+     * DEM-665 (gas fee separation): post-fork, the validating node sets
+     * this field during `confirmTransaction` to its own signing pubkey
+     * so the fee-distribution edits can route the `rpc_fee` portion to
+     * the correct account.
+     *
+     * Wire-format compatibility:
+     * - Pre-fork node: field is `null` (or absent) — the legacy lump-sum
+     *   gas path has no rpc-routing notion.
+     * - Post-fork node: required; the post-fork serializer
+     *   (`serializerGate.ts`) emits the hex string. The DB column is
+     *   nullable so historical pre-fork rows persist with `null`.
+     */
+    rpc_address: string | null
 }

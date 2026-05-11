@@ -572,6 +572,7 @@ export class Demos {
                     rpc_fee:
                         typeof params.rpcFee === "number" ? params.rpcFee : 0,
                     additional_fee: 0,
+                    rpc_address: null,
                 }
                 appliedFromNode = true
             }
@@ -768,6 +769,7 @@ export class Demos {
             network_fee: 0,
             rpc_fee: 0,
             additional_fee: 0,
+            rpc_address: null,
         }
         const totalExistingOs =
             Demos._coerceWireAmountToOs(existing.network_fee ?? 0) +
@@ -785,6 +787,7 @@ export class Demos {
                 network_fee: feeDem,
                 rpc_fee: 0,
                 additional_fee: 0,
+                rpc_address: null,
             }
         }
         return raw_tx

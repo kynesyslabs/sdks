@@ -60,6 +60,7 @@ function nodeTransformToOsTransactionContent(
             additional_fee: toOsString(
                 nodeToOsBigint(fee.additional_fee as number | string | bigint),
             ) as unknown as number,
+            rpc_address: fee.rpc_address ?? null,
         }
     }
 
@@ -150,6 +151,7 @@ function buildPostForkShapedFixture(): TransactionContent {
             network_fee: "1000000000",
             rpc_fee: "0",
             additional_fee: "0",
+            rpc_address: null,
         },
         from_ed25519_address: "0xsender",
         gcr_edits,
@@ -180,6 +182,7 @@ describe("round-trip hash equality — SDK post-fork == node post-fork", () => {
             network_fee: 1,
             rpc_fee: 0,
             additional_fee: 0,
+            rpc_address: null,
         }
         const sdkBytes = serializeTransactionContent(content, true)
         const nodeBytes = nodeSerializeTransactionContent(content, true)
@@ -235,6 +238,7 @@ describe("round-trip hash equality — SDK post-fork == node post-fork", () => {
                 network_fee: 1,
                 rpc_fee: 0,
                 additional_fee: 0,
+                rpc_address: null,
             },
             from_ed25519_address: "0xsender",
             gcr_edits: [

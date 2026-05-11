@@ -18,6 +18,39 @@ export interface NetworkParameters {
     networkFee: number
     /** Default RPC fee, basis points [0, 5000]. */
     rpcFee: number
+    /**
+     * Default additional fee — reserved for the future dApp-paid fee
+     * path described in DEM-665. Today every chain ships with
+     * `additionalFee: 0`. Basis-points bounds match the other fee
+     * scalars: [0, 5000].
+     */
+    additionalFee: number
+    /**
+     * Per-component fee distribution percentages. DEM-665 splits the
+     * single lump-sum gas deduction into network / rpc / additional fee
+     * components, each routed across burn / treasury / rpc-operator
+     * recipients per these tunable percentages.
+     *
+     * Cross-key invariant enforced by `safetyBounds.ts`: within each
+     * group the percentages MUST sum to exactly 100.
+     *
+     *   network_fee:    burnPct + treasuryPct                === 100
+     *   additional_fee: burnPct + treasuryPct                === 100
+     *   special_ops:    burnPct + treasuryPct + rpcPct       === 100
+     *
+     * `rpc_fee` itself is implicit 100% to the rpc operator — no
+     * tunables here, no entry on this struct. Proposals touching any
+     * distribution key are governed by a tighter ±10% per-proposal cap
+     * (vs the default ±50%) so a single bad actor cannot drain the
+     * treasury in one vote.
+     */
+    networkFeeBurnPct: number
+    networkFeeTreasuryPct: number
+    additionalFeeBurnPct: number
+    additionalFeeTreasuryPct: number
+    specialOpsBurnPct: number
+    specialOpsTreasuryPct: number
+    specialOpsRpcPct: number
     /** Feature flags — string key → boolean. */
     featureFlags: Record<string, boolean>
 }

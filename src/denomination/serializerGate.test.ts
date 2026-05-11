@@ -74,6 +74,7 @@ function buildFixture(): TransactionContent {
             network_fee: 1,
             rpc_fee: 0,
             additional_fee: 0,
+            rpc_address: null,
         },
         from_ed25519_address: "0xsender",
         gcr_edits,
@@ -171,10 +172,13 @@ describe("serializerGate — post-fork branch", () => {
         const content = buildFixture()
         const out = serializeTransactionContent(content, true)
         const parsed = JSON.parse(out)
+        // DEM-665: rpc_address is now part of the canonical TxFee shape;
+        // buildFixture writes it after additional_fee.
         expect(Object.keys(parsed.transaction_fee)).toEqual([
             "network_fee",
             "rpc_fee",
             "additional_fee",
+            "rpc_address",
         ])
     })
 
@@ -218,9 +222,11 @@ describe("serializerGate — transaction_fee key order (myc#19)", () => {
     test("post-fork preserves non-canonical fee insertion order", () => {
         const content = buildFixture()
         // Construct fee with `additional_fee` first to break the old
-        // hard-coded literal order.
+        // hard-coded literal order. DEM-665: rpc_address joins the
+        // ordered key set and must round-trip in its declared position.
         content.transaction_fee = {
             additional_fee: 0,
+            rpc_address: null,
             rpc_fee: 0,
             network_fee: 1,
         } as any
@@ -228,6 +234,7 @@ describe("serializerGate — transaction_fee key order (myc#19)", () => {
         const parsed = JSON.parse(out)
         expect(Object.keys(parsed.transaction_fee)).toEqual([
             "additional_fee",
+            "rpc_address",
             "rpc_fee",
             "network_fee",
         ])
@@ -237,6 +244,7 @@ describe("serializerGate — transaction_fee key order (myc#19)", () => {
         const content = buildFixture()
         content.transaction_fee = {
             additional_fee: 0,
+            rpc_address: null,
             rpc_fee: 0,
             network_fee: 1,
         } as any
@@ -244,6 +252,7 @@ describe("serializerGate — transaction_fee key order (myc#19)", () => {
         const parsed = JSON.parse(out)
         expect(Object.keys(parsed.transaction_fee)).toEqual([
             "additional_fee",
+            "rpc_address",
             "rpc_fee",
             "network_fee",
         ])
@@ -255,6 +264,7 @@ describe("serializerGate — transaction_fee key order (myc#19)", () => {
             network_fee: 1,
             rpc_fee: 0,
             additional_fee: 0,
+            rpc_address: null,
             // Future extension field the SDK doesn't know about — must
             // not be dropped (consensus would diverge if the node knows
             // it and we strip it).

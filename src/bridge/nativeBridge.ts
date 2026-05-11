@@ -130,6 +130,7 @@ export const methods = {
                     network_fee: 0,
                     rpc_fee: 0,
                     additional_fee: 0,
+                    rpc_address: null,
                 },
             },
             signature: {
