@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "4.0.0",
+    "version": "4.0.1",
     "type": "module",
     "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
@@ -101,7 +101,6 @@
         "@cosmjs/proto-signing": "^0.32.4",
         "@cosmjs/stargate": "^0.32.4",
         "@cryptkeeperzk/snarkjs": "^0.7.2",
-        "@kynesyslabs/demosdk": "^2.8.22",
         "@metaplex-foundation/js": "^0.20.1",
         "@multiversx/sdk-core": "^13.17.2",
         "@multiversx/sdk-extension-provider": "^3.0.0",
