@@ -44,6 +44,15 @@ export interface L2PSEncryptedPayload {
     tag: string;
     /** Hash of the original transaction for integrity verification */
     original_hash: string;
+    /**
+     * Base64-encoded AES-GCM nonce (12 bytes) used for this specific
+     * encryption. Required for AES-GCM safety: nonce reuse under the
+     * same key catastrophically breaks confidentiality + authentication.
+     * Optional in the type for backward compatibility — payloads written
+     * by older SDKs predating the per-call-nonce fix do not include it
+     * and `decryptTx` falls back to the instance IV for those.
+     */
+    nonce?: string;
 }
 
 /**
@@ -199,7 +208,12 @@ export default class L2PS {
             const txBuffer = forge.util.createBuffer(txString);
             const cipher = forge.cipher.createCipher('AES-GCM', this.privateKey);
 
-            cipher.start({ iv: this.iv });
+            // Fresh 96-bit nonce per encryption — the instance IV is no
+            // longer used for new ciphertexts. AES-GCM nonce reuse under
+            // the same key is catastrophic (loses confidentiality + auth),
+            // so this MUST be unique per call.
+            const nonce = forge.random.getBytesSync(12);
+            cipher.start({ iv: nonce });
             cipher.update(txBuffer);
 
             if (!cipher.finish()) {
@@ -210,7 +224,8 @@ export default class L2PS {
                 l2ps_uid: this.config?.uid || this.id,
                 encrypted_data: forge.util.encode64(cipher.output.getBytes()),
                 tag: forge.util.encode64(cipher.mode.tag.getBytes()),
-                original_hash: tx.hash
+                original_hash: tx.hash,
+                nonce: forge.util.encode64(nonce)
             };
 
             const encryptedTxContent: L2PSTransactionContent = {
@@ -283,9 +298,16 @@ export default class L2PS {
             const encryptedData = forge.util.createBuffer(forge.util.decode64(encryptedPayload.encrypted_data));
             const tag = forge.util.createBuffer(forge.util.decode64(encryptedPayload.tag));
 
+            // Per-call nonce (new path) when present in payload; fall
+            // back to the instance IV for legacy ciphertexts encrypted
+            // before the per-call-nonce fix.
+            const iv = encryptedPayload.nonce
+                ? forge.util.decode64(encryptedPayload.nonce)
+                : this.iv;
+
             const decipher = forge.cipher.createDecipher('AES-GCM', this.privateKey);
             decipher.start({
-                iv: this.iv,
+                iv,
                 tag: tag
             });
 
