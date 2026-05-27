@@ -439,11 +439,20 @@ export const DemosTransactions = {
                 await new Promise(r => setTimeout(r, pollInterval))
             }
 
+            // demos.call signature: (method, message, data, extra). The
+            // node's rpcDispatch routes by `method`, then
+            // manageNodeCall dispatches by `content.message` against
+            // handlerRegistry. The previous version passed
+            // "getTransactionStatus" as `extra` and an empty string as
+            // `message`, so the lookup landed on `handlerRegistry[""]`
+            // → "Unknown message" (HTTP 404) on EVERY poll. The SDK
+            // then never observed `state` and timed out even though
+            // the tx was on chain. Pass the action name as `message`
+            // so the handler resolves.
             const statusRes = await demos.call(
                 "nodeCall",
-                "",
-                { hash: txHash },
                 "getTransactionStatus",
+                { hash: txHash },
             )
 
             // `Demos.call("nodeCall", ...)` normally returns the inner
