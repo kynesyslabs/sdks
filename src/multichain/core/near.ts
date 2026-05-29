@@ -267,8 +267,7 @@ export class NEAR extends DefaultChain {
     ): Promise<boolean> {
         const signatureDecoded = utils.serialize.base_decode(signature);
         const publicKeyObject = utils.key_pair.PublicKey.from(publicKey);
-        const publicKeyRaw = Object.values(publicKeyObject.ed25519Key.data);
-        const publicKeyDecoded = new Uint8Array(publicKeyRaw);
+        const publicKeyDecoded = new Uint8Array(publicKeyObject.data);
         const messageBytes = decodeUTF8(message);
 
         const isValid = nacl.sign.detached.verify(
