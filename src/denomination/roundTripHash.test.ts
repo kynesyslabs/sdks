@@ -262,7 +262,7 @@ describe("round-trip hash equality — SDK post-fork == node post-fork", () => {
                     rationale: "smoke",
                     effectiveAtBlock: 1000,
                     txhash: "",
-                } as unknown as GCREdit,
+                } satisfies GCREdit,
                 {
                     type: "balance",
                     isRollback: false,
@@ -316,7 +316,7 @@ describe("round-trip hash equality — SDK post-fork == node post-fork", () => {
                     proposalId: "00000000-0000-0000-0000-000000000001",
                     approve: true,
                     txhash: "",
-                } as unknown as GCREdit,
+                } satisfies GCREdit,
                 {
                     type: "balance",
                     isRollback: false,
