@@ -217,6 +217,129 @@ describe("round-trip hash equality — SDK post-fork == node post-fork", () => {
         expect(parsed.amount).toBe("100")
     })
 
+    test("networkUpgrade content (post-sign canonical shape) round-trips", () => {
+        // Mirrors what `DemosTransactions.proposeNetworkUpgrade()` ships
+        // AFTER `demos.sign()` normalises the content via
+        // `raw_tx.content = JSON.parse(serialized)`. The wire shape that
+        // reaches the node has:
+        //   - top-level `amount` as OS string
+        //   - `transaction_fee.*` as OS strings
+        //   - `gcr_edits[].balance.amount` already canonicalised to OS
+        //     string by the SDK's `transformEditPostFork` walk
+        // Asserts the byte-equality contract holds for governance content
+        // shapes — closes the coverage gap revealed by dev.node2 propose
+        // failures (see kynesyslabs/node@a0957941 battery report).
+        const content: TransactionContent = {
+            type: "networkUpgrade",
+            from: "0xsender",
+            to: "0xsender",
+            amount: "0",
+            data: [
+                "networkUpgrade",
+                {
+                    proposalId: "00000000-0000-0000-0000-000000000001",
+                    proposedParameters: { blockTimeMs: 1100 },
+                    rationale: "smoke",
+                    effectiveAtBlock: 1000,
+                },
+            ] as unknown as TransactionContent["data"],
+            nonce: 1,
+            timestamp: 1_700_000_000_000,
+            transaction_fee: {
+                network_fee: "1000000000",
+                rpc_fee: "1000000000",
+                additional_fee: "0",
+                rpc_address: null,
+            },
+            from_ed25519_address: "0xsender",
+            gcr_edits: [
+                {
+                    type: "networkUpgrade",
+                    isRollback: false,
+                    account: "0xsender",
+                    proposalId: "00000000-0000-0000-0000-000000000001",
+                    proposedParameters: { blockTimeMs: 1100 },
+                    rationale: "smoke",
+                    effectiveAtBlock: 1000,
+                    txhash: "",
+                } satisfies GCREdit,
+                {
+                    type: "balance",
+                    isRollback: false,
+                    operation: "remove",
+                    account: "0xsender",
+                    amount: "1000000000",
+                    txhash: "",
+                },
+                {
+                    type: "nonce",
+                    isRollback: false,
+                    operation: "add",
+                    account: "0xsender",
+                    amount: 1,
+                    txhash: "",
+                },
+            ],
+        }
+        const sdkBytes = serializeTransactionContent(content, true)
+        const nodeBytes = nodeSerializeTransactionContent(content, true)
+        expect(sdkBytes).toBe(nodeBytes)
+    })
+
+    test("networkUpgradeVote content (post-sign canonical shape) round-trips", () => {
+        const content: TransactionContent = {
+            type: "networkUpgradeVote",
+            from: "0xsender",
+            to: "0xsender",
+            amount: "0",
+            data: [
+                "networkUpgradeVote",
+                {
+                    proposalId: "00000000-0000-0000-0000-000000000001",
+                    approve: true,
+                },
+            ] as unknown as TransactionContent["data"],
+            nonce: 2,
+            timestamp: 1_700_000_000_001,
+            transaction_fee: {
+                network_fee: "1000000000",
+                rpc_fee: "1000000000",
+                additional_fee: "0",
+                rpc_address: null,
+            },
+            from_ed25519_address: "0xsender",
+            gcr_edits: [
+                {
+                    type: "networkUpgradeVote",
+                    isRollback: false,
+                    account: "0xsender",
+                    proposalId: "00000000-0000-0000-0000-000000000001",
+                    approve: true,
+                    txhash: "",
+                } satisfies GCREdit,
+                {
+                    type: "balance",
+                    isRollback: false,
+                    operation: "remove",
+                    account: "0xsender",
+                    amount: "1000000000",
+                    txhash: "",
+                },
+                {
+                    type: "nonce",
+                    isRollback: false,
+                    operation: "add",
+                    account: "0xsender",
+                    amount: 2,
+                    txhash: "",
+                },
+            ],
+        }
+        const sdkBytes = serializeTransactionContent(content, true)
+        const nodeBytes = nodeSerializeTransactionContent(content, true)
+        expect(sdkBytes).toBe(nodeBytes)
+    })
+
     test("pre-fork branch: SDK and node both stringify content as-is", () => {
         // For pre-fork content with no internal bigints / OS strings,
         // both branches produce `JSON.stringify(content)` verbatim.
