@@ -9,7 +9,7 @@
  */
 export class TransportError extends Error {
     public readonly attempts: number
-    public override readonly cause: unknown
+    public readonly cause: unknown
 
     constructor(message: string, opts: { cause: unknown; attempts: number }) {
         super(message)
