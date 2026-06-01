@@ -111,7 +111,7 @@ console.log("Wallet address:", address)
 // Send native DEM tokens
 const tx = await demos.transfer(
   "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
-  100 // amount in DEM
+  100_000_000_000n // 100 DEM as OS bigint (preferred since 3.0.0-rc.1; OS_PER_DEM = 10^9). A `number` is still accepted as legacy DEM.
 )
 
 // Confirm and broadcast transaction
