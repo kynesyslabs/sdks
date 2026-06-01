@@ -14,6 +14,7 @@ import {
     PqcIdentityRemovePayload,
     DiscordProof,
     InferFromDiscordPayload,
+    InferFromDomainPayload,
     InferFromTelegramPayload,
     TelegramSignedAttestation,
     FindDemosIdByWeb2IdentityQuery,
@@ -53,6 +54,7 @@ export class Identities {
                 "https://discord.com/channels",
                 "https://ptb.discord.com/channels",
             ],
+            domain: ["https://"],
         },
     }
 
@@ -424,6 +426,113 @@ export class Identities {
         }
 
         return await this.inferIdentity(demos, "web2", telegramPayload)
+    }
+
+    // SECTION: Domain Identities
+
+    /**
+     * Build the proof payload a domain owner must host to prove control.
+     *
+     * Host the returned string at `https://<host>/.well-known/demos-cci.txt`,
+     * then call {@link addDomainIdentity}. The format is identical to the web2
+     * proof payload, so the node verifies it with the same parser.
+     *
+     * @param demos A connected Demos instance.
+     * @returns The proof payload string (`demos:dw2p:<algorithm>:<signature>`).
+     */
+    async createDomainProofPayload(demos: Demos) {
+        return await this.createWeb2ProofPayload(demos)
+    }
+
+    /**
+     * Add a domain identity to the GCR (CCI).
+     *
+     * Proves the connected wallet controls a web domain by pointing at a
+     * well-known file the owner hosts:
+     * `https://<host>/.well-known/demos-cci.txt`. The file body must be the
+     * payload from {@link createDomainProofPayload}. The node fetches the file
+     * over HTTPS (the TLS cert binds the content to the hostname), verifies the
+     * signed payload against the sender, and writes a `web2.domain` entry on
+     * the CCI.
+     *
+     * Mirrors {@link addTwitterIdentity}.
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param hostname The domain being claimed (e.g. "example.com"). A full
+     *   URL is also accepted; only the hostname is used.
+     * @param referralCode Optional referral code for incentive points.
+     * @returns The response from the RPC call.
+     *
+     * @example
+     * ```typescript
+     * const identities = new Identities()
+     * // 1. Generate the proof the user hosts at /.well-known/demos-cci.txt
+     * const proof = await identities.createDomainProofPayload(demos)
+     * // 2. After the file is live, link the domain:
+     * await identities.addDomainIdentity(demos, "example.com")
+     * ```
+     */
+    async addDomainIdentity(
+        demos: Demos,
+        hostname: string,
+        referralCode?: string,
+    ) {
+        const host = this.normalizeHostname(hostname)
+        const proofUrl = `https://${host}/.well-known/demos-cci.txt`
+
+        // Fail fast if the well-known file is missing or unparseable, mirroring
+        // addTwitterIdentity's pre-fetch via getTweet.
+        const data = await demos.web2.getDomainProof(proofUrl)
+        if (!data.success) {
+            throw new Error(
+                data.error ||
+                    `Could not read domain proof at ${proofUrl}`,
+            )
+        }
+
+        const domainPayload: InferFromDomainPayload = {
+            context: "domain",
+            proof: proofUrl,
+            username: host,
+            userId: host,
+            referralCode: referralCode,
+        }
+
+        return await this.inferIdentity(demos, "web2", domainPayload)
+    }
+
+    /**
+     * Remove a domain identity from the GCR (CCI).
+     *
+     * @param demos A Demos instance to communicate with the RPC.
+     * @param hostname The domain to unlink (e.g. "example.com").
+     * @returns The response from the RPC call.
+     */
+    async removeDomainIdentity(demos: Demos, hostname: string) {
+        const host = this.normalizeHostname(hostname)
+        return await this.removeIdentity(demos, "web2", {
+            context: "domain",
+            username: host,
+        })
+    }
+
+    /**
+     * Normalize a hostname or URL down to its bare hostname.
+     * "https://example.com/foo" -> "example.com"; "example.com/" -> "example.com".
+     */
+    private normalizeHostname(input: string): string {
+        const trimmed = input.trim()
+        try {
+            return new URL(
+                trimmed.includes("://") ? trimmed : `https://${trimmed}`,
+            ).hostname
+        } catch {
+            // Fall back to stripping protocol + path manually.
+            return trimmed
+                .replace(/^[a-z]+:\/\//i, "")
+                .split("/")[0]
+                .split(":")[0]
+        }
     }
 
     // SECTION: PQC Identities

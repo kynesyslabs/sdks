@@ -1674,6 +1674,27 @@ export class Demos {
                 discordUrl,
             })
         },
+        /**
+         * Fetch a domain ownership proof file over HTTPS.
+         *
+         * Retrieves `https://<host>/.well-known/demos-cci.txt` and returns its
+         * body plus the verified hostname. Used by
+         * `Identities.addDomainIdentity` to prove control of a web domain.
+         *
+         * @param url The full proof URL (https://<host>/.well-known/demos-cci.txt).
+         */
+        getDomainProof: async (
+            url: string,
+        ): Promise<{
+            success: boolean
+            hostname?: string
+            body?: string
+            error?: string
+        }> => {
+            return await this.nodeCall("getDomainProof", {
+                url,
+            })
+        },
     }
 
     // REVIEW: Phase 9 - IPFS cost estimation endpoints
