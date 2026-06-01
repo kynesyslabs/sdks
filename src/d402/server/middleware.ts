@@ -49,7 +49,7 @@ export interface D402Request {
  * ```typescript
  * app.get('/premium-article',
  *   d402Required({
- *     amount: 5000000000000000000, // 5 DEM in smallest unit
+ *     amount: 5000000000, // 5 DEM in smallest unit (OS); OS_PER_DEM = 10^9
  *     resourceId: 'article-123',
  *     rpcUrl: 'https://node2.demos.sh',
  *     recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb'
