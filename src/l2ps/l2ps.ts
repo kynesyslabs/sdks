@@ -212,8 +212,16 @@ export default class L2PS {
             // longer used for new ciphertexts. AES-GCM nonce reuse under
             // the same key is catastrophic (loses confidentiality + auth),
             // so this MUST be unique per call.
+            //
+            // The nonce is also bound into the authenticated envelope as
+            // AAD. AES-GCM authentication covers ciphertext + AAD but not
+            // the IV itself, so without this an attacker who can modify
+            // the stored payload could flip the `nonce` field and force
+            // decryption to fail — a targeted DoS against specific
+            // ciphertexts. Decrypt mirrors this binding when a per-call
+            // nonce is present on the wire.
             const nonce = forge.random.getBytesSync(12);
-            cipher.start({ iv: nonce });
+            cipher.start({ iv: nonce, additionalData: nonce });
             cipher.update(txBuffer);
 
             if (!cipher.finish()) {
@@ -301,14 +309,34 @@ export default class L2PS {
             // Per-call nonce (new path) when present in payload; fall
             // back to the instance IV for legacy ciphertexts encrypted
             // before the per-call-nonce fix.
-            const iv = encryptedPayload.nonce
-                ? forge.util.decode64(encryptedPayload.nonce)
-                : this.iv;
+            //
+            // `nonce === undefined` is the only legacy signal — any other
+            // value (including `""`) is rejected so a malformed payload
+            // does not silently fall through to the legacy IV. The decoded
+            // nonce MUST be exactly 12 bytes per the AES-GCM contract.
+            let iv: forge.Bytes;
+            if (encryptedPayload.nonce === undefined) {
+                iv = this.iv;
+            } else {
+                iv = forge.util.decode64(encryptedPayload.nonce);
+                if (iv.length !== 12) {
+                    throw new Error(
+                        'Invalid encrypted payload nonce: expected a base64-encoded 12-byte value'
+                    );
+                }
+            }
 
+            // Bind the nonce as AAD on the new path so the auth tag
+            // covers it — see the matching block in `encryptTx`. Legacy
+            // payloads were encrypted without AAD, so we leave it off
+            // when falling back to the instance IV.
             const decipher = forge.cipher.createDecipher('AES-GCM', this.privateKey);
             decipher.start({
                 iv,
-                tag: tag
+                tag,
+                ...(encryptedPayload.nonce !== undefined
+                    ? { additionalData: iv }
+                    : {})
             });
 
             decipher.update(encryptedData);
