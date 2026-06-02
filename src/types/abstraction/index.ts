@@ -113,7 +113,7 @@ export type DomainProof = `https://${string}/.well-known/demos-cci.txt`
 
 export interface InferFromDomainPayload extends Web2CoreTargetIdentityPayload {
     context: "domain"
-    proof: string
+    proof: DomainProof
     /** The hostname being claimed (e.g. "example.com"). */
     username: string
     /** Domains have no separate numeric id; mirrors `username`. */

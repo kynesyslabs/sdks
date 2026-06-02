@@ -37,15 +37,43 @@ describe("Domain Identities (offline SDK logic)", () => {
         expect(sigValid).toBe(true)
     })
 
-    test("normalizeHostname reduces URLs/hosts to bare hostname", () => {
-        const norm = (input: string): string =>
-            (identities as any).normalizeHostname(input)
+    test("buildDomainProof canonicalizes host + URL (incl. IPv6 bracketing)", () => {
+        const build = (input: string): { proofUrl: string; hostname: string } =>
+            (identities as any).buildDomainProof(input)
 
-        expect(norm("https://example.com/foo")).toBe("example.com")
-        expect(norm("example.com/")).toBe("example.com")
-        expect(norm("http://sub.example.com:8443/x")).toBe("sub.example.com")
-        expect(norm("  example.com  ")).toBe("example.com")
-        expect(norm("example.com")).toBe("example.com")
+        const PATH = "/.well-known/demos-cci.txt"
+
+        expect(build("https://example.com/foo")).toEqual({
+            proofUrl: `https://example.com${PATH}`,
+            hostname: "example.com",
+        })
+        expect(build("Example.COM")).toEqual({
+            proofUrl: `https://example.com${PATH}`,
+            hostname: "example.com",
+        })
+        expect(build("  sub.example.com  ")).toEqual({
+            proofUrl: `https://sub.example.com${PATH}`,
+            hostname: "sub.example.com",
+        })
+        // query/fragment stripped
+        expect(build("https://example.com/x?a=1#f").proofUrl).toBe(
+            `https://example.com${PATH}`,
+        )
+        // IPv6: URL keeps the brackets, producing a valid (not "https://::1/")
+        // proof URL, and the stored host stays consistent with it.
+        expect(build("https://[::1]/x")).toEqual({
+            proofUrl: `https://[::1]${PATH}`,
+            hostname: "[::1]",
+        })
+    })
+
+    test("buildDomainProof rejects empty / degenerate inputs", () => {
+        const build = (input: string) =>
+            (identities as any).buildDomainProof(input)
+
+        expect(() => build("")).toThrow()
+        expect(() => build("   ")).toThrow()
+        expect(() => build("://")).toThrow()
     })
 
     test("addDomainIdentity builds the correct web2/domain request", async () => {
@@ -79,6 +107,18 @@ describe("Domain Identities (offline SDK logic)", () => {
         expect(p.proof).toBe("https://example.com/.well-known/demos-cci.txt")
         expect(p.username).toBe("example.com")
         expect(p.userId).toBe("example.com")
+    })
+
+    test("inferWeb2Identity rejects a domain proof URL with the wrong path", async () => {
+        // A caller bypassing addDomainIdentity must still hit the path check.
+        await expect(
+            identities.inferWeb2Identity(demos, {
+                context: "domain",
+                proof: "https://evil.com/malicious",
+                username: "evil.com",
+                userId: "evil.com",
+            } as any),
+        ).rejects.toThrow(/domain proof URL/i)
     })
 
     test("addDomainIdentity throws a clear error when the file is unreadable", async () => {

@@ -15,6 +15,7 @@ import {
     DiscordProof,
     InferFromDiscordPayload,
     InferFromDomainPayload,
+    DomainProof,
     InferFromTelegramPayload,
     TelegramSignedAttestation,
     FindDemosIdByWeb2IdentityQuery,
@@ -107,6 +108,27 @@ export class Identities {
                             payload.context
                         ].join(", ")}`
                     throw new Error(errorMessage)
+                }
+            }
+
+            // The scheme-only format check above cannot enforce a path suffix,
+            // so validate the full domain proof URL shape here: any caller
+            // (e.g. inferWeb2Identity) passing context "domain" must point at
+            // exactly https://<host>/.well-known/demos-cci.txt.
+            if (payload.context === "domain") {
+                let valid = false
+                try {
+                    const u = new URL(payload.proof)
+                    valid =
+                        u.protocol === "https:" &&
+                        u.pathname === "/.well-known/demos-cci.txt"
+                } catch {
+                    valid = false
+                }
+                if (!valid) {
+                    throw new Error(
+                        "Invalid domain proof URL: must be https://<host>/.well-known/demos-cci.txt",
+                    )
                 }
             }
         }
@@ -477,8 +499,7 @@ export class Identities {
         hostname: string,
         referralCode?: string,
     ) {
-        const host = this.normalizeHostname(hostname)
-        const proofUrl = `https://${host}/.well-known/demos-cci.txt`
+        const { proofUrl, hostname: host } = this.buildDomainProof(hostname)
 
         // Fail fast if the well-known file is missing or unparseable, mirroring
         // addTwitterIdentity's pre-fetch via getTweet.
@@ -487,6 +508,21 @@ export class Identities {
             throw new Error(
                 data.error ||
                     `Could not read domain proof at ${proofUrl}`,
+            )
+        }
+        // Assert the success fields exist (mirrors the Twitter/Discord flows
+        // validating their fetched fields) and confirm the node fetched/verified
+        // the same host we are about to store — both derive from the same URL,
+        // so a mismatch means something rewrote the target.
+        if (!data.hostname) {
+            throw new Error("Domain proof response missing verified hostname")
+        }
+        if (!data.body) {
+            throw new Error(`Empty domain proof at ${proofUrl}`)
+        }
+        if (data.hostname.toLowerCase() !== host) {
+            throw new Error(
+                `Verified host "${data.hostname}" does not match requested "${host}"`,
             )
         }
 
@@ -509,7 +545,8 @@ export class Identities {
      * @returns The response from the RPC call.
      */
     async removeDomainIdentity(demos: Demos, hostname: string) {
-        const host = this.normalizeHostname(hostname)
+        // Same canonicalisation as addDomainIdentity so add/remove round-trip.
+        const { hostname: host } = this.buildDomainProof(hostname)
         return await this.removeIdentity(demos, "web2", {
             context: "domain",
             username: host,
@@ -517,21 +554,49 @@ export class Identities {
     }
 
     /**
-     * Normalize a hostname or URL down to its bare hostname.
-     * "https://example.com/foo" -> "example.com"; "example.com/" -> "example.com".
+     * Build the canonical domain proof URL and hostname from a hostname or URL.
+     *
+     * Parses the input with the URL API (which correctly brackets IPv6 literals
+     * in the resulting URL while exposing the bare host via `.hostname`), forces
+     * https + the well-known CCI path, and strips any query/fragment/userinfo.
+     * Throws on anything that does not parse to a real host — no silent fallback.
+     *
+     * @example "https://Example.COM/x?y" -> { proofUrl: "https://example.com/.well-known/demos-cci.txt", hostname: "example.com" }
+     * @example "[::1]" -> { proofUrl: "https://[::1]/.well-known/demos-cci.txt", hostname: "::1" }
      */
-    private normalizeHostname(input: string): string {
+    private buildDomainProof(input: string): {
+        proofUrl: DomainProof
+        hostname: string
+    } {
         const trimmed = input.trim()
+        if (!trimmed) {
+            throw new Error("hostname must not be empty")
+        }
+
+        let url: URL
         try {
-            return new URL(
+            url = new URL(
                 trimmed.includes("://") ? trimmed : `https://${trimmed}`,
-            ).hostname
+            )
         } catch {
-            // Fall back to stripping protocol + path manually.
-            return trimmed
-                .replace(/^[a-z]+:\/\//i, "")
-                .split("/")[0]
-                .split(":")[0]
+            throw new Error(`Invalid hostname: "${input}"`)
+        }
+
+        if (!url.hostname) {
+            throw new Error(`Invalid hostname: "${input}"`)
+        }
+
+        url.protocol = "https:"
+        url.username = ""
+        url.password = ""
+        url.search = ""
+        url.hash = ""
+        url.pathname = "/.well-known/demos-cci.txt"
+
+        // URL already lower-cases the host; toString() brackets IPv6 correctly.
+        return {
+            proofUrl: url.toString() as DomainProof,
+            hostname: url.hostname.toLowerCase(),
         }
     }
 
