@@ -456,6 +456,18 @@ export default class L2PS {
         if (payload.l2ps_uid !== (this.config?.uid || this.id)) {
             throw new Error('L2PS.decryptBytes: payload encrypted for different L2PS uid');
         }
+        // Storage-loaded JSON can violate the L2PSEncryptedBytes shape at
+        // runtime; without an explicit shape check forge would throw a
+        // base64 error that does not tell the caller which field is wrong.
+        if (
+            typeof payload.ciphertext !== 'string' ||
+            typeof payload.tag !== 'string' ||
+            typeof payload.nonce !== 'string'
+        ) {
+            throw new Error(
+                'L2PS.decryptBytes: payload must include base64 strings for ciphertext, tag, and nonce',
+            );
+        }
         const ciphertext = forge.util.createBuffer(
             forge.util.decode64(payload.ciphertext),
         );

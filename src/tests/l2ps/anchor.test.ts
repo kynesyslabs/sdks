@@ -125,6 +125,29 @@ describe("L2PS.encryptBytes / decryptBytes (WI-3 building block)", () => {
         }
         await expect(l2ps.decryptBytes(bad)).rejects.toThrow(/12-byte/)
     })
+
+    // Regression for CodeRabbit finding on l2ps.ts:466. Storage-loaded
+    // JSON can violate the L2PSEncryptedBytes shape; without the explicit
+    // shape guard forge throws an opaque base64 error.
+    it("rejects payload with missing ciphertext / tag / nonce fields", async () => {
+        const l2ps = await L2PS.create()
+        const enc = await l2ps.encryptBytes(new TextEncoder().encode("x"))
+        for (const field of ["ciphertext", "tag", "nonce"] as const) {
+            const bad = { ...enc, [field]: undefined } as unknown as L2PSEncryptedBytes
+            await expect(l2ps.decryptBytes(bad)).rejects.toThrow(
+                /base64 strings for ciphertext, tag, and nonce/,
+            )
+        }
+    })
+
+    it("rejects payload with non-string field types", async () => {
+        const l2ps = await L2PS.create()
+        const enc = await l2ps.encryptBytes(new TextEncoder().encode("x"))
+        const bad = { ...enc, ciphertext: 12345 } as unknown as L2PSEncryptedBytes
+        await expect(l2ps.decryptBytes(bad)).rejects.toThrow(
+            /base64 strings for ciphertext, tag, and nonce/,
+        )
+    })
 })
 
 describe("anchorEncryptedTranscript — policy gating (WI-3)", () => {

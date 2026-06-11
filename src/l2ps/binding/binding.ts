@@ -25,12 +25,19 @@ import L2PS from "../l2ps"
 /**
  * Deterministic Storage Program name for `(channelId, subnetMemberId)`.
  * Public so `resolveMember` can re-derive it; included verbatim in tests.
+ *
+ * Components are percent-encoded so the layout stays one-to-one. Without
+ * this guard, the pairs `("a:b", "c")` and `("a", "b:c")` would collide on
+ * the same SP name and `resolveMember` could be tricked into returning a
+ * binding from one channel/member context for a lookup of another.
  */
 export function bindingProgramName(
     channelId: string,
     subnetMemberId: string,
 ): string {
-    return `l2ps-binding:${channelId}:${subnetMemberId}`
+    return `l2ps-binding:${encodeURIComponent(channelId)}:${encodeURIComponent(
+        subnetMemberId,
+    )}`
 }
 
 /**
@@ -70,12 +77,18 @@ export async function createMembershipBinding(
             `createMembershipBinding: claim must be a "demos:..." ClaimReference, got "${claim}"`,
         )
 
+    const boundAt = opts.boundAt ?? Date.now()
+    if (!Number.isSafeInteger(boundAt) || boundAt < 0)
+        throw new Error(
+            "createMembershipBinding: boundAt must be a non-negative safe-integer unix-ms timestamp",
+        )
+
     const unsigned: UnsignedL2PSMembershipBinding = {
         bindingVersion: "1",
         channelId,
         subnetMemberId,
         cciPrimaryClaim: claim,
-        boundAt: opts.boundAt ?? Date.now(),
+        boundAt,
     }
 
     const payload = bindingSigningBytes(unsigned)
@@ -97,6 +110,11 @@ export function verifyMembershipBinding(
     if (binding?.bindingVersion !== "1") return false
     if (!binding.channelId || !binding.subnetMemberId) return false
     if (!isDemosClaim(binding.cciPrimaryClaim)) return false
+    if (
+        !Number.isSafeInteger(binding.boundAt) ||
+        (binding.boundAt as number) < 0
+    )
+        return false
     if (typeof binding.signature !== "string" || !binding.signature)
         return false
 

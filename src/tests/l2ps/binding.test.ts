@@ -396,4 +396,61 @@ describe("L2PS membership binding (WI-1)", () => {
             ).resolves.toBeNull()
         })
     })
+
+    describe("bindingProgramName injectivity (CodeRabbit regression)", () => {
+        // Regression for CodeRabbit finding on binding.ts:34. Without
+        // percent-encoding the colon-separated layout `("a:b","c")` and
+        // `("a","b:c")` collided on the same SP name.
+        it("does not collide when channelId or subnetMemberId contains a colon", () => {
+            const a = bindingProgramName("a:b", "c")
+            const b = bindingProgramName("a", "b:c")
+            expect(a).not.toBe(b)
+        })
+
+        it("preserves backward-compat for ids without special chars", () => {
+            expect(bindingProgramName("ch-1", "mem-2")).toBe(
+                "l2ps-binding:ch-1:mem-2",
+            )
+        })
+    })
+
+    describe("boundAt validation (CodeRabbit regression)", () => {
+        it("createMembershipBinding refuses a negative boundAt", async () => {
+            await expect(
+                createMembershipBinding({
+                    channelId: CHANNEL,
+                    subnetMemberId: MEMBER,
+                    claim,
+                    demos,
+                    boundAt: -1,
+                }),
+            ).rejects.toThrow(/boundAt/)
+        })
+
+        it("createMembershipBinding refuses a non-integer boundAt", async () => {
+            await expect(
+                createMembershipBinding({
+                    channelId: CHANNEL,
+                    subnetMemberId: MEMBER,
+                    claim,
+                    demos,
+                    boundAt: 1.5,
+                }),
+            ).rejects.toThrow(/boundAt/)
+        })
+
+        it("verifyMembershipBinding rejects a binding whose boundAt was clobbered to NaN at rest", async () => {
+            const ok = await createMembershipBinding({
+                channelId: CHANNEL,
+                subnetMemberId: MEMBER,
+                claim,
+                demos,
+            })
+            const clobbered = {
+                ...ok,
+                boundAt: Number.NaN,
+            } as unknown as L2PSMembershipBinding
+            expect(verifyMembershipBinding(clobbered)).toBe(false)
+        })
+    })
 })

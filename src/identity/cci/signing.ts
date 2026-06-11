@@ -17,6 +17,19 @@ import {
  *
  * Domain separation is the caller's responsibility — pass the full payload
  * including the `dacs-*:v1:` prefix. WI-0 stays scheme-agnostic.
+ *
+ * @param claim   - The signer's primary `demos:` ClaimReference. Refuses any
+ *                  other scheme until a controlling-key resolver for them
+ *                  is added.
+ * @param payload - Pre-domain-separated bytes to cover. Caller composes
+ *                  `dacs-*:v1: || canonical_hash`.
+ * @param demos   - Connected `Demos` instance. Its Ed25519 address must
+ *                  match `claim`'s identifier — otherwise we refuse to
+ *                  produce a misattributable signature.
+ * @returns       Raw 64-byte Ed25519 signature.
+ * @throws {Error} If the scheme is not `demos`, the wallet is not
+ *                 connected, or the connected address does not match the
+ *                 claim's address.
  */
 export async function signWithPrimaryClaim(
     claim: ClaimReference,
@@ -51,6 +64,15 @@ export async function signWithPrimaryClaim(
  * Recovers the public key from the claim identifier and verifies forge-style.
  * Caller-supplied payload must match the bytes that were signed (including
  * any `dacs-*:v1:` domain prefix).
+ *
+ * @param claim     - The claimed signer's `demos:` ClaimReference.
+ * @param payload   - Exact bytes that were signed (must roundtrip through
+ *                    UTF-8). Caller composes `dacs-*:v1: || hash`.
+ * @param signature - Raw 64-byte Ed25519 signature.
+ * @returns        `true` iff the signature verifies under the public key
+ *                 encoded in `claim`; `false` for cryptographic mismatch.
+ * @throws {Error} If the scheme is not `demos` or the recovered public
+ *                 key is not 32 bytes (malformed claim).
  */
 export function verifyPrimaryClaimSignature(
     claim: ClaimReference,

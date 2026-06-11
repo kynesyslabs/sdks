@@ -33,9 +33,12 @@ import type {
  * Deterministic per-channel Storage Program name. One anchor per
  * channelId; a redo of the same channel reuses the slot (the SP's
  * `mode: "owner"` ACL guarantees only the original signer can overwrite).
+ *
+ * @param channelId - Per-session `channelId` (matches `ChannelTranscript.channelId`).
+ * @returns         The SR-2 program name used by `anchorEncryptedTranscript`.
  */
 export function anchorProgramName(channelId: string): string {
-    return `l2ps-transcript:${channelId}`
+    return `l2ps-transcript:${encodeURIComponent(channelId)}`
 }
 
 export interface AnchorEncryptedTranscriptOpts {
@@ -51,16 +54,28 @@ export interface AnchorEncryptedTranscriptOpts {
 }
 
 /**
- * §8.7 anchor entrypoint.
+ * §8.7 anchor entrypoint. Encrypts a `ChannelTranscript` to the L2PS
+ * member set, anchors the ciphertext via SR-2, and signs the plaintext
+ * hash with the connected Demos key.
  *
- * - `none`             → throws (caller should not have invoked this).
- * - `recommended`      → only anchors when `consent === true`; otherwise returns `null`.
- * - `required`         → always anchors; broadcast failures propagate so the
- *                        caller's phase can fail per §8.7.
+ * Policy behaviour:
+ * - `none`            → throws (caller should not have invoked this).
+ * - `recommended`     → only anchors when `consent === true`; otherwise returns `null`.
+ * - `required`        → always anchors; broadcast failures propagate so
+ *                       the caller's phase can fail per §8.7.
  *
- * On success returns `{ anchor: storageAddress, contentHash }`. The SP is
- * deployed via SR-2 with `mode: "public"` (anyone can read the ciphertext
- * + the hash for tamper-evidence; only the owner can overwrite).
+ * The SP is deployed via SR-2 with `mode: "public"` (anyone reads the
+ * ciphertext + the public content hash for tamper-evidence; only the
+ * owner can overwrite).
+ *
+ * @param opts - Transcript + L2PS instance (for the AES-GCM key) +
+ *               connected Demos (for the signing key + broadcast) +
+ *               signer claim + policy/consent.
+ * @returns   `{ anchor, contentHash }` on success, `null` only when the
+ *            recommended policy is in effect and consent is missing.
+ * @throws {Error} On `policy === "none"`, non-demos signer, non-member
+ *                 signer, signer-wallet mismatch, or broadcast failure
+ *                 under `required` policy.
  */
 export async function anchorEncryptedTranscript(
     opts: AnchorEncryptedTranscriptOpts,
@@ -169,19 +184,21 @@ export interface DecryptAnchoredTranscriptOpts {
 }
 
 /**
- * Fetch + decrypt + fully verify the original transcript. Throws on the
- * first failure of any of:
+ * Fetch + decrypt + fully verify the original transcript.
+ *
+ * @param opts - RPC URL + Storage Program address + L2PS instance (caller
+ *               must be a subnet member; otherwise AES-GCM auth fails).
+ * @returns   A `ChannelTranscript` whose every component has been
+ *            validated end-to-end — callers do not need to run
+ *            `verifyTranscript` again.
+ * @throws {Error} On the first of:
  *   - SP not found / wrong shape / unknown transcriptVersion
  *   - ciphertext hash does not match the stored `contentHash` (tamper)
  *   - AES-GCM auth fails (= caller's L2PS instance is not a subnet member)
  *   - decrypted `channelId` does not match the anchor's `channelId`
  *   - anchor-party transcript signature is invalid
  *   - any embedded ChannelMessage signature, sequence, sender ∈ members,
- *     or per-message channelId check fails (delegated to `verifyTranscript`)
- *
- * The return value is therefore a transcript every property of which has
- * been validated end-to-end; callers do not need to run `verifyTranscript`
- * again afterwards.
+ *     or per-message channelId check fails (delegated to `verifyTranscript`).
  */
 export async function decryptAnchoredTranscript(
     opts: DecryptAnchoredTranscriptOpts,
@@ -250,9 +267,14 @@ export interface VerifyAnchorIntegrityResult {
 
 /**
  * Public tamper-check that needs no decryption keys. Hashes the on-chain
- * ciphertext and compares with the stored `contentHash`; also asserts
- * `channelId` lines up and the SP owner matches the embedded signer's
- * address. Useful for auditors / non-members.
+ * ciphertext and compares with the stored `contentHash`; also asserts the
+ * SP owner address matches the embedded signer's CCI claim. Useful for
+ * auditors and non-members verifying an anchor without subnet access.
+ *
+ * @param opts - RPC URL + Storage Program address.
+ * @returns   `{ ok, errors }` — `ok` only when every public check passes;
+ *            `errors` contains every failure (collected in one pass so
+ *            auditors see the full picture, not the first failure).
  */
 export async function verifyAnchorIntegrity(opts: {
     rpcUrl: string
