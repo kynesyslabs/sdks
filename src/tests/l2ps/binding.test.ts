@@ -8,12 +8,14 @@ import {
     bindingProgramName,
     bindingSigningBytes,
     createMembershipBinding,
+    resolveMember,
     signatureFromHex,
     signatureToHex,
     stripBindingSignature,
     verifyMembershipBinding,
     type L2PSMembershipBinding,
 } from "@/l2ps/binding"
+import { StorageProgram } from "@/storage/StorageProgram"
 
 const CHANNEL = "ch-7f9a"
 const MEMBER = "rsa-fingerprint-1"
@@ -303,6 +305,95 @@ describe("L2PS membership binding (WI-1)", () => {
             expect("signature" in stripped).toBe(false)
             expect(stripped.channelId).toBe(b.channelId)
             expect(stripped.cciPrimaryClaim).toBe(b.cciPrimaryClaim)
+        })
+    })
+
+    describe("resolveMember — DoS resistance (P1 regression)", () => {
+        // Regression for greptile P1 finding on resolveMember: a single
+        // squatter publishing a malformed SP under our deterministic name
+        // must not crash the resolver — it must be skipped so a legitimate
+        // candidate further down the candidate list still resolves.
+        const RPC = "https://rpc.test"
+
+        afterEach(() => jest.restoreAllMocks())
+
+        it("skips a candidate with a malformed sp.owner and keeps iterating", async () => {
+            const valid = await createMembershipBinding({
+                channelId: CHANNEL,
+                subnetMemberId: MEMBER,
+                claim,
+                demos,
+            })
+
+            jest.spyOn(StorageProgram, "searchByName").mockResolvedValue([
+                { storageAddress: "stor-malformed", programName: "", encoding: "json", sizeBytes: 0, storageLocation: "onchain", createdAt: "", updatedAt: "" },
+                { storageAddress: "stor-valid", programName: "", encoding: "json", sizeBytes: 0, storageLocation: "onchain", createdAt: "", updatedAt: "" },
+            ] as any)
+
+            jest.spyOn(StorageProgram, "getByAddress").mockImplementation(
+                async (_rpc: string, addr: string) => {
+                    if (addr === "stor-malformed") {
+                        return {
+                            storageAddress: addr,
+                            owner: "not-a-hex-address",
+                            programName: bindingProgramName(CHANNEL, MEMBER),
+                            encoding: "json",
+                            data: valid as unknown as Record<string, unknown>,
+                            metadata: null,
+                            storageLocation: "onchain",
+                            sizeBytes: 0,
+                            createdAt: "",
+                            updatedAt: "",
+                        } as any
+                    }
+                    if (addr === "stor-valid") {
+                        const ownerHex = (await demos.getEd25519Address())
+                            .toLowerCase()
+                        return {
+                            storageAddress: addr,
+                            owner: ownerHex.startsWith("0x")
+                                ? ownerHex
+                                : "0x" + ownerHex,
+                            programName: bindingProgramName(CHANNEL, MEMBER),
+                            encoding: "json",
+                            data: valid as unknown as Record<string, unknown>,
+                            metadata: null,
+                            storageLocation: "onchain",
+                            sizeBytes: 0,
+                            createdAt: "",
+                            updatedAt: "",
+                        } as any
+                    }
+                    return null
+                },
+            )
+
+            // Pre-fix this throws inside normalizeDemosAddress(sp.owner).
+            // Post-fix it returns the valid candidate's claim.
+            const resolved = await resolveMember(CHANNEL, MEMBER, RPC)
+            expect(resolved).toBe(claim)
+        })
+
+        it("returns null when EVERY candidate is malformed (no throws)", async () => {
+            jest.spyOn(StorageProgram, "searchByName").mockResolvedValue([
+                { storageAddress: "stor-bad", programName: "", encoding: "json", sizeBytes: 0, storageLocation: "onchain", createdAt: "", updatedAt: "" },
+            ] as any)
+            jest.spyOn(StorageProgram, "getByAddress").mockResolvedValue({
+                storageAddress: "stor-bad",
+                owner: "not-hex",
+                programName: bindingProgramName(CHANNEL, MEMBER),
+                encoding: "json",
+                data: { bogus: true } as Record<string, unknown>,
+                metadata: null,
+                storageLocation: "onchain",
+                sizeBytes: 0,
+                createdAt: "",
+                updatedAt: "",
+            } as any)
+
+            await expect(
+                resolveMember(CHANNEL, MEMBER, RPC),
+            ).resolves.toBeNull()
         })
     })
 })

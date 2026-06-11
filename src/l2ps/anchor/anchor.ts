@@ -18,11 +18,11 @@ import type {
     UnsignedChannelTranscript,
 } from "../channel/types"
 import {
-    signatureFromHex,
-    signatureToHex,
     stripTranscriptSignatures,
     transcriptSigningBytes,
 } from "../channel/canonical"
+import { verifyTranscript } from "../channel/transcript"
+import { bytesToHex, signatureFromHex, signatureToHex } from "../utils/hex"
 import type {
     AnchoredTranscriptPayload,
     AttestationRef,
@@ -169,11 +169,19 @@ export interface DecryptAnchoredTranscriptOpts {
 }
 
 /**
- * Fetch + decrypt + verify the original transcript. Throws if:
- *   - SP not found / not the expected shape
- *   - ciphertext hash does not match the stored contentHash (tamper)
+ * Fetch + decrypt + fully verify the original transcript. Throws on the
+ * first failure of any of:
+ *   - SP not found / wrong shape / unknown transcriptVersion
+ *   - ciphertext hash does not match the stored `contentHash` (tamper)
  *   - AES-GCM auth fails (= caller's L2PS instance is not a subnet member)
- *   - transcript-plaintext signature does not verify under `signer`
+ *   - decrypted `channelId` does not match the anchor's `channelId`
+ *   - anchor-party transcript signature is invalid
+ *   - any embedded ChannelMessage signature, sequence, sender ∈ members,
+ *     or per-message channelId check fails (delegated to `verifyTranscript`)
+ *
+ * The return value is therefore a transcript every property of which has
+ * been validated end-to-end; callers do not need to run `verifyTranscript`
+ * again afterwards.
  */
 export async function decryptAnchoredTranscript(
     opts: DecryptAnchoredTranscriptOpts,
@@ -219,7 +227,20 @@ export async function decryptAnchoredTranscript(
             "decryptAnchoredTranscript: transcript signature verification failed",
         )
 
-    return { ...transcript, signatures: [payload.signature] }
+    const fullTranscript: ChannelTranscript = {
+        ...transcript,
+        signatures: [payload.signature],
+    }
+
+    // Run the audit verifier on the assembled transcript so the caller's
+    // return value is end-to-end validated, not just the anchor wrapper.
+    const audit = verifyTranscript(fullTranscript)
+    if (!audit.ok)
+        throw new Error(
+            `decryptAnchoredTranscript: transcript audit failed — ${audit.errors.join("; ")}`,
+        )
+
+    return fullTranscript
 }
 
 export interface VerifyAnchorIntegrityResult {
@@ -273,14 +294,6 @@ export async function verifyAnchorIntegrity(opts: {
     }
 
     return { ok: errors.length === 0, errors }
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-    let out = ""
-    for (let i = 0; i < bytes.length; i++) {
-        out += bytes[i].toString(16).padStart(2, "0")
-    }
-    return out
 }
 
 function base64ToBytes(b64: string): Uint8Array {

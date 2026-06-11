@@ -88,9 +88,15 @@ export class ChannelSession {
         repliesTo?: number
     }): Promise<ChannelMessage> {
         this.assertOpened()
+        // Reserve the sequence slot SYNCHRONOUSLY before any await — two
+        // concurrent sendOutgoing() calls would otherwise read the same
+        // `highestSeen`, sign two messages with identical sequence
+        // numbers, and silently violate the anti-replay invariant on the
+        // receiver side.
+        const sequence = ++this.highestSeen
         const unsigned: UnsignedChannelMessage = {
             channelId: this.channelId,
-            sequence: this.highestSeen + 1,
+            sequence,
             sender: this.me,
             sentAt: opts.sentAt ?? Date.now(),
             type: opts.type,
@@ -100,7 +106,6 @@ export class ChannelSession {
             }),
         }
         const signed = await signChannelMessage(unsigned, this.demos)
-        this.highestSeen = signed.sequence
         this.transcript.push(signed)
         return signed
     }

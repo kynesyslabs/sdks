@@ -511,3 +511,49 @@ describe("Transcript (WI-2 → consumed by WI-3)", () => {
         ).rejects.toThrow(/demos:/)
     })
 })
+
+describe("ChannelSession.sendOutgoing — concurrency (P1 regression)", () => {
+    // Regression for greptile P1 on session.ts: sendOutgoing read
+    // `highestSeen` BEFORE await signChannelMessage and wrote it AFTER,
+    // so two unawaited concurrent calls produced duplicate sequence
+    // numbers. Post-fix, the slot is reserved synchronously via ++.
+    it("two unawaited sendOutgoing calls get distinct, monotonic sequence numbers", async () => {
+        const alice = await newConnectedDemos()
+        const bob = await newConnectedDemos()
+        const session = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await session.open()
+
+        // Fire BOTH calls before awaiting either, then await together.
+        const p1 = session.sendOutgoing({ type: "offer", body: { i: 1 } })
+        const p2 = session.sendOutgoing({ type: "offer", body: { i: 2 } })
+        const [m1, m2] = await Promise.all([p1, p2])
+
+        expect(m1.sequence).not.toBe(m2.sequence)
+        const seen = [m1.sequence, m2.sequence].sort()
+        expect(seen).toEqual([1, 2])
+    })
+
+    it("burst of 5 concurrent sendOutgoing calls gets 5 distinct sequences", async () => {
+        const alice = await newConnectedDemos()
+        const bob = await newConnectedDemos()
+        const session = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await session.open()
+
+        const promises = Array.from({ length: 5 }, (_, i) =>
+            session.sendOutgoing({ type: "offer", body: { i } }),
+        )
+        const msgs = await Promise.all(promises)
+        const seqs = msgs.map(m => m.sequence).sort((a, b) => a - b)
+        expect(seqs).toEqual([1, 2, 3, 4, 5])
+    })
+})

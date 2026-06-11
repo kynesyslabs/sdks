@@ -201,13 +201,17 @@ export async function resolveMember(
         if (binding.subnetMemberId !== subnetMemberId) continue
         if (!verifyMembershipBinding(binding)) continue
 
-        let claimAddress: string
+        // Both parses are inside the same try so a single adversarially-
+        // crafted candidate (malformed claim ref OR malformed sp.owner)
+        // gets skipped instead of aborting the whole resolution loop —
+        // otherwise a squatter publishing a poisoned binding under our
+        // deterministic name could deny-of-service every consumer.
         try {
-            claimAddress = demosAddressFromClaim(binding.cciPrimaryClaim)
+            const claimAddress = demosAddressFromClaim(binding.cciPrimaryClaim)
+            if (normalizeDemosAddress(sp.owner) !== claimAddress) continue
         } catch {
             continue
         }
-        if (normalizeDemosAddress(sp.owner) !== claimAddress) continue
 
         return binding.cciPrimaryClaim
     }
