@@ -34,6 +34,14 @@ describe("demToOs", () => {
         expect(demToOs("100")).toBe(100_000_000_000n)
     })
 
+    // Underscore digit-group separators are stripped before parsing, so a
+    // grouped string equals its ungrouped form.
+    test("accepts underscore digit-group separators", () => {
+        expect(demToOs("1_000_000_000")).toBe(1_000_000_000_000_000_000n)
+        expect(demToOs("1_000_000_000")).toBe(demToOs("1000000000"))
+        expect(demToOs("1_000.5")).toBe(1_000_500_000_000n)
+    })
+
     // Edge case: explicit zero string input.
     test("converts the string \"0\" to 0n", () => {
         expect(demToOs("0")).toBe(0n)

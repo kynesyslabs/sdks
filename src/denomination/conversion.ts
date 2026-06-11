@@ -33,7 +33,10 @@ import { OS_DECIMALS, ZERO_OS } from "./constants"
  * @returns OS amount as `bigint`.
  */
 export function demToOs(dem: number | string): bigint {
-    const str = typeof dem === "number" ? dem.toString() : dem
+    const str = (typeof dem === "number" ? dem.toString() : dem).replace(
+        /_/g,
+        "",
+    )
 
     // Split on decimal point. Missing fractional part defaults to "".
     const [whole, frac = ""] = str.split(".")
