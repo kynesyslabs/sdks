@@ -56,6 +56,22 @@ export interface L2PSEncryptedPayload {
 }
 
 /**
+ * Payload shape for `L2PS.encryptBytes` / `L2PS.decryptBytes`. Used by
+ * SR-4 WI-3 to encrypt channel transcripts to the subnet member set
+ * without dragging the L2PS-transaction envelope into a non-tx context.
+ */
+export interface L2PSEncryptedBytes {
+    /** UID of the L2PS network that encrypted these bytes. */
+    l2ps_uid: string;
+    /** Base64-encoded AES-GCM ciphertext. */
+    ciphertext: string;
+    /** Base64-encoded AES-GCM authentication tag. */
+    tag: string;
+    /** Base64-encoded AES-GCM nonce (always 12 bytes, fresh per call). */
+    nonce: string;
+}
+
+/**
  * L2PS (Layer 2 Private Subnets) class for encrypted transaction processing.
  * 
  * This class implements a multi-singleton pattern to manage multiple L2PS networks.
@@ -398,5 +414,79 @@ export default class L2PS {
      */
     async getKeyFingerprint(): Promise<string> {
         return Hashing.sha256(this.privateKey).substring(0, 16);
+    }
+
+    /**
+     * AES-GCM-encrypt arbitrary bytes under the subnet key.
+     *
+     * Mirrors the per-call-nonce + nonce-as-AAD pattern in `encryptTx`: a
+     * fresh 12-byte nonce per call, bound into the auth tag via AAD so an
+     * attacker cannot DoS specific ciphertexts by flipping the stored
+     * nonce. Used by SR-4 WI-3 to encrypt channel transcripts to the
+     * subnet member set; nothing in the payload shape is L2PS-transaction
+     * specific.
+     */
+    async encryptBytes(plaintext: Uint8Array): Promise<L2PSEncryptedBytes> {
+        const cipher = forge.cipher.createCipher('AES-GCM', this.privateKey);
+        const nonce = forge.random.getBytesSync(12);
+        cipher.start({ iv: nonce, additionalData: nonce });
+        cipher.update(
+            forge.util.createBuffer(
+                Buffer.from(plaintext).toString('binary'),
+                'binary' as any,
+            ),
+        );
+        if (!cipher.finish()) {
+            throw new Error('L2PS.encryptBytes: AES-GCM finish() failed');
+        }
+        return {
+            l2ps_uid: this.config?.uid || this.id,
+            ciphertext: forge.util.encode64(cipher.output.getBytes()),
+            tag: forge.util.encode64(cipher.mode.tag.getBytes()),
+            nonce: forge.util.encode64(nonce),
+        };
+    }
+
+    /**
+     * Inverse of `encryptBytes`. Verifies the `l2ps_uid` matches this
+     * instance and that the AES-GCM auth tag (covering nonce + ciphertext)
+     * is intact; throws on either failure.
+     */
+    async decryptBytes(payload: L2PSEncryptedBytes): Promise<Uint8Array> {
+        if (payload.l2ps_uid !== (this.config?.uid || this.id)) {
+            throw new Error('L2PS.decryptBytes: payload encrypted for different L2PS uid');
+        }
+        // Storage-loaded JSON can violate the L2PSEncryptedBytes shape at
+        // runtime; without an explicit shape check forge would throw a
+        // base64 error that does not tell the caller which field is wrong.
+        if (
+            typeof payload.ciphertext !== 'string' ||
+            typeof payload.tag !== 'string' ||
+            typeof payload.nonce !== 'string'
+        ) {
+            throw new Error(
+                'L2PS.decryptBytes: payload must include base64 strings for ciphertext, tag, and nonce',
+            );
+        }
+        const ciphertext = forge.util.createBuffer(
+            forge.util.decode64(payload.ciphertext),
+        );
+        const tag = forge.util.createBuffer(forge.util.decode64(payload.tag));
+        const iv = forge.util.decode64(payload.nonce);
+        if (iv.length !== 12) {
+            throw new Error(
+                'L2PS.decryptBytes: invalid nonce (expected base64-encoded 12-byte value)',
+            );
+        }
+        const decipher = forge.cipher.createDecipher('AES-GCM', this.privateKey);
+        decipher.start({ iv, tag, additionalData: iv });
+        decipher.update(ciphertext);
+        if (!decipher.finish()) {
+            throw new Error('L2PS.decryptBytes: AES-GCM authentication failed');
+        }
+        const bin = decipher.output.getBytes();
+        const out = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xff;
+        return out;
     }
 }
