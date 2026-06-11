@@ -57,7 +57,7 @@ export async function signChannelMessage(
  * are handled by `ChannelSession` — this function does crypto only.
  */
 export function verifyChannelMessage(msg: ChannelMessage): boolean {
-    if (!msg || !msg.signature || msg.signature.sigVersion !== "1") return false
+    if (msg?.signature?.sigVersion !== "1") return false
     if (!isDemosClaim(msg.sender)) return false
     if (!Number.isInteger(msg.sequence) || msg.sequence < 1) return false
     if (!msg.channelId) return false

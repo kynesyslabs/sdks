@@ -99,7 +99,7 @@ export function verifyTranscript(
     t: ChannelTranscript,
 ): TranscriptVerificationResult {
     const errors: string[] = []
-    if (!t || t.transcriptVersion !== "1") {
+    if (t?.transcriptVersion !== "1") {
         errors.push("transcriptVersion is not 1")
         return { ok: false, errors }
     }

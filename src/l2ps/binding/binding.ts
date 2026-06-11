@@ -94,7 +94,7 @@ export async function createMembershipBinding(
 export function verifyMembershipBinding(
     binding: L2PSMembershipBinding,
 ): boolean {
-    if (!binding || binding.bindingVersion !== "1") return false
+    if (binding?.bindingVersion !== "1") return false
     if (!binding.channelId || !binding.subnetMemberId) return false
     if (!isDemosClaim(binding.cciPrimaryClaim)) return false
     if (typeof binding.signature !== "string" || !binding.signature)
@@ -193,7 +193,7 @@ export async function resolveMember(
 
     for (const item of list) {
         const sp = await StorageProgram.getByAddress(rpcUrl, item.storageAddress)
-        if (!sp || sp.encoding !== "json" || !sp.data) continue
+        if (sp?.encoding !== "json" || !sp.data) continue
         if (typeof sp.data !== "object") continue
 
         const binding = sp.data as unknown as L2PSMembershipBinding

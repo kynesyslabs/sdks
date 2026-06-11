@@ -23,7 +23,7 @@ export function signatureFromHex(hex: string): Uint8Array {
     }
     const out = new Uint8Array(h.length / 2)
     for (let i = 0; i < h.length; i += 2) {
-        out[i / 2] = parseInt(h.slice(i, i + 2), 16)
+        out[i / 2] = Number.parseInt(h.slice(i, i + 2), 16)
     }
     return out
 }

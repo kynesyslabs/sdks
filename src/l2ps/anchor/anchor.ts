@@ -190,7 +190,7 @@ export async function decryptAnchoredTranscript(
         opts.rpcUrl,
         opts.storageAddress,
     )
-    if (!sp || !sp.data || typeof sp.data !== "object")
+    if (!sp?.data || typeof sp.data !== "object")
         throw new Error(
             `decryptAnchoredTranscript: no storage program at ${opts.storageAddress}`,
         )
@@ -263,7 +263,7 @@ export async function verifyAnchorIntegrity(opts: {
         opts.rpcUrl,
         opts.storageAddress,
     )
-    if (!sp || !sp.data || typeof sp.data !== "object") {
+    if (!sp?.data || typeof sp.data !== "object") {
         errors.push(`no storage program at ${opts.storageAddress}`)
         return { ok: false, errors }
     }

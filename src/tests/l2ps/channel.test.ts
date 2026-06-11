@@ -534,7 +534,7 @@ describe("ChannelSession.sendOutgoing — concurrency (P1 regression)", () => {
         const [m1, m2] = await Promise.all([p1, p2])
 
         expect(m1.sequence).not.toBe(m2.sequence)
-        const seen = [m1.sequence, m2.sequence].sort()
+        const seen = [m1.sequence, m2.sequence].sort((a, b) => a - b)
         expect(seen).toEqual([1, 2])
     })
 
