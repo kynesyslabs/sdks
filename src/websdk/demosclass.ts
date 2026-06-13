@@ -47,11 +47,7 @@ import {
 } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
-import {
-    OS_PER_DEM,
-    demToOs,
-    parseOsString,
-} from "@/denomination"
+import { OS_PER_DEM, demToOs, parseOsString } from "@/denomination"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
 import {
     SubDemPrecisionError,
@@ -346,8 +342,7 @@ export class Demos {
      */
     async pay(to: string, amount: number | bigint) {
         required(this.keypair, "Wallet not connected")
-        const amountOs =
-            typeof amount === "bigint" ? amount : demToOs(amount)
+        const amountOs = typeof amount === "bigint" ? amount : demToOs(amount)
         await this._assertAmountAcceptableOnTargetNode(amountOs)
         return DemosTransactions.pay(to, amountOs, this)
     }
@@ -882,8 +877,7 @@ export class Demos {
                 const isConnError =
                     typeof code === "string" && RETRYABLE_CODES.has(code)
                 const isRetryableStatus =
-                    typeof status === "number" &&
-                    RETRYABLE_STATUSES.has(status)
+                    typeof status === "number" && RETRYABLE_STATUSES.has(status)
 
                 const shouldRetry =
                     (isConnError || isRetryableStatus) && attempt < maxRetries
@@ -1301,11 +1295,9 @@ export class Demos {
      * @param address - The address
      */
     async getAddressNonce(address: string): Promise<number> {
-        const nonceResponse = await this.nodeCall("getAddressNonce", {
+        const nonceValue = await this.nodeCall("getAddressNonce", {
             address,
         })
-
-        const nonceValue = nonceResponse?.response
 
         if (typeof nonceValue === "number" && Number.isFinite(nonceValue)) {
             return nonceValue
@@ -1559,7 +1551,9 @@ export class Demos {
      * weight, approve/reject breakdowns, per-validator votes, threshold, and
      * a `passed` flag.
      */
-    async getProposalVotes(proposalId: string): Promise<ProposalVoteInfo | null> {
+    async getProposalVotes(
+        proposalId: string,
+    ): Promise<ProposalVoteInfo | null> {
         return (await this.nodeCall("getProposalVotes", {
             proposalId,
         })) as ProposalVoteInfo | null

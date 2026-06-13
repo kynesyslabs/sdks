@@ -14,3 +14,4 @@ export function validateEd25519Address(address: string) {
 
 export * as dataManipulation from "./dataManipulation"
 export { deserializeUint8Array, serializeUint8Array } from "./uint8Serialize"
+export { demToOs, osToDem, parseOsString, formatDem, toOsString } from "@/denomination/conversion"

@@ -285,7 +285,6 @@ export const DemosTransactions = {
      */
     confirm: async function (transaction: Transaction, demos: Demos) {
         let response = await demos.call("execute", "", transaction, "confirmTx")
-        console.log("response:", response)
         // If the tx is not valid, we notify the user
         if (!response.response.data.valid) {
             throw new Error(
