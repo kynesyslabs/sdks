@@ -420,11 +420,20 @@ export class Demos {
             }
 
             if (this.walletConnected) {
-                const { data } = await this.signMessage(this.getAddress(), {
+                // Timestamp-bound auth (audit C3b): sign sha256(identity:ts)
+                // instead of the bare address, so the header isn't a static
+                // replayable token. Mirrors rpcCall.
+                const identityStr = `ed25519:${this.getAddress()}`
+                const timestamp = Date.now().toString()
+                const authMessage = Hashing.sha256(
+                    `${identityStr}:${timestamp}`,
+                )
+                const { data } = await this.signMessage(authMessage, {
                     algorithm: "ed25519",
                 })
-                headers["identity"] = `ed25519:${this.getAddress()}`
+                headers["identity"] = identityStr
                 headers["signature"] = data
+                headers["timestamp"] = timestamp
             }
 
             const response = await axios.get<StorageProgramResponse>(
@@ -939,12 +948,23 @@ export class Demos {
     ): Promise<RPCResponse> {
         let publicKey = ""
         let signature = ""
+        // Timestamp binds the auth signature to a moment in time so a captured
+        // header can't be replayed indefinitely. Previously the signature was
+        // over the bare public key — a static, reusable bearer token (audit
+        // C3b). The node verifies the signature over `${identity}:${timestamp}`
+        // and rejects stale timestamps.
+        let timestamp = ""
 
         if (isAuthenticated) {
             publicKey = uint8ArrayToHex(this.keypair.publicKey)
+            const identityStr = this.algorithm + ":" + publicKey
+            timestamp = Date.now().toString()
+            const authMessage = Hashing.sha256(
+                `${identityStr}:${timestamp}`,
+            )
             const _signature = await this.crypto.sign(
                 this.algorithm,
-                new TextEncoder().encode(publicKey),
+                new TextEncoder().encode(authMessage),
             )
             signature = uint8ArrayToHex(_signature.signature)
         }
@@ -953,6 +973,7 @@ export class Demos {
             "Content-Type": "application/json",
             identity: this.algorithm + ":" + publicKey,
             signature: signature,
+            timestamp: timestamp,
         }
 
         // The legacy `retries`/`sleepTime` knobs are application-level: they
@@ -1038,6 +1059,7 @@ export class Demos {
 
         let pubkey_string: string
         let pubkey_signature: string
+        let auth_timestamp = ""
         let isAuthenticated: boolean = method !== "nodeCall"
 
         if (isAuthenticated) {
@@ -1048,12 +1070,18 @@ export class Demos {
             }
 
             const publicKey = uint8ArrayToHex(this.keypair.publicKey)
+            pubkey_string = this.algorithm + ":" + publicKey
+            // Timestamp-bound auth (audit C3b): sign sha256(identity:ts), not
+            // the bare public key, so the header isn't a static replayable
+            // token. Mirrors rpcCall + storage read.
+            auth_timestamp = Date.now().toString()
+            const authMessage = Hashing.sha256(
+                `${pubkey_string}:${auth_timestamp}`,
+            )
             const signature = await this.crypto.sign(
                 this.algorithm,
-                new TextEncoder().encode(publicKey),
+                new TextEncoder().encode(authMessage),
             )
-
-            pubkey_string = this.algorithm + ":" + publicKey
             pubkey_signature = uint8ArrayToHex(signature.signature)
         }
 
@@ -1071,6 +1099,7 @@ export class Demos {
                     "Content-Type": "application/json",
                     identity: pubkey_string,
                     signature: pubkey_signature,
+                    timestamp: auth_timestamp,
                 },
             )
 
