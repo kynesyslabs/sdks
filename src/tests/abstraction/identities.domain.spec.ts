@@ -17,8 +17,8 @@ describe("Domain Identities (offline SDK logic)", () => {
         await demos.connectWallet(MNEMONIC) // local crypto only, no node
     })
 
-    test("createDomainProofPayload returns a validly-signed web2 proof", async () => {
-        const payload = await identities.createDomainProofPayload(demos)
+    test("createDomainProofPayload signs a host+sender-bound message", async () => {
+        const payload = await identities.createDomainProofPayload(demos, "example.com")
         const parts = payload.split(":")
 
         expect(parts).toHaveLength(4)
@@ -26,15 +26,41 @@ describe("Domain Identities (offline SDK logic)", () => {
         expect(parts[1]).toBe("dw2p")
         expect(parts[2]).toBe("ed25519")
 
+        const sender = await demos.getEd25519Address()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
-        const sigValid = await demos.crypto.verify({
+
+        // Verifies against the bound message (host + sender)...
+        const boundValid = await demos.crypto.verify({
+            algorithm: "ed25519",
+            message: new TextEncoder().encode(`dw2p:domain:example.com:${sender}`),
+            signature: hexToBytes(parts[3]),
+            publicKey: publicKey as Uint8Array,
+        } as any)
+        expect(boundValid).toBe(true)
+
+        // ...and NOT against the bare "dw2p" (the old, unbound format).
+        const bareValid = await demos.crypto.verify({
             algorithm: "ed25519",
             message: new TextEncoder().encode("dw2p"),
             signature: hexToBytes(parts[3]),
             publicKey: publicKey as Uint8Array,
         } as any)
+        expect(bareValid).toBe(false)
+    })
 
-        expect(sigValid).toBe(true)
+    test("domain proof does not verify for a different host (no cross-domain replay)", async () => {
+        const payload = await identities.createDomainProofPayload(demos, "example.com")
+        const sig = hexToBytes(payload.split(":")[3])
+        const sender = await demos.getEd25519Address()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+
+        const liftedToOtherHost = await demos.crypto.verify({
+            algorithm: "ed25519",
+            message: new TextEncoder().encode(`dw2p:domain:evil.com:${sender}`),
+            signature: sig,
+            publicKey: publicKey as Uint8Array,
+        } as any)
+        expect(liftedToOtherHost).toBe(false)
     })
 
     test("buildDomainProof canonicalizes host + URL (incl. IPv6 bracketing)", () => {
@@ -77,7 +103,7 @@ describe("Domain Identities (offline SDK logic)", () => {
     })
 
     test("addDomainIdentity builds the correct web2/domain request", async () => {
-        const payload = await identities.createDomainProofPayload(demos)
+        const payload = await identities.createDomainProofPayload(demos, "example.com")
 
         let proofUrlSeen: string | null = null
         let signedTx: any = null

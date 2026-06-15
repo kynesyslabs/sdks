@@ -459,11 +459,28 @@ export class Identities {
      * then call {@link addDomainIdentity}. The format is identical to the web2
      * proof payload, so the node verifies it with the same parser.
      *
+     * The signed message is bound to the domain and the signer
+     * (`dw2p:domain:<host>:<ed25519Address>`), so a proof published for one
+     * domain/identity cannot be lifted onto another (node #897).
+     *
      * @param demos A connected Demos instance.
+     * @param hostname The domain this proof is for (e.g. "example.com"). Must be
+     *   the same domain later passed to {@link addDomainIdentity}.
      * @returns The proof payload string (`demos:dw2p:<algorithm>:<signature>`).
      */
-    async createDomainProofPayload(demos: Demos) {
-        return await this.createWeb2ProofPayload(demos)
+    async createDomainProofPayload(demos: Demos, hostname: string) {
+        const { hostname: host } = this.buildDomainProof(hostname)
+        const sender = await demos.getEd25519Address()
+        // Domain-bound message: ties the proof to this host AND this identity,
+        // so it can't be replayed across domains, identities, or web2 contexts.
+        const message = `dw2p:domain:${host}:${sender}`
+        const signature = await demos.crypto.sign(
+            demos.algorithm,
+            new TextEncoder().encode(message),
+        )
+        return `demos:dw2p:${demos.algorithm}:${uint8ArrayToHex(
+            signature.signature,
+        )}`
     }
 
     /**
