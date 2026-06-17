@@ -153,8 +153,9 @@ describe("Domain Identities (offline SDK logic)", () => {
             error: "404 not found",
         })
 
+        // Assert the underlying fetch-failure reason surfaces, not just "some error".
         await expect(
             identities.addDomainIdentity(demos, "missing.com"),
-        ).rejects.toThrow()
+        ).rejects.toThrow(/404 not found/)
     })
 })

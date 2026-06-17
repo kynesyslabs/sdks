@@ -581,7 +581,7 @@ export class Identities {
      * Throws on anything that does not parse to a real host — no silent fallback.
      *
      * @example "https://Example.COM/x?y" -> { proofUrl: "https://example.com/.well-known/demos-cci.txt", hostname: "example.com" }
-     * @example "[::1]" -> { proofUrl: "https://[::1]/.well-known/demos-cci.txt", hostname: "::1" }
+     * @example "[::1]" -> { proofUrl: "https://[::1]/.well-known/demos-cci.txt", hostname: "[::1]" }
      */
     private buildDomainProof(input: string): {
         proofUrl: DomainProof
