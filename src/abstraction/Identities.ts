@@ -459,9 +459,12 @@ export class Identities {
      * then call {@link addDomainIdentity}. The format is identical to the web2
      * proof payload, so the node verifies it with the same parser.
      *
-     * The signed message is bound to the domain and the signer
-     * (`dw2p:domain:<host>:<ed25519Address>`), so a proof published for one
-     * domain/identity cannot be lifted onto another (node #897).
+     * The signed message is domain-separated and bound to the host + signer
+     * (`dacs-domain:v1:<host>:<ed25519Address>`), so a signature cannot be
+     * lifted across domains, identities, or web2 contexts (node #897 / DEM-767).
+     * NOTE: the exact message shape MUST stay in lockstep with the node's
+     * verifyWeb2Proof reconstruction. Freshness (nonce/issuedAt) is the Tier-2
+     * follow-up tracked in DEM-767.
      *
      * @param demos A connected Demos instance.
      * @param hostname The domain this proof is for (e.g. "example.com"). Must be
@@ -471,9 +474,8 @@ export class Identities {
     async createDomainProofPayload(demos: Demos, hostname: string) {
         const { hostname: host } = this.buildDomainProof(hostname)
         const sender = await demos.getEd25519Address()
-        // Domain-bound message: ties the proof to this host AND this identity,
-        // so it can't be replayed across domains, identities, or web2 contexts.
-        const message = `dw2p:domain:${host}:${sender}`
+        // Domain-separated, host+signer-bound message (must match the node).
+        const message = `dacs-domain:v1:${host}:${sender}`
         const signature = await demos.crypto.sign(
             demos.algorithm,
             new TextEncoder().encode(message),

@@ -32,7 +32,7 @@ describe("Domain Identities (offline SDK logic)", () => {
         // Verifies against the bound message (host + sender)...
         const boundValid = await demos.crypto.verify({
             algorithm: "ed25519",
-            message: new TextEncoder().encode(`dw2p:domain:example.com:${sender}`),
+            message: new TextEncoder().encode(`dacs-domain:v1:example.com:${sender}`),
             signature: hexToBytes(parts[3]),
             publicKey: publicKey as Uint8Array,
         } as any)
@@ -56,7 +56,7 @@ describe("Domain Identities (offline SDK logic)", () => {
 
         const liftedToOtherHost = await demos.crypto.verify({
             algorithm: "ed25519",
-            message: new TextEncoder().encode(`dw2p:domain:evil.com:${sender}`),
+            message: new TextEncoder().encode(`dacs-domain:v1:evil.com:${sender}`),
             signature: sig,
             publicKey: publicKey as Uint8Array,
         } as any)
