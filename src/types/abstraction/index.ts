@@ -102,6 +102,24 @@ export interface InferFromGithubPayload extends Web2CoreTargetIdentityPayload {
     proof: GithubProof
 }
 
+// ANCHOR Domain Identities
+/**
+ * A domain proof is the HTTPS URL of the well-known file the domain owner
+ * hosts to prove control:  https://<host>/.well-known/demos-cci.txt
+ * The file body is the standard web2 proof payload produced by
+ * Identities.createDomainProofPayload (i.e. `demos:dw2p:<algorithm>:<signature>`).
+ */
+export type DomainProof = `https://${string}/.well-known/demos-cci.txt`
+
+export interface InferFromDomainPayload extends Web2CoreTargetIdentityPayload {
+    context: "domain"
+    proof: DomainProof
+    /** The hostname being claimed (e.g. "example.com"). */
+    username: string
+    /** Domains have no separate numeric id; mirrors `username`. */
+    userId: string
+}
+
 // ANCHOR X Identities (aka Twitter Identities)
 export type XProof = `https://x.com/${string}/${string}` // TODO Better scope for X posts
 export type TwitterProof = XProof
@@ -178,6 +196,7 @@ export interface Web2IdentityAssignPayload extends BaseWeb2IdentityPayload {
         | InferFromTwitterPayload
         | InferFromTelegramPayload
         | InferFromDiscordPayload
+        | InferFromDomainPayload
 }
 
 export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
@@ -554,7 +573,7 @@ export interface UserPoints {
 
 export interface FindDemosIdByWeb2IdentityQuery {
     type: "web2"
-    context: "twitter" | "telegram" | "github" | "discord"
+    context: "twitter" | "telegram" | "github" | "discord" | "domain"
     username: string
     userId?: string
 }
