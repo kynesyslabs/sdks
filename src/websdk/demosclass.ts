@@ -396,9 +396,21 @@ export class Demos {
                 "Storage address Not found in payload",
             )
 
+            // Sender's nonce must be set on the tx like every other
+            // builder (DemosTransactions.pay/store, contracts, escrow…);
+            // GCRGeneration only adds the GCR-state nonce edit, it does
+            // not backfill tx.content.nonce. Without this, storageProgram
+            // txs ship with the skeleton default nonce 0 and get rejected
+            // by the node's sequential-nonce / expectedPrior enforcement
+            // after the first one.
+            const { publicKey } = await this.crypto.getIdentity("ed25519")
+            const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+            const nonce = await this.getAddressNonce(publicKeyHex)
+
             const tx = DemosTransactions.empty()
             tx.content.to = payload.storageAddress
             tx.content.type = "storageProgram"
+            tx.content.nonce = nonce + 1
             tx.content.data = ["storageProgram", payload]
             return await this.sign(tx)
         },
