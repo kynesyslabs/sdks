@@ -65,7 +65,9 @@
         "./tlsnotary/service": "./build/tlsnotary/service.js",
         "./tlsnotary/webpack": "./build/tlsnotary/webpack.js",
         "./tlsnotary/auto-init": "./build/tlsnotary/auto-init.js",
-        "./tlsnotary/wasm/*": "./build/tlsnotary/wasm/*"
+        "./tlsnotary/wasm/*": "./build/tlsnotary/wasm/*",
+        "./identity": "./build/identity/index.js",
+        "./identity/cci": "./build/identity/cci/index.js"
     },
     "scripts": {
         "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",
