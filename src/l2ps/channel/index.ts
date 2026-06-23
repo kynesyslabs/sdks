@@ -50,3 +50,12 @@ export {
     verifyTranscript,
     type TranscriptVerificationResult,
 } from "./transcript"
+
+export {
+    L2PSChannelTransport,
+    type L2PSChannelTransportOpts,
+    type ChannelSessionLike,
+    type L2PSMessagingPeerLike,
+    type SerializedEncryptedMessage,
+    type IncomingMessagePayload,
+} from "./transport"
