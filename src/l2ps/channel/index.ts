@@ -70,3 +70,11 @@ export {
     type RfqEndBody,
     type StandingProposal,
 } from "./negotiate"
+
+export {
+    finalizeRfq,
+    type FinalizeRfqOpts,
+    type RfqFinalizeResult,
+    type RfqLike,
+    type ChannelSessionView,
+} from "./finalize"
