@@ -84,14 +84,59 @@ export async function finalizeRfq(
         )
     }
 
+    // The signer must be a channel member — `exportTranscript` will sign
+    // with any demos claim, so a non-member signer produces a transcript
+    // that later fails `verifyTranscript` (signer ∉ members). Catch it
+    // here rather than emitting a transcript that cannot be verified.
+    if (!opts.session.members.includes(opts.signer)) {
+        throw new Error(
+            `finalizeRfq: signer "${opts.signer}" is not a channel member — ` +
+                "the transcript signature would fail verification",
+        )
+    }
+
+    // The transcript must actually contain the agreed exchange: the
+    // accepted proposal and the matching accept that `rfq.outcome()`
+    // points at. A stale or mismatched session would otherwise let us
+    // export/anchor a transcript that does not back the agreement.
+    const outcome = opts.rfq.outcome()
+    const acceptedSequence = outcome.acceptedSequence
+    if (acceptedSequence === undefined) {
+        throw new Error(
+            "finalizeRfq: accepted outcome has no acceptedSequence — cannot match transcript",
+        )
+    }
+    const messages = opts.session.messages()
+    const hasAcceptedProposal = messages.some(
+        m => m.sequence === acceptedSequence,
+    )
+    const hasAccept = messages.some(
+        m =>
+            m.type === "accept" &&
+            (m.body as { acceptedSequence?: number } | undefined)
+                ?.acceptedSequence === acceptedSequence,
+    )
+    if (!hasAcceptedProposal || !hasAccept) {
+        throw new Error(
+            `finalizeRfq: session transcript does not contain the accepted proposal ` +
+                `(seq ${acceptedSequence}) and its matching accept — session mismatch`,
+        )
+    }
+
     const transcript = await exportTranscript({
         channelId: opts.session.channelId,
         members: [...opts.session.members],
-        messages: opts.session.messages(),
+        messages,
         signers: [{ claim: opts.signer, demos: opts.demos }],
     })
 
-    if (opts.policy === "none") {
+    // §8.7 `none`: transcript stays local; nothing anchored.
+    // §8.7 `recommended` WITHOUT consent: also a no-anchor outcome — it
+    // must NOT require an L2PS instance just to take its null-ref branch.
+    const willAnchor =
+        opts.policy === "encrypted-anchored-required" ||
+        (opts.policy === "encrypted-anchored-recommended" && !!opts.consent)
+    if (!willAnchor) {
         return { transcript, channelTranscriptRef: null }
     }
 

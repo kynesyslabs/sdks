@@ -198,4 +198,87 @@ describe("L2PSChannelTransport — reorder buffer", () => {
         expect(applied).toEqual([2, 4])
         expect(peer.sent.length).toBe(2) // one delivery per send to the single recipient
     })
+
+    it("does not commit appliedSeq when a recipient send fails", async () => {
+        // A session whose sendOutgoing mints a sequence but, unlike the
+        // monotonic FakeSession, does not raise highestSeen — so we can
+        // observe purely the transport's appliedSeq behaviour on a send
+        // that fails downstream at peer.send.
+        const recvApplied: number[] = []
+        const session: ChannelSessionLike = {
+            channelId: CHANNEL,
+            async sendOutgoing(opts) {
+                return makeMsg(1, opts.type, opts.body)
+            },
+            async receiveIncoming(msg) {
+                recvApplied.push(msg.sequence)
+            },
+        }
+        const peer = new FakePeer()
+        // Make the (only) send reject.
+        peer.send = async () => {
+            throw new Error("transport down")
+        }
+        const transport = new L2PSChannelTransport({
+            session,
+            peer,
+            sharedKey: KEY,
+            recipients: ["0xpeer"],
+        })
+        transport.start()
+
+        // sendOutgoing mints seq 1; peer.send rejects → send() throws and
+        // appliedSeq must stay 0 (never advanced past the failed send).
+        await expect(
+            transport.send({ type: "offer", body: {} }),
+        ).rejects.toThrow(/transport down/)
+
+        // appliedSeq still 0, so an inbound seq 1 is fresh and is applied —
+        // proving the failed send did not consume the channel sequence.
+        await inject(peer, makeMsg(1))
+        await flush()
+        expect(recvApplied).toEqual([1])
+    })
+
+    it("accepts a 32-byte key that is a subarray of a larger buffer", async () => {
+        // A 32-byte key view backed by a 64-byte ArrayBuffer. `key.buffer`
+        // would expose all 64 bytes and break Web Crypto's AES-256 import;
+        // the adapter must slice the exact view bytes.
+        const backing = new Uint8Array(64).fill(9)
+        const keyView = backing.subarray(0, 32)
+        const session = new FakeSession()
+        const peer = new FakePeer()
+        const transport = new L2PSChannelTransport({
+            session,
+            peer,
+            sharedKey: keyView,
+            recipients: ["0xpeer"],
+        })
+        transport.start()
+        // If the key import used the 64-byte backing buffer, encrypt would
+        // throw a DataError here.
+        await expect(
+            transport.send({ type: "offer", body: { ok: true } }),
+        ).resolves.toBeDefined()
+        expect(peer.sent.length).toBe(1)
+    })
+
+    it("drops inbound frames more than the reorder window ahead", async () => {
+        const errors: Error[] = []
+        const session = new FakeSession()
+        const peer = new FakePeer()
+        const transport = new L2PSChannelTransport({
+            session,
+            peer,
+            sharedKey: KEY,
+            recipients: ["0xpeer"],
+            onError: e => errors.push(e),
+        })
+        transport.start()
+        // appliedSeq is 0; a frame at seq 1000 is far beyond MAX_REORDER_AHEAD.
+        await inject(peer, makeMsg(1000))
+        await flush()
+        expect(transport.bufferedCount).toBe(0) // not buffered
+        expect(errors.some(e => /ahead of applied/.test(e.message))).toBe(true)
+    })
 })

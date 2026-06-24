@@ -134,6 +134,14 @@ export class RfqSession {
         this.assertOpen("accept")
         if (!this._standing)
             throw new Error("RfqSession: nothing to accept — no standing offer")
+        // You cannot accept your own proposal: acceptance is the
+        // counterparty agreeing to the terms on the table. Accepting a
+        // self-authored standing proposal would settle the negotiation
+        // (and produce a transcript) without the other side ever agreeing.
+        if (this._standing.sender === this.me)
+            throw new Error(
+                "RfqSession: cannot accept your own proposal — wait for the counterparty",
+            )
         const accepted = this._standing
         const body: RfqAcceptBody = { acceptedSequence: accepted.sequence }
         const msg = await this.sendFn({
@@ -179,17 +187,26 @@ export class RfqSession {
         if (this._state !== "open") return // terminal — ignore trailing traffic
 
         switch (msg.type) {
-            case "offer":
+            case "offer": {
+                // An offer opens a negotiation: it is only legal when no
+                // proposal stands yet. A second inbound offer must not
+                // overwrite the standing proposal — `offer()` rejects the
+                // same case outbound, so the inbound path enforces it too.
+                if (this._standing)
+                    throw new Error(
+                        `RfqSession: inbound offer (seq ${msg.sequence}) but a proposal already stands (seq ${this._standing.sequence})`,
+                    )
+                this.acceptProposal(msg)
+                break
+            }
             case "counter": {
-                const terms = (msg.body as RfqProposalBody)?.terms
-                const proposal: StandingProposal = {
-                    sequence: msg.sequence,
-                    sender: msg.sender,
-                    terms,
-                }
-                this.proposals.set(msg.sequence, proposal)
-                this._standing = proposal
-                this.onProposal?.(proposal)
+                // A counter replaces the standing proposal — illegal before
+                // any offer exists, mirroring `counter()` outbound.
+                if (!this._standing)
+                    throw new Error(
+                        `RfqSession: inbound counter (seq ${msg.sequence}) but no standing offer to counter`,
+                    )
+                this.acceptProposal(msg)
                 break
             }
             case "accept": {
@@ -198,6 +215,17 @@ export class RfqSession {
                 if (!accepted)
                     throw new Error(
                         `RfqSession: accept references unknown proposal sequence ${seq}`,
+                    )
+                // The accept must reference the proposal currently on the
+                // table. Once a counter supersedes an earlier offer, that
+                // older offer is off the table — accepting it would settle
+                // obsolete terms instead of what is currently being
+                // negotiated.
+                if (!this._standing || seq !== this._standing.sequence)
+                    throw new Error(
+                        `RfqSession: accept references stale proposal seq ${seq}; standing proposal is seq ${
+                            this._standing?.sequence ?? "none"
+                        }`,
                     )
                 this.settle({
                     state: "accepted",
@@ -221,6 +249,19 @@ export class RfqSession {
                 break
             }
         }
+    }
+
+    /** Record a verified inbound offer/counter as the standing proposal. */
+    private acceptProposal(msg: ChannelMessage): void {
+        const terms = (msg.body as RfqProposalBody)?.terms
+        const proposal: StandingProposal = {
+            sequence: msg.sequence,
+            sender: msg.sender,
+            terms,
+        }
+        this.proposals.set(msg.sequence, proposal)
+        this._standing = proposal
+        this.onProposal?.(proposal)
     }
 
     private async proposeOutgoing(

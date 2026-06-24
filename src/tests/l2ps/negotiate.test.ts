@@ -119,7 +119,9 @@ describe("RfqSession — negotiate-rfq state machine", () => {
         const { aSes, bSes } = harness()
         await aSes.offer({ price: 100 })
         await tick()
-        await aSes.accept()
+        // The counterparty (B) accepts A's offer — reaching the terminal
+        // state legitimately (a party cannot accept its own proposal).
+        await bSes.accept()
         await tick()
         await expect(aSes.counter({ price: 1 })).rejects.toThrow(/accepted/)
         await expect(aSes.reject()).rejects.toThrow(/accepted/)
@@ -138,6 +140,63 @@ describe("RfqSession — negotiate-rfq state machine", () => {
             signature: { sigVersion: "1", signature: "0xsig9" },
         } as ChannelMessage
         expect(() => aSes.onIncoming(bogus)).toThrow(/unknown proposal/)
+    })
+
+    it("refuses to accept your own standing proposal", async () => {
+        const { aSes } = harness()
+        await aSes.offer({ price: 100 })
+        await tick()
+        // A's own offer stands locally; A must not accept it.
+        await expect(aSes.accept()).rejects.toThrow(/your own proposal/)
+    })
+
+    it("rejects an inbound counter before any offer stands", () => {
+        const { aSes } = harness()
+        const counter = {
+            channelId: "ch",
+            sequence: 1,
+            sender: B,
+            sentAt: 1,
+            type: "counter" as ChannelMessageType,
+            body: { terms: { price: 1 } } as RfqProposalBody,
+            signature: { sigVersion: "1", signature: "0xsig1" },
+        } as ChannelMessage
+        expect(() => aSes.onIncoming(counter)).toThrow(/no standing offer to counter/)
+    })
+
+    it("rejects a second inbound offer once a proposal stands", async () => {
+        const { aSes } = harness()
+        await aSes.offer({ price: 100 }) // A's offer stands (seq 1)
+        await tick()
+        const secondOffer = {
+            channelId: "ch",
+            sequence: 2,
+            sender: B,
+            sentAt: 2,
+            type: "offer" as ChannelMessageType,
+            body: { terms: { price: 5 } } as RfqProposalBody,
+            signature: { sigVersion: "1", signature: "0xsig2" },
+        } as ChannelMessage
+        expect(() => aSes.onIncoming(secondOffer)).toThrow(/already stands/)
+    })
+
+    it("rejects an inbound accept that references a stale (superseded) proposal", async () => {
+        const { aSes, bSes } = harness()
+        await aSes.offer({ price: 100 }) // seq 1
+        await tick()
+        await bSes.counter({ price: 80 }) // seq 2 — supersedes seq 1
+        await tick()
+        // A receives an accept that points at the now-stale seq 1.
+        const staleAccept = {
+            channelId: "ch",
+            sequence: 3,
+            sender: B,
+            sentAt: 3,
+            type: "accept" as ChannelMessageType,
+            body: { acceptedSequence: 1 } as RfqAcceptBody,
+            signature: { sigVersion: "1", signature: "0xsig3" },
+        } as ChannelMessage
+        expect(() => aSes.onIncoming(staleAccept)).toThrow(/stale proposal/)
     })
 
     it("carries impl-defined terms opaquely (offer body shape)", async () => {

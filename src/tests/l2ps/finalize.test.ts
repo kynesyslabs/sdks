@@ -183,4 +183,63 @@ describe("finalizeRfq — WI-C transcript anchor on terminal", () => {
             }),
         ).rejects.toThrow(/requires an L2PS instance/)
     })
+
+    it("`recommended` without consent succeeds without an L2PS instance", async () => {
+        // No-anchor outcome must not require l2ps just to take the null
+        // branch (regression: the l2ps check used to run first).
+        const { alice, aSes, aRfq } = await agreedSession()
+        const res = await finalizeRfq({
+            rfq: aRfq,
+            session: aSes,
+            signer: alice.claim,
+            demos: alice.demos,
+            policy: "encrypted-anchored-recommended",
+            consent: false,
+            // no l2ps, no anchor override
+        })
+        expect(res.channelTranscriptRef).toBeNull()
+        expect(res.transcript.messages.length).toBe(3)
+    })
+
+    it("rejects a signer who is not a channel member", async () => {
+        const { aSes, aRfq } = await agreedSession()
+        const stranger = await newConnectedDemos()
+        await expect(
+            finalizeRfq({
+                rfq: aRfq,
+                session: aSes,
+                signer: stranger.claim, // not in members
+                demos: stranger.demos,
+                policy: "none",
+            }),
+        ).rejects.toThrow(/not a channel member/)
+    })
+
+    it("rejects a session whose transcript lacks the accepted exchange", async () => {
+        const { alice } = await agreedSession()
+        // An accepted RFQ outcome pointing at seq 2, but a session whose
+        // messages don't contain that proposal/accept → mismatch.
+        const mismatchedRfq = {
+            state: "accepted" as const,
+            outcome: () => ({
+                state: "accepted" as const,
+                agreedTerms: { price: 90 },
+                acceptedSequence: 2,
+            }),
+        }
+        const emptySession = {
+            channelId: CHANNEL,
+            members: [alice.claim],
+            messages: () => [] as ChannelMessage[],
+        }
+        await expect(
+            finalizeRfq({
+                rfq: mismatchedRfq,
+                session: emptySession,
+                signer: alice.claim,
+                demos: alice.demos,
+                policy: "none",
+            }),
+        ).rejects.toThrow(/session mismatch/)
+    })
 })

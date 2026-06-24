@@ -34,6 +34,13 @@
 import type { ChannelMessage, ChannelMessageType } from "./types"
 
 /**
+ * Max number of sequences a buffered inbound frame may sit ahead of the
+ * current contiguous point before it is dropped, bounding reorder-buffer
+ * memory. Turn-based negotiation never legitimately exceeds this.
+ */
+const MAX_REORDER_AHEAD = 256
+
+/**
  * Minimal surface of `ChannelSession` the adapter depends on. Declared
  * structurally so tests can inject a fake without real signing keys.
  */
@@ -140,15 +147,22 @@ export class L2PSChannelTransport {
         repliesTo?: number
     }): Promise<ChannelMessage> {
         const signed = await this.session.sendOutgoing(opts)
-        // Our own send advances the shared per-channel counter; record it
-        // so we expect the peer's reply at appliedSeq + 1.
-        if (signed.sequence > this.appliedSeq) this.appliedSeq = signed.sequence
 
         const encrypted = await this.encrypt(JSON.stringify(signed))
         const messageHash = signed.signature.signature // unique per signed envelope
+        // Deliver to every recipient BEFORE committing the sequence locally.
+        // If any send rejects, the throw propagates here and appliedSeq is
+        // left untouched, so a retry re-emits the same sequence rather than
+        // skipping ahead and stranding peers behind a reorder gap. (Recipients
+        // that did receive it will drop the duplicate on resend — seq <=
+        // appliedSeq — so at-least-once delivery is safe.)
         for (const to of this.recipients) {
             await this.peer.send(to, encrypted, messageHash)
         }
+
+        // Our own send advances the shared per-channel counter; record it
+        // so we expect the peer's reply at appliedSeq + 1.
+        if (signed.sequence > this.appliedSeq) this.appliedSeq = signed.sequence
         return signed
     }
 
@@ -169,6 +183,22 @@ export class L2PSChannelTransport {
         if (msg.channelId !== this.session.channelId) return
         // Duplicate / already-applied (or a colliding concurrent send): drop.
         if (msg.sequence <= this.appliedSeq) return
+        // Bound the reorder window: a member could otherwise stream many
+        // validly-encrypted frames at far-future sequences without ever
+        // filling the gap, growing `buffer` without limit. Drop anything
+        // beyond MAX_REORDER_AHEAD of the current contiguous point — a
+        // legitimate turn-based negotiation never runs that far ahead, and
+        // a dropped frame is re-deliverable (the offline queue replays it
+        // once the gap closes and appliedSeq advances).
+        if (msg.sequence > this.appliedSeq + MAX_REORDER_AHEAD) {
+            this.onError?.(
+                new Error(
+                    `L2PSChannelTransport: dropping seq ${msg.sequence} — ` +
+                        `more than ${MAX_REORDER_AHEAD} ahead of applied ${this.appliedSeq}`,
+                ),
+            )
+            return
+        }
         // Buffer; a later sequence with the same value would be a protocol
         // error — keep the first seen.
         if (!this.buffer.has(msg.sequence)) this.buffer.set(msg.sequence, msg)
@@ -204,7 +234,7 @@ export class L2PSChannelTransport {
         const nonce = crypto.getRandomValues(new Uint8Array(12))
         const key = await crypto.subtle.importKey(
             "raw",
-            this.sharedKey.buffer as ArrayBuffer,
+            keyBytes(this.sharedKey),
             "AES-GCM",
             false,
             ["encrypt"],
@@ -223,7 +253,7 @@ export class L2PSChannelTransport {
     private async decrypt(enc: SerializedEncryptedMessage): Promise<string> {
         const key = await crypto.subtle.importKey(
             "raw",
-            this.sharedKey.buffer as ArrayBuffer,
+            keyBytes(this.sharedKey),
             "AES-GCM",
             false,
             ["decrypt"],
@@ -235,6 +265,22 @@ export class L2PSChannelTransport {
         )
         return new TextDecoder().decode(plain)
     }
+}
+
+/**
+ * Return a standalone `ArrayBuffer` holding exactly the bytes of `view`.
+ * `view.buffer` exposes the whole backing buffer, which for a `subarray`
+ * (e.g. a 32-byte key sliced out of a larger buffer) is longer than the
+ * view — Web Crypto would then see the wrong length / wrong bytes and
+ * reject or mis-key the AES import. Copying the exact `[byteOffset,
+ * byteOffset+byteLength)` window guarantees the key import sees only the
+ * intended bytes.
+ */
+function keyBytes(view: Uint8Array): ArrayBuffer {
+    return view.buffer.slice(
+        view.byteOffset,
+        view.byteOffset + view.byteLength,
+    ) as ArrayBuffer
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
