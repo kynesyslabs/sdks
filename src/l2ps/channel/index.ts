@@ -50,3 +50,31 @@ export {
     verifyTranscript,
     type TranscriptVerificationResult,
 } from "./transcript"
+
+export {
+    L2PSChannelTransport,
+    type L2PSChannelTransportOpts,
+    type ChannelSessionLike,
+    type L2PSMessagingPeerLike,
+    type SerializedEncryptedMessage,
+    type IncomingMessagePayload,
+} from "./transport"
+
+export {
+    RfqSession,
+    type RfqState,
+    type RfqOutcome,
+    type RfqSessionOpts,
+    type RfqProposalBody,
+    type RfqAcceptBody,
+    type RfqEndBody,
+    type StandingProposal,
+} from "./negotiate"
+
+export {
+    finalizeRfq,
+    type FinalizeRfqOpts,
+    type RfqFinalizeResult,
+    type RfqLike,
+    type ChannelSessionView,
+} from "./finalize"
