@@ -13,6 +13,8 @@
  */
 export class BroadcastFailedError extends Error {
     public readonly txHash: string
+    // No `override`: the configured lib (es2021) predates ES2022's
+    // `Error.cause`, so the base class has no `cause` to override (TS4113).
     public readonly cause: unknown
 
     constructor(opts: { txHash: string; cause: unknown; message?: string }) {
