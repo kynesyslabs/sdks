@@ -136,6 +136,10 @@ export class Identities {
         const tx = DemosTransactions.empty()
         const ed25519 = await demos.crypto.getIdentity("ed25519")
         const address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+        // Use the address' current nonce (+1) like every other native tx in
+        // this SDK — hardcoding nonce:1 only validated for a fresh account and
+        // broke the second identity op (e.g. remove after add).
+        const nonce = await demos.getAddressNonce(address)
 
         tx.content = {
             ...tx.content,
@@ -150,7 +154,7 @@ export class Identities {
                     payload: payload,
                 },
             ],
-            nonce: 1,
+            nonce: nonce + 1,
             timestamp: Date.now(),
         }
 
@@ -174,6 +178,10 @@ export class Identities {
 
         const ed25519 = await demos.crypto.getIdentity("ed25519")
         const address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
+        // Use the address' current nonce (+1) like every other native tx in
+        // this SDK — hardcoding nonce:1 broke removing an identity once the
+        // account had already done one identity op (e.g. the add).
+        const nonce = await demos.getAddressNonce(address)
 
         tx.content = {
             ...tx.content,
@@ -188,7 +196,7 @@ export class Identities {
                     payload: payload,
                 },
             ],
-            nonce: 1,
+            nonce: nonce + 1,
             timestamp: Date.now(),
         }
 
