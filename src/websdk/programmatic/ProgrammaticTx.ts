@@ -3,6 +3,15 @@ import { createProgrammaticContext } from "./context"
 import { createPayNamespace } from "./pay"
 import { createAttestNamespace } from "./attest"
 import { createTokensNamespace } from "./tokens"
+import { createStorageNamespace } from "./storage"
+import { createEscrowNamespace } from "./escrow"
+import { createValidatorNamespace } from "./validator"
+import { createGovernanceNamespace } from "./governance"
+import { createXmNamespace } from "./xm"
+import { createBridgeNamespace } from "./bridge"
+import { createDemosworkNamespace } from "./demoswork"
+import { createIpfsNamespace } from "./ipfs"
+import { createD402Namespace } from "./d402"
 
 /**
  * Build the `demos.run` programmatic-transaction facade for a Demos instance.
@@ -24,6 +33,24 @@ export function createProgrammaticTx(demos: Demos) {
         attest: createAttestNamespace(ctx),
         /** Token creation and execution. */
         tokens: createTokensNamespace(ctx),
+        /** Binary storage and storage programs. */
+        storage: createStorageNamespace(ctx),
+        /** Escrow to social identities (send / claim / refund). */
+        escrow: createEscrowNamespace(ctx),
+        /** Validator staking (stake / unstake / exit). */
+        validator: createValidatorNamespace(ctx),
+        /** Network-upgrade governance (propose / vote). */
+        governance: createGovernanceNamespace(ctx),
+        /** Cross-chain (XM) operation submission. */
+        xm: createXmNamespace(ctx),
+        /** Native bridge operation submission. */
+        bridge: createBridgeNamespace(ctx),
+        /** Demoswork workflow submission. */
+        demoswork: createDemosworkNamespace(ctx),
+        /** IPFS storage (add / pin / unpin). */
+        ipfs: createIpfsNamespace(ctx),
+        /** d402 payments. */
+        d402: createD402Namespace(ctx),
     }
 }
 

@@ -168,6 +168,25 @@ await demos.run.tokens.mint(tokenAddress, to, "1000000000")
 await demos.run.tokens.burn(tokenAddress, from, "1000000000")
 ```
 
+## Coverage & caveats
+
+`demos.run.*` namespaces: `pay`/`transfer`, `attest.*` (web2 + web3/xm + pqc +
+ud + nomis + humanpassport + ethos + tlsn + dahr), `tokens.*`, `storage.*`
+(`store`, `program`), `escrow.*`, `validator.*`, `governance.*`, `xm.submit`,
+`bridge.submit`, `demoswork.submit`, `ipfs.*`, `d402.pay`.
+
+- **Live-verified** against a node: `pay`/`transfer`, `storage.store`,
+  `storage.program`, plus the fee-cap / confirm-mode behaviour.
+- **`ipfs.*` and `d402.pay`** are wired and type-checked but the underlying
+  operations are **not enabled on production nodes yet** — they cannot be
+  exercised end-to-end until the network turns them on.
+- **Smart contracts** (`contractDeploy` / `contractCall` via `DemosContracts`)
+  are intentionally **not** under `demos.run`: they are RPC-native and bypass
+  the `confirm → broadcast` stage the fee cap governs, so they don't fit the
+  runner model.
+- **`xm.submit`** takes an already-assembled `XMScript`; building that script
+  (per-chain signed payloads) stays with the caller.
+
 ## Design note
 
 Under the hood a single runner (`runProgrammaticTx`) is the only place that

@@ -1,4 +1,8 @@
-import type { TokenCreationParams } from "@/types/token"
+import type {
+    TokenCreationParams,
+    TokenHookType,
+    TokenScriptMethod,
+} from "@/types/token"
 import { DemosTokens } from "../DemosTokens"
 import type { ProgrammaticContext } from "./context"
 import type { ProgrammaticTxOptions, ProgrammaticTxResult } from "./types"
@@ -119,5 +123,158 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(() => tokens.burn(tokenAddress, from, amount), opts),
+
+        /**
+         * Transfer tokens from one address to another using an existing
+         * allowance, end to end.
+         *
+         * @param tokenAddress - Token contract address.
+         * @param from - Owner address the tokens are moved from.
+         * @param to - Recipient address.
+         * @param amount - Amount to transfer (bigint-valued decimal string).
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         */
+        transferFrom: (
+            tokenAddress: string,
+            from: string,
+            to: string,
+            amount: string,
+            opts?: ProgrammaticTxOptions,
+        ): Promise<ProgrammaticTxResult> =>
+            ctx.run(
+                () => tokens.transferFrom(tokenAddress, from, to, amount),
+                opts,
+            ),
+
+        /**
+         * Pause all token operations, end to end.
+         *
+         * @param tokenAddress - Token contract address.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         */
+        pause: (
+            tokenAddress: string,
+            opts?: ProgrammaticTxOptions,
+        ): Promise<ProgrammaticTxResult> =>
+            ctx.run(() => tokens.pause(tokenAddress), opts),
+
+        /**
+         * Resume a paused token, end to end.
+         *
+         * @param tokenAddress - Token contract address.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         */
+        unpause: (
+            tokenAddress: string,
+            opts?: ProgrammaticTxOptions,
+        ): Promise<ProgrammaticTxResult> =>
+            ctx.run(() => tokens.unpause(tokenAddress), opts),
+
+        /**
+         * Transfer ownership of the token to a new owner, end to end.
+         *
+         * @param tokenAddress - Token contract address.
+         * @param newOwner - Address of the new owner.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         */
+        transferOwnership: (
+            tokenAddress: string,
+            newOwner: string,
+            opts?: ProgrammaticTxOptions,
+        ): Promise<ProgrammaticTxResult> =>
+            ctx.run(
+                () => tokens.transferOwnership(tokenAddress, newOwner),
+                opts,
+            ),
+
+        /**
+         * Grant ACL permissions to an address, end to end.
+         *
+         * @param tokenAddress - Token contract address.
+         * @param address - Address being granted the permissions.
+         * @param permissions - Permissions to grant.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         */
+        grantPermissions: (
+            tokenAddress: string,
+            address: string,
+            permissions: string[],
+            opts?: ProgrammaticTxOptions,
+        ): Promise<ProgrammaticTxResult> =>
+            ctx.run(
+                () =>
+                    tokens.grantPermissions(tokenAddress, address, permissions),
+                opts,
+            ),
+
+        /**
+         * Revoke ACL permissions from an address, end to end.
+         *
+         * @param tokenAddress - Token contract address.
+         * @param address - Address the permissions are revoked from.
+         * @param permissions - Permissions to revoke.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         */
+        revokePermissions: (
+            tokenAddress: string,
+            address: string,
+            permissions: string[],
+            opts?: ProgrammaticTxOptions,
+        ): Promise<ProgrammaticTxResult> =>
+            ctx.run(
+                () =>
+                    tokens.revokePermissions(
+                        tokenAddress,
+                        address,
+                        permissions,
+                    ),
+                opts,
+            ),
+
+        /**
+         * Upgrade the token's on-chain script, end to end.
+         *
+         * @param tokenAddress - Token contract address.
+         * @param newCode - New script code.
+         * @param newMethods - New method definitions to install.
+         * @param newHooks - New hooks to activate.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         */
+        upgradeScript: (
+            tokenAddress: string,
+            newCode: string,
+            newMethods: TokenScriptMethod[],
+            newHooks: TokenHookType[],
+            opts?: ProgrammaticTxOptions,
+        ): Promise<ProgrammaticTxResult> =>
+            ctx.run(
+                () =>
+                    tokens.upgradeScript(
+                        tokenAddress,
+                        newCode,
+                        newMethods,
+                        newHooks,
+                    ),
+                opts,
+            ),
+
+        /**
+         * Call a custom script method on the token, end to end.
+         *
+         * @param tokenAddress - Token contract address.
+         * @param method - Method name to invoke.
+         * @param params - Method parameters.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         */
+        callMethod: (
+            tokenAddress: string,
+            method: string,
+            params: unknown[],
+            opts?: ProgrammaticTxOptions,
+        ): Promise<ProgrammaticTxResult> =>
+            ctx.run(
+                () => tokens.callMethod(tokenAddress, method, params),
+                opts,
+            ),
     }
 }
