@@ -177,13 +177,15 @@ ud + nomis + humanpassport + ethos + tlsn + dahr), `tokens.*`, `storage.*`
 
 - **Live-verified** against a node: `pay`/`transfer`, `storage.store`,
   `storage.program`, plus the fee-cap / confirm-mode behaviour.
-- **`ipfs.*` and `d402.pay`** are wired and type-checked but the underlying
-  operations are **not enabled on production nodes yet** — they cannot be
-  exercised end-to-end until the network turns them on.
-- **Smart contracts** (`contractDeploy` / `contractCall` via `DemosContracts`)
-  are intentionally **not** under `demos.run`: they are RPC-native and bypass
-  the `confirm → broadcast` stage the fee cap governs, so they don't fit the
-  runner model.
+- **`ipfs.*`, `d402.pay` and `contracts.*`** are wired and type-checked but
+  the underlying operations are **not enabled on production nodes yet** — they
+  cannot be exercised end-to-end until the network turns them on.
+- **`contracts.*`** (`deploy` / `call` / `deployTemplate` / …) is **RPC-native
+  and NOT fee-capped**: it bypasses the `confirm → broadcast` runner and
+  returns the contract's own result types (`ContractInstance`,
+  `ContractCallResult`, gas `bigint`), not a `ProgrammaticTxResult`. It lives
+  under `demos.run.contracts` for a uniform surface, but `maxFee`/`confirm`/
+  `wait` do not apply there.
 - **`xm.submit`** takes an already-assembled `XMScript`; building that script
   (per-chain signed payloads) stays with the caller.
 

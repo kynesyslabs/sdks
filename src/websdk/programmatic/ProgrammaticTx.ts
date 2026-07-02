@@ -12,6 +12,7 @@ import { createBridgeNamespace } from "./bridge"
 import { createDemosworkNamespace } from "./demoswork"
 import { createIpfsNamespace } from "./ipfs"
 import { createD402Namespace } from "./d402"
+import { createContractsNamespace } from "./contracts"
 
 /**
  * Build the `demos.run` programmatic-transaction facade for a Demos instance.
@@ -51,6 +52,8 @@ export function createProgrammaticTx(demos: Demos) {
         ipfs: createIpfsNamespace(ctx),
         /** d402 payments. */
         d402: createD402Namespace(ctx),
+        /** Smart contracts — RPC-native, NOT fee-capped (see namespace docs). */
+        contracts: createContractsNamespace(ctx),
     }
 }
 
