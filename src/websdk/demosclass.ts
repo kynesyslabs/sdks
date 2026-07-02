@@ -41,6 +41,10 @@ import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
 import {
+    createProgrammaticTx,
+    type ProgrammaticTx,
+} from "./programmatic"
+import {
     hexToUint8Array,
     uint8ArrayToHex,
     UnifiedCrypto,
@@ -1811,6 +1815,26 @@ export class Demos {
             return this.sign(raw_tx)
         },
     }
+
+    /**
+     * Programmatic transaction facade — one call per transaction type.
+     *
+     * Collapses the classic `build → sign → confirm → broadcast` flow into a
+     * single method per operation (`run.pay`, `run.attest.*`, `run.tokens.*`,
+     * …) that auto-broadcasts within a configurable fee ceiling (default
+     * 5 DEM). Additive: the classic `pay`/`confirm`/`broadcast` methods are
+     * unchanged.
+     *
+     * @example
+     * ```ts
+     * // one-call payment, auto-broadcast within the 5 DEM fee cap
+     * await demos.run.pay("0x...", 100n)
+     * // build + confirm only, broadcast yourself later
+     * const r = await demos.run.pay("0x...", 100n, { confirm: "manual" })
+     * await demos.broadcast(r.validityData)
+     * ```
+     */
+    run: ProgrammaticTx = createProgrammaticTx(this)
 
     // ANCHOR Supporting txs
     // REVIEW: These two are deprecated, in favor of `demos.tx` (but kept to avoid breaking references)
