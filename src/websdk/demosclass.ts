@@ -1878,6 +1878,8 @@ export class Demos {
         },
     }
 
+    private _run?: ProgrammaticTx
+
     /**
      * Programmatic transaction facade — one call per transaction type.
      *
@@ -1886,6 +1888,14 @@ export class Demos {
      * …) that auto-broadcasts within a configurable fee ceiling (default
      * 5 DEM). Additive: the classic `pay`/`confirm`/`broadcast` methods are
      * unchanged.
+     *
+     * Built lazily on first access (and memoised) rather than in the
+     * constructor: the singleton `demos = Demos.instance` is created at import
+     * time, and eagerly constructing the namespaces here (which pull in
+     * `@/abstraction`, tokens, contracts, …) during construction can trip the
+     * websdk↔abstraction import cycle depending on which entry point loads
+     * first. Deferring to first use sidesteps that and avoids building ~6
+     * objects every `new Demos()` that many callers never touch.
      *
      * @example
      * ```ts
@@ -1896,7 +1906,9 @@ export class Demos {
      * await demos.broadcast(r.validityData)
      * ```
      */
-    run: ProgrammaticTx = createProgrammaticTx(this)
+    get run(): ProgrammaticTx {
+        return (this._run ??= createProgrammaticTx(this))
+    }
 
     // ANCHOR Supporting txs
     // REVIEW: These two are deprecated, in favor of `demos.tx` (but kept to avoid breaking references)

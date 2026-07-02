@@ -58,12 +58,16 @@ export function totalFeeOs(
 
 /**
  * Resolve the configured fee ceiling to OS. Returns `null` when the cap is
- * disabled (`maxFee` is `null` or a non-finite number like `Infinity`).
+ * disabled — only `null` or `Infinity` disable it. `undefined` falls back to
+ * the default ceiling. Any other value (including `NaN` or a non-numeric
+ * string) is routed through `demToOs`, which throws loudly: silently
+ * disabling the cap on a `NaN` from `Number(userInput)` would remove the very
+ * safety this feature promises.
  */
 function resolveCapOs(maxFee: ProgrammaticTxOptions["maxFee"]): bigint | null {
     if (maxFee === null) return null
     if (maxFee === undefined) return demToOs(DEFAULT_MAX_FEE_DEM)
-    if (typeof maxFee === "number" && !Number.isFinite(maxFee)) return null
+    if (maxFee === Infinity) return null
     return demToOs(maxFee)
 }
 
@@ -75,7 +79,7 @@ function isValidityData(
         v != null &&
         typeof v === "object" &&
         "response" in v &&
-        (v as RPCResponseWithValidityData).response?.data !== undefined
+        (v as RPCResponseWithValidityData).response?.data != null
     )
 }
 
@@ -98,7 +102,14 @@ async function resolveToConfirmed(
     }
 
     const tx = resolved as Transaction
-    const signed = tx.signature ? tx : await demos.sign(tx)
+    // A tx counts as signed only when its signature actually carries data.
+    // Some builders (e.g. DemosTokens) return an UNSIGNED tx with a truthy
+    // placeholder `signature: { type: "ed25519", data: "" }`, so a bare
+    // `tx.signature` truthiness check would wrongly skip signing and confirm
+    // an empty-signature tx. Gate on the signature payload instead.
+    const sig = tx.signature as { data?: unknown } | null
+    const isSigned = !!(sig && sig.data)
+    const signed = isSigned ? tx : await demos.sign(tx)
     return await demos.confirm(signed)
 }
 

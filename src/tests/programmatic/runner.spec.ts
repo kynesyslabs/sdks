@@ -331,4 +331,58 @@ describe("runProgrammaticTx — source resolution", () => {
         expect(broadcast).toHaveBeenCalledTimes(1)
         expect(result.validityData).toBe(vd)
     })
+
+    test("token-shape tx (truthy but empty signature) is still signed", async () => {
+        // DemosTokens builds an UNSIGNED tx with a placeholder
+        // `signature: { type: "ed25519", data: "" }` — truthy but empty. The
+        // runner must sign it (gate on signature.data, not truthiness),
+        // otherwise every demos.run.tokens.* ships an empty-signature tx.
+        const tokenShapeTx = {
+            hash: "",
+            signature: { type: "ed25519", data: "" },
+            content: { type: "tokenExecution", data: {} },
+        } as unknown as Transaction
+        const vd = fakeValidityData({
+            network_fee: 1,
+            rpc_fee: 1,
+            additional_fee: 1,
+        })
+        const { demos, sign, confirm } = makeMockDemos(vd)
+
+        await runProgrammaticTx(demos, tokenShapeTx)
+
+        expect(sign).toHaveBeenCalledTimes(1)
+        expect(sign).toHaveBeenCalledWith(tokenShapeTx)
+        expect(confirm).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe("runProgrammaticTx — maxFee edge values", () => {
+    test("maxFee: Infinity disables the cap (huge fee broadcasts)", async () => {
+        const vd = fakeValidityData({
+            network_fee: 1_000_000,
+            rpc_fee: 0,
+            additional_fee: 0,
+        })
+        const { demos, broadcast } = makeMockDemos(vd)
+
+        const result = await runProgrammaticTx(demos, vd, { maxFee: Infinity })
+
+        expect(broadcast).toHaveBeenCalledTimes(1)
+        expect(result.broadcasted).toBe(true)
+    })
+
+    test("maxFee: NaN does NOT silently disable the cap — it throws", async () => {
+        const vd = fakeValidityData({
+            network_fee: 1,
+            rpc_fee: 1,
+            additional_fee: 1,
+        })
+        const { demos, broadcast } = makeMockDemos(vd)
+
+        await expect(
+            runProgrammaticTx(demos, vd, { maxFee: NaN }),
+        ).rejects.toThrow()
+        expect(broadcast).not.toHaveBeenCalled()
+    })
 })
