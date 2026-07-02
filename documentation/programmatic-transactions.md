@@ -22,6 +22,23 @@ All programmatic methods live under `demos.run.*`. The classic
 `demos.pay` / `demos.confirm` / `demos.broadcast` methods are **unchanged** —
 `demos.run` is an additive facade, so nothing breaks.
 
+## Setup
+
+```ts
+import { Demos } from "@kynesyslabs/demosdk/websdk"
+
+// one-call bootstrap (node + wallet), ready for demos.run.*
+const demos = await Demos.start("https://node2.demos.sh", mnemonic)
+
+// …equivalent to the classic two-step setup, which still works:
+// const demos = Demos.instance
+// await demos.connect("https://node2.demos.sh")
+// await demos.connectWallet(mnemonic)
+```
+
+`Demos.start(rpc, wallet?, walletOptions?)` returns the connected instance;
+omit `wallet` to connect read-only.
+
 ## The uniform result
 
 Every `demos.run.*` method (except `attest.dahr`, see below) resolves to a

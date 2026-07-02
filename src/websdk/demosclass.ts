@@ -204,6 +204,68 @@ export class Demos {
     }
 
     /**
+     * One-call bootstrap: connect to a node and (optionally) a wallet, then
+     * return the ready instance for immediate use with `demos.run.*`.
+     *
+     * Convenience wrapper over {@link connect} + {@link connectWallet} — no
+     * new behaviour, just the two-step setup collapsed into one. Omit
+     * `wallet` to connect read-only.
+     *
+     * @example
+     * ```ts
+     * import { Demos } from "@kynesyslabs/demosdk/websdk"
+     * const demos = await Demos.start("https://node2.demos.sh", mnemonic)
+     * await demos.run.pay("0x...", 100n)
+     * ```
+     *
+     * @param rpc_url - The URL of the demos node.
+     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     *                 Omit to connect without a wallet.
+     * @param walletOptions - Forwarded to {@link connectWallet}.
+     * @returns This connected Demos instance.
+     */
+    async start(
+        rpc_url: string,
+        wallet?: string | Uint8Array,
+        walletOptions?: {
+            algorithm?: SigningAlgorithm
+            dual_sign?: boolean
+        },
+    ): Promise<this> {
+        await this.connect(rpc_url)
+        if (wallet !== undefined) {
+            await this.connectWallet(wallet, walletOptions)
+        }
+        return this
+    }
+
+    /**
+     * Static one-call bootstrap over the shared singleton — starts
+     * {@link Demos.instance} and returns it ready for `demos.run.*`.
+     *
+     * @example
+     * ```ts
+     * const demos = await Demos.start("https://node2.demos.sh", mnemonic)
+     * await demos.run.pay("0x...", 100n)
+     * ```
+     *
+     * @param rpc_url - The URL of the demos node.
+     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     * @param walletOptions - Forwarded to {@link connectWallet}.
+     * @returns The started shared Demos instance.
+     */
+    static async start(
+        rpc_url: string,
+        wallet?: string | Uint8Array,
+        walletOptions?: {
+            algorithm?: SigningAlgorithm
+            dual_sign?: boolean
+        },
+    ): Promise<Demos> {
+        return Demos.instance.start(rpc_url, wallet, walletOptions)
+    }
+
+    /**
      * Connects to a Demos wallet using the provided master seed.
      *
      * @param masterSeed - The master seed of the wallet
@@ -485,7 +547,7 @@ export class Demos {
      * handle async confirmation yourself.
      *
      * @param validationData - The validity data of the transaction
-     * @param opts.timeoutMs - Total time to wait. Defaults to 30_000.
+     * @param opts.timeoutMs - Total time to wait. Defaults to 60_000.
      * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
      */
     broadcastAndWait(
