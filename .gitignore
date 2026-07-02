@@ -32,3 +32,5 @@ package.sync-conflict-20250901-171031-7JPPSQB.json
 /.pr-comment-body.txt
 PREVIEW_REPORT.md
 .github/workflows/publish.yml.bak
+/.claude/settings.local.json
+/knip.json
