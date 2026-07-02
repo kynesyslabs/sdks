@@ -111,6 +111,33 @@ describe("totalFeeOs — fee wire-shape normalisation", () => {
         } as unknown as RPCResponseWithValidityData
         expect(totalFeeOs(vd)).toBe(0n)
     })
+
+    test("falls back to transaction.content.transaction_fee when gas_operation is null (real-node shape)", () => {
+        // Live nodes return gas_operation: null and carry the fee on the
+        // confirmed transaction itself (OS strings). Verified against a
+        // real node: network_fee 1 DEM + rpc_fee 1 DEM => 2 DEM.
+        const vd = {
+            response: {
+                data: {
+                    valid: true,
+                    reference_block: 42,
+                    gas_operation: null,
+                    transaction: {
+                        hash: "0xabc",
+                        content: {
+                            transaction_fee: {
+                                network_fee: "1000000000",
+                                rpc_fee: "1000000000",
+                                additional_fee: "0",
+                                rpc_address: null,
+                            },
+                        },
+                    },
+                },
+            },
+        } as unknown as RPCResponseWithValidityData
+        expect(totalFeeOs(vd)).toBe(2n * OS_PER_DEM)
+    })
 })
 
 describe("runProgrammaticTx — auto mode & fee cap", () => {

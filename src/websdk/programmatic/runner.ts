@@ -31,13 +31,23 @@ function feeFieldToOs(value: number | string | null | undefined): bigint {
     return s.includes(".") ? demToOs(s) : BigInt(s)
 }
 
-/** Sum `network_fee + rpc_fee + additional_fee` into a single OS `bigint`. */
+/**
+ * Sum `network_fee + rpc_fee + additional_fee` into a single OS `bigint`.
+ *
+ * The fee is read from the node's confirm response. Two shapes are handled:
+ *  - `gas_operation.fees` — the node's authoritative gas operation, when the
+ *    node populates it (post-fork gas-separation model), preferred; else
+ *  - `transaction.content.transaction_fee` — the fee carried on the confirmed
+ *    transaction itself, which live nodes return with `gas_operation: null`.
+ *
+ * Returns `0n` when neither is present (fee not exposed at confirm time).
+ */
 export function totalFeeOs(
     validityData: RPCResponseWithValidityData,
 ): bigint {
-    const fees = validityData?.response?.data?.gas_operation?.fees as
-        | TxFee
-        | undefined
+    const data = validityData?.response?.data
+    const fees = (data?.gas_operation?.fees ??
+        data?.transaction?.content?.transaction_fee) as TxFee | undefined
     if (!fees) return 0n
     return (
         feeFieldToOs(fees.network_fee) +
