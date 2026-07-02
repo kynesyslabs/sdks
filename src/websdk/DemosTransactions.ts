@@ -343,7 +343,7 @@ export const DemosTransactions = {
      * Broadcast a confirmed transaction and wait for inclusion.
      *
      * Polls the node's `getTransactionStatus` RPC until the tx is observed
-     * `included` or `failed`, or until `opts.timeoutMs` elapses (default 30s).
+     * `included` or `failed`, or until `opts.timeoutMs` elapses (default 60s).
      *
      * Use this when you want a single call with a deterministic outcome.
      * Use plain `broadcast()` when you want to handle async confirmation
@@ -362,7 +362,7 @@ export const DemosTransactions = {
      *
      * @param validationData - The validity data of the transaction (from `confirm`)
      * @param demos - The demos instance
-     * @param opts.timeoutMs - Total time to wait for inclusion. Defaults to 30_000.
+     * @param opts.timeoutMs - Total time to wait for inclusion. Defaults to 60_000.
      * @param opts.pollIntervalMs - Delay between status polls. Defaults to 500.
      * @param opts.failFastOnBroadcastError - If true, throw `BroadcastFailedError`
      *   immediately when the broadcast can't contact the node. Defaults to false.
@@ -381,7 +381,7 @@ export const DemosTransactions = {
         broadcast: RPCResponse
         status: { state: "included" | "failed"; blockNumber?: number }
     }> {
-        const timeout = opts?.timeoutMs ?? 30_000
+        const timeout = opts?.timeoutMs ?? 60_000
         const pollInterval = opts?.pollIntervalMs ?? 500
         const failFast = opts?.failFastOnBroadcastError ?? false
 

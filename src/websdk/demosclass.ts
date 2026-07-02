@@ -41,6 +41,10 @@ import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
 import { web2Calls } from "./Web2Calls"
 import {
+    createProgrammaticTx,
+    type ProgrammaticTx,
+} from "./programmatic"
+import {
     hexToUint8Array,
     uint8ArrayToHex,
     UnifiedCrypto,
@@ -197,6 +201,68 @@ export class Demos {
 
         this.connected = true
         return this.connected
+    }
+
+    /**
+     * One-call bootstrap: connect to a node and (optionally) a wallet, then
+     * return the ready instance for immediate use with `demos.run.*`.
+     *
+     * Convenience wrapper over {@link connect} + {@link connectWallet} — no
+     * new behaviour, just the two-step setup collapsed into one. Omit
+     * `wallet` to connect read-only.
+     *
+     * @example
+     * ```ts
+     * import { Demos } from "@kynesyslabs/demosdk/websdk"
+     * const demos = await Demos.start("https://node2.demos.sh", mnemonic)
+     * await demos.run.pay("0x...", 100n)
+     * ```
+     *
+     * @param rpc_url - The URL of the demos node.
+     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     *                 Omit to connect without a wallet.
+     * @param walletOptions - Forwarded to {@link connectWallet}.
+     * @returns This connected Demos instance.
+     */
+    async start(
+        rpc_url: string,
+        wallet?: string | Uint8Array,
+        walletOptions?: {
+            algorithm?: SigningAlgorithm
+            dual_sign?: boolean
+        },
+    ): Promise<this> {
+        await this.connect(rpc_url)
+        if (wallet !== undefined) {
+            await this.connectWallet(wallet, walletOptions)
+        }
+        return this
+    }
+
+    /**
+     * Static one-call bootstrap over the shared singleton — starts
+     * {@link Demos.instance} and returns it ready for `demos.run.*`.
+     *
+     * @example
+     * ```ts
+     * const demos = await Demos.start("https://node2.demos.sh", mnemonic)
+     * await demos.run.pay("0x...", 100n)
+     * ```
+     *
+     * @param rpc_url - The URL of the demos node.
+     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     * @param walletOptions - Forwarded to {@link connectWallet}.
+     * @returns The started shared Demos instance.
+     */
+    static async start(
+        rpc_url: string,
+        wallet?: string | Uint8Array,
+        walletOptions?: {
+            algorithm?: SigningAlgorithm
+            dual_sign?: boolean
+        },
+    ): Promise<Demos> {
+        return Demos.instance.start(rpc_url, wallet, walletOptions)
     }
 
     /**
@@ -481,7 +547,7 @@ export class Demos {
      * handle async confirmation yourself.
      *
      * @param validationData - The validity data of the transaction
-     * @param opts.timeoutMs - Total time to wait. Defaults to 30_000.
+     * @param opts.timeoutMs - Total time to wait. Defaults to 60_000.
      * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
      */
     broadcastAndWait(
@@ -1810,6 +1876,45 @@ export class Demos {
         sign: (raw_tx: Transaction) => {
             return this.sign(raw_tx)
         },
+    }
+
+    private _run?: ProgrammaticTx
+
+    /**
+     * Programmatic transaction facade — one call per transaction type.
+     *
+     * Collapses the classic `build → sign → confirm → broadcast` flow into a
+     * single method per operation (`run.pay`, `run.attest.*`, `run.tokens.*`,
+     * …) that auto-broadcasts within a configurable fee ceiling (default
+     * 5 DEM). Additive: the classic `pay`/`confirm`/`broadcast` methods are
+     * unchanged.
+     *
+     * Built lazily on first access (and memoised) rather than in the
+     * constructor. Two reasons: (1) the singleton `demos = Demos.instance` is
+     * created at import time, so eagerly *constructing* the namespaces during
+     * `new Demos()` — which reach into `@/abstraction`, tokens, contracts — is
+     * the part that risked tripping the websdk↔abstraction import cycle;
+     * deferring construction removes that crash vector. (2) it avoids building
+     * ~6 objects on every `new Demos()` that many callers never touch.
+     *
+     * Note: the programmatic module graph is still *loaded* when this file is
+     * imported (a static `import` cannot be deferred in ESM). That residual
+     * cycle is benign — no module reads a cross-cycle binding at evaluation
+     * time, only inside functions — and has been narrowed by importing
+     * `Identities` directly from `@/abstraction/Identities` rather than via the
+     * `@/abstraction` barrel.
+     *
+     * @example
+     * ```ts
+     * // one-call payment, auto-broadcast within the 5 DEM fee cap
+     * await demos.run.pay("0x...", 100n)
+     * // build + confirm only, broadcast yourself later
+     * const r = await demos.run.pay("0x...", 100n, { confirm: "manual" })
+     * await demos.broadcast(r.validityData)
+     * ```
+     */
+    get run(): ProgrammaticTx {
+        return (this._run ??= createProgrammaticTx(this))
     }
 
     // ANCHOR Supporting txs
