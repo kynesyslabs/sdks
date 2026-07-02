@@ -1890,12 +1890,19 @@ export class Demos {
      * unchanged.
      *
      * Built lazily on first access (and memoised) rather than in the
-     * constructor: the singleton `demos = Demos.instance` is created at import
-     * time, and eagerly constructing the namespaces here (which pull in
-     * `@/abstraction`, tokens, contracts, …) during construction can trip the
-     * websdk↔abstraction import cycle depending on which entry point loads
-     * first. Deferring to first use sidesteps that and avoids building ~6
-     * objects every `new Demos()` that many callers never touch.
+     * constructor. Two reasons: (1) the singleton `demos = Demos.instance` is
+     * created at import time, so eagerly *constructing* the namespaces during
+     * `new Demos()` — which reach into `@/abstraction`, tokens, contracts — is
+     * the part that risked tripping the websdk↔abstraction import cycle;
+     * deferring construction removes that crash vector. (2) it avoids building
+     * ~6 objects on every `new Demos()` that many callers never touch.
+     *
+     * Note: the programmatic module graph is still *loaded* when this file is
+     * imported (a static `import` cannot be deferred in ESM). That residual
+     * cycle is benign — no module reads a cross-cycle binding at evaluation
+     * time, only inside functions — and has been narrowed by importing
+     * `Identities` directly from `@/abstraction/Identities` rather than via the
+     * `@/abstraction` barrel.
      *
      * @example
      * ```ts
