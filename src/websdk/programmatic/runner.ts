@@ -24,11 +24,21 @@ import {
  */
 function feeFieldToOs(value: number | string | null | undefined): bigint {
     if (value == null) return 0n
-    if (typeof value === "number") return demToOs(value)
-    const s = value.trim()
-    if (s === "") return 0n
-    // Decimal string ⇒ DEM (human) shape; integer string ⇒ OS (wire) shape.
-    return s.includes(".") ? demToOs(s) : BigInt(s)
+    try {
+        if (typeof value === "number") return demToOs(value)
+        const s = value.trim()
+        if (s === "") return 0n
+        // Decimal string ⇒ DEM (human) shape; integer string ⇒ OS (wire) shape.
+        return s.includes(".") ? demToOs(s) : BigInt(s)
+    } catch {
+        // The value comes from the node's confirm response — surface which
+        // field/shape failed instead of a bare BigInt/demToOs SyntaxError.
+        throw new Error(
+            `[programmatic-tx] unparseable fee field ${JSON.stringify(
+                value,
+            )} in the node's confirm response`,
+        )
+    }
 }
 
 /**
@@ -134,7 +144,15 @@ export async function runProgrammaticTx(
 ): Promise<ProgrammaticTxResult> {
     const validityData = await resolveToConfirmed(demos, source)
     const transaction = validityData.response.data.transaction
-    const hash = transaction?.hash
+    // A successful confirm always echoes the transaction; guard so the
+    // non-optional `transaction`/`hash` on the result types stay truthful
+    // (rather than silently handing callers `undefined.hash`).
+    if (!transaction) {
+        throw new Error(
+            "[programmatic-tx] confirm response did not include a transaction",
+        )
+    }
+    const hash = transaction.hash
     const referenceBlock = validityData.response.data.reference_block
 
     const feeOs = totalFeeOs(validityData)

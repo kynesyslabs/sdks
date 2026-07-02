@@ -1,4 +1,7 @@
-import { Identities } from "@/abstraction"
+// Import the class directly (not via the @/abstraction barrel) to avoid
+// pulling the coin-finder/provider surface into the websdk bundle and to
+// narrow the websdk↔abstraction module cycle.
+import { Identities } from "@/abstraction/Identities"
 import type { UnifiedDomainResolution } from "@/abstraction/types/UDResolution"
 import type {
     DiscordProof,
