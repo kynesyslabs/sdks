@@ -42,7 +42,10 @@ export function createValidatorNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => ctx.demos.tx.stake(amount, connectionUrl, ctx.demos),
+                () =>
+                    ctx.demos.tx.stake(amount, connectionUrl, ctx.demos, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -60,7 +63,10 @@ export function createValidatorNamespace(ctx: ProgrammaticContext) {
         unstake: (
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => ctx.demos.tx.unstake(ctx.demos), opts),
+            ctx.run(
+                () => ctx.demos.tx.unstake(ctx.demos, { nonce: opts?.nonce }),
+                opts,
+            ),
 
         /**
          * Complete validator exit, end to end. Only accepted by the network
@@ -77,6 +83,12 @@ export function createValidatorNamespace(ctx: ProgrammaticContext) {
         exit: (
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => ctx.demos.tx.validatorExit(ctx.demos), opts),
+            ctx.run(
+                () =>
+                    ctx.demos.tx.validatorExit(ctx.demos, {
+                        nonce: opts?.nonce,
+                    }),
+                opts,
+            ),
     }
 }

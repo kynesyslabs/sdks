@@ -16,6 +16,7 @@ import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import * as skeletons from "@/websdk/utils/skeletons"
 import { sha256 } from "@/websdk/utils/sha256"
 import { OS_PER_DEM } from "@/denomination"
+import { resolveNonce } from "@/utils"
 
 /**
  * High-level API for creating escrow transactions
@@ -77,6 +78,7 @@ export class EscrowTransaction {
         options?: {
             expiryDays?: number  // Default: 30 days
             message?: string     // Optional memo
+            nonce?: number
         }
     ): Promise<Transaction> {
         // P4 commit 3: bigint OS is the canonical internal carrier; the
@@ -102,7 +104,9 @@ export class EscrowTransaction {
         const escrowAddress = this.getEscrowAddress(platform, username)
 
         // Get nonce
-        const nonce = await demos.getAddressNonce(sender)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(sender),
+        )
 
         // Create empty transaction
         let tx = structuredClone(skeletons.transaction)
@@ -153,7 +157,7 @@ export class EscrowTransaction {
         // OS string post-fork) when `demos.sign` hashes.
         tx.content.from = sender
         tx.content.to = escrowAddress
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = amountOs as unknown as number
         tx.content.type = "escrow"
         tx.content.timestamp = Date.now()
@@ -254,7 +258,8 @@ export class EscrowTransaction {
     static async claimEscrow(
         demos: Demos,
         platform: "twitter" | "github" | "telegram",
-        username: string
+        username: string,
+        options?: { nonce?: number }
     ): Promise<Transaction> {
         // Get claimant address from demos instance
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
@@ -264,7 +269,9 @@ export class EscrowTransaction {
         const escrowAddress = this.getEscrowAddress(platform, username)
 
         // Get nonce
-        const nonce = await demos.getAddressNonce(claimant)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(claimant),
+        )
 
         // Create empty transaction
         let tx = structuredClone(skeletons.transaction)
@@ -300,7 +307,7 @@ export class EscrowTransaction {
         // Fill transaction content
         tx.content.from = claimant
         tx.content.to = escrowAddress
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 0  // Amount filled by node
         tx.content.type = "escrow"
         tx.content.timestamp = Date.now()
@@ -339,7 +346,8 @@ export class EscrowTransaction {
     static async refundExpiredEscrow(
         demos: Demos,
         platform: "twitter" | "github" | "telegram",
-        username: string
+        username: string,
+        options?: { nonce?: number }
     ): Promise<Transaction> {
         // Get refunder address from demos instance
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
@@ -349,7 +357,9 @@ export class EscrowTransaction {
         const escrowAddress = this.getEscrowAddress(platform, username)
 
         // Get nonce
-        const nonce = await demos.getAddressNonce(refunder)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(refunder),
+        )
 
         // Create empty transaction
         let tx = structuredClone(skeletons.transaction)
@@ -384,7 +394,7 @@ export class EscrowTransaction {
         // Fill transaction content
         tx.content.from = refunder
         tx.content.to = escrowAddress
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 0  // Amount filled by node
         tx.content.type = "escrow"
         tx.content.timestamp = Date.now()

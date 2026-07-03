@@ -12,6 +12,25 @@ export function validateEd25519Address(address: string) {
     return /^0x[0-9a-f]{64}$/i.test(address)
 }
 
+export function assertValidNonce(nonce: number): number {
+    if (typeof nonce !== "number" || !Number.isInteger(nonce) || nonce < 0) {
+        throw new Error(
+            `Invalid nonce: expected a non-negative integer, got ${nonce}`,
+        )
+    }
+    return nonce
+}
+
+export async function resolveNonce(
+    customNonce: number | undefined,
+    fetchCurrent: () => Promise<number>,
+): Promise<number> {
+    if (customNonce !== undefined) {
+        return assertValidNonce(customNonce)
+    }
+    return (await fetchCurrent()) + 1
+}
+
 export * as dataManipulation from "./dataManipulation"
 export { deserializeUint8Array, serializeUint8Array } from "./uint8Serialize"
 export { demToOs, osToDem, parseOsString, formatDem, toOsString } from "@/denomination/conversion"

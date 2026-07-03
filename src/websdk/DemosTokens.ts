@@ -6,6 +6,7 @@
  */
 
 import type { Demos } from "./demosclass"
+import { assertValidNonce } from "@/utils"
 import type { Transaction } from "@/types"
 import type {
     TokenCreationParams,
@@ -50,7 +51,10 @@ export class DemosTokens {
      * @param params - Token creation parameters
      * @returns Unsigned transaction ready for signing
      */
-    async createToken(params: TokenCreationParams): Promise<Transaction> {
+    async createToken(
+        params: TokenCreationParams,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
         // Validate parameters
         const validation = validateTokenCreationParams(params)
         if (!validation.valid) {
@@ -71,7 +75,9 @@ export class DemosTokens {
 
         // Get deployer info for address derivation preview
         const deployerAddress = this.demos.getAddress()
-        const nonce = await this.demos.getAddressNonce(deployerAddress)
+        const nonce = options?.nonce !== undefined
+            ? assertValidNonce(options.nonce)
+            : await this.demos.getAddressNonce(deployerAddress)
 
         // Derive the token address (preview - actual derivation happens on-chain)
         const tokenAddress = deriveTokenAddress(deployerAddress, nonce, params)
@@ -110,8 +116,11 @@ export class DemosTokens {
      * @param params - Token creation parameters
      * @returns Signed transaction ready for confirm/broadcast
      */
-    async createTokenSigned(params: TokenCreationParams): Promise<Transaction> {
-        const tx = await this.createToken(params)
+    async createTokenSigned(
+        params: TokenCreationParams,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
+        const tx = await this.createToken(params, options)
         return this.demos.sign(tx)
     }
 
@@ -125,9 +134,14 @@ export class DemosTokens {
      * @param amount - Amount to transfer (as string for bigint)
      * @returns Unsigned transaction
      */
-    async transfer(tokenAddress: string, to: string, amount: string): Promise<Transaction> {
+    async transfer(
+        tokenAddress: string,
+        to: string,
+        amount: string,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
         const args: TokenTransferArgs = { type: "transfer", to, amount }
-        return this._createExecutionTx(tokenAddress, "transfer", args)
+        return this._createExecutionTx(tokenAddress, "transfer", args, options)
     }
 
     /**
@@ -138,9 +152,14 @@ export class DemosTokens {
      * @param amount - Amount to approve (as string for bigint)
      * @returns Unsigned transaction
      */
-    async approve(tokenAddress: string, spender: string, amount: string): Promise<Transaction> {
+    async approve(
+        tokenAddress: string,
+        spender: string,
+        amount: string,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
         const args: TokenApproveArgs = { type: "approve", spender, amount }
-        return this._createExecutionTx(tokenAddress, "approve", args)
+        return this._createExecutionTx(tokenAddress, "approve", args, options)
     }
 
     /**
@@ -156,10 +175,11 @@ export class DemosTokens {
         tokenAddress: string,
         from: string,
         to: string,
-        amount: string
+        amount: string,
+        options?: { nonce?: number },
     ): Promise<Transaction> {
         const args: TokenTransferFromArgs = { type: "transferFrom", from, to, amount }
-        return this._createExecutionTx(tokenAddress, "transferFrom", args)
+        return this._createExecutionTx(tokenAddress, "transferFrom", args, options)
     }
 
     /**
@@ -170,9 +190,14 @@ export class DemosTokens {
      * @param amount - Amount to mint (as string for bigint)
      * @returns Unsigned transaction
      */
-    async mint(tokenAddress: string, to: string, amount: string): Promise<Transaction> {
+    async mint(
+        tokenAddress: string,
+        to: string,
+        amount: string,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
         const args: TokenMintArgs = { type: "mint", to, amount }
-        return this._createExecutionTx(tokenAddress, "mint", args)
+        return this._createExecutionTx(tokenAddress, "mint", args, options)
     }
 
     /**
@@ -183,9 +208,14 @@ export class DemosTokens {
      * @param amount - Amount to burn (as string for bigint)
      * @returns Unsigned transaction
      */
-    async burn(tokenAddress: string, from: string, amount: string): Promise<Transaction> {
+    async burn(
+        tokenAddress: string,
+        from: string,
+        amount: string,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
         const args: TokenBurnArgs = { type: "burn", from, amount }
-        return this._createExecutionTx(tokenAddress, "burn", args)
+        return this._createExecutionTx(tokenAddress, "burn", args, options)
     }
 
     /**
@@ -194,8 +224,11 @@ export class DemosTokens {
      * @param tokenAddress - Token contract address
      * @returns Unsigned transaction
      */
-    async pause(tokenAddress: string): Promise<Transaction> {
-        return this._createExecutionTx(tokenAddress, "pause", { type: "pause" })
+    async pause(
+        tokenAddress: string,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
+        return this._createExecutionTx(tokenAddress, "pause", { type: "pause" }, options)
     }
 
     /**
@@ -204,8 +237,11 @@ export class DemosTokens {
      * @param tokenAddress - Token contract address
      * @returns Unsigned transaction
      */
-    async unpause(tokenAddress: string): Promise<Transaction> {
-        return this._createExecutionTx(tokenAddress, "unpause", { type: "unpause" })
+    async unpause(
+        tokenAddress: string,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
+        return this._createExecutionTx(tokenAddress, "unpause", { type: "unpause" }, options)
     }
 
     /**
@@ -215,11 +251,20 @@ export class DemosTokens {
      * @param newOwner - New owner address
      * @returns Unsigned transaction
      */
-    async transferOwnership(tokenAddress: string, newOwner: string): Promise<Transaction> {
-        return this._createExecutionTx(tokenAddress, "transferOwnership", {
-            type: "transferOwnership",
-            newOwner,
-        })
+    async transferOwnership(
+        tokenAddress: string,
+        newOwner: string,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
+        return this._createExecutionTx(
+            tokenAddress,
+            "transferOwnership",
+            {
+                type: "transferOwnership",
+                newOwner,
+            },
+            options,
+        )
     }
 
     /**
@@ -233,7 +278,8 @@ export class DemosTokens {
     async grantPermissions(
         tokenAddress: string,
         address: string,
-        permissions: string[]
+        permissions: string[],
+        options?: { nonce?: number },
     ): Promise<Transaction> {
         const args: TokenACLArgs = {
             type: "modifyACL",
@@ -241,7 +287,7 @@ export class DemosTokens {
             address,
             permissions,
         }
-        return this._createExecutionTx(tokenAddress, "modifyACL", args)
+        return this._createExecutionTx(tokenAddress, "modifyACL", args, options)
     }
 
     /**
@@ -255,7 +301,8 @@ export class DemosTokens {
     async revokePermissions(
         tokenAddress: string,
         address: string,
-        permissions: string[]
+        permissions: string[],
+        options?: { nonce?: number },
     ): Promise<Transaction> {
         const args: TokenACLArgs = {
             type: "modifyACL",
@@ -263,7 +310,7 @@ export class DemosTokens {
             address,
             permissions,
         }
-        return this._createExecutionTx(tokenAddress, "modifyACL", args)
+        return this._createExecutionTx(tokenAddress, "modifyACL", args, options)
     }
 
     /**
@@ -279,7 +326,8 @@ export class DemosTokens {
         tokenAddress: string,
         newCode: string,
         newMethods: TokenScriptMethod[],
-        newHooks: TokenHookType[]
+        newHooks: TokenHookType[],
+        options?: { nonce?: number },
     ): Promise<Transaction> {
         const args: TokenUpgradeArgs = {
             type: "upgradeScript",
@@ -287,7 +335,7 @@ export class DemosTokens {
             newMethods,
             newHooks,
         }
-        return this._createExecutionTx(tokenAddress, "upgradeScript", args)
+        return this._createExecutionTx(tokenAddress, "upgradeScript", args, options)
     }
 
     /**
@@ -301,10 +349,11 @@ export class DemosTokens {
     async callMethod(
         tokenAddress: string,
         method: string,
-        params: unknown[]
+        params: unknown[],
+        options?: { nonce?: number },
     ): Promise<Transaction> {
         const args: TokenCustomArgs = { type: "custom", method, params }
-        return this._createExecutionTx(tokenAddress, "custom", args)
+        return this._createExecutionTx(tokenAddress, "custom", args, options)
     }
 
     // SECTION: Token Queries (via nodeCall)
@@ -380,7 +429,8 @@ export class DemosTokens {
     private async _createExecutionTx(
         tokenAddress: string,
         operation: TokenOperationType,
-        args: TokenExecutionPayload["args"]
+        args: TokenExecutionPayload["args"],
+        options?: { nonce?: number },
     ): Promise<Transaction> {
         const payload: TokenExecutionPayload = {
             tokenAddress,
@@ -389,7 +439,9 @@ export class DemosTokens {
         }
 
         const senderAddress = this.demos.getAddress()
-        const nonce = await this.demos.getAddressNonce(senderAddress)
+        const nonce = options?.nonce !== undefined
+            ? assertValidNonce(options.nonce)
+            : await this.demos.getAddressNonce(senderAddress)
 
         const tx: Transaction = {
             content: {

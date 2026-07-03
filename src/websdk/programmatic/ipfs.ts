@@ -9,6 +9,7 @@ import {
 import { DemosTransactions } from "../DemosTransactions"
 import type { ProgrammaticContext } from "./context"
 import type { ProgrammaticTxOptions, ProgrammaticTxResult } from "./types"
+import { resolveNonce } from "@/utils"
 
 /**
  * IPFS operations as one-call programmatic transactions.
@@ -45,15 +46,20 @@ export function createIpfsNamespace(ctx: ProgrammaticContext) {
      * @param payload - An IPFS payload from an `IPFSOperations.create*` method.
      * @returns The unsigned `ipfs` transaction, ready for `ctx.run`.
      */
-    const buildIpfsTx = async (payload: IPFSPayload): Promise<Transaction> => {
-        const { publicKey } = await ctx.demos.crypto.getIdentity("ed25519")
-        const nonce = await ctx.demos.getAddressNonce(
-            uint8ArrayToHex(publicKey as Uint8Array),
-        )
+    const buildIpfsTx = async (
+        payload: IPFSPayload,
+        customNonce?: number,
+    ): Promise<Transaction> => {
+        const nonce = await resolveNonce(customNonce, async () => {
+            const { publicKey } = await ctx.demos.crypto.getIdentity("ed25519")
+            return ctx.demos.getAddressNonce(
+                uint8ArrayToHex(publicKey as Uint8Array),
+            )
+        })
 
         const tx = DemosTransactions.empty()
         tx.content.type = "ipfs"
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.data = ["ipfs", payload]
 
         // Mirror the signed cost ceiling onto the transaction content when the
@@ -95,6 +101,7 @@ export function createIpfsNamespace(ctx: ProgrammaticContext) {
                 () =>
                     buildIpfsTx(
                         IPFSOperations.createAddPayload(content, addOptions),
+                        opts?.nonce,
                     ),
                 opts,
             ),
@@ -121,6 +128,7 @@ export function createIpfsNamespace(ctx: ProgrammaticContext) {
                 () =>
                     buildIpfsTx(
                         IPFSOperations.createPinPayload(cid, pinOptions),
+                        opts?.nonce,
                     ),
                 opts,
             ),
@@ -141,7 +149,7 @@ export function createIpfsNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => buildIpfsTx(IPFSOperations.createUnpinPayload(cid)),
+                () => buildIpfsTx(IPFSOperations.createUnpinPayload(cid), opts?.nonce),
                 opts,
             ),
     }

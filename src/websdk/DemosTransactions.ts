@@ -18,6 +18,7 @@ import { BroadcastTimeoutError } from "./BroadcastTimeoutError"
 import { BroadcastFailedError } from "./BroadcastFailedError"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
 import { OS_PER_DEM } from "@/denomination"
+import { resolveNonce } from "@/utils"
 
 // Connection-error codes indicating the request never reached the node.
 // HTTP 5xx is intentionally NOT in this set: a 5xx means the server did
@@ -62,14 +63,21 @@ export const DemosTransactions = {
      *
      * @returns The signed transaction.
      */
-    async pay(to: string, amount: number | bigint, demos: Demos) {
+    async pay(
+        to: string,
+        amount: number | bigint,
+        demos: Demos,
+        options?: { nonce?: number },
+    ) {
         required(demos.keypair, "Wallet not connected")
 
         let tx = DemosTransactions.empty()
 
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(publicKeyHex),
+        )
 
         if (typeof amount === "bigint" && amount < 0n) {
             throw new Error(
@@ -103,7 +111,7 @@ export const DemosTransactions = {
             : Number(amountOs / OS_PER_DEM)
 
         tx.content.to = to
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         // Internal carrier on `content.amount` is bigint OS — the
         // serializerGate normalises it at hash time.
         tx.content.amount = amountOs as unknown as number | string
@@ -161,8 +169,13 @@ export const DemosTransactions = {
      *
      * @returns The signed transaction.
      */
-    transfer(to: string, amount: number | bigint, demos: Demos) {
-        return DemosTransactions.pay(to, amount, demos)
+    transfer(
+        to: string,
+        amount: number | bigint,
+        demos: Demos,
+        options?: { nonce?: number },
+    ) {
+        return DemosTransactions.pay(to, amount, demos, options)
     },
     // NOTE Signing a transaction after hashing it
     /**
@@ -505,20 +518,26 @@ export const DemosTransactions = {
      *
      * @returns The signed storage transaction.
      */
-    async store(bytes: Uint8Array, demos: Demos) {
+    async store(
+        bytes: Uint8Array,
+        demos: Demos,
+        options?: { nonce?: number },
+    ) {
         required(demos.keypair, "Wallet not connected")
 
         let tx = DemosTransactions.empty()
 
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(publicKeyHex),
+        )
 
         // Convert bytes to base64 for JSONB compatibility
         const base64Bytes = Buffer.from(bytes).toString('base64')
 
         tx.content.to = publicKeyHex // Storage is always to the sender's address
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 0 // Storage transactions don't transfer native tokens
         tx.content.type = "storage"
         tx.content.timestamp = Date.now()
@@ -559,7 +578,8 @@ export const DemosTransactions = {
         l2psUid: string,
         consolidatedHash: string,
         transactionCount: number,
-        demos: Demos
+        demos: Demos,
+        options?: { nonce?: number },
     ) {
         required(demos.keypair, "Wallet not connected")
         required(l2psUid, "L2PS UID is required")
@@ -570,11 +590,13 @@ export const DemosTransactions = {
 
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(publicKeyHex),
+        )
 
         // Self-directed transaction (from = to) triggers DTR routing
         tx.content.to = publicKeyHex
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 0 // No tokens transferred in hash updates
         tx.content.type = "l2ps_hash_update"
         tx.content.timestamp = Date.now()
@@ -604,7 +626,12 @@ export const DemosTransactions = {
      *                        subsequent top-ups may overwrite it).
      * @param demos - The demos instance (for nonce + signing).
      */
-    async stake(amount: string, connectionUrl: string, demos: Demos) {
+    async stake(
+        amount: string,
+        connectionUrl: string,
+        demos: Demos,
+        options?: { nonce?: number },
+    ) {
         required(demos.keypair, "Wallet not connected")
         required(amount, "Stake amount is required")
         if (typeof amount !== "string" || !/^\d+$/.test(amount)) {
@@ -627,12 +654,14 @@ export const DemosTransactions = {
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(publicKeyHex),
+        )
 
         // Staking txs are reflexive — the sender operates on their own
         // validator record. `to` must still pass sign()'s 0x64-hex check.
         tx.content.to = publicKeyHex
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 0
         tx.content.type = "validatorStake"
         tx.content.timestamp = Date.now()
@@ -646,16 +675,18 @@ export const DemosTransactions = {
      * period; after `UNSTAKE_LOCK_BLOCKS` have elapsed the validator may call
      * `validatorExit`.
      */
-    async unstake(demos: Demos) {
+    async unstake(demos: Demos, options?: { nonce?: number }) {
         required(demos.keypair, "Wallet not connected")
 
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(publicKeyHex),
+        )
 
         tx.content.to = publicKeyHex
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 0
         tx.content.type = "validatorUnstake"
         tx.content.timestamp = Date.now()
@@ -668,16 +699,18 @@ export const DemosTransactions = {
      * Create a signed `validatorExit` transaction. Only accepted by the
      * network once `unstake_available_at <= currentBlock`.
      */
-    async validatorExit(demos: Demos) {
+    async validatorExit(demos: Demos, options?: { nonce?: number }) {
         required(demos.keypair, "Wallet not connected")
 
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(publicKeyHex),
+        )
 
         tx.content.to = publicKeyHex
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 0
         tx.content.type = "validatorExit"
         tx.content.timestamp = Date.now()
@@ -708,6 +741,7 @@ export const DemosTransactions = {
             effectiveAtBlock: number
         },
         demos: Demos,
+        options?: { nonce?: number },
     ) {
         required(demos.keypair, "Wallet not connected")
         const trimmedProposalId = params?.proposalId?.trim()
@@ -751,10 +785,12 @@ export const DemosTransactions = {
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(publicKeyHex),
+        )
 
         tx.content.to = publicKeyHex
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 0
         tx.content.type = "networkUpgrade"
         tx.content.timestamp = Date.now()
@@ -784,6 +820,7 @@ export const DemosTransactions = {
         proposalId: string,
         approve: boolean,
         demos: Demos,
+        options?: { nonce?: number },
     ) {
         required(demos.keypair, "Wallet not connected")
         const trimmedProposalId = proposalId?.trim()
@@ -795,10 +832,12 @@ export const DemosTransactions = {
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(publicKeyHex),
+        )
 
         tx.content.to = publicKeyHex
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 0
         tx.content.type = "networkUpgradeVote"
         tx.content.timestamp = Date.now()

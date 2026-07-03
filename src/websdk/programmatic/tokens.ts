@@ -47,7 +47,10 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             params: TokenCreationParams,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => tokens.createToken(params), opts),
+            ctx.run(
+                () => tokens.createToken(params, { nonce: opts?.nonce }),
+                opts,
+            ),
 
         /**
          * Transfer tokens to another address, end to end.
@@ -74,7 +77,13 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             amount: string,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => tokens.transfer(tokenAddress, to, amount), opts),
+            ctx.run(
+                () =>
+                    tokens.transfer(tokenAddress, to, amount, {
+                        nonce: opts?.nonce,
+                    }),
+                opts,
+            ),
 
         /**
          * Approve a spender to move tokens on your behalf, end to end.
@@ -90,7 +99,13 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             amount: string,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => tokens.approve(tokenAddress, spender, amount), opts),
+            ctx.run(
+                () =>
+                    tokens.approve(tokenAddress, spender, amount, {
+                        nonce: opts?.nonce,
+                    }),
+                opts,
+            ),
 
         /**
          * Mint new tokens to an address, end to end.
@@ -106,7 +121,13 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             amount: string,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => tokens.mint(tokenAddress, to, amount), opts),
+            ctx.run(
+                () =>
+                    tokens.mint(tokenAddress, to, amount, {
+                        nonce: opts?.nonce,
+                    }),
+                opts,
+            ),
 
         /**
          * Burn tokens from an address, end to end.
@@ -122,7 +143,13 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             amount: string,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => tokens.burn(tokenAddress, from, amount), opts),
+            ctx.run(
+                () =>
+                    tokens.burn(tokenAddress, from, amount, {
+                        nonce: opts?.nonce,
+                    }),
+                opts,
+            ),
 
         /**
          * Transfer tokens from one address to another using an existing
@@ -142,7 +169,10 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => tokens.transferFrom(tokenAddress, from, to, amount),
+                () =>
+                    tokens.transferFrom(tokenAddress, from, to, amount, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -156,7 +186,10 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             tokenAddress: string,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => tokens.pause(tokenAddress), opts),
+            ctx.run(
+                () => tokens.pause(tokenAddress, { nonce: opts?.nonce }),
+                opts,
+            ),
 
         /**
          * Resume a paused token, end to end.
@@ -168,7 +201,10 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             tokenAddress: string,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => tokens.unpause(tokenAddress), opts),
+            ctx.run(
+                () => tokens.unpause(tokenAddress, { nonce: opts?.nonce }),
+                opts,
+            ),
 
         /**
          * Transfer ownership of the token to a new owner, end to end.
@@ -183,7 +219,10 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => tokens.transferOwnership(tokenAddress, newOwner),
+                () =>
+                    tokens.transferOwnership(tokenAddress, newOwner, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -203,7 +242,12 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
                 () =>
-                    tokens.grantPermissions(tokenAddress, address, permissions),
+                    tokens.grantPermissions(
+                        tokenAddress,
+                        address,
+                        permissions,
+                        { nonce: opts?.nonce },
+                    ),
                 opts,
             ),
 
@@ -227,6 +271,7 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
                         tokenAddress,
                         address,
                         permissions,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -254,6 +299,7 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
                         newCode,
                         newMethods,
                         newHooks,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -273,7 +319,9 @@ export function createTokensNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => tokens.callMethod(tokenAddress, method, params),
+                () => tokens.callMethod(tokenAddress, method, params, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
     }

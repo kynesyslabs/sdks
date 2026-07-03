@@ -43,6 +43,7 @@ import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { OS_PER_DEM, osToDem } from "@/denomination"
 import { TLSNotary } from "./TLSNotary"
 import { calculateStorageFee } from "./helpers"
+import { resolveNonce } from "@/utils"
 import type { StatusCallback } from "./types"
 
 /**
@@ -108,6 +109,7 @@ export interface TLSNotaryToken {
 export interface RequestAttestationOptions {
     /** Target HTTPS URL to attest */
     targetUrl: string
+    nonce?: number
 }
 
 /**
@@ -116,6 +118,7 @@ export interface RequestAttestationOptions {
 export interface StoreProofOptions {
     /** Storage location: on-chain or IPFS */
     storage: "onchain" | "ipfs"
+    nonce?: number
 }
 
 /**
@@ -202,7 +205,10 @@ export class TLSNotaryService {
         }
 
         // 1. Create and submit TLSN_REQUEST native transaction (burns 1 DEM)
-        const tx = await this.createTlsnRequestTransaction(targetUrl)
+        const tx = await this.createTlsnRequestTransaction(
+            targetUrl,
+            options.nonce,
+        )
 
         // 2. Confirm and broadcast the transaction
         const confirmResult = await DemosTransactions.confirm(tx, this.demos)
@@ -317,7 +323,10 @@ export class TLSNotaryService {
         }
 
         // 1. Create the transaction (but don't broadcast yet)
-        const tx = await this.createTlsnRequestTransaction(targetUrl)
+        const tx = await this.createTlsnRequestTransaction(
+            targetUrl,
+            options.nonce,
+        )
 
         // 2. Get confirmation from user
         const details: TransactionDetails = {
@@ -617,6 +626,7 @@ export class TLSNotaryService {
             proof,
             storage,
             storageFee,
+            options.nonce,
         )
 
         // 3. Confirm and broadcast
@@ -692,6 +702,7 @@ export class TLSNotaryService {
             proof,
             storage,
             storageFee,
+            options.nonce,
         )
 
         // 3. Get confirmation from user
@@ -803,18 +814,23 @@ export class TLSNotaryService {
      * Create a TLSN_REQUEST native transaction
      * @internal
      */
-    private async createTlsnRequestTransaction(targetUrl: string) {
+    private async createTlsnRequestTransaction(
+        targetUrl: string,
+        customNonce?: number,
+    ) {
         const tx = DemosTransactions.empty()
 
         const { publicKey } = await this.demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await this.demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(customNonce, () =>
+            this.demos.getAddressNonce(publicKeyHex),
+        )
 
         // Self-directed transaction (burns tokens). Pre-fork wire format:
         // 1 DEM as JS number. The serializerGate (P4 commit 2) will
         // re-encode to OS string when talking to a post-fork node.
         tx.content.to = publicKeyHex
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = 1 // 1 DEM fee for attestation request (legacy wire shape)
         tx.content.type = "native"
         tx.content.timestamp = Date.now()
@@ -843,12 +859,15 @@ export class TLSNotaryService {
         proof: string,
         storageType: "onchain" | "ipfs",
         fee: bigint,
+        customNonce?: number,
     ) {
         const tx = DemosTransactions.empty()
 
         const { publicKey } = await this.demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await this.demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(customNonce, () =>
+            this.demos.getAddressNonce(publicKeyHex),
+        )
 
         // Pre-fork wire shape: DEM as JS number. Convert OS fee to DEM
         // assuming the fee is a whole multiple of OS_PER_DEM (true for
@@ -857,7 +876,7 @@ export class TLSNotaryService {
 
         // Self-directed transaction (burns tokens)
         tx.content.to = publicKeyHex
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.amount = feeDem // Storage fee in DEM (legacy wire shape)
         tx.content.type = "native"
         tx.content.timestamp = Date.now()

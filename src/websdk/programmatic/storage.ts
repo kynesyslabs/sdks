@@ -35,7 +35,7 @@ export function createStorageNamespace(ctx: ProgrammaticContext) {
             bytes: Uint8Array,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => ctx.demos.store(bytes), opts),
+            ctx.run(() => ctx.demos.store(bytes, { nonce: opts?.nonce }), opts),
 
         /**
          * Sign and submit a storage program, end to end.
@@ -56,6 +56,12 @@ export function createStorageNamespace(ctx: ProgrammaticContext) {
             payload: StorageProgramPayload,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => ctx.demos.storagePrograms.sign(payload), opts),
+            ctx.run(
+                () =>
+                    ctx.demos.storagePrograms.sign(payload, {
+                        nonce: opts?.nonce,
+                    }),
+                opts,
+            ),
     }
 }

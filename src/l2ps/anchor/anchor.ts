@@ -13,6 +13,7 @@ import { DemosTransactions } from "@/websdk/DemosTransactions"
 import { StorageProgram } from "@/storage/StorageProgram"
 import type { Transaction } from "@/types"
 import L2PS from "../l2ps"
+import { resolveNonce } from "@/utils"
 import type {
     ChannelTranscript,
     UnsignedChannelTranscript,
@@ -51,6 +52,7 @@ export interface AnchorEncryptedTranscriptOpts {
     policy: TranscriptDisclosurePolicy
     /** Required to actually anchor when `policy === "encrypted-anchored-recommended"`. */
     consent?: boolean
+    nonce?: number
 }
 
 /**
@@ -141,6 +143,7 @@ export async function anchorEncryptedTranscript(
         opts.demos,
         anchorProgramName(opts.transcript.channelId),
         payload,
+        opts.nonce,
     )
 
     return { anchor: storageAddress, contentHash }
@@ -150,9 +153,12 @@ async function deployAnchorSP(
     demos: Demos,
     programName: string,
     payload: AnchoredTranscriptPayload,
+    customNonce?: number,
 ): Promise<string> {
     const deployer = normalizeDemosAddress(await demos.getEd25519Address())
-    const nonce = (await demos.getAddressNonce(deployer)) + 1
+    const nonce = await resolveNonce(customNonce, () =>
+        demos.getAddressNonce(deployer),
+    )
     const spPayload = StorageProgram.createStorageProgram(
         deployer,
         programName,

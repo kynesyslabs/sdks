@@ -48,7 +48,10 @@ export function createGovernanceNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => ctx.demos.tx.proposeNetworkUpgrade(params, ctx.demos),
+                () =>
+                    ctx.demos.tx.proposeNetworkUpgrade(params, ctx.demos, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -72,7 +75,10 @@ export function createGovernanceNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => ctx.demos.tx.voteOnUpgrade(proposalId, approve, ctx.demos),
+                () =>
+                    ctx.demos.tx.voteOnUpgrade(proposalId, approve, ctx.demos, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
     }

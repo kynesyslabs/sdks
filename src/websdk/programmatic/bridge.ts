@@ -40,7 +40,12 @@ export function createBridgeNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => NativeBridgeMethods.generateOperationTx(compiled, ctx.demos),
+                () =>
+                    NativeBridgeMethods.generateOperationTx(
+                        compiled,
+                        ctx.demos,
+                        { nonce: opts?.nonce },
+                    ),
                 opts,
             ),
     }

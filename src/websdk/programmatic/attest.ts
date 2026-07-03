@@ -68,6 +68,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         ctx.demos,
                         proof,
                         referralCode,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -95,6 +96,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         ctx.demos,
                         proof,
                         referralCode,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -124,6 +126,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         ctx.demos,
                         proof,
                         referralCode,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -151,6 +154,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         ctx.demos,
                         attestation,
                         referralCode,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -183,6 +187,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         ctx.demos,
                         hostname,
                         referralCode,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -206,7 +211,10 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => identities.removeWeb2Identity(ctx.demos, payload),
+                () =>
+                    identities.removeWeb2Identity(ctx.demos, payload, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -239,6 +247,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         ctx.demos,
                         payload,
                         referralCode,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -264,7 +273,10 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => identities.removeXmIdentity(ctx.demos, payload),
+                () =>
+                    identities.removeXmIdentity(ctx.demos, payload, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -292,7 +304,10 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => identities.bindPqcIdentity(ctx.demos, algorithms),
+                () =>
+                    identities.bindPqcIdentity(ctx.demos, algorithms, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -314,7 +329,10 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => identities.removePqcIdentity(ctx.demos, algorithms),
+                () =>
+                    identities.removePqcIdentity(ctx.demos, algorithms, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -366,6 +384,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         challenge,
                         resolutionData,
                         referralCode,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -391,6 +410,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                     identities.removeUnstoppableDomainIdentity(
                         ctx.demos,
                         domain,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -416,7 +436,10 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => identities.addNomisIdentity(ctx.demos, payload),
+                () =>
+                    identities.addNomisIdentity(ctx.demos, payload, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -441,7 +464,10 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => identities.removeNomisIdentity(ctx.demos, payload),
+                () =>
+                    identities.removeNomisIdentity(ctx.demos, payload, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -464,7 +490,10 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => identities.addHumanPassportIdentity(ctx.demos, payload),
+                () =>
+                    identities.addHumanPassportIdentity(ctx.demos, payload, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -487,7 +516,9 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
                 () =>
-                    identities.removeHumanPassportIdentity(ctx.demos, address),
+                    identities.removeHumanPassportIdentity(ctx.demos, address, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -513,7 +544,10 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => identities.addEthosIdentity(ctx.demos, payload),
+                () =>
+                    identities.addEthosIdentity(ctx.demos, payload, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -539,7 +573,10 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
-                () => identities.removeEthosIdentity(ctx.demos, payload),
+                () =>
+                    identities.removeEthosIdentity(ctx.demos, payload, {
+                        nonce: opts?.nonce,
+                    }),
                 opts,
             ),
 
@@ -596,6 +633,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         username,
                         userId,
                         referralCode,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),
@@ -624,6 +662,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         ctx.demos,
                         context,
                         username,
+                        { nonce: opts?.nonce },
                     ),
                 opts,
             ),

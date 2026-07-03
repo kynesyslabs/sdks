@@ -103,6 +103,7 @@ function isValidityData(
 async function resolveToConfirmed(
     demos: Demos,
     source: TxSource,
+    customNonce?: number,
 ): Promise<RPCResponseWithValidityData> {
     const resolved =
         typeof source === "function" ? await source() : source
@@ -119,7 +120,12 @@ async function resolveToConfirmed(
     // an empty-signature tx. Gate on the signature payload instead.
     const sig = tx.signature as { data?: unknown } | null
     const isSigned = !!(sig && sig.data)
-    const signed = isSigned ? tx : await demos.sign(tx)
+    const signed = isSigned
+        ? tx
+        : await demos.sign(
+              tx,
+              customNonce !== undefined ? { nonce: customNonce } : undefined,
+          )
     return await demos.confirm(signed)
 }
 
@@ -142,7 +148,7 @@ export async function runProgrammaticTx(
     source: TxSource,
     opts: ProgrammaticTxOptions = {},
 ): Promise<ProgrammaticTxResult> {
-    const validityData = await resolveToConfirmed(demos, source)
+    const validityData = await resolveToConfirmed(demos, source, opts.nonce)
     const transaction = validityData.response.data.transaction
     // A successful confirm always echoes the transaction; guard so the
     // non-optional `transaction`/`hash` on the result types stay truthful

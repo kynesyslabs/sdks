@@ -21,6 +21,7 @@ import {
     stripBindingSignature,
 } from "./canonical"
 import L2PS from "../l2ps"
+import { resolveNonce } from "@/utils"
 
 /**
  * Deterministic Storage Program name for `(channelId, subnetMemberId)`.
@@ -149,6 +150,7 @@ export interface AnchorMembershipBindingResult {
 export async function anchorMembershipBinding(
     binding: L2PSMembershipBinding,
     demos: Demos,
+    options?: { nonce?: number },
 ): Promise<AnchorMembershipBindingResult> {
     if (!verifyMembershipBinding(binding))
         throw new Error(
@@ -162,7 +164,9 @@ export async function anchorMembershipBinding(
             `anchorMembershipBinding: claim "${binding.cciPrimaryClaim}" does not match connected wallet ${connected}`,
         )
 
-    const nonce = (await demos.getAddressNonce(connected)) + 1
+    const nonce = await resolveNonce(options?.nonce, () =>
+        demos.getAddressNonce(connected),
+    )
     const payload = StorageProgram.createStorageProgram(
         connected,
         bindingProgramName(binding.channelId, binding.subnetMemberId),

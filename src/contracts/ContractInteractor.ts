@@ -10,6 +10,7 @@ import {
 import { ContractCallPayload } from '../types/blockchain/TransactionSubtypes/ContractCallTransaction'
 import { RPCRequest } from '../types/communication/rpc'
 import { uint8ArrayToHex } from '../encryption/unifiedCrypto'
+import { assertValidNonce } from '@/utils'
 import * as skeletons from '../websdk/utils/skeletons'
 
 export class ContractInteractor {
@@ -180,7 +181,9 @@ export class ContractInteractor {
     ): Promise<any> {
         const { publicKey } = await this.demos.crypto.getIdentity('ed25519')
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = options.nonce ?? await this.demos.getAddressNonce(publicKeyHex)
+        const nonce = options.nonce !== undefined
+            ? assertValidNonce(options.nonce)
+            : await this.demos.getAddressNonce(publicKeyHex)
 
         const payload: ContractCallPayload = {
             contractAddress,

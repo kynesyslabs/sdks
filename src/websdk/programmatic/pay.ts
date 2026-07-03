@@ -31,7 +31,7 @@ export function createPayNamespace(ctx: ProgrammaticContext) {
             amount: number | bigint,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => ctx.demos.pay(to, amount), opts),
+            ctx.run(() => ctx.demos.pay(to, amount, { nonce: opts?.nonce }), opts),
 
         /**
          * Alias of {@link pay}. Same dual-input amount semantics.
@@ -45,6 +45,9 @@ export function createPayNamespace(ctx: ProgrammaticContext) {
             amount: number | bigint,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => ctx.demos.transfer(to, amount), opts),
+            ctx.run(
+                () => ctx.demos.transfer(to, amount, { nonce: opts?.nonce }),
+                opts,
+            ),
     }
 }

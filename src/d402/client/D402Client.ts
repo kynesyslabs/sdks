@@ -9,6 +9,7 @@ import type { Transaction } from '@/types'
 import type { D402PaymentRequirement, D402SettlementResult } from './types'
 import { uint8ArrayToHex } from '@/encryption/unifiedCrypto'
 import * as skeletons from '../../websdk/utils/skeletons'
+import { resolveNonce } from '@/utils'
 
 export class D402Client {
     private demos: Demos
@@ -22,7 +23,10 @@ export class D402Client {
      * @param requirement Payment requirements from 402 response
      * @returns Unsigned d402_payment transaction
      */
-    async createPayment(requirement: D402PaymentRequirement): Promise<Transaction> {
+    async createPayment(
+        requirement: D402PaymentRequirement,
+        options?: { nonce?: number },
+    ): Promise<Transaction> {
         if (!this.demos.keypair) {
             throw new Error('Wallet not connected')
         }
@@ -30,7 +34,9 @@ export class D402Client {
         // Get user's public key and nonce
         const { publicKey } = await this.demos.crypto.getIdentity('ed25519')
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await this.demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            this.demos.getAddressNonce(publicKeyHex),
+        )
 
         // Create transaction skeleton
         const tx = structuredClone(skeletons.transaction)
@@ -42,7 +48,7 @@ export class D402Client {
 
         // Fill in transaction details
         tx.content.type = 'd402_payment'
-        tx.content.nonce = nonce + 1
+        tx.content.nonce = nonce
         tx.content.timestamp = Date.now()
         tx.content.data = [
             'd402_payment',

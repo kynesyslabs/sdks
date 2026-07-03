@@ -37,6 +37,10 @@ export function createD402Namespace(ctx: ProgrammaticContext) {
             requirement: D402PaymentRequirement,
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
-            ctx.run(() => client.createPayment(requirement), opts),
+            ctx.run(
+                () =>
+                    client.createPayment(requirement, { nonce: opts?.nonce }),
+                opts,
+            ),
     }
 }

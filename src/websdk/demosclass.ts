@@ -52,6 +52,7 @@ import {
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import { OS_PER_DEM, demToOs, parseOsString } from "@/denomination"
+import { assertValidNonce, resolveNonce } from "@/utils"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
 import {
     SubDemPrecisionError,
@@ -406,11 +407,15 @@ export class Demos {
      * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
      * @returns The signed transaction.
      */
-    async pay(to: string, amount: number | bigint) {
+    async pay(
+        to: string,
+        amount: number | bigint,
+        options?: { nonce?: number },
+    ) {
         required(this.keypair, "Wallet not connected")
         const amountOs = typeof amount === "bigint" ? amount : demToOs(amount)
         await this._assertAmountAcceptableOnTargetNode(amountOs)
-        return DemosTransactions.pay(to, amountOs, this)
+        return DemosTransactions.pay(to, amountOs, this, options)
     }
 
     /**
@@ -430,8 +435,12 @@ export class Demos {
      * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
      * @returns The signed transaction.
      */
-    async transfer(to: string, amount: number | bigint) {
-        return this.pay(to, amount)
+    async transfer(
+        to: string,
+        amount: number | bigint,
+        options?: { nonce?: number },
+    ) {
+        return this.pay(to, amount, options)
     }
 
     /**
@@ -442,9 +451,9 @@ export class Demos {
      *
      * @returns The signed storage transaction.
      */
-    store(bytes: Uint8Array) {
+    store(bytes: Uint8Array, options?: { nonce?: number }) {
         required(this.keypair, "Wallet not connected")
-        return DemosTransactions.store(bytes, this)
+        return DemosTransactions.store(bytes, this, options)
     }
 
     storagePrograms = {
@@ -455,7 +464,10 @@ export class Demos {
          * @returns The signed transaction
          *
          */
-        sign: async (payload: StorageProgramPayload): Promise<Transaction> => {
+        sign: async (
+            payload: StorageProgramPayload,
+            options?: { nonce?: number },
+        ): Promise<Transaction> => {
             required(this.keypair, "Wallet not connected")
             required(
                 payload.storageAddress,
@@ -469,14 +481,16 @@ export class Demos {
             // txs ship with the skeleton default nonce 0 and get rejected
             // by the node's sequential-nonce / expectedPrior enforcement
             // after the first one.
-            const { publicKey } = await this.crypto.getIdentity("ed25519")
-            const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-            const nonce = await this.getAddressNonce(publicKeyHex)
+            const nonce = await resolveNonce(options?.nonce, async () => {
+                const { publicKey } = await this.crypto.getIdentity("ed25519")
+                const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+                return this.getAddressNonce(publicKeyHex)
+            })
 
             const tx = DemosTransactions.empty()
             tx.content.to = payload.storageAddress
             tx.content.type = "storageProgram"
-            tx.content.nonce = nonce + 1
+            tx.content.nonce = nonce
             tx.content.data = ["storageProgram", payload]
             return await this.sign(tx)
         },
@@ -564,8 +578,11 @@ export class Demos {
      * @param options - The dual-signing options
      * @returns The signed transaction
      */
-    async sign(raw_tx: Transaction) {
+    async sign(raw_tx: Transaction, options?: { nonce?: number }) {
         required(this.keypair, "Wallet not connected")
+        if (options?.nonce !== undefined) {
+            raw_tx.content.nonce = assertValidNonce(options.nonce)
+        }
         if (!raw_tx.content.timestamp || raw_tx.content.timestamp === 0) {
             raw_tx.content.timestamp = Date.now()
         }

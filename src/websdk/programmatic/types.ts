@@ -78,6 +78,8 @@ export interface ProgrammaticTxOptions {
 
     /** Options forwarded to `broadcastAndWait` when `wait` is `true`. */
     waitOptions?: { timeoutMs?: number; pollIntervalMs?: number }
+
+    nonce?: number
 }
 
 /** Why a confirmed transaction was not broadcast. */

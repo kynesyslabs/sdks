@@ -13,6 +13,7 @@ import type {
     IWeb2Payload,
     IWeb2Result,
 } from "@/types"
+import { resolveNonce } from "@/utils"
 
 class Web2InvalidUrlError extends Error {
     code: string
@@ -191,10 +192,10 @@ export class Web2Proxy {
         web2Tx.content.data = ["web2Request", web2Payload]
         web2Tx.content.timestamp = Date.now()
 
-        const nonce = await this._demos.getAddressNonce(
-            await this._demos.getEd25519Address(),
+        const nonce = await resolveNonce(options?.nonce, async () =>
+            this._demos.getAddressNonce(await this._demos.getEd25519Address()),
         )
-        web2Tx.content.nonce = nonce + 1
+        web2Tx.content.nonce = nonce
 
         const signedWeb2Tx = await this._demos.sign(web2Tx)
         const validityData = await this._demos.confirm(signedWeb2Tx)

@@ -81,6 +81,7 @@ export interface IWeb2RequestOptions {
     headers?: OutgoingHttpHeaders
     payload?: unknown
     authorization?: string
+    nonce?: number
 }
 
 export interface IStartProxyParams {

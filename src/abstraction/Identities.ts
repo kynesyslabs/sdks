@@ -39,6 +39,7 @@ import { PQCAlgorithm } from "@/types/cryptography"
 import { Account, RPCResponse, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
+import { resolveNonce } from "@/utils"
 
 type IdentityContext = "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn"
 
@@ -90,6 +91,7 @@ export class Identities {
         demos: Demos,
         context: IdentityContext,
         payload: any,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
             // Skip validation for telegram as it uses custom attestation format, not URL proofs
@@ -139,7 +141,9 @@ export class Identities {
         // Use the address' current nonce (+1) like every other native tx in
         // this SDK — hardcoding nonce:1 only validated for a fresh account and
         // broke the second identity op (e.g. remove after add).
-        const nonce = await demos.getAddressNonce(address)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(address),
+        )
 
         tx.content = {
             ...tx.content,
@@ -154,7 +158,7 @@ export class Identities {
                     payload: payload,
                 },
             ],
-            nonce: nonce + 1,
+            nonce: nonce,
             timestamp: Date.now(),
         }
 
@@ -173,6 +177,7 @@ export class Identities {
         demos: Demos,
         context: IdentityContext,
         payload: any,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         const tx = DemosTransactions.empty()
 
@@ -181,7 +186,9 @@ export class Identities {
         // Use the address' current nonce (+1) like every other native tx in
         // this SDK — hardcoding nonce:1 broke removing an identity once the
         // account had already done one identity op (e.g. the add).
-        const nonce = await demos.getAddressNonce(address)
+        const nonce = await resolveNonce(options?.nonce, () =>
+            demos.getAddressNonce(address),
+        )
 
         tx.content = {
             ...tx.content,
@@ -196,7 +203,7 @@ export class Identities {
                     payload: payload,
                 },
             ],
-            nonce: nonce + 1,
+            nonce: nonce,
             timestamp: Date.now(),
         }
 
@@ -215,11 +222,17 @@ export class Identities {
         demos: Demos,
         payload: InferFromSignaturePayload,
         referralCode?: string,
+        options?: { nonce?: number },
     ) {
-        return await this.inferIdentity(demos, "xm", {
-            ...payload,
-            referralCode: referralCode,
-        })
+        return await this.inferIdentity(
+            demos,
+            "xm",
+            {
+                ...payload,
+                referralCode: referralCode,
+            },
+            options,
+        )
     }
 
     /**
@@ -233,8 +246,9 @@ export class Identities {
     async inferWeb2Identity(
         demos: Demos,
         payload: Web2CoreTargetIdentityPayload,
+        options?: { nonce?: number },
     ) {
-        return await this.inferIdentity(demos, "web2", payload)
+        return await this.inferIdentity(demos, "web2", payload, options)
     }
 
     /**
@@ -244,8 +258,12 @@ export class Identities {
      * @param payload The payload to remove the identity.
      * @returns The response from the RPC call.
      */
-    async removeXmIdentity(demos: Demos, payload: XMCoreTargetIdentityPayload) {
-        return await this.removeIdentity(demos, "xm", payload)
+    async removeXmIdentity(
+        demos: Demos,
+        payload: XMCoreTargetIdentityPayload,
+        options?: { nonce?: number },
+    ) {
+        return await this.removeIdentity(demos, "xm", payload, options)
     }
 
     /**
@@ -261,8 +279,9 @@ export class Identities {
             context: string
             username: string
         },
+        options?: { nonce?: number },
     ) {
-        return await this.removeIdentity(demos, "web2", payload)
+        return await this.removeIdentity(demos, "web2", payload, options)
     }
 
     /**
@@ -276,6 +295,7 @@ export class Identities {
         demos: Demos,
         payload: GithubProof,
         referralCode?: string,
+        options?: { nonce?: number },
     ) {
         const username = payload.split("/")[3]
         const ghUser = await axios.get(
@@ -294,7 +314,7 @@ export class Identities {
             referralCode: referralCode,
         }
 
-        return await this.inferIdentity(demos, "web2", githubPayload)
+        return await this.inferIdentity(demos, "web2", githubPayload, options)
     }
 
     /**
@@ -324,6 +344,7 @@ export class Identities {
         username: string,
         userId: string | number,
         referralCode?: string,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         const payload: InferFromTLSNPayload = {
             context: context,
@@ -336,7 +357,7 @@ export class Identities {
             referralCode,
         }
 
-        return await this.inferIdentity(demos, "tlsn", payload)
+        return await this.inferIdentity(demos, "tlsn", payload, options)
     }
 
     /**
@@ -351,11 +372,17 @@ export class Identities {
         demos: Demos,
         context: TLSNIdentityContext,
         username: string,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
-        return await this.removeIdentity(demos, "tlsn", {
-            context: context,
-            username: username,
-        })
+        return await this.removeIdentity(
+            demos,
+            "tlsn",
+            {
+                context: context,
+                username: username,
+            },
+            options,
+        )
     }
 
     /**
@@ -369,6 +396,7 @@ export class Identities {
         demos: Demos,
         payload: TwitterProof,
         referralCode?: string,
+        options?: { nonce?: number },
     ) {
         const data = await demos.web2.getTweet(payload)
 
@@ -390,7 +418,7 @@ export class Identities {
             referralCode: referralCode,
         }
 
-        return await this.inferIdentity(demos, "web2", twitterPayload)
+        return await this.inferIdentity(demos, "web2", twitterPayload, options)
     }
 
     /**
@@ -404,6 +432,7 @@ export class Identities {
         demos: Demos,
         payload: DiscordProof,
         referralCode?: string,
+        options?: { nonce?: number },
     ) {
         const data = await demos.web2.getDiscordMessage(payload)
 
@@ -428,7 +457,7 @@ export class Identities {
             referralCode: referralCode,
         }
 
-        return await this.inferIdentity(demos, "web2", discordPayload)
+        return await this.inferIdentity(demos, "web2", discordPayload, options)
     }
 
     /**
@@ -444,6 +473,7 @@ export class Identities {
         demos: Demos,
         payload: TelegramSignedAttestation,
         referralCode?: string,
+        options?: { nonce?: number },
     ) {
         const telegramPayload: InferFromTelegramPayload & {
             referralCode?: string
@@ -455,7 +485,7 @@ export class Identities {
             referralCode: referralCode,
         }
 
-        return await this.inferIdentity(demos, "web2", telegramPayload)
+        return await this.inferIdentity(demos, "web2", telegramPayload, options)
     }
 
     // SECTION: Domain Identities
@@ -525,6 +555,7 @@ export class Identities {
         demos: Demos,
         hostname: string,
         referralCode?: string,
+        options?: { nonce?: number },
     ) {
         const { proofUrl, hostname: host } = this.buildDomainProof(hostname)
 
@@ -561,7 +592,7 @@ export class Identities {
             referralCode: referralCode,
         }
 
-        return await this.inferIdentity(demos, "web2", domainPayload)
+        return await this.inferIdentity(demos, "web2", domainPayload, options)
     }
 
     /**
@@ -571,13 +602,22 @@ export class Identities {
      * @param hostname The domain to unlink (e.g. "example.com").
      * @returns The response from the RPC call.
      */
-    async removeDomainIdentity(demos: Demos, hostname: string) {
+    async removeDomainIdentity(
+        demos: Demos,
+        hostname: string,
+        options?: { nonce?: number },
+    ) {
         // Same canonicalisation as addDomainIdentity so add/remove round-trip.
         const { hostname: host } = this.buildDomainProof(hostname)
-        return await this.removeIdentity(demos, "web2", {
-            context: "domain",
-            username: host,
-        })
+        return await this.removeIdentity(
+            demos,
+            "web2",
+            {
+                context: "domain",
+                username: host,
+            },
+            options,
+        )
     }
 
     /**
@@ -631,6 +671,7 @@ export class Identities {
     async bindPqcIdentity(
         demos: Demos,
         algorithms: "all" | PQCAlgorithm[] = "all",
+        options?: { nonce?: number },
     ) {
         let addressTypes: PQCAlgorithm[] = []
 
@@ -664,12 +705,13 @@ export class Identities {
             })
         }
 
-        return await this.inferIdentity(demos, "pqc", payloads)
+        return await this.inferIdentity(demos, "pqc", payloads, options)
     }
 
     async removePqcIdentity(
         demos: Demos,
         algorithms: "all" | PQCAlgorithm[] = "all",
+        options?: { nonce?: number },
     ) {
         let addressTypes: PQCAlgorithm[] = []
 
@@ -695,7 +737,7 @@ export class Identities {
             })
         }
 
-        return await this.removeIdentity(demos, "pqc", payloads)
+        return await this.removeIdentity(demos, "pqc", payloads, options)
     }
 
     /**
@@ -1325,6 +1367,7 @@ export class Identities {
         challenge: string,
         resolutionData: UnifiedDomainResolution,
         referralCode?: string,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         const publicKey = await demos.getEd25519Address()
         const signatureType = this.detectSignatureType(signingAddress)
@@ -1357,10 +1400,15 @@ export class Identities {
             registryType: resolutionData.registryType,
         }
 
-        return await this.inferIdentity(demos, "ud" as any, {
-            ...udPayload,
-            referralCode,
-        })
+        return await this.inferIdentity(
+            demos,
+            "ud" as any,
+            {
+                ...udPayload,
+                referralCode,
+            },
+            options,
+        )
     }
 
     /**
@@ -1374,8 +1422,9 @@ export class Identities {
     async removeUnstoppableDomainIdentity(
         demos: Demos,
         domain: string,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
-        return await this.removeIdentity(demos, "ud", { domain })
+        return await this.removeIdentity(demos, "ud", { domain }, options)
     }
 
     /**
@@ -1442,8 +1491,9 @@ export class Identities {
     async addNomisIdentity(
         demos: Demos,
         payload: NomisWalletIdentity,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
-        return await this.inferIdentity(demos, "nomis", payload)
+        return await this.inferIdentity(demos, "nomis", payload, options)
     }
 
     /**
@@ -1456,8 +1506,9 @@ export class Identities {
     async removeNomisIdentity(
         demos: Demos,
         payload: NomisWalletIdentity,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
-        return await this.removeIdentity(demos, "nomis", payload)
+        return await this.removeIdentity(demos, "nomis", payload, options)
     }
 
     // ==================== Human Passport Identity ====================
@@ -1544,12 +1595,13 @@ export class Identities {
     async addHumanPassportIdentity(
         demos: Demos,
         payload: HumanPassportIdentityData,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         if (payload.verificationMethod === 'onchain' && payload.chainId == null) {
             throw new Error('chainId must be provided for onchain verification')
         }
 
-        return await this.inferIdentity(demos, "humanpassport", payload)
+        return await this.inferIdentity(demos, "humanpassport", payload, options)
     }
 
     /**
@@ -1562,8 +1614,14 @@ export class Identities {
     async removeHumanPassportIdentity(
         demos: Demos,
         address: string,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
-        return await this.removeIdentity(demos, "humanpassport", { address })
+        return await this.removeIdentity(
+            demos,
+            "humanpassport",
+            { address },
+            options,
+        )
     }
 
     // ==================== Ethos Identity ====================
@@ -1734,9 +1792,10 @@ export class Identities {
     async addEthosIdentity(
         demos: Demos,
         payload: EthosWalletIdentity,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         this.validateEthosPayload(payload, true)
-        return await this.inferIdentity(demos, "ethos", payload)
+        return await this.inferIdentity(demos, "ethos", payload, options)
     }
 
     /**
@@ -1798,8 +1857,9 @@ export class Identities {
     async removeEthosIdentity(
         demos: Demos,
         payload: EthosIdentityRemoveData,
+        options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         this.validateEthosRemovePayload(payload)
-        return await this.removeIdentity(demos, "ethos", payload)
+        return await this.removeIdentity(demos, "ethos", payload, options)
     }
 }
