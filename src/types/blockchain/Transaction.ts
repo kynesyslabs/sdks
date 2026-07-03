@@ -121,6 +121,13 @@ export interface TransactionContent {
     custom_charges?: CustomCharges
 }
 
+export interface TransactionAttrs {
+    reference_block: number
+    expectedNonce?: number
+    actualNonce?: number
+    code?: string
+}
+
 export interface Transaction {
     content: TransactionContent
 
@@ -132,6 +139,7 @@ export interface Transaction {
     hash: string
     status: string
     blockNumber: number | null
+    attrs?: TransactionAttrs
 }
 
 // Re-export specific transaction types

@@ -37,35 +37,7 @@ export interface GCREditBalance {
     amount: number | string
     txhash: string
 }
-/**
- * Nonce-increment GCR edit. `amount` is a counter delta, not a token
- * amount — always `1` in current code. Kept as `number` because the fork
- * does not change its encoding. Do **not** confuse with `GCREditBalance.amount`.
- *
- * `expectedPrior` is the consensus-time apply check introduced by the
- * Demos node `nonceEnforcement` fork (audit-sweep batch C):
- *
- *  - **Optional** so the SDK runtime continues to emit the legacy
- *    shape (no `expectedPrior`). Old clients stay forwards-compatible
- *    forever; re-syncing pre-fork blocks is unaffected; new clients
- *    also do not need to know about the field at runtime.
- *  - **Populated by the node** after hash validation, not by the SDK.
- *    The node's post-fork `nonceEnforcement` apply path fills it from
- *    the local GCR state (`accountGCR.nonce`) immediately before
- *    handing the edit to `GCRNonceRoutines`. Both ends of the
- *    SDK-emit + node-regen comparison ship the edit WITHOUT the
- *    field, so hashes match.
- *  - **At apply time**, `GCRNonceRoutines` rejects the edit iff
- *    `accountGCR.nonce !== expectedPrior` — this is the cross-RPC
- *    double-spend safety net. Two competing same-nonce txs bundled
- *    into the same block from different RPCs cannot both apply: the
- *    second loses because its `expectedPrior` (filled at apply time
- *    by the node) no longer matches after the first applies.
- *  - SDK consumers that walk `tx.content.gcr_edits[]` from a
- *    persisted block (e.g. block-explorer code, indexers) may see the
- *    field on post-fork blocks. The field is declared here so those
- *    consumers compile; SDK runtime never writes it.
- */
+
 export interface GCREditNonce {
     type: "nonce"
     isRollback: boolean
@@ -73,7 +45,6 @@ export interface GCREditNonce {
     account: string
     amount: number
     txhash: string
-    expectedPrior?: number
 }
 
 export interface GCREditAssign {
