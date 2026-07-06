@@ -483,7 +483,7 @@ export class Demos {
     ) {
         const signed = await this.pay(to, amount, { nonce: options?.nonce })
         const validityData = await this.confirm(signed)
-        return this.broadcastAndWait(validityData, {
+        return await this.broadcastAndWait(validityData, {
             timeoutMs: options?.timeoutMs,
             pollIntervalMs: options?.pollIntervalMs,
         })
@@ -493,6 +493,19 @@ export class Demos {
      * Alias of {@link payAndWait}: sign, broadcast, and wait for a native
      * transfer. The broadcasting counterpart to {@link transfer} (which only
      * signs).
+     *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * await demos.transferAndWait("0x...", denomination.demToOs(100))  // sent & confirmed
+     * ```
+     *
+     * @param to - The receiver address (0x-prefixed hex).
+     * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
+     * @param options.nonce - Optional explicit nonce.
+     * @param options.timeoutMs - Total time to wait. Defaults to 60_000.
+     * @param options.pollIntervalMs - Delay between polls. Defaults to 500.
+     * @returns The node's terminal broadcast response.
      */
     async transferAndWait(
         to: string,
