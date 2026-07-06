@@ -403,9 +403,13 @@ export class Demos {
      * await demos.pay("0x...", 100)                          // legacy DEM number (deprecated)
      * ```
      *
+     * ⚠️ This only **signs** the transaction — it does NOT broadcast it, so
+     * on its own it moves no funds. Use {@link payAndWait} (or
+     * {@link transferAndWait}) to sign, broadcast, and wait for inclusion.
+     *
      * @param to - The receiver address (0x-prefixed hex).
      * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
-     * @returns The signed transaction.
+     * @returns The signed transaction (NOT broadcast).
      */
     async pay(
         to: string,
@@ -431,9 +435,12 @@ export class Demos {
      * await demos.transfer("0x...", 1_500_000_000n)                // raw OS
      * ```
      *
+     * ⚠️ Like {@link pay}, this only **signs** — it does NOT broadcast. Use
+     * {@link transferAndWait} to sign, broadcast, and wait for inclusion.
+     *
      * @param to - The receiver address (0x-prefixed hex).
      * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
-     * @returns The signed transaction.
+     * @returns The signed transaction (NOT broadcast).
      */
     async transfer(
         to: string,
@@ -441,6 +448,62 @@ export class Demos {
         options?: { nonce?: number },
     ) {
         return this.pay(to, amount, options)
+    }
+
+    /**
+     * Sign, broadcast, and wait for a native transfer to land on chain.
+     *
+     * The broadcasting counterpart to {@link pay}: it runs the full path
+     * (sign → confirm → broadcastAndWait), so the funds actually move. Prefer
+     * this over `pay`/`transfer` unless you deliberately want to handle
+     * broadcasting yourself. Throws `BroadcastTimeoutError` if the transaction
+     * doesn't reach a terminal state before the timeout.
+     *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * await demos.payAndWait("0x...", denomination.demToOs(100))  // sent & confirmed
+     * ```
+     *
+     * @param to - The receiver address (0x-prefixed hex).
+     * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
+     * @param options.nonce - Optional explicit nonce.
+     * @param options.timeoutMs - Total time to wait. Defaults to 60_000.
+     * @param options.pollIntervalMs - Delay between polls. Defaults to 500.
+     * @returns The node's terminal broadcast response.
+     */
+    async payAndWait(
+        to: string,
+        amount: number | bigint,
+        options?: {
+            nonce?: number
+            timeoutMs?: number
+            pollIntervalMs?: number
+        },
+    ) {
+        const signed = await this.pay(to, amount, { nonce: options?.nonce })
+        const validityData = await this.confirm(signed)
+        return this.broadcastAndWait(validityData, {
+            timeoutMs: options?.timeoutMs,
+            pollIntervalMs: options?.pollIntervalMs,
+        })
+    }
+
+    /**
+     * Alias of {@link payAndWait}: sign, broadcast, and wait for a native
+     * transfer. The broadcasting counterpart to {@link transfer} (which only
+     * signs).
+     */
+    async transferAndWait(
+        to: string,
+        amount: number | bigint,
+        options?: {
+            nonce?: number
+            timeoutMs?: number
+            pollIntervalMs?: number
+        },
+    ) {
+        return this.payAndWait(to, amount, options)
     }
 
     /**
