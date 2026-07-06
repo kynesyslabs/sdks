@@ -66,7 +66,7 @@ export {
     NetworkUpgradePayload,
     NetworkUpgradeVoteTransaction,
     NetworkUpgradeVotePayload,
-} from "./blockchain/TransactionSubtypes"
+} from "./blockchain/TransactionSubtypes/index.js"
 
 // L2PSEncryptedPayload removed to avoid circular dependency - import directly from @/l2ps
 
@@ -297,4 +297,4 @@ export {
     validateTokenCreationParams,
     applyMutations,
     hasPermission,
-} from "./token"
+} from "./token/index.js"

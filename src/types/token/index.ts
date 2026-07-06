@@ -63,4 +63,4 @@ export {
     // Mutation helpers
     applyMutations,
     hasPermission,
-} from "./TokenUtils"
+} from "./TokenUtils.js"

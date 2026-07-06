@@ -7,7 +7,7 @@ import {
 } from "@/types"
 import { DemosWorkOutputKey } from "@/types/demoswork"
 import { Operand } from "@/types/demoswork/steps"
-import { DemosWorkOperation } from ".."
+import { DemosWorkOperation } from "../index.js"
 
 export class ConditionalOperation extends DemosWorkOperation {
     override type: OperationType = "conditional"
