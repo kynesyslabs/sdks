@@ -10,7 +10,10 @@
  */
 
 // REVIEW: Phase 10.1 - Production cryptographic implementation
-import * as snarkjs from '@cryptkeeperzk/snarkjs'
+// snarkjs is loaded lazily (dynamic import inside the proof/verify functions):
+// a static import pulls snarkjs → node `fs` into the eager graph, which breaks
+// browser bundles that merely touch `encryption`/`websdk`. It's only needed when
+// a proof is actually generated/verified.
 
 export interface ZKProof {
     pi_a: string[]
@@ -83,6 +86,7 @@ export async function generateIdentityProof(
     const zkeyPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle_final.zkey'
 
     // REVIEW: Phase 10.1 - Production-ready proof generation using snarkjs
+    const snarkjs = await import('@cryptkeeperzk/snarkjs')
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
         circuitInputs,
         wasmPath,
@@ -148,6 +152,7 @@ export async function verifyProof(
             protocol: proof.protocol,
         }
 
+        const snarkjs = await import('@cryptkeeperzk/snarkjs')
         return await snarkjs.groth16.verify(vkey, publicSignals, snarkjsProof)
     } catch (error) {
         throw new Error(
