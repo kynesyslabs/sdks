@@ -468,9 +468,14 @@ export class Demos {
      * @param to - The receiver address (0x-prefixed hex).
      * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
      * @param options.nonce - Optional explicit nonce.
-     * @param options.timeoutMs - Total time to wait. Defaults to 60_000.
-     * @param options.pollIntervalMs - Delay between polls. Defaults to 500.
-     * @returns The node's terminal broadcast response.
+     * @param options.timeoutMs - Max time to wait for on-chain inclusion (the
+     *   broadcast-and-poll phase). Defaults to 60_000. The preceding confirm
+     *   RPC is a single call and is not bounded by this.
+     * @param options.pollIntervalMs - Delay between inclusion polls. Defaults to 500.
+     * @param options.failFastOnBroadcastError - Reject immediately if the broadcast
+     *   RPC errors, instead of polling for a terminal status.
+     * @returns `{ broadcast, status }` — the broadcast RPC response and the
+     *   terminal on-chain status (`included` | `failed`, with optional `blockNumber`).
      */
     async payAndWait(
         to: string,
@@ -479,6 +484,7 @@ export class Demos {
             nonce?: number
             timeoutMs?: number
             pollIntervalMs?: number
+            failFastOnBroadcastError?: boolean
         },
     ) {
         const signed = await this.pay(to, amount, { nonce: options?.nonce })
@@ -486,6 +492,7 @@ export class Demos {
         return await this.broadcastAndWait(validityData, {
             timeoutMs: options?.timeoutMs,
             pollIntervalMs: options?.pollIntervalMs,
+            failFastOnBroadcastError: options?.failFastOnBroadcastError,
         })
     }
 
@@ -503,9 +510,14 @@ export class Demos {
      * @param to - The receiver address (0x-prefixed hex).
      * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
      * @param options.nonce - Optional explicit nonce.
-     * @param options.timeoutMs - Total time to wait. Defaults to 60_000.
-     * @param options.pollIntervalMs - Delay between polls. Defaults to 500.
-     * @returns The node's terminal broadcast response.
+     * @param options.timeoutMs - Max time to wait for on-chain inclusion (the
+     *   broadcast-and-poll phase). Defaults to 60_000. The preceding confirm
+     *   RPC is a single call and is not bounded by this.
+     * @param options.pollIntervalMs - Delay between inclusion polls. Defaults to 500.
+     * @param options.failFastOnBroadcastError - Reject immediately if the broadcast
+     *   RPC errors, instead of polling for a terminal status.
+     * @returns `{ broadcast, status }` — the broadcast RPC response and the
+     *   terminal on-chain status (`included` | `failed`, with optional `blockNumber`).
      */
     async transferAndWait(
         to: string,
@@ -514,6 +526,7 @@ export class Demos {
             nonce?: number
             timeoutMs?: number
             pollIntervalMs?: number
+            failFastOnBroadcastError?: boolean
         },
     ) {
         return this.payAndWait(to, amount, options)
@@ -639,10 +652,16 @@ export class Demos {
      * @param validationData - The validity data of the transaction
      * @param opts.timeoutMs - Total time to wait. Defaults to 60_000.
      * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
+     * @param opts.failFastOnBroadcastError - Reject immediately if the broadcast
+     *   RPC errors, instead of polling for a terminal status.
      */
     broadcastAndWait(
         validationData: RPCResponseWithValidityData,
-        opts?: { timeoutMs?: number; pollIntervalMs?: number },
+        opts?: {
+            timeoutMs?: number
+            pollIntervalMs?: number
+            failFastOnBroadcastError?: boolean
+        },
     ) {
         return DemosTransactions.broadcastAndWait(validationData, this, opts)
     }
