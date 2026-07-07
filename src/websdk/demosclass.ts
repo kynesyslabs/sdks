@@ -347,6 +347,47 @@ export class Demos {
     }
 
     /**
+     * Connect a wallet from a hex-encoded key instead of a mnemonic.
+     *
+     * `connectWallet(<string>)` treats a non-mnemonic string as a BIP-39
+     * *passphrase* (PBKDF2), so passing a raw hex key there silently derives an
+     * unexpected identity. This method decodes the hex to bytes and feeds them to
+     * `connectWallet` as the master seed — a deterministic identity from the key,
+     * on the exact same derivation path as `connectWallet(<bytes>)`. Existing
+     * derivation is unchanged.
+     *
+     * Note: the hex is used as the SDK **master seed**, not as a literal ed25519
+     * seed — the keypair is still derived (sha3_512 → HKDF → forge). Use this for
+     * service accounts that want a stable identity from a fixed secret; it does not
+     * import a keypair produced by an external ed25519 tool.
+     *
+     * @param privateKeyHex - Hex-encoded key, optionally `0x`-prefixed.
+     * @param options - Same options as {@link connectWallet}.
+     * @returns The public key of the connected wallet (hex).
+     */
+    async connectWalletFromPrivateKey(
+        privateKeyHex: string,
+        options?: {
+            algorithm?: SigningAlgorithm
+            dual_sign?: boolean
+        },
+    ) {
+        const clean = privateKeyHex.startsWith("0x")
+            ? privateKeyHex.slice(2)
+            : privateKeyHex
+        if (
+            clean.length === 0 ||
+            clean.length % 2 !== 0 ||
+            !/^[0-9a-fA-F]+$/.test(clean)
+        ) {
+            throw new Error(
+                "connectWalletFromPrivateKey: expected a hex-encoded key (optionally 0x-prefixed).",
+            )
+        }
+        return await this.connectWallet(hexToUint8Array(clean), options)
+    }
+
+    /**
      * Returns the public key of the connected wallet.
      *
      * @returns The public key of the wallet
