@@ -361,7 +361,7 @@ export class Demos {
      * service accounts that want a stable identity from a fixed secret; it does not
      * import a keypair produced by an external ed25519 tool.
      *
-     * @param privateKeyHex - Hex-encoded key, optionally `0x`-prefixed.
+     * @param privateKeyHex - A 32-byte key as 64 hex chars, optionally `0x`-prefixed.
      * @param options - Same options as {@link connectWallet}.
      * @returns The public key of the connected wallet (hex).
      */
@@ -375,13 +375,13 @@ export class Demos {
         const clean = privateKeyHex.startsWith("0x")
             ? privateKeyHex.slice(2)
             : privateKeyHex
-        if (
-            clean.length === 0 ||
-            clean.length % 2 !== 0 ||
-            !/^[0-9a-fA-F]+$/.test(clean)
-        ) {
+        // Require exactly 32 bytes (64 hex chars). Besides being the standard key
+        // length, this avoids connectWallet's 128-byte special case (a 128-byte
+        // master seed skips the sha3_512 step), so derivation is consistent for
+        // every accepted input.
+        if (clean.length !== 64 || !/^[0-9a-fA-F]+$/.test(clean)) {
             throw new Error(
-                "connectWalletFromPrivateKey: expected a hex-encoded key (optionally 0x-prefixed).",
+                "connectWalletFromPrivateKey: expected a 32-byte key as 64 hex chars (optionally 0x-prefixed).",
             )
         }
         return await this.connectWallet(hexToUint8Array(clean), options)
