@@ -1438,6 +1438,16 @@ export class Demos {
         }
         const timeoutMs = opts?.timeoutMs ?? 60_000
         const pollIntervalMs = opts?.pollIntervalMs ?? 500
+        if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+            throw new Error(
+                `waitForNonce: timeoutMs must be a non-negative number, got ${timeoutMs}`,
+            )
+        }
+        if (!Number.isFinite(pollIntervalMs) || pollIntervalMs <= 0) {
+            throw new Error(
+                `waitForNonce: pollIntervalMs must be a positive number, got ${pollIntervalMs}`,
+            )
+        }
         const deadline = Date.now() + timeoutMs
 
         let observed = -1
