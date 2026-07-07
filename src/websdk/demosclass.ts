@@ -1431,22 +1431,38 @@ export class Demos {
         target: number,
         opts?: { timeoutMs?: number; pollIntervalMs?: number },
     ): Promise<number> {
+        if (!Number.isInteger(target) || target < 0) {
+            throw new Error(
+                `waitForNonce: target must be a non-negative integer, got ${target}`,
+            )
+        }
         const timeoutMs = opts?.timeoutMs ?? 60_000
         const pollIntervalMs = opts?.pollIntervalMs ?? 500
         const deadline = Date.now() + timeoutMs
 
-        let observed = await this.getAddressNonce(address)
-        while (observed < target) {
+        let observed = -1
+        let lastError: unknown = null
+        while (true) {
+            try {
+                observed = await this.getAddressNonce(address)
+                if (observed >= target) return observed
+                lastError = null
+            } catch (error) {
+                // Tolerate transient node/transport errors — a single failed poll
+                // shouldn't abort the wait; keep polling until the deadline.
+                lastError = error
+            }
             if (Date.now() >= deadline) {
+                const detail = lastError
+                    ? `last error: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+                    : `last observed ${observed}`
                 throw new Error(
                     `waitForNonce: nonce for ${address} did not reach ${target} ` +
-                        `within ${timeoutMs}ms (last observed ${observed})`,
+                        `within ${timeoutMs}ms (${detail})`,
                 )
             }
             await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
-            observed = await this.getAddressNonce(address)
         }
-        return observed
     }
 
     /**
