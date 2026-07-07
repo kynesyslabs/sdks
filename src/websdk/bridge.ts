@@ -1,7 +1,7 @@
 import { RPCResponse } from "@/types"
 import { BridgeTradePayload } from "@/types/bridge/bridgeTradePayload"
 import { Demos } from "@/websdk/demosclass"
-import { WrappedCrossChainTrade } from "rubic-sdk"
+import type { WrappedCrossChainTrade } from "rubic-sdk"
 
 export class RubicBridge {
     async getTrade(
