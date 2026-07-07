@@ -753,6 +753,16 @@ export class Identities {
         address?: string,
     ) {
         if (!address) {
+            // Reading your own identities needs a connected wallet to know the
+            // address; reading someone else's only needs their address. Fail with
+            // a clear message instead of crashing on an undefined keypair.
+            if (!demos.walletConnected) {
+                throw new Error(
+                    "getIdentities: no address given and no wallet connected. " +
+                        "Pass an `address` to read a specific account's identities, " +
+                        "or connect a wallet to read your own.",
+                )
+            }
             const ed25519 = await demos.crypto.getIdentity("ed25519")
             address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
         }
@@ -767,7 +777,9 @@ export class Identities {
             ],
         }
 
-        return await demos.rpcCall(request, true)
+        // Identities for an address are public data — only authenticate when a
+        // wallet is connected, so indexers/verifiers can read without a keypair.
+        return await demos.rpcCall(request, demos.walletConnected)
     }
 
     /**
