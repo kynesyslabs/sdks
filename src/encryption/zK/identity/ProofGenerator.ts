@@ -86,7 +86,16 @@ export async function generateIdentityProof(
     const zkeyPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle_final.zkey'
 
     // REVIEW: Phase 10.1 - Production-ready proof generation using snarkjs
-    const snarkjs = await import('@cryptkeeperzk/snarkjs')
+    let snarkjs: typeof import('@cryptkeeperzk/snarkjs')
+    try {
+        snarkjs = await import('@cryptkeeperzk/snarkjs')
+    } catch (error) {
+        throw new Error(
+            `ZK proof generation unavailable: could not load snarkjs (zK proofs ` +
+                `need a Node/WASM-capable environment). ` +
+                `${error instanceof Error ? error.message : String(error)}`,
+        )
+    }
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
         circuitInputs,
         wasmPath,
