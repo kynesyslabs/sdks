@@ -32,9 +32,10 @@ export class NonceManager {
     /**
      * Reserve the next nonce for `address`, serialized against other
      * reservations for the same address. Seeds from `fetchNext` on first use
-     * (or after {@link reset}); `fetchNext` must resolve the next usable nonce
-     * for the address — i.e. one accounting for txs already pending, not just
-     * the confirmed count (see `Demos.getAddressPendingNonce`).
+     * (or after {@link reset}); `fetchNext` must resolve the first usable nonce
+     * for the address — the confirmed on-chain nonce plus one
+     * (`Demos.getAddressNonce(address) + 1`). Subsequent reservations increment
+     * locally, which is what keeps concurrent sends from colliding.
      */
     async reserve(
         address: string,

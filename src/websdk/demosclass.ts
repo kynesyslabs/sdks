@@ -1465,8 +1465,15 @@ export class Demos {
      * Reserver passed to `resolveNonce` by the transaction builders. Returns a
      * function that sequences the nonce for `address` when auto-nonce is on,
      * or `undefined` so `resolveNonce` keeps its historical per-send read.
-     * The manager seeds from {@link getAddressPendingNonce} (mempool-aware),
-     * then increments locally per send.
+     *
+     * Seeds once from the confirmed on-chain nonce (`getAddressNonce() + 1`),
+     * then increments locally per send. Seeding from the confirmed nonce (not a
+     * mempool-aware value) is deliberate: the node accepts any nonce greater
+     * than the confirmed one, and the confirmed nonce is consistent across
+     * every RPC — whereas a per-RPC mempool count is not. The local counter is
+     * what keeps a batch's nonces distinct (`N+1, N+2, …`) so they don't
+     * collide; re-reading `getAddressNonce` for each send would not, because it
+     * lags inclusion.
      *
      * @internal
      */
@@ -1475,39 +1482,10 @@ export class Demos {
             return undefined
         }
         return () =>
-            this._nonceManager.reserve(address, () =>
-                this.getAddressPendingNonce(address),
-            )
-    }
-
-    /**
-     * Get the next usable nonce for `address`, accounting for transactions
-     * already pending in the node's mempool — i.e. the value to place directly
-     * in `tx.content.nonce`. This is `getAddressNonce` semantics shifted by the
-     * sender's in-flight count (like eth `getTransactionCount('pending')`), and
-     * is what avoids batch-send collisions.
-     *
-     * Falls back to `getAddressNonce() + 1` when the node does not expose the
-     * pending-nonce RPC yet, so this works against older nodes too.
-     */
-    async getAddressPendingNonce(address: string): Promise<number> {
-        try {
-            const pending = await this.nodeCall("getAddressPendingNonce", {
+            this._nonceManager.reserve(
                 address,
-            })
-            if (typeof pending === "number" && Number.isInteger(pending) && pending >= 0) {
-                return pending
-            }
-            if (typeof pending === "string") {
-                const parsed = Number.parseInt(pending, 10)
-                if (Number.isInteger(parsed) && parsed >= 0) {
-                    return parsed
-                }
-            }
-        } catch {
-            // Older node without the pending-nonce handler — fall through.
-        }
-        return (await this.getAddressNonce(address)) + 1
+                async () => (await this.getAddressNonce(address)) + 1,
+            )
     }
 
     /**
