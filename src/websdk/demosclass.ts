@@ -206,6 +206,10 @@ export class Demos {
                 this._cachedNetworkInfoRpcUrl = null
                 this._cachedNetworkInfoFailed = false
                 this._cachedNetworkInfoFailedAt = 0
+                // Local nonce counters are tied to the previous node's state;
+                // drop them so the next auto-nonce reservation reseeds from
+                // the new node.
+                this._nonceManager.resetAll()
             }
             this.rpc_url = rpc_url
         }
@@ -1750,6 +1754,9 @@ export class Demos {
         // remove rpc_url and wallet connection
         this.rpc_url = null
         this.dual_sign = false
+        // Drop local nonce counters — they belong to the node/wallet we're
+        // leaving; the next connect+reservation reseeds.
+        this._nonceManager.resetAll()
 
         this.connected = false
         // Clean up the per-instance crypto from the multiton map

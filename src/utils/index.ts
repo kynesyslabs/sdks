@@ -33,7 +33,7 @@ export async function resolveNonce(
     // sequences concurrent sends locally, seeded from the mempool-aware
     // pending nonce. Absent it, keep the historical confirmed-nonce read.
     if (reserve) {
-        return reserve()
+        return assertValidNonce(await reserve())
     }
     return (await fetchCurrent()) + 1
 }
