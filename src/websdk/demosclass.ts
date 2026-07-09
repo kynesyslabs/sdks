@@ -11,6 +11,7 @@ import { TransportError } from "./TransportError"
 
 // NOTE Including custom libraries from Demos
 import { DemosTransactions } from "./DemosTransactions"
+import { NonceManager } from "./NonceManager"
 import { DemosWebAuth } from "./DemosWebAuth"
 import { prepareXMPayload } from "./XMTransactions"
 
@@ -125,6 +126,15 @@ export class Demos {
      * still see the warning exactly once per instance lifetime.
      */
     private static readonly _NETWORK_INFO_FAILURE_TTL_MS = 30_000
+
+    /**
+     * Client-side nonce sequencer. Opt-in via {@link enableAutoNonce}. When
+     * enabled, transaction builders reserve nonces from this manager instead
+     * of re-reading the lagging chain nonce, so batched sends from the same
+     * address don't collide. See {@link NonceManager}.
+     */
+    private readonly _nonceManager = new NonceManager()
+    private _autoNonce = false
 
     /** Connection status of the RPC URL */
     connected: boolean = false
@@ -481,11 +491,13 @@ export class Demos {
             // txs ship with the skeleton default nonce 0 and get rejected
             // by the node's sequential-nonce / expectedPrior enforcement
             // after the first one.
-            const nonce = await resolveNonce(options?.nonce, async () => {
-                const { publicKey } = await this.crypto.getIdentity("ed25519")
-                const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-                return this.getAddressNonce(publicKeyHex)
-            })
+            const { publicKey } = await this.crypto.getIdentity("ed25519")
+            const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+            const nonce = await resolveNonce(
+                options?.nonce,
+                () => this.getAddressNonce(publicKeyHex),
+                this._nonceReserver(publicKeyHex),
+            )
 
             const tx = DemosTransactions.empty()
             tx.content.to = payload.storageAddress
@@ -1473,6 +1485,74 @@ export class Demos {
             }
             await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
         }
+    }
+
+    /**
+     * Enable client-side nonce sequencing for this instance.
+     *
+     * Once enabled, every transaction builder reserves its nonce from a local
+     * per-address counter (seeded once from the node) instead of re-reading
+     * `getAddressNonce` for each send. This prevents the collisions that make
+     * batched sends from the same address fail — the node rejects two txs
+     * that reuse a nonce because `getAddressNonce` lags inclusion.
+     *
+     * Opt-in for now. Passing an explicit `options.nonce` still overrides the
+     * manager. If a send is rejected for a nonce error, call
+     * {@link resetNonce} so the next send reseeds from the chain.
+     */
+    enableAutoNonce(): void {
+        this._autoNonce = true
+    }
+
+    /** Disable client-side nonce sequencing and clear its local state. */
+    disableAutoNonce(): void {
+        this._autoNonce = false
+        this._nonceManager.resetAll()
+    }
+
+    /** Whether client-side nonce sequencing is enabled for this instance. */
+    get autoNonceEnabled(): boolean {
+        return this._autoNonce
+    }
+
+    /**
+     * Reseed the local nonce counter for `address` (or every address) from the
+     * node on the next send. Call after a nonce-rejection, or when the same
+     * key may have sent from another client.
+     */
+    resetNonce(address?: string): void {
+        if (address === undefined) {
+            this._nonceManager.resetAll()
+        } else {
+            this._nonceManager.reset(address)
+        }
+    }
+
+    /**
+     * Reserver passed to `resolveNonce` by the transaction builders. Returns a
+     * function that sequences the nonce for `address` when auto-nonce is on,
+     * or `undefined` so `resolveNonce` keeps its historical per-send read.
+     *
+     * Seeds once from the confirmed on-chain nonce (`getAddressNonce() + 1`),
+     * then increments locally per send. Seeding from the confirmed nonce (not a
+     * mempool-aware value) is deliberate: the node accepts any nonce greater
+     * than the confirmed one, and the confirmed nonce is consistent across
+     * every RPC — whereas a per-RPC mempool count is not. The local counter is
+     * what keeps a batch's nonces distinct (`N+1, N+2, …`) so they don't
+     * collide; re-reading `getAddressNonce` for each send would not, because it
+     * lags inclusion.
+     *
+     * @internal
+     */
+    _nonceReserver(address: string): (() => Promise<number>) | undefined {
+        if (!this._autoNonce) {
+            return undefined
+        }
+        return () =>
+            this._nonceManager.reserve(
+                address,
+                async () => (await this.getAddressNonce(address)) + 1,
+            )
     }
 
     /**
