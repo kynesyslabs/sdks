@@ -192,8 +192,11 @@ export class Web2Proxy {
         web2Tx.content.data = ["web2Request", web2Payload]
         web2Tx.content.timestamp = Date.now()
 
-        const nonce = await resolveNonce(options?.nonce, async () =>
-            this._demos.getAddressNonce(await this._demos.getEd25519Address()),
+        const fromAddress = await this._demos.getEd25519Address()
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => this._demos.getAddressNonce(fromAddress),
+            this._demos._nonceReserver(fromAddress),
         )
         web2Tx.content.nonce = nonce
 

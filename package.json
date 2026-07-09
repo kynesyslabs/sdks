@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "4.0.14",
+    "version": "4.0.15",
     "type": "module",
     "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
@@ -157,6 +157,7 @@
         "pqcrypto": "^1.0.1",
         "protobufjs": "^7.6.2",
         "ripple-keypairs": "^2.0.0",
+        "sigstore": "^5.0.0",
         "simple-peer": "^9.11.1",
         "socket.io-client": "^4.8.3",
         "sphincs": "^3.0.4",

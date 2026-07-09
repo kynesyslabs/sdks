@@ -24,9 +24,16 @@ export function assertValidNonce(nonce: number): number {
 export async function resolveNonce(
     customNonce: number | undefined,
     fetchCurrent: () => Promise<number>,
+    reserve?: () => Promise<number>,
 ): Promise<number> {
     if (customNonce !== undefined) {
         return assertValidNonce(customNonce)
+    }
+    // When a reserver is supplied (auto-nonce enabled on the client) it
+    // sequences concurrent sends locally, seeded from the mempool-aware
+    // pending nonce. Absent it, keep the historical confirmed-nonce read.
+    if (reserve) {
+        return reserve()
     }
     return (await fetchCurrent()) + 1
 }

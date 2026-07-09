@@ -75,8 +75,10 @@ export const DemosTransactions = {
 
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(options?.nonce, () =>
-            demos.getAddressNonce(publicKeyHex),
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
         )
 
         if (typeof amount === "bigint" && amount < 0n) {
@@ -529,8 +531,10 @@ export const DemosTransactions = {
 
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(options?.nonce, () =>
-            demos.getAddressNonce(publicKeyHex),
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
         )
 
         // Convert bytes to base64 for JSONB compatibility
@@ -590,8 +594,10 @@ export const DemosTransactions = {
 
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(options?.nonce, () =>
-            demos.getAddressNonce(publicKeyHex),
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
         )
 
         // Self-directed transaction (from = to) triggers DTR routing
@@ -654,8 +660,10 @@ export const DemosTransactions = {
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(options?.nonce, () =>
-            demos.getAddressNonce(publicKeyHex),
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
         )
 
         // Staking txs are reflexive — the sender operates on their own
@@ -681,8 +689,10 @@ export const DemosTransactions = {
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(options?.nonce, () =>
-            demos.getAddressNonce(publicKeyHex),
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
         )
 
         tx.content.to = publicKeyHex
@@ -705,8 +715,10 @@ export const DemosTransactions = {
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(options?.nonce, () =>
-            demos.getAddressNonce(publicKeyHex),
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
         )
 
         tx.content.to = publicKeyHex
@@ -785,8 +797,10 @@ export const DemosTransactions = {
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(options?.nonce, () =>
-            demos.getAddressNonce(publicKeyHex),
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
         )
 
         tx.content.to = publicKeyHex
@@ -832,8 +846,10 @@ export const DemosTransactions = {
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(options?.nonce, () =>
-            demos.getAddressNonce(publicKeyHex),
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
         )
 
         tx.content.to = publicKeyHex
