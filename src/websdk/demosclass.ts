@@ -357,6 +357,47 @@ export class Demos {
     }
 
     /**
+     * Connect a wallet from a hex-encoded key instead of a mnemonic.
+     *
+     * `connectWallet(<string>)` treats a non-mnemonic string as a BIP-39
+     * *passphrase* (PBKDF2), so passing a raw hex key there silently derives an
+     * unexpected identity. This method decodes the hex to bytes and feeds them to
+     * `connectWallet` as the master seed — a deterministic identity from the key,
+     * on the exact same derivation path as `connectWallet(<bytes>)`. Existing
+     * derivation is unchanged.
+     *
+     * Note: the hex is used as the SDK **master seed**, not as a literal ed25519
+     * seed — the keypair is still derived (sha3_512 → HKDF → forge). Use this for
+     * service accounts that want a stable identity from a fixed secret; it does not
+     * import a keypair produced by an external ed25519 tool.
+     *
+     * @param privateKeyHex - A 32-byte key as 64 hex chars, optionally `0x`-prefixed.
+     * @param options - Same options as {@link connectWallet}.
+     * @returns The public key of the connected wallet (hex).
+     */
+    async connectWalletFromPrivateKey(
+        privateKeyHex: string,
+        options?: {
+            algorithm?: SigningAlgorithm
+            dual_sign?: boolean
+        },
+    ) {
+        const clean = privateKeyHex.startsWith("0x")
+            ? privateKeyHex.slice(2)
+            : privateKeyHex
+        // Require exactly 32 bytes (64 hex chars). Besides being the standard key
+        // length, this avoids connectWallet's 128-byte special case (a 128-byte
+        // master seed skips the sha3_512 step), so derivation is consistent for
+        // every accepted input.
+        if (clean.length !== 64 || !/^[0-9a-fA-F]+$/.test(clean)) {
+            throw new Error(
+                "connectWalletFromPrivateKey: expected a 32-byte key as 64 hex chars (optionally 0x-prefixed).",
+            )
+        }
+        return await this.connectWallet(hexToUint8Array(clean), options)
+    }
+
+    /**
      * Returns the public key of the connected wallet.
      *
      * @returns The public key of the wallet
