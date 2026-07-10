@@ -413,9 +413,13 @@ export class Demos {
      * await demos.pay("0x...", 100)                          // legacy DEM number (deprecated)
      * ```
      *
+     * ⚠️ This only **signs** the transaction — it does NOT broadcast it, so
+     * on its own it moves no funds. Use {@link payAndWait} (or
+     * {@link transferAndWait}) to sign, broadcast, and wait for inclusion.
+     *
      * @param to - The receiver address (0x-prefixed hex).
      * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
-     * @returns The signed transaction.
+     * @returns The signed transaction (NOT broadcast).
      */
     async pay(
         to: string,
@@ -441,9 +445,12 @@ export class Demos {
      * await demos.transfer("0x...", 1_500_000_000n)                // raw OS
      * ```
      *
+     * ⚠️ Like {@link pay}, this only **signs** — it does NOT broadcast. Use
+     * {@link transferAndWait} to sign, broadcast, and wait for inclusion.
+     *
      * @param to - The receiver address (0x-prefixed hex).
      * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
-     * @returns The signed transaction.
+     * @returns The signed transaction (NOT broadcast).
      */
     async transfer(
         to: string,
@@ -451,6 +458,88 @@ export class Demos {
         options?: { nonce?: number },
     ) {
         return this.pay(to, amount, options)
+    }
+
+    /**
+     * Sign, broadcast, and wait for a native transfer to land on chain.
+     *
+     * The broadcasting counterpart to {@link pay}: it runs the full path
+     * (sign → confirm → broadcastAndWait), so the funds actually move. Prefer
+     * this over `pay`/`transfer` unless you deliberately want to handle
+     * broadcasting yourself. Throws `BroadcastTimeoutError` if the transaction
+     * doesn't reach a terminal state before the timeout.
+     *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * await demos.payAndWait("0x...", denomination.demToOs(100))  // sent & confirmed
+     * ```
+     *
+     * @param to - The receiver address (0x-prefixed hex).
+     * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
+     * @param options.nonce - Optional explicit nonce.
+     * @param options.timeoutMs - Max time to wait for on-chain inclusion (the
+     *   broadcast-and-poll phase). Defaults to 60_000. The preceding confirm
+     *   RPC is a single call and is not bounded by this.
+     * @param options.pollIntervalMs - Delay between inclusion polls. Defaults to 500.
+     * @param options.failFastOnBroadcastError - Reject immediately if the broadcast
+     *   RPC errors, instead of polling for a terminal status.
+     * @returns `{ broadcast, status }` — the broadcast RPC response and the
+     *   terminal on-chain status (`included` | `failed`, with optional `blockNumber`).
+     */
+    async payAndWait(
+        to: string,
+        amount: number | bigint,
+        options?: {
+            nonce?: number
+            timeoutMs?: number
+            pollIntervalMs?: number
+            failFastOnBroadcastError?: boolean
+        },
+    ) {
+        const signed = await this.pay(to, amount, { nonce: options?.nonce })
+        const validityData = await this.confirm(signed)
+        return await this.broadcastAndWait(validityData, {
+            timeoutMs: options?.timeoutMs,
+            pollIntervalMs: options?.pollIntervalMs,
+            failFastOnBroadcastError: options?.failFastOnBroadcastError,
+        })
+    }
+
+    /**
+     * Alias of {@link payAndWait}: sign, broadcast, and wait for a native
+     * transfer. The broadcasting counterpart to {@link transfer} (which only
+     * signs).
+     *
+     * @example
+     * ```ts
+     * import { denomination } from "@kynesyslabs/demosdk"
+     * await demos.transferAndWait("0x...", denomination.demToOs(100))  // sent & confirmed
+     * ```
+     *
+     * @param to - The receiver address (0x-prefixed hex).
+     * @param amount - DEM `number` (legacy) or OS `bigint` (preferred).
+     * @param options.nonce - Optional explicit nonce.
+     * @param options.timeoutMs - Max time to wait for on-chain inclusion (the
+     *   broadcast-and-poll phase). Defaults to 60_000. The preceding confirm
+     *   RPC is a single call and is not bounded by this.
+     * @param options.pollIntervalMs - Delay between inclusion polls. Defaults to 500.
+     * @param options.failFastOnBroadcastError - Reject immediately if the broadcast
+     *   RPC errors, instead of polling for a terminal status.
+     * @returns `{ broadcast, status }` — the broadcast RPC response and the
+     *   terminal on-chain status (`included` | `failed`, with optional `blockNumber`).
+     */
+    async transferAndWait(
+        to: string,
+        amount: number | bigint,
+        options?: {
+            nonce?: number
+            timeoutMs?: number
+            pollIntervalMs?: number
+            failFastOnBroadcastError?: boolean
+        },
+    ) {
+        return this.payAndWait(to, amount, options)
     }
 
     /**
@@ -575,10 +664,16 @@ export class Demos {
      * @param validationData - The validity data of the transaction
      * @param opts.timeoutMs - Total time to wait. Defaults to 60_000.
      * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
+     * @param opts.failFastOnBroadcastError - Reject immediately if the broadcast
+     *   RPC errors, instead of polling for a terminal status.
      */
     broadcastAndWait(
         validationData: RPCResponseWithValidityData,
-        opts?: { timeoutMs?: number; pollIntervalMs?: number },
+        opts?: {
+            timeoutMs?: number
+            pollIntervalMs?: number
+            failFastOnBroadcastError?: boolean
+        },
     ) {
         return DemosTransactions.broadcastAndWait(validationData, this, opts)
     }
