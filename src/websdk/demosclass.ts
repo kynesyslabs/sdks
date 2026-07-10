@@ -1557,6 +1557,73 @@ export class Demos {
     }
 
     /**
+     * Poll the node until the nonce for `address` reaches (or exceeds) `target`.
+     *
+     * The node's `getAddressNonce` lags inclusion, so sending several transactions
+     * back-to-back can silently evict one: the next `pay`/`sign` reads a stale
+     * nonce and collides. When you must sequence dependent sends, wait for the
+     * nonce to advance past the last-sent one before signing the next.
+     *
+     * (For a single native transfer, prefer {@link payAndWait}, which already waits
+     * for on-chain inclusion.)
+     *
+     * @param address - The account address (hex).
+     * @param target - The nonce value to wait for (e.g. `lastSentNonce + 1`).
+     * @param opts.timeoutMs - Total time to wait. Defaults to 60_000.
+     * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
+     * @returns The observed nonce (>= `target`).
+     * @throws if `target` isn't reached before the timeout elapses.
+     */
+    async waitForNonce(
+        address: string,
+        target: number,
+        opts?: { timeoutMs?: number; pollIntervalMs?: number },
+    ): Promise<number> {
+        if (!Number.isInteger(target) || target < 0) {
+            throw new Error(
+                `waitForNonce: target must be a non-negative integer, got ${target}`,
+            )
+        }
+        const timeoutMs = opts?.timeoutMs ?? 60_000
+        const pollIntervalMs = opts?.pollIntervalMs ?? 500
+        if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+            throw new Error(
+                `waitForNonce: timeoutMs must be a non-negative number, got ${timeoutMs}`,
+            )
+        }
+        if (!Number.isFinite(pollIntervalMs) || pollIntervalMs <= 0) {
+            throw new Error(
+                `waitForNonce: pollIntervalMs must be a positive number, got ${pollIntervalMs}`,
+            )
+        }
+        const deadline = Date.now() + timeoutMs
+
+        let observed = -1
+        let lastError: unknown = null
+        while (true) {
+            try {
+                observed = await this.getAddressNonce(address)
+                if (observed >= target) return observed
+                lastError = null
+            } catch (error) {
+                // Tolerate transient node/transport errors — a single failed poll
+                // shouldn't abort the wait; keep polling until the deadline.
+                lastError = error
+            }
+            if (Date.now() >= deadline) {
+                const detail = lastError
+                    ? `last error: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+                    : `last observed ${observed}`
+                throw new Error(
+                    `waitForNonce: nonce for ${address} did not reach ${target} ` +
+                        `within ${timeoutMs}ms (${detail})`,
+                )
+            }
+            await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+        }
+    }
+
+    /**
      * Enable client-side nonce sequencing for this instance.
      *
      * Once enabled, every transaction builder reserves its nonce from a local
