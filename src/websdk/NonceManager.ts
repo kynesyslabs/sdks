@@ -28,6 +28,12 @@ export class NonceManager {
     private readonly next = new Map<string, number>()
     /** Per-address serialization tail so concurrent reservations don't race. */
     private readonly tail = new Map<string, Promise<unknown>>()
+    /**
+     * Per-address reset generation. Bumped by {@link reset}/{@link resetAll}
+     * so a reservation whose seed fetch straddled a reset does not write its
+     * now-stale seed back into `next`.
+     */
+    private readonly epoch = new Map<string, number>()
 
     /**
      * Reserve the next nonce for `address`, serialized against other
@@ -45,10 +51,19 @@ export class NonceManager {
         const run = prior.then(async () => {
             let n = this.next.get(address)
             if (n === undefined) {
-                // Seed once. `fetchNext` already returns the next nonce to
-                // use; subsequent reservations increment locally so rapid
-                // sends don't re-read the lagging confirmed nonce.
-                n = await fetchNext()
+                // Seed once. `fetchNext` returns the first usable nonce;
+                // validate it so a bad node reply (NaN/negative/fractional)
+                // can't poison every later reservation. Subsequent
+                // reservations increment locally so rapid sends don't re-read
+                // the lagging confirmed nonce.
+                const startEpoch = this.epoch.get(address) ?? 0
+                n = assertValidNonce(await fetchNext())
+                if ((this.epoch.get(address) ?? 0) !== startEpoch) {
+                    // A reset() landed while we were fetching the seed. Honour
+                    // it: hand this value to the caller but don't cache it, so
+                    // the next reservation reseeds from the node afresh.
+                    return n
+                }
             }
             this.next.set(address, n + 1)
             return n
@@ -74,11 +89,17 @@ export class NonceManager {
      */
     reset(address: string): void {
         this.next.delete(address)
+        this.epoch.set(address, (this.epoch.get(address) ?? 0) + 1)
     }
 
     /** Drop local state for every address. */
     resetAll(): void {
         this.next.clear()
+        // Bump the epoch of every address seen so far (the tail retains them)
+        // so any in-flight reservation reseeds instead of writing stale state.
+        for (const address of this.tail.keys()) {
+            this.epoch.set(address, (this.epoch.get(address) ?? 0) + 1)
+        }
     }
 
     /**

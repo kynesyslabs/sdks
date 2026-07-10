@@ -81,4 +81,31 @@ describe("NonceManager", () => {
         expect(await m.reserve(ADDR, async () => 0)).toBe(77)
         expect(m.peek(ADDR)).toBe(78)
     })
+
+    it("rejects an invalid seed instead of poisoning later reservations", async () => {
+        const m = new NonceManager()
+        await expect(m.reserve(ADDR, async () => NaN)).rejects.toThrow()
+        await expect(m.reserve(ADDR, async () => -1)).rejects.toThrow()
+        await expect(m.reserve(ADDR, async () => 3.5)).rejects.toThrow()
+        // A valid seed still works afterwards (state not poisoned).
+        expect(await m.reserve(ADDR, async () => 9)).toBe(9)
+    })
+
+    it("a reset during an in-flight seed fetch forces the next reservation to reseed", async () => {
+        const m = new NonceManager()
+        let started: () => void
+        const startedP = new Promise<void>(r => (started = r))
+        let release: (v: number) => void
+        const slowSeed = () => {
+            started()
+            return new Promise<number>(r => (release = r))
+        }
+        const inflight = m.reserve(ADDR, slowSeed)
+        await startedP // seed fetch has started (epoch captured)
+        m.reset(ADDR) // reset lands mid-fetch
+        release!(10)
+        expect(await inflight).toBe(10) // caller still gets its value
+        // but state wasn't cached — the next reservation reseeds from the node.
+        expect(await m.reserve(ADDR, async () => 20)).toBe(20)
+    })
 })
