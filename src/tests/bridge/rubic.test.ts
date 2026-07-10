@@ -4,7 +4,7 @@ import {
     CrossChainTrade,
     RubicSdkError,
     WrappedCrossChainTrade,
-} from "@/bridge"
+} from "@/bridge/rubic"
 import { RubicBridge } from "@/bridge"
 import { BridgeTradePayload, SupportedChains } from "@/bridge"
 
