@@ -32,6 +32,7 @@ NC='\033[0m'
 DRY_RUN=false
 AUTO_YES=false
 BUMP_TYPE=""
+EXPLICIT_VERSION=""
 REDO_MODE=false
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -46,10 +47,12 @@ Usage:
   publish-cli.sh --dry-run          # show what would happen
   publish-cli.sh --version          # print current version
   publish-cli.sh --redo            # redo last release
-  publish-cli.sh --redo --yes      # redo without confirmation
+  publish-cli.sh --set-version 4.1.0 # set exact version and publish
+  publish-cli.sh --redo --yes       # redo without confirmation
   publish-cli.sh --help            # show this help
 
 Options:
+  --set-version <v>  Set exact version (e.g. 4.1.0) instead of bumping
   --bump <type>    Bump version: patch, minor, or major (non-interactive)
   --yes, -y         Skip all confirmation prompts
   --dry-run         Show what would happen without doing it
@@ -58,6 +61,7 @@ Options:
   --help, -h        Show this help message
 
 Examples:
+  ./publish-cli.sh --set-version 4.1.0 --yes   # publish exact version
   ./publish-cli.sh                           # interactive release
   ./publish-cli.sh --bump patch              # bump patch, commit and push
   ./publish-cli.sh --bump minor --yes        # non-interactive minor bump
@@ -187,9 +191,12 @@ redo_release() {
     echo -e "${BLUE}🚀 Release workflow should start shortly for v${current_version}${NC}"
 }
 
-# ─── Parse Args ───────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --set-version)
+            EXPLICIT_VERSION="$2"
+            shift 2
+            ;;
         --bump)
             BUMP_TYPE="$2"
             shift 2
@@ -223,6 +230,42 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
+# ─── Explicit version mode ───────────────────────────────────────────────────
+if [ -n "$EXPLICIT_VERSION" ]; then
+    if [[ ! "$EXPLICIT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo -e "${RED}Error: --set-version must be semver (got: '$EXPLICIT_VERSION')${NC}" >&2
+        exit 1
+    fi
+    current_version=$(get_current_version)
+    echo -e "${BLUE}=== RELEASE (explicit version) ===${NC}"
+    echo -e "Current: ${YELLOW}v${current_version}${NC} → Target: ${GREEN}v${EXPLICIT_VERSION}${NC}"
+
+    if [ "$DRY_RUN" = true ]; then
+        echo -e "${CYAN}[dry-run]${NC} Would run: bun run build"
+        echo -e "${CYAN}[dry-run]${NC} Would set version to ${GREEN}v${EXPLICIT_VERSION}${NC}"
+        echo -e "${CYAN}[dry-run]${NC} Would commit: ${BOLD}release v${EXPLICIT_VERSION}${NC}"
+        echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+        echo -e "${GREEN}✓ Dry run complete — no changes made${NC}"
+        exit 0
+    fi
+
+    run_build
+
+    # Write version directly
+    node -e "
+const fs = require('fs');
+const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+pkg.version = '$EXPLICIT_VERSION';
+fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 4) + '\n');
+"
+    echo -e "${GREEN}✓ Version set to v${EXPLICIT_VERSION}${NC}"
+
+    confirm "This will commit the version bump and push 'release v${EXPLICIT_VERSION}' to trigger the release workflow."
+
+    commit_and_push "$EXPLICIT_VERSION"
+    exit 0
+fi
+
 if [ "$REDO_MODE" = true ]; then
     current_version=$(get_current_version)
     echo -e "${BLUE}=== REDO RELEASE ===${NC}"
