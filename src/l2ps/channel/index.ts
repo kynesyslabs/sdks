@@ -92,3 +92,10 @@ export {
     type SealedCommitment,
     type RevealedBid,
 } from "./sealedEnvelope"
+
+export {
+    finalizeSealedEnvelope,
+    type FinalizeSealedEnvelopeOpts,
+    type SealedEnvelopeFinalizeResult,
+    type SealedEnvelopeLike,
+} from "./finalizeSealed"
