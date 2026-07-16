@@ -44,7 +44,32 @@ export const SEALED_ENVELOPE_DOMAIN_PREFIX = "dacs-sealed-envelope:v1:"
  * bytes. Recomputing this from a reveal and comparing to the commit is the
  * whole anti-cheat check: it binds the revealer to the exact bid it sealed.
  */
+function assertInjectivelySerialisable(
+    value: unknown,
+    path = "bid",
+    seen: WeakSet<object> = new WeakSet(),
+): void {
+    if (typeof value === "number") {
+        if (!Number.isFinite(value))
+            throw new Error(
+                `sealed-envelope: ${path} is ${String(value)}, which canonicalises to null — committing to it would let the sender open a different bid`,
+            )
+        return
+    }
+    if (!value || typeof value !== "object") return
+    if (seen.has(value)) return
+    seen.add(value)
+    if (Array.isArray(value)) {
+        value.forEach((v, i) => assertInjectivelySerialisable(v, `${path}[${i}]`, seen))
+        return
+    }
+    for (const [k, v] of Object.entries(value)) {
+        assertInjectivelySerialisable(v, `${path}.${k}`, seen)
+    }
+}
+
 export function commitmentHex(bid: unknown, salt: string): string {
+    assertInjectivelySerialisable(bid)
     const canonical = canonicalJSONStringify({ bid, salt })
     return bytesToHex(
         sha256(new TextEncoder().encode(SEALED_ENVELOPE_DOMAIN_PREFIX + canonical)),
@@ -156,6 +181,13 @@ export class SealedEnvelopeSession {
             throw new Error(
                 `SealedEnvelopeSession: me (${opts.me}) is not a participant`,
             )
+        // `commits` is keyed by participant, so a duplicated entry would make
+        // participants.length exceed the reachable commits.size and the commit
+        // phase could never auto-advance.
+        if (new Set(opts.participants).size !== opts.participants.length)
+            throw new Error(
+                "SealedEnvelopeSession: participants contains duplicates",
+            )
         this.me = opts.me
         this.participants = [...opts.participants]
         this.sendFn = opts.send
@@ -215,6 +247,16 @@ export class SealedEnvelopeSession {
     }
 
     /**
+     * CALLER CONTRACT — this closes THIS member's phase only. Every member must
+     * close on a signal they all share (a deadline agreed in the terms, or one
+     * derived from the transcript — not each member's own wall clock). If one
+     * member closes and reveals while another is still collecting commits, the
+     * second treats that reveal as an early one and fails the channel. That is
+     * the right call, not a bug to paper over: it cannot tell a deadline race
+     * from a cheat, and guessing would be exactly how the fairness rule gets
+     * lost. The safe default is to let the phase auto-advance once everyone has
+     * committed, and to reach for this only on an agreed deadline.
+     *
      * Close the commit phase early without waiting for every participant —
      * the deadline path. Whoever has not committed is simply excluded from the
      * auction (they never bid); the committed set is locked and reveals begin.
@@ -301,7 +343,9 @@ export class SealedEnvelopeSession {
                     throw new Error(
                         `SealedEnvelopeSession: reveal from ${msg.sender} who never committed`,
                     )
-                if (this.reveals.has(msg.sender))
+                // Already opened, or already caught cheating: a second reveal
+                // must not get another shot at passing.
+                if (this.reveals.has(msg.sender) || this._badReveals.has(msg.sender))
                     throw new Error(
                         `SealedEnvelopeSession: duplicate reveal from ${msg.sender}`,
                     )
@@ -313,7 +357,17 @@ export class SealedEnvelopeSession {
                 // A reveal that does not reproduce the commitment is a bid the
                 // sender did not seal. Disqualify — do not throw: one cheater
                 // must not sink an otherwise-valid auction.
-                if (commitmentHex(bid, salt) !== commit.commitment) {
+                // A bid the serializer rejects (bigint, undefined, a class
+                // instance, a cycle) makes commitmentHex throw. That is still a
+                // reveal that fails to open the commitment, so it disqualifies
+                // the sender — it must not crash the auction for everyone else.
+                let opens: boolean
+                try {
+                    opens = commitmentHex(bid, salt) === commit.commitment
+                } catch {
+                    opens = false
+                }
+                if (!opens) {
                     this._badReveals.add(msg.sender)
                     this.maybeAutoClose()
                     break

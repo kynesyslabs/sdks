@@ -264,6 +264,53 @@ describe("SealedEnvelopeSession — protocol guards", () => {
     })
 })
 
+describe("SealedEnvelopeSession — a sealed bid must open to exactly what was sealed", () => {
+    it("refuses NaN/Infinity, which canonicalise to null and would open as null", () => {
+        // Commit {price: NaN}, reveal {price: null}: same canonical bytes, same
+        // commitment. That breaks the whole scheme, so it is refused at commit.
+        for (const bad of [NaN, Infinity, -Infinity]) {
+            expect(() => commitmentHex({ price: bad }, "aa")).toThrow(/canonicalises to null/)
+        }
+        expect(commitmentHex({ price: 1 }, "aa")).not.toBe(commitmentHex({ price: null }, "aa"))
+    })
+
+    it("disqualifies a reveal the serializer rejects, instead of crashing the auction", async () => {
+        const h = harness([A, B], { compareBids: byPrice })
+        await h.get(A).commit({ price: 90 })
+        await h.get(B).commit({ price: 100 })
+        await tick()
+        await h.get(A).reveal()
+
+        // A bid that cannot be canonicalised (undefined) cannot open anything —
+        // that is a failed reveal, not a reason to kill everyone's auction.
+        const junk = h.raw(B, "sealed-envelope-reveal", { bid: { price: undefined }, salt: "00" })
+        expect(() => h.get(A).onIncoming(junk)).not.toThrow()
+        await tick()
+        const o = h.get(A).outcome()
+        expect(o.disqualified).toEqual([B])
+        expect(o.winner).toBe(A)
+    })
+
+    it("keeps a disqualified bidder out — no second attempt", async () => {
+        const h = harness([A, B])
+        await h.get(A).commit({ price: 90 })
+        await h.get(B).commit({ price: 100 })
+        await tick()
+        const bad = h.raw(B, "sealed-envelope-reveal", { bid: { price: 999 }, salt: "00" })
+        h.get(A).onIncoming(bad)
+        // B, caught cheating, tries again with something that would open cleanly.
+        const retry = h.raw(B, "sealed-envelope-reveal", { bid: { price: 100 }, salt: "11" })
+        expect(() => h.get(A).onIncoming(retry)).toThrow(/duplicate reveal/)
+        expect(h.get(A).outcome().disqualified).toEqual([B])
+    })
+
+    it("refuses duplicate participants — the commit phase could never complete", () => {
+        expect(
+            () => new SealedEnvelopeSession({ me: A, participants: [A, B, B], send: async () => ({}) as ChannelMessage }),
+        ).toThrow(/duplicates/)
+    })
+})
+
 describe("SealedEnvelopeSession — abort", () => {
     it("aborts terminally and refuses further transitions", async () => {
         const h = harness([A, B])
