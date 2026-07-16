@@ -32,5 +32,6 @@ export {
     coSignAgreement,
     signAgreement,
     verifyAgreement,
+    verifyAgreementSignatures,
     type AgreementVerificationResult,
 } from "./agreement"
