@@ -34,3 +34,11 @@ export {
     verifyAgreement,
     type AgreementVerificationResult,
 } from "./agreement"
+
+export {
+    commitRfq,
+    type CommitRfqOpts,
+    type CommittableOutcome,
+    type CommittableRfq,
+    type CommittableSession,
+} from "./commit"
