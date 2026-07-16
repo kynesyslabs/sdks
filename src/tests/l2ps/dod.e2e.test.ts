@@ -228,7 +228,7 @@ describe("commitRfq — what it refuses", () => {
                     { claim: bob.claim, demos: bob.demos },
                 ],
             }),
-        ).rejects.toThrow(/not "accepted"/)
+        ).rejects.toThrow(/not accepted/)
     })
 
     it("refuses to mint a document the whole channel did not sign (§0)", async () => {
@@ -245,7 +245,7 @@ describe("commitRfq — what it refuses", () => {
                 session: aSes,
                 signers: [{ claim: alice.claim, demos: alice.demos }],
             }),
-        ).rejects.toThrow(/no signer for channel member/)
+        ).rejects.toThrow(/no signer for party/)
 
         // …and an outsider cannot be smuggled in as a signer.
         const outsider = await newConnectedDemos()
@@ -259,6 +259,52 @@ describe("commitRfq — what it refuses", () => {
                     { claim: outsider.claim, demos: outsider.demos },
                 ],
             }),
-        ).rejects.toThrow(/is not a member of the channel/)
+        ).rejects.toThrow(/is not a party/)
+    })
+
+    it("refuses an RFQ accepted in a different channel", async () => {
+        const { alice, bob, aRfq, bRfq } = await accepted()
+        await aRfq.offer({ price: 100 })
+        await bRfq.counter({ price: 90 })
+        await aRfq.accept()
+
+        // The RFQ state machine carries no channelId of its own, so nothing but
+        // this check stops channel A's agreement being minted against channel B.
+        const other = await accepted()
+        await expect(
+            commitRfq({
+                rfq: aRfq,
+                session: other.aSes, // a different channel, which never saw that proposal
+                signers: [
+                    { claim: other.alice.claim, demos: other.alice.demos },
+                    { claim: other.bob.claim, demos: other.bob.demos },
+                ],
+            }),
+        ).rejects.toThrow(/belongs to a different channel/)
+        void alice, bob
+    })
+
+    it("refuses an outcome that disagrees with the reported state", async () => {
+        const { alice, bob, aSes, aRfq, bRfq } = await accepted()
+        await aRfq.offer({ price: 100 })
+        await bRfq.counter({ price: 90 })
+        await aRfq.accept()
+
+        // A stale/inconsistent implementation could claim accepted while its
+        // outcome says otherwise; committing on that would bind terms nobody agreed.
+        const twoFaced = {
+            state: "accepted",
+            outcome: () => ({ ...aRfq.outcome(), state: "rejected" }),
+        }
+        await expect(
+            commitRfq({
+                rfq: twoFaced,
+                session: aSes,
+                signers: [
+                    { claim: alice.claim, demos: alice.demos },
+                    { claim: bob.claim, demos: bob.demos },
+                ],
+            }),
+        ).rejects.toThrow(/not accepted/)
     })
 })
