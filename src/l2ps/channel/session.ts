@@ -30,9 +30,26 @@ export interface ChannelSessionOpts {
     channelIdRegistry?: ChannelIdRegistry
     /**
      * Clock for CH-4 liveness. Injectable so delivery bounds are testable
-     * without waiting on wall time. Defaults to `Date.now`.
+     * without waiting on wall time.
+     *
+     * Defaults to a MONOTONIC source. A wall clock steps backwards (NTP, a
+     * manual correction) and a backwards step would push the deadline out until
+     * real time caught up — the stall would go unnoticed for exactly as long as
+     * the jump. Supply your own only if it is monotonic too.
      */
     now?: () => number
+}
+
+/**
+ * Monotonic milliseconds — never steps backwards, unlike `Date.now()`.
+ *
+ * @returns A monotonically non-decreasing timestamp in ms.
+ */
+function monotonicNow(): number {
+    return typeof performance !== "undefined" &&
+        typeof performance.now === "function"
+        ? performance.now()
+        : Date.now()
 }
 
 /**
@@ -78,7 +95,7 @@ export class ChannelSession {
         this.me = opts.me
         this.demos = opts.demos
         this.registry = opts.channelIdRegistry
-        this.clock = opts.now ?? (() => Date.now())
+        this.clock = opts.now ?? monotonicNow
     }
 
     /**

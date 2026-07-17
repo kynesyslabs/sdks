@@ -13,6 +13,12 @@
  *    (or hostile) counterparty could keep claiming it just spoke and look alive
  *    forever. Only what *this* member actually observed can bound delivery.
  *
+ * 3. **Timestamps must come from a MONOTONIC clock.** A wall clock steps
+ *    backwards (NTP, a manual correction), and a backwards step would push the
+ *    deadline out until real time caught up — the stall would go unnoticed for
+ *    exactly as long as the jump. `ChannelSession` defaults to a monotonic
+ *    source; if you call this directly, supply one too.
+ *
  * 2. **Pure, no timers.** This layer moves no bytes and owns no wall clock, the
  *    same way the session and the negotiation state machines don't. The caller
  *    asks "is it still alive?" — on a tick, before sending, or from its own
@@ -78,8 +84,26 @@ export function checkLiveness(opts: CheckLivenessOpts): LivenessState {
             `checkLiveness: sessionTimeoutMs must be a positive number, got ${policy.sessionTimeoutMs}`,
         )
 
+    // A NaN anywhere makes every >= comparison below false, which would report
+    // "alive" forever — a broken clock must fail loud, not silently disable the
+    // only thing bounding delivery.
+    for (const [name, t] of [
+        ["now", opts.now ?? Date.now()],
+        ["openedAt", opts.openedAt],
+        ["lastActivityAt", opts.lastActivityAt],
+    ] as const) {
+        if (!Number.isFinite(t))
+            throw new Error(
+                `checkLiveness: ${name} must be a finite timestamp, got ${String(t)}`,
+            )
+    }
+
     const now = opts.now ?? Date.now()
-    const msSinceLastActivity = now - opts.lastActivityAt
+    // Wall clocks step backwards (NTP, a manual correction). Left alone that
+    // pushes the deadline out until real time catches up — the stall would go
+    // unnoticed for exactly as long as the jump. Treat any backwards move as no
+    // progress at all rather than as fresh activity.
+    const msSinceLastActivity = Math.max(0, now - opts.lastActivityAt)
     const turnDeadlineAt = opts.lastActivityAt + policy.turnTimeoutMs
 
     // The session cap is absolute: a channel that keeps chattering past it is

@@ -49,6 +49,32 @@ describe("CH-4 checkLiveness — the pure bound", () => {
         expect(r).toMatchObject({ status: "alive", deadlineAt: 6_000 }) // session cap is nearer
     })
 
+    it("rejects a broken clock instead of silently never timing out", () => {
+        // A NaN makes every >= comparison false, i.e. "alive" forever — the one
+        // thing bounding delivery would quietly stop working.
+        for (const bad of [
+            { ...base, now: NaN },
+            { ...base, openedAt: NaN },
+            { ...base, lastActivityAt: NaN },
+        ]) {
+            expect(() => checkLiveness({ ...bad, policy: { turnTimeoutMs: 100 } })).toThrow(
+                /finite timestamp/,
+            )
+        }
+    })
+
+    it("a clock that steps backwards does not extend the deadline", () => {
+        // Defensive: with a monotonic clock this cannot happen, but a caller
+        // passing wall-clock times must not get "fresh activity" out of a jump.
+        const r = checkLiveness({
+            openedAt: 1_000,
+            lastActivityAt: 5_000,
+            policy: { turnTimeoutMs: 100 },
+            now: 4_000, // NTP stepped us back
+        })
+        expect(r.msSinceLastActivity).toBe(0)
+    })
+
     it("rejects a nonsensical policy", () => {
         expect(() => checkLiveness({ ...base, policy: { turnTimeoutMs: 0 } })).toThrow(/positive number/)
         expect(() => checkLiveness({ ...base, policy: { turnTimeoutMs: -1 } })).toThrow(/positive number/)
