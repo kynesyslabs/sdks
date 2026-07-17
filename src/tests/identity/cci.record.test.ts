@@ -8,6 +8,7 @@ import {
 } from "@/identity/cci"
 
 const EVM = "0xAbC0000000000000000000000000000000000001"
+const EVM_CLAIM = `evm:${EVM.toLowerCase()}`
 const SOL = "So1anaAddress1111111111111111111111111111111"
 
 /** The identities blob exactly as the node's GCR models it. */
@@ -55,7 +56,7 @@ describe("cciLinksFrom — the linked identities become claims", () => {
         const links = cciLinksFrom(IDENTITIES)
         const claims = links.map((l) => l.claim).sort()
 
-        expect(claims).toEqual([`evm:${EVM}`, `solana:${SOL}`, "twitter:agent"].sort())
+        expect(claims).toEqual([EVM_CLAIM, `solana:${SOL}`, "twitter:agent"].sort())
         expect(links.find((l) => l.context === "evm")).toMatchObject({ kind: "xm" })
         expect(links.find((l) => l.context === "twitter")).toMatchObject({ kind: "web2" })
         // The original entry survives for anything the flat shape drops.
@@ -79,7 +80,7 @@ describe("cciLinksFrom — the linked identities become claims", () => {
             ud: null,
         }
         expect(cciLinksFrom(future).map((l) => l.claim).sort()).toEqual(
-            [`evm:${EVM}`, `solana:${SOL}`, "twitter:agent"].sort(),
+            [EVM_CLAIM, `solana:${SOL}`, "twitter:agent"].sort(),
         )
     })
 
@@ -98,6 +99,44 @@ describe("cciLinksFrom — the linked identities become claims", () => {
     })
 })
 
+describe("claim spelling", () => {
+    it("normalises hex addresses — the same EVM wallet is one identity", () => {
+        // The node can hand back either checksum spelling for the same wallet;
+        // a raw compare would call them two different identities.
+        const shouted = { xm: { evm: { mainnet: [{ address: EVM.toUpperCase().replace("0X", "0x") }] } } }
+        const quiet = { xm: { evm: { mainnet: [{ address: EVM.toLowerCase() }] } } }
+        expect(cciLinksFrom(shouted)[0].claim).toBe(cciLinksFrom(quiet)[0].claim)
+        expect(cciLinksFrom(shouted)[0].claim).toBe(`evm:${EVM.toLowerCase()}`)
+    })
+
+    it("leaves base58 alone — lowercasing Solana would be a different account", () => {
+        // Solana addresses are case-SENSITIVE; "normalising" one corrupts it.
+        expect(cciLinksFrom(IDENTITIES).find((l) => l.context === "solana")?.claim).toBe(
+            `solana:${SOL}`,
+        )
+    })
+})
+
+describe("TLSN-proven identities", () => {
+    it("are picked up — the node files them under web2.<platform>, not a tlsn key", () => {
+        // Review flagged these as dropped. They are not: tlsnRoutines writes to
+        // `identities.web2[context]` with context = github|discord|telegram, and
+        // web2 parsing is generic over the platform key.
+        const viaTlsn = {
+            web2: {
+                github: [
+                    { username: "octocat", userId: "583231", proof: "{}", proofHash: "0x", recvHash: "0x" },
+                ],
+                discord: [{ username: "agent#1", userId: "99" }],
+            },
+        }
+        expect(cciLinksFrom(viaTlsn).map((l) => l.claim).sort()).toEqual(
+            ["discord:agent#1", "github:octocat"].sort(),
+        )
+        expect(cciLinksFrom(viaTlsn)[0].kind).toBe("web2")
+    })
+})
+
 describe("record helpers", () => {
     const record: CciRecord = {
         primary: demosClaimRefForAddress("0x" + "a".repeat(64)),
@@ -112,7 +151,7 @@ describe("record helpers", () => {
 
     it("finds the account's claim on a given scheme", () => {
         expect(cciClaimFor(record, "twitter")).toBe("twitter:agent")
-        expect(cciClaimFor(record, "evm")).toBe(`evm:${EVM}`)
+        expect(cciClaimFor(record, "evm")).toBe(EVM_CLAIM)
         expect(cciClaimFor(record, "bitcoin")).toBeUndefined()
     })
 })

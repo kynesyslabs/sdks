@@ -58,6 +58,24 @@ function isRecord(v: unknown): v is Record<string, unknown> {
     return !!v && typeof v === "object" && !Array.isArray(v)
 }
 
+/**
+ * Normalise an address for use inside a claim.
+ *
+ * Hex (`0x…`) addresses are case-insensitive — EVM checksum casing is a display
+ * convention — so the node can hand back either spelling for the same wallet,
+ * and a raw compare would call them different identities. Lowercase those.
+ *
+ * Everything else is left verbatim on purpose: base58 chains (Solana) are
+ * case-SENSITIVE, and lowercasing one would corrupt the address into a
+ * different (or invalid) account.
+ *
+ * @param address - The address as the node stored it.
+ * @returns A stable spelling safe to compare.
+ */
+function normalizeLinkAddress(address: string): string {
+    return /^0x[0-9a-fA-F]+$/.test(address) ? address.toLowerCase() : address
+}
+
 /** Flatten `xm.<chain>.<network>[]` into claims like `evm:0x…`. */
 function xmLinks(xm: unknown): CciLink[] {
     if (!isRecord(xm)) return []
@@ -70,7 +88,7 @@ function xmLinks(xm: unknown): CciLink[] {
                 const address = isRecord(e) ? e.address : undefined
                 if (typeof address !== "string" || !address) continue
                 out.push({
-                    claim: `${chain}:${address}` as ClaimReference,
+                    claim: `${chain}:${normalizeLinkAddress(address)}` as ClaimReference,
                     kind: "xm",
                     context: chain,
                     raw: e,

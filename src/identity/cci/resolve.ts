@@ -88,12 +88,15 @@ async function resolveAddress(
 function unwrap(response: unknown): unknown {
     if (!response || typeof response !== "object") return response
     const r = response as Record<string, unknown>
-    if (!("response" in r)) return response
+    // Check the error BEFORE looking for `response`: an RPC error may carry no
+    // `response` key at all, and returning it verbatim would hand the caller an
+    // error object dressed up as an identities blob.
     if (typeof r.result === "number" && r.result >= 400)
         throw new Error(
             `resolveCciRecord: node returned ${r.result}: ${
                 (r.extra as { error?: string } | undefined)?.error ?? "unknown error"
             }`,
         )
+    if (!("response" in r)) return response
     return r.response
 }
