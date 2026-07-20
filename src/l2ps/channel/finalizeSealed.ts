@@ -29,7 +29,14 @@ import { anchorEncryptedTranscript } from "../anchor"
 import { exportTranscript } from "./transcript"
 import type { ChannelTranscript } from "./types"
 import type { ChannelSessionView } from "./finalize"
-import type { SealedEnvelopeOutcome, SealedEnvelopeState } from "./sealedEnvelope"
+import {
+    commitmentHex,
+    type SealedCommitBody,
+    type SealedEnvelopeOutcome,
+    type SealedEnvelopeState,
+    type SealedRevealBody,
+} from "./sealedEnvelope"
+import type { ChannelMessage } from "./types"
 
 /** Minimal SealedEnvelopeSession surface — structural for testability. */
 export interface SealedEnvelopeLike {
@@ -87,32 +94,71 @@ export async function finalizeSealedEnvelope(
         )
     }
 
-    // The transcript must actually back the reported outcome: every valid
-    // revealed bid must have both its reveal message (at the recorded
-    // sequence) and the commit it opened present in the record. Otherwise we
-    // could export/anchor a transcript that does not support the bids the
-    // outcome claims. (Vacuous — and legitimately so — for an all-defaulted
-    // auction with no valid reveals.)
+    // The transcript must actually back the reported outcome — not merely
+    // contain a reveal and *a* commit from the same sender, but a reveal that
+    // cryptographically OPENS that commit. `sealed` and `session` are separate
+    // structural inputs, so a mismatched or mocked pair could otherwise pair a
+    // real reveal sequence with an unrelated commit and still produce a
+    // transcript that verifies while proving nothing about the sealed bid.
     const messages = opts.session.messages()
-    for (const reveal of opts.sealed.outcome().reveals) {
-        const hasReveal = messages.some(
+    const commitOf = (participant: ClaimReference): ChannelMessage | undefined =>
+        messages.find(
+            m => m.type === "sealed-envelope-commit" && m.sender === participant,
+        )
+
+    const outcome = opts.sealed.outcome()
+
+    for (const reveal of outcome.reveals) {
+        const revealMsg = messages.find(
             m =>
                 m.sequence === reveal.sequence &&
                 m.type === "sealed-envelope-reveal" &&
                 m.sender === reveal.participant,
         )
-        const hasCommit = messages.some(
-            m =>
-                m.type === "sealed-envelope-commit" &&
-                m.sender === reveal.participant,
-        )
-        if (!hasReveal || !hasCommit) {
+        const commitMsg = commitOf(reveal.participant)
+        if (!revealMsg || !commitMsg)
             throw new Error(
                 `finalizeSealedEnvelope: transcript does not contain ${reveal.participant}'s ` +
                     `commit and its reveal (seq ${reveal.sequence}) — session mismatch`,
             )
+        const { bid, salt } = (revealMsg.body as SealedRevealBody) ?? {}
+        const { commitment } = (commitMsg.body as SealedCommitBody) ?? {}
+        let opens = false
+        try {
+            opens = typeof salt === "string" && commitmentHex(bid, salt) === commitment
+        } catch {
+            opens = false
         }
+        if (!opens)
+            throw new Error(
+                `finalizeSealedEnvelope: ${reveal.participant}'s reveal (seq ${reveal.sequence}) ` +
+                    "does not open the commit it is bound to — session mismatch",
+            )
     }
+
+    // An all-defaulted auction's evidence IS the commits: every disqualified
+    // participant committed and then failed to open. Without their commits in
+    // the record, a fabricated `{state:"closed", reveals:[]}` would export a
+    // transcript that proves nothing — so require the commits that back them.
+    for (const participant of outcome.disqualified ?? []) {
+        if (!commitOf(participant))
+            throw new Error(
+                `finalizeSealedEnvelope: disqualified participant ${participant} has no commit ` +
+                    "in the transcript — nothing backs the default",
+            )
+    }
+
+    // A closed auction with neither a valid reveal nor a disqualified committer
+    // has no bids to anchor; refuse rather than sign an empty record.
+    if (
+        opts.sealed.state === "closed" &&
+        outcome.reveals.length === 0 &&
+        (outcome.disqualified?.length ?? 0) === 0
+    )
+        throw new Error(
+            "finalizeSealedEnvelope: closed auction has no reveals and no disqualified " +
+                "committers — there is nothing to anchor",
+        )
 
     const transcript = await exportTranscript({
         channelId: opts.session.channelId,
