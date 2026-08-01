@@ -2,7 +2,6 @@
 
 import * as forge from "node-forge"
 
-import { DemosTransactions } from "@/websdk/DemosTransactions"
 import type { Demos } from "@/websdk/demosclass"
 import { PasskeyGenerator } from "./passkeys/passkeys"
 import { Cryptography } from "@/encryption/Cryptography"
@@ -73,7 +72,7 @@ export default class Wallet {
 
     async getBalance(): Promise<void> {
         const { demos } = await import("@/websdk/demos")
-        let info = await demos.getAddressInfo(this.ed25519_hex.publicKey)
+        await demos.getAddressInfo(this.ed25519_hex.publicKey)
         // TODO Implement this and other nodeCalls
         // return info.native.balance
     }
