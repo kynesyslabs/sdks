@@ -1,6 +1,7 @@
 // @ts-nocheck
 export { demos } from "./demos"
 export { Demos } from "./demosclass"
+export type { ExternalEd25519TransactionSigner } from "./demosclass"
 export { DemosTransactions } from "./DemosTransactions"
 export { TransportError } from "./TransportError"
 export { BroadcastTimeoutError } from "./BroadcastTimeoutError"

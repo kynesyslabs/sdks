@@ -50,6 +50,7 @@ import {
     uint8ArrayToHex,
     UnifiedCrypto,
 } from "@/encryption/unifiedCrypto"
+import { Cryptography } from "@/encryption/Cryptography"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import { OS_PER_DEM, demToOs, parseOsString } from "@/denomination"
@@ -82,6 +83,45 @@ async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+export interface ExternalEd25519TransactionSigner {
+    /** Ed25519 public key that becomes the transaction sender address. */
+    publicKey: Uint8Array
+    /** Transaction types this signer is explicitly permitted to authorize. */
+    allowedTransactionTypes: readonly TransactionContent["type"][]
+    /** Sign the exact UTF-8 bytes of the SDK-produced transaction hash. */
+    sign(message: Uint8Array): Promise<Uint8Array>
+}
+
+const TRANSACTION_TYPES = new Set<TransactionContent["type"]>([
+    "web2Request",
+    "crosschainOperation",
+    "subnet",
+    "native",
+    "demoswork",
+    "genesis",
+    "NODE_ONLINE",
+    "identity",
+    "instantMessaging",
+    "l2psInstantMessaging",
+    "nativeBridge",
+    "l2psEncryptedTx",
+    "storage",
+    "storageProgram",
+    "l2ps_hash_update",
+    "contractDeploy",
+    "contractCall",
+    "d402_payment",
+    "escrow",
+    "ipfs",
+    "tokenCreation",
+    "tokenExecution",
+    "validatorStake",
+    "validatorUnstake",
+    "validatorExit",
+    "networkUpgrade",
+    "networkUpgradeVote",
+])
+
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 
 /**
@@ -93,6 +133,11 @@ export class Demos {
     private static _instance: Demos | null = null
     // REVIEW: Unique instance ID for per-instance crypto isolation (fixes multi-instance identity bleed)
     private readonly _cryptoInstanceId = crypto.randomUUID()
+    private _externalEd25519Signer: {
+        publicKey: Uint8Array
+        allowedTransactionTypes: ReadonlySet<TransactionContent["type"]>
+        sign(message: Uint8Array): Promise<Uint8Array>
+    } | null = null
 
     /** The RPC URL of the demos node */
     private rpc_url: string = null
@@ -303,6 +348,11 @@ export class Demos {
             dual_sign?: boolean
         },
     ) {
+        if (this._externalEd25519Signer) {
+            throw new Error(
+                "Cannot connect a wallet after an external signer is connected",
+            )
+        }
         if (!masterSeed) {
             throw new Error(
                 "Master seed is required. Use `demos.newMnemonic()` to generate a new mnemonic.",
@@ -361,6 +411,57 @@ export class Demos {
     }
 
     /**
+     * Connects a purpose-bounded external Ed25519 transaction signer.
+     *
+     * The SDK retains transaction construction and hashing. The callback sees
+     * only the exact UTF-8 bytes of the resulting hash and never exposes key
+     * material to this process. Message signing and read-auth remain unavailable.
+     */
+    connectExternalEd25519Signer(
+        signer: ExternalEd25519TransactionSigner,
+    ): string {
+        if (this.walletConnected || this._externalEd25519Signer) {
+            throw new Error("A wallet or external signer is already connected")
+        }
+        if (
+            !(signer.publicKey instanceof Uint8Array) ||
+            signer.publicKey.length !== 32
+        ) {
+            throw new Error("External signer requires a 32-byte Ed25519 public key")
+        }
+        if (
+            !Array.isArray(signer.allowedTransactionTypes) ||
+            signer.allowedTransactionTypes.length === 0
+        ) {
+            throw new Error(
+                "External signer requires a non-empty transaction-type allowlist",
+            )
+        }
+        if (typeof signer.sign !== "function") {
+            throw new Error("External signer requires a signing callback")
+        }
+
+        const allowedTransactionTypes = new Set<TransactionContent["type"]>()
+        for (const transactionType of signer.allowedTransactionTypes) {
+            if (!TRANSACTION_TYPES.has(transactionType)) {
+                throw new Error(
+                    `Invalid external signer transaction type: ${transactionType}`,
+                )
+            }
+            allowedTransactionTypes.add(transactionType)
+        }
+
+        this.algorithm = "ed25519"
+        this.dual_sign = false
+        this._externalEd25519Signer = {
+            publicKey: new Uint8Array(signer.publicKey),
+            allowedTransactionTypes,
+            sign: signer.sign.bind(signer),
+        }
+        return uint8ArrayToHex(this._externalEd25519Signer.publicKey)
+    }
+
+    /**
      * Connect a wallet from a hex-encoded key instead of a mnemonic.
      *
      * `connectWallet(<string>)` treats a non-mnemonic string as a BIP-39
@@ -407,7 +508,13 @@ export class Demos {
      * @returns The public key of the wallet
      */
     getAddress() {
-        required(this.walletConnected, "Wallet not connected")
+        if (this._externalEd25519Signer) {
+            return uint8ArrayToHex(this._externalEd25519Signer.publicKey)
+        }
+        required(
+            this.walletConnected,
+            "Wallet or external signer not connected",
+        )
         return uint8ArrayToHex(this.keypair.publicKey)
     }
 
@@ -416,6 +523,9 @@ export class Demos {
      *
      */
     async getEd25519Address() {
+        if (this._externalEd25519Signer) {
+            return uint8ArrayToHex(this._externalEd25519Signer.publicKey)
+        }
         const { publicKey } = await this.crypto.getIdentity("ed25519")
         return uint8ArrayToHex(publicKey as Uint8Array)
     }
@@ -612,7 +722,10 @@ export class Demos {
             payload: StorageProgramPayload,
             options?: { nonce?: number },
         ): Promise<Transaction> => {
-            required(this.keypair, "Wallet not connected")
+            required(
+                this.keypair || this._externalEd25519Signer,
+                "Wallet or external signer not connected",
+            )
             required(
                 payload.storageAddress,
                 "Storage address Not found in payload",
@@ -625,8 +738,7 @@ export class Demos {
             // txs ship with the skeleton default nonce 0 and get rejected
             // by the node's sequential-nonce / expectedPrior enforcement
             // after the first one.
-            const { publicKey } = await this.crypto.getIdentity("ed25519")
-            const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+            const publicKeyHex = await this.getEd25519Address()
             const nonce = await resolveNonce(
                 options?.nonce,
                 () => this.getAddressNonce(publicKeyHex),
@@ -731,7 +843,38 @@ export class Demos {
      * @returns The signed transaction
      */
     async sign(raw_tx: Transaction, options?: { nonce?: number }) {
-        required(this.keypair, "Wallet not connected")
+        required(
+            this.keypair || this._externalEd25519Signer,
+            "Wallet or external signer not connected",
+        )
+        const externalSigner = this._externalEd25519Signer
+        if (
+            externalSigner &&
+            !externalSigner.allowedTransactionTypes.has(raw_tx.content.type)
+        ) {
+            throw new Error(
+                `Transaction type ${raw_tx.content.type} is not admitted by the external signer`,
+            )
+        }
+        if (externalSigner) {
+            const boundAddress = uint8ArrayToHex(externalSigner.publicKey)
+            if (
+                raw_tx.content.from &&
+                raw_tx.content.from.toLowerCase() !== boundAddress
+            ) {
+                throw new Error(
+                    "Transaction sender does not match the external signer",
+                )
+            }
+            if (
+                raw_tx.content.from_ed25519_address &&
+                raw_tx.content.from_ed25519_address.toLowerCase() !== boundAddress
+            ) {
+                throw new Error(
+                    "Transaction Ed25519 address does not match the external signer",
+                )
+            }
+        }
         if (options?.nonce !== undefined) {
             raw_tx.content.nonce = assertValidNonce(options.nonce)
         }
@@ -740,16 +883,11 @@ export class Demos {
         }
 
         // INFO: Use the connected algorithm's public key as the sender
-        raw_tx.content.from = uint8ArrayToHex(
-            this.keypair.publicKey as Uint8Array,
-        )
+        raw_tx.content.from = this.getAddress()
 
         // INFO: If no ed25519 address is provided, use the connected master seed's ed25519 address
         if (!raw_tx.content.from_ed25519_address) {
-            const { publicKey } = await this.crypto.getIdentity("ed25519")
-            raw_tx.content.from_ed25519_address = uint8ArrayToHex(
-                publicKey as Uint8Array,
-            )
+            raw_tx.content.from_ed25519_address = await this.getEd25519Address()
         }
 
         // INFO: Client-side enforcement of reflexive transactions
@@ -848,7 +986,7 @@ export class Demos {
             raw_tx.content,
             isPostFork,
         )
-        raw_tx.hash = Hashing.sha256(serialized)
+        const canonicalHash = Hashing.sha256(serialized)
         // Normalise content to the wire shape the hash committed to.
         // Without this, internal `bigint` carriers in `tx.content.amount`,
         // `tx.content.transaction_fee.*`, and `gcr_edits[].amount` would
@@ -858,7 +996,79 @@ export class Demos {
         // node rejects as InvalidSignature). `JSON.parse(serialized)`
         // round-trips through the canonical post-fork-or-pre-fork shape
         // and matches the bytes hashed.
-        raw_tx.content = JSON.parse(serialized) as TransactionContent
+        const canonicalContent = JSON.parse(serialized) as TransactionContent
+        if (externalSigner) {
+            if (!externalSigner.allowedTransactionTypes.has(canonicalContent.type)) {
+                throw new Error(
+                    `Transaction type ${canonicalContent.type} is not admitted by the external signer`,
+                )
+            }
+            const boundAddress = uint8ArrayToHex(externalSigner.publicKey)
+            if (canonicalContent.from.toLowerCase() !== boundAddress) {
+                throw new Error(
+                    "Canonical transaction sender does not match the external signer",
+                )
+            }
+            if (
+                canonicalContent.from_ed25519_address.toLowerCase() !==
+                boundAddress
+            ) {
+                throw new Error(
+                    "Canonical transaction Ed25519 address does not match the external signer",
+                )
+            }
+
+            const expectedMessage = new TextEncoder().encode(canonicalHash)
+            const callbackMessage = new Uint8Array(expectedMessage)
+            const callbackSignature = await externalSigner.sign(callbackMessage)
+            if (
+                callbackMessage.length !== expectedMessage.length ||
+                callbackMessage.some(
+                    (byte, index) => byte !== expectedMessage[index],
+                )
+            ) {
+                throw new Error(
+                    "External signer mutated the admitted transaction hash bytes",
+                )
+            }
+            if (
+                !(callbackSignature instanceof Uint8Array) ||
+                callbackSignature.length !== 64
+            ) {
+                throw new Error(
+                    "External signer must return a 64-byte Ed25519 signature",
+                )
+            }
+            const signature = new Uint8Array(callbackSignature)
+            if (signature.length !== 64) {
+                throw new Error(
+                    "External signer must return a 64-byte Ed25519 signature",
+                )
+            }
+            if (
+                !Cryptography.verify(
+                    canonicalHash,
+                    signature,
+                    externalSigner.publicKey,
+                )
+            ) {
+                throw new Error("External signer returned an invalid Ed25519 signature")
+            }
+            // The caller retains the input transaction and may mutate it while
+            // the provider callback is pending. Restore only the canonical
+            // content/hash that the verified signature actually covers.
+            raw_tx.content = canonicalContent
+            raw_tx.hash = canonicalHash
+            raw_tx.signature = {
+                type: "ed25519",
+                data: uint8ArrayToHex(signature),
+            }
+            return raw_tx
+        }
+
+        raw_tx.content = canonicalContent
+        raw_tx.hash = canonicalHash
+
         const signature = await this.crypto.sign(
             this.algorithm,
             new TextEncoder().encode(raw_tx.hash),
