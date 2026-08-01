@@ -10,7 +10,7 @@ KyneSys Labs: https://www.kynesys.xyz/
 */
 
 import { Transaction, GCREdit } from "@/types"
-import { Demos } from "@/websdk"
+import type { Demos } from "@/websdk/demosclass"
 import { Hashing } from "@/encryption/Hashing"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import * as skeletons from "@/websdk/utils/skeletons"

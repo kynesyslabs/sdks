@@ -12,7 +12,7 @@ import {
 } from "./nativeBridgeTypes"
 import { Transaction } from "@/types/blockchain/Transaction"
 import { RPCRequest } from "@/types"
-import { Demos } from "@/websdk"
+import type { Demos } from "@/websdk/demosclass"
 import { resolveNonce } from "@/utils"
 
 
