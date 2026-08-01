@@ -71,6 +71,7 @@ export default class Wallet {
     /* SECTION nodeCalls */
 
     async getBalance(): Promise<void> {
+        // REVIEW: Keep this lazy; eager demos loading reintroduces the initialization cycle.
         const { demos } = await import("@/websdk/demos")
         await demos.getAddressInfo(this.ed25519_hex.publicKey)
         // TODO Implement this and other nodeCalls
