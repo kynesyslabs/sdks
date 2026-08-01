@@ -1,6 +1,6 @@
 import { getNewUID } from "./utils"
 
-import { skeletons } from "@/websdk"
+import * as skeletons from "@/websdk/utils/skeletons"
 import { Web2Method, IWeb2Request, XMScript } from "@/types"
 import { INativePayload } from "@/types/native"
 import { DataTypes } from "@/types/demoswork/datatypes"

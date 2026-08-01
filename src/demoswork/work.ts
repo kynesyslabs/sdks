@@ -1,7 +1,8 @@
 import { Transaction } from "@/types"
 import { DemoScript } from "@/types/demoswork"
 
-import { Demos, DemosTransactions } from "@/websdk"
+import { DemosTransactions } from "@/websdk/DemosTransactions"
+import type { Demos } from "@/websdk/demosclass"
 import executeScript from "./executor"
 import { DemosWorkOperation } from "./operations"
 import { runSanityChecks } from "./validator"
