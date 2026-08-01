@@ -1020,7 +1020,7 @@ export class Demos {
 
             const expectedMessage = new TextEncoder().encode(canonicalHash)
             const callbackMessage = new Uint8Array(expectedMessage)
-            const signature = await externalSigner.sign(callbackMessage)
+            const callbackSignature = await externalSigner.sign(callbackMessage)
             if (
                 callbackMessage.length !== expectedMessage.length ||
                 callbackMessage.some(
@@ -1031,7 +1031,16 @@ export class Demos {
                     "External signer mutated the admitted transaction hash bytes",
                 )
             }
-            if (!(signature instanceof Uint8Array) || signature.length !== 64) {
+            if (
+                !(callbackSignature instanceof Uint8Array) ||
+                callbackSignature.length !== 64
+            ) {
+                throw new Error(
+                    "External signer must return a 64-byte Ed25519 signature",
+                )
+            }
+            const signature = new Uint8Array(callbackSignature)
+            if (signature.length !== 64) {
                 throw new Error(
                     "External signer must return a 64-byte Ed25519 signature",
                 )

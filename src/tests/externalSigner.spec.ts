@@ -137,6 +137,36 @@ describe("external Ed25519 transaction signer", () => {
         await expect(malformed.sign(storageTransaction())).rejects.toThrow(/64-byte/)
     })
 
+    test("serializes the same owned signature snapshot that it verifies", async () => {
+        const demos = new Demos()
+        const signer = externalSigner(23)
+        const validSignature = new Uint8Array(64)
+        const sharedBytes = new Uint8Array(new SharedArrayBuffer(64))
+        const originalSign = signer.sign
+        signer.sign = jest.fn(async (message: Uint8Array) => {
+            const signature = await originalSign(message)
+            validSignature.set(signature)
+            sharedBytes.set(signature)
+            return sharedBytes
+        }) as unknown as typeof signer.sign
+        demos.connectExternalEd25519Signer(signer)
+        stubSigningPipeline(demos)
+        const verify = Cryptography.verify
+        jest.spyOn(Cryptography, "verify").mockImplementation(
+            (message, signature, publicKey) => {
+                const valid = verify(message, signature, publicKey)
+                sharedBytes.fill(0)
+                return valid
+            },
+        )
+
+        const signed = await demos.sign(storageTransaction())
+
+        expect(signed.signature?.data).toBe(
+            `0x${Buffer.from(validSignature).toString("hex")}`,
+        )
+    })
+
     test("rejects callback mutation of the admitted hash bytes", async () => {
         const demos = new Demos()
         demos.connectExternalEd25519Signer({
