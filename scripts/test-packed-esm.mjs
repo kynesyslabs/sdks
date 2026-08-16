@@ -8,6 +8,19 @@ import process from "node:process"
 import { fileURLToPath } from "node:url"
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+const nodeInstallation = await fs.realpath(
+    path.resolve(path.dirname(process.execPath), ".."),
+)
+const npmCli = await fs.realpath(
+    path.join(
+        nodeInstallation,
+        "lib",
+        "node_modules",
+        "npm",
+        "bin",
+        "npm-cli.js",
+    ),
+)
 const temporaryRoot = await fs.mkdtemp(
     path.join(tmpdir(), "demosdk-packed-esm-"),
 )
@@ -79,8 +92,9 @@ async function writeConsumer(directory, source, compilerOverrides = {}) {
 
 function installConsumer(directory, packages, options = []) {
     execFileSync(
-        "npm",
+        process.execPath,
         [
+            npmCli,
             "install",
             "--ignore-scripts",
             "--no-audit",
@@ -151,8 +165,8 @@ const compatibilityAssertions = [
 
 try {
     const packOutput = execFileSync(
-        "npm",
-        ["pack", "--json", "--pack-destination", temporaryRoot],
+        process.execPath,
+        [npmCli, "pack", "--json", "--pack-destination", temporaryRoot],
         { cwd: repository, encoding: "utf8" },
     )
     const [{ filename }] = JSON.parse(packOutput)
