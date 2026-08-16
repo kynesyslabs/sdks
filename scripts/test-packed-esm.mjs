@@ -3,7 +3,7 @@
 import { execFileSync } from "node:child_process"
 import { promises as fs } from "node:fs"
 import { tmpdir } from "node:os"
-import path, { delimiter } from "node:path"
+import path from "node:path"
 import process from "node:process"
 import { fileURLToPath } from "node:url"
 
@@ -11,11 +11,6 @@ const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 const temporaryRoot = await fs.mkdtemp(
     path.join(tmpdir(), "demosdk-packed-esm-"),
 )
-const childEnvironment = {
-    ...process.env,
-    PATH: `${path.dirname(process.execPath)}${delimiter}${process.env.PATH ?? ""}`,
-}
-
 const packageMetadata = JSON.parse(
     await fs.readFile(path.join(repository, "package.json"), "utf8"),
 )
@@ -94,7 +89,7 @@ function installConsumer(directory, packages, options = []) {
             ...options,
             ...packages,
         ],
-        { cwd: directory, stdio: "inherit", env: childEnvironment },
+        { cwd: directory, stdio: "inherit" },
     )
 }
 
@@ -102,7 +97,7 @@ function typecheckConsumer(directory) {
     execFileSync(
         path.join(directory, "node_modules", ".bin", "tsc"),
         ["--project", "tsconfig.json"],
-        { cwd: directory, stdio: "inherit", env: childEnvironment },
+        { cwd: directory, stdio: "inherit" },
     )
 }
 
@@ -158,7 +153,7 @@ try {
     const packOutput = execFileSync(
         "npm",
         ["pack", "--json", "--pack-destination", temporaryRoot],
-        { cwd: repository, encoding: "utf8", env: childEnvironment },
+        { cwd: repository, encoding: "utf8" },
     )
     const [{ filename }] = JSON.parse(packOutput)
     const tarball = path.join(temporaryRoot, filename)
@@ -236,7 +231,7 @@ try {
                 "if (webpack.getTlsnWasmPath() !== wasmPath) throw new Error('TLSNotary path helpers disagree')",
             ].join(";"),
         ],
-        { cwd: dacsConsumer, stdio: "inherit", env: childEnvironment },
+        { cwd: dacsConsumer, stdio: "inherit" },
     )
     typecheckConsumer(dacsConsumer)
     console.log(
@@ -299,7 +294,7 @@ try {
             "--eval",
             "const rubic = await import('@kynesyslabs/demosdk/bridge/rubic'); if (!rubic.BLOCKCHAIN_NAME || !rubic.CROSS_CHAIN_TRADE_TYPE) throw new Error('optional Rubic entrypoint did not expose its runtime API')",
         ],
-        { cwd: rubicConsumer, stdio: "inherit", env: childEnvironment },
+        { cwd: rubicConsumer, stdio: "inherit" },
     )
     typecheckConsumer(rubicConsumer)
     console.log(
