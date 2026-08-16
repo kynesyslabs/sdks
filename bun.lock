@@ -30,6 +30,7 @@
         "@ton/ton": "^16.2.4",
         "@types/node-forge": "^1.3.14",
         "@types/simple-peer": "^9.11.9",
+        "@xrplf/isomorphic": "1.0.1",
         "axios": "^1.16.1",
         "big-integer": "^1.6.52",
         "bignumber.js": "^9.3.1",
@@ -59,7 +60,10 @@
         "poseidon-lite": "^0.3.0",
         "pqcrypto": "^1.0.1",
         "protobufjs": "^7.6.2",
+        "ripple-address-codec": "5.0.0",
+        "ripple-binary-codec": "2.5.0",
         "ripple-keypairs": "^2.0.0",
+        "rpc-websockets": "9.3.10",
         "sigstore": "^5.0.0",
         "simple-peer": "^9.11.1",
         "socket.io-client": "^4.8.3",
@@ -67,6 +71,8 @@
         "superdilithium": "^2.0.6",
         "tlsn-js": "0.1.0-alpha.12.0",
         "tronweb": "^6.3.0",
+        "tweetnacl": "^1.0.3",
+        "tweetnacl-util": "^0.15.1",
         "web3": "^4.16.0",
         "xrpl": "^3.1.0",
       },
@@ -2242,7 +2248,7 @@
 
     "rlp": ["rlp@2.2.7", "", { "dependencies": { "bn.js": "^5.2.0" }, "bin": { "rlp": "bin/rlp" } }, "sha512-d5gdPmgQ0Z+AklL2NVXr/IoSjNZFfTVvQWzL/AM2AOcSzYP2xjlb0AC8YyCLc41MSNf6P6QVtjgPdmVtzb+4lQ=="],
 
-    "rpc-websockets": ["rpc-websockets@7.9.0", "", { "dependencies": { "@babel/runtime": "^7.17.2", "eventemitter3": "^4.0.7", "uuid": "^8.3.2", "ws": "^8.5.0" }, "optionalDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": "^5.0.2" } }, "sha512-DwKewQz1IUA5wfLvgM8wDpPRcr+nWSxuFxx5CbrI2z/MyyZ4nXLM86TvIA+cI1ZAdqC8JIBR1mZR55dzaLU+Hw=="],
+    "rpc-websockets": ["rpc-websockets@9.3.10", "", { "dependencies": { "@swc/helpers": "^0.5.11", "@types/ws": "^8.2.2", "buffer": "^6.0.3", "eventemitter3": "^5.0.1", "ws": "^8.5.0" }, "optionalDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": "^6.0.0" } }, "sha512-QT5PQ6LiWhA5RCS93oWwgxU4XzQltkYm8C3aTmmKEgj0HolGRo3VbdzELw7CEV35l9T7Amha8Vnr4rCfSjVP+w=="],
 
     "rubic-sdk": ["rubic-sdk@5.57.4", "", { "dependencies": { "@1inch/limit-order-protocol-utils": "3.0.1", "@arbitrum/sdk": "^3.1.3", "@cetusprotocol/cetus-sui-clmm-sdk": "^5.3.0", "@debridge-finance/debridge-external-call": "^1.0.7", "@dedust/sdk": "^0.8.7", "@layerzerolabs/scan-client": "0.0.8", "@mysten/sui": "^1.21.2", "@noble/secp256k1": "^1.7.1", "@pancakeswap/sdk": "^5.1.0", "@pancakeswap/smart-router": "4.2.1", "@pancakeswap/swap-sdk-core": "^1.0.0", "@pancakeswap/tokens": "0.1.6", "@solana/spl-token": "^0.4.8", "@solana/web3.js": "1.89.1", "@solflare-wallet/utl-sdk": "^1.4.0", "@ston-fi/api": "^0.12.1", "@ston-fi/sdk": "2.0.1", "@suiet/wallet-sdk": "^0.3.3", "@teleportdao/teleswap-sdk": "^2.2.3", "@ton/core": "0.59.0", "@ton/crypto": "^3.3.0", "@ton/ton": "15.1.0", "@toncodex/sdk": "1.0.26", "@tonconnect/ui": "^2.0.5", "@viaprotocol/router-sdk": "^1.0.7", "assert": "^2.0.0", "axios": "^1.7.2", "bignumber.js": "9.1.0", "bitcoin-address-validation": "2.2.1", "browserify-zlib": "^0.2.0", "cbridge-revert-manager": "1.1.0", "crc32": "^0.2.2", "ethers": "^5.6.8", "graphql-request": "^6.1.0", "grpc-web": "^1.4.2", "iziswap-sdk": "3.0.1", "lodash.clonedeep": "^4.5.0", "rpc-websockets": "7.9.0", "rxjs": "7.8.1", "tronweb": "^6.0.0", "viem": "^1.3.1", "vm-browserify": "^1.1.2", "web3": "^1.8.1", "web3-eth": "1.10.4", "web3-utils": "1.10.4" } }, "sha512-AOreSO/P239VVk43ibTTj+TEwPuij81WJCNGm4Cmxhe/BbGuuZHKDxSsPcWDGNUsBw4esEgaKWTzx2c6vnTsQg=="],
 
@@ -2532,7 +2538,7 @@
 
     "url-set-query": ["url-set-query@1.0.0", "", {}, "sha512-3AChu4NiXquPfeckE5R5cGdiHCMWJx1dwCWOmWIL4KHAziJNOFIYJlpGFeKDvwLPHovZRCxK3cYlwzqI9Vp+Gg=="],
 
-    "utf-8-validate": ["utf-8-validate@5.0.10", "", { "dependencies": { "node-gyp-build": "^4.3.0" } }, "sha512-Z6czzLq4u8fPOyx7TU6X3dvUZVvoJmxSQ+IcrlmagKhilxlhZgxPK6C5Jqbkw1IDUmFTM+cz9QDnnLTwDz/2gQ=="],
+    "utf-8-validate": ["utf-8-validate@6.0.6", "", { "dependencies": { "node-gyp-build": "^4.3.0" } }, "sha512-q3l3P9UtEEiAHcsgsqTgf9PPjctrDWoIXW3NpOHFdRDbLvu4DLIcxHangJ4RLrWkBcKjmcs/6NkerI8T/rE4LA=="],
 
     "utf8": ["utf8@3.0.0", "", {}, "sha512-E8VjFIQ/TyQgp+TZfS6l8yp/xWppSAHzidGiRrqe4bK4XP9pTRyKFgGJpO3SN7zdX4DeomTrwaseCHovfpFcqQ=="],
 
@@ -3498,7 +3504,7 @@
 
     "ripple-keypairs/@noble/curves": ["@noble/curves@1.9.7", "", { "dependencies": { "@noble/hashes": "1.8.0" } }, "sha512-gbKGcRUYIjA3/zCCNaWDciTMFI0dCkvou3TL8Zmy5Nc7sJ47a0jtOeZoTaMxkuqRo9cRhjOdZJXegxYE5FN/xw=="],
 
-    "rpc-websockets/eventemitter3": ["eventemitter3@4.0.7", "", {}, "sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw=="],
+    "rpc-websockets/ws": ["ws@8.18.2", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-DMricUmwGZUVr++AEAe2uiVM7UoO9MAVZMDu05UQOaUII0lp+zOzLLU4Xqh/JvTqklB1T4uELaaPBKyjE1r4fQ=="],
 
     "rubic-sdk/@solana/web3.js": ["@solana/web3.js@1.89.1", "", { "dependencies": { "@babel/runtime": "^7.23.4", "@noble/curves": "^1.2.0", "@noble/hashes": "^1.3.2", "@solana/buffer-layout": "^4.0.1", "agentkeepalive": "^4.5.0", "bigint-buffer": "^1.1.5", "bn.js": "^5.2.1", "borsh": "^0.7.0", "bs58": "^4.0.1", "buffer": "6.0.3", "fast-stable-stringify": "^1.0.0", "jayson": "^4.1.0", "node-fetch": "^2.7.0", "rpc-websockets": "^7.5.1", "superstruct": "^0.14.2" } }, "sha512-t9TTLtPQxtQB3SAf/5E8xPXfVDsC6WGOsgKY02l2cbe0HLymT7ynE8Hu48Lk5qynHCquj6nhISfEHcjMkYpu/A=="],
 
@@ -3511,6 +3517,8 @@
     "rubic-sdk/bignumber.js": ["bignumber.js@9.1.0", "", {}, "sha512-4LwHK4nfDOraBCtst+wOWIHbu1vhvAPJK8g8nROd4iuc3PSEjWif/qwbkh8jwCJz6yDBvtU4KPynETgrfh7y3A=="],
 
     "rubic-sdk/ethers": ["ethers@5.8.0", "", { "dependencies": { "@ethersproject/abi": "5.8.0", "@ethersproject/abstract-provider": "5.8.0", "@ethersproject/abstract-signer": "5.8.0", "@ethersproject/address": "5.8.0", "@ethersproject/base64": "5.8.0", "@ethersproject/basex": "5.8.0", "@ethersproject/bignumber": "5.8.0", "@ethersproject/bytes": "5.8.0", "@ethersproject/constants": "5.8.0", "@ethersproject/contracts": "5.8.0", "@ethersproject/hash": "5.8.0", "@ethersproject/hdnode": "5.8.0", "@ethersproject/json-wallets": "5.8.0", "@ethersproject/keccak256": "5.8.0", "@ethersproject/logger": "5.8.0", "@ethersproject/networks": "5.8.0", "@ethersproject/pbkdf2": "5.8.0", "@ethersproject/properties": "5.8.0", "@ethersproject/providers": "5.8.0", "@ethersproject/random": "5.8.0", "@ethersproject/rlp": "5.8.0", "@ethersproject/sha2": "5.8.0", "@ethersproject/signing-key": "5.8.0", "@ethersproject/solidity": "5.8.0", "@ethersproject/strings": "5.8.0", "@ethersproject/transactions": "5.8.0", "@ethersproject/units": "5.8.0", "@ethersproject/wallet": "5.8.0", "@ethersproject/web": "5.8.0", "@ethersproject/wordlists": "5.8.0" } }, "sha512-DUq+7fHrCg1aPDFCHx6UIPb3nmt2XMpM7Y/g2gLhsl3lIBqeAfOJIl1qEvRf2uq3BiKxmh6Fh5pfp2ieyek7Kg=="],
+
+    "rubic-sdk/rpc-websockets": ["rpc-websockets@7.9.0", "", { "dependencies": { "@babel/runtime": "^7.17.2", "eventemitter3": "^4.0.7", "uuid": "^8.3.2", "ws": "^8.5.0" }, "optionalDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": "^5.0.2" } }, "sha512-DwKewQz1IUA5wfLvgM8wDpPRcr+nWSxuFxx5CbrI2z/MyyZ4nXLM86TvIA+cI1ZAdqC8JIBR1mZR55dzaLU+Hw=="],
 
     "rubic-sdk/tronweb": ["tronweb@6.0.4", "", { "dependencies": { "@babel/runtime": "7.26.10", "axios": "1.11.0", "bignumber.js": "9.1.2", "ethereum-cryptography": "2.2.1", "ethers": "6.13.5", "eventemitter3": "5.0.1", "google-protobuf": "3.21.4", "semver": "7.7.1", "validator": "13.12.0" } }, "sha512-+9Nc7H4FYVh2DcOnQG93WLm3UdlHSf9W+GXkfrXI77oLjTB1cptROJDKRSSxQBiOAyjjAJOOTuYDzlAkaLT85w=="],
 
@@ -3672,6 +3680,8 @@
 
     "websocket/debug": ["debug@2.6.9", "", { "dependencies": { "ms": "2.0.0" } }, "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA=="],
 
+    "websocket/utf-8-validate": ["utf-8-validate@5.0.10", "", { "dependencies": { "node-gyp-build": "^4.3.0" } }, "sha512-Z6czzLq4u8fPOyx7TU6X3dvUZVvoJmxSQ+IcrlmagKhilxlhZgxPK6C5Jqbkw1IDUmFTM+cz9QDnnLTwDz/2gQ=="],
+
     "whatwg-url/webidl-conversions": ["webidl-conversions@3.0.1", "", {}, "sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ=="],
 
     "wif/bs58check": ["bs58check@4.0.0", "", { "dependencies": { "@noble/hashes": "^1.2.0", "bs58": "^6.0.0" } }, "sha512-FsGDOnFg9aVI9erdriULkd/JjEWONV/lQE5aYziB5PoBsXRind56lh8doIZIc9X4HoxT5x4bLjMWN1/NB8Zp5g=="],
@@ -3737,6 +3747,8 @@
     "@coral-xyz/anchor/bs58/base-x": ["base-x@3.0.11", "", { "dependencies": { "safe-buffer": "^5.0.1" } }, "sha512-xz7wQ8xDhdyP7tQxwdteLYeFfS68tSMNCZ/Y37WJ4bhGfKPpqEIlmIyueQHqOyoPhE6xNUqjzRr8ra0eF9VRvA=="],
 
     "@cosmjs/crypto/libsodium-wrappers-sumo/libsodium-sumo": ["libsodium-sumo@0.7.15", "", {}, "sha512-5tPmqPmq8T8Nikpm1Nqj0hBHvsLFCXvdhBFV7SGOitQPZAA6jso8XoL0r4L7vmfKXr486fiQInvErHtEvizFMw=="],
+
+    "@cosmjs/socket/ws/utf-8-validate": ["utf-8-validate@5.0.10", "", { "dependencies": { "node-gyp-build": "^4.3.0" } }, "sha512-Z6czzLq4u8fPOyx7TU6X3dvUZVvoJmxSQ+IcrlmagKhilxlhZgxPK6C5Jqbkw1IDUmFTM+cz9QDnnLTwDz/2gQ=="],
 
     "@cosmjs/tendermint-rpc/axios/follow-redirects": ["follow-redirects@1.15.11", "", {}, "sha512-deG2P0JfjrTxl50XGCDyfI97ZGVCxIpfKYmfyrQ54n5FO/0gfIES8C/Psl6kWVDolizcaaxZJnTS0QSMxvnsBQ=="],
 
@@ -3890,6 +3902,8 @@
 
     "@solana/web3.js/bs58/base-x": ["base-x@3.0.11", "", { "dependencies": { "safe-buffer": "^5.0.1" } }, "sha512-xz7wQ8xDhdyP7tQxwdteLYeFfS68tSMNCZ/Y37WJ4bhGfKPpqEIlmIyueQHqOyoPhE6xNUqjzRr8ra0eF9VRvA=="],
 
+    "@solana/web3.js/rpc-websockets/utf-8-validate": ["utf-8-validate@5.0.10", "", { "dependencies": { "node-gyp-build": "^4.3.0" } }, "sha512-Z6czzLq4u8fPOyx7TU6X3dvUZVvoJmxSQ+IcrlmagKhilxlhZgxPK6C5Jqbkw1IDUmFTM+cz9QDnnLTwDz/2gQ=="],
+
     "@solflare-wallet/utl-sdk/@metaplex-foundation/js/@metaplex-foundation/beet": ["@metaplex-foundation/beet@0.2.0", "", { "dependencies": { "ansicolors": "^0.3.2", "bn.js": "^5.2.0", "debug": "^4.3.3" } }, "sha512-H570hkJxmx/FxET1OggPPLkPL7psYQa71rNI9NJjYRM8WXdrEvmI/IRIEUW2KR6RqwWWN3FvlRHnKoQUV/lQtA=="],
 
     "@solflare-wallet/utl-sdk/@metaplex-foundation/js/@metaplex-foundation/beet-solana": ["@metaplex-foundation/beet-solana@0.1.1", "", { "dependencies": { "@metaplex-foundation/beet": ">=0.1.0", "@solana/web3.js": "^1.31.0" } }, "sha512-QV2DbxjaJWLkMvn12OC09g+r7a6R0uNwf8msYuOUSw4cG7amXzvFb7s0bh4IxY3Rk8/0ma0PfKi/FEdC7Hi4Pg=="],
@@ -4032,6 +4046,8 @@
 
     "jayson/@types/ws/@types/node": ["@types/node@22.7.5", "", { "dependencies": { "undici-types": "~6.19.2" } }, "sha512-jML7s2NAzMWc//QSJ1a3prpk78cOPchGvXJsC3C6R6PSMoooztvRVQEz89gmBTBY1SPMaqo5teB4uNHPdetShQ=="],
 
+    "jayson/ws/utf-8-validate": ["utf-8-validate@5.0.10", "", { "dependencies": { "node-gyp-build": "^4.3.0" } }, "sha512-Z6czzLq4u8fPOyx7TU6X3dvUZVvoJmxSQ+IcrlmagKhilxlhZgxPK6C5Jqbkw1IDUmFTM+cz9QDnnLTwDz/2gQ=="],
+
     "jest-circus/@types/node/undici-types": ["undici-types@6.19.8", "", {}, "sha512-ve2KP6f/JnbPBFyobGHuerC9g1FYGn/F8n1LWTwNxCEzd6IfqTwUQcNXgEtmmQ6DlRrC1hrSrBnCZPokRrDHjw=="],
 
     "jest-environment-node/@types/node/undici-types": ["undici-types@6.19.8", "", {}, "sha512-ve2KP6f/JnbPBFyobGHuerC9g1FYGn/F8n1LWTwNxCEzd6IfqTwUQcNXgEtmmQ6DlRrC1hrSrBnCZPokRrDHjw=="],
@@ -4085,6 +4101,10 @@
     "rubic-sdk/axios/follow-redirects": ["follow-redirects@1.15.11", "", {}, "sha512-deG2P0JfjrTxl50XGCDyfI97ZGVCxIpfKYmfyrQ54n5FO/0gfIES8C/Psl6kWVDolizcaaxZJnTS0QSMxvnsBQ=="],
 
     "rubic-sdk/axios/proxy-from-env": ["proxy-from-env@1.1.0", "", {}, "sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg=="],
+
+    "rubic-sdk/rpc-websockets/eventemitter3": ["eventemitter3@4.0.7", "", {}, "sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw=="],
+
+    "rubic-sdk/rpc-websockets/utf-8-validate": ["utf-8-validate@5.0.10", "", { "dependencies": { "node-gyp-build": "^4.3.0" } }, "sha512-Z6czzLq4u8fPOyx7TU6X3dvUZVvoJmxSQ+IcrlmagKhilxlhZgxPK6C5Jqbkw1IDUmFTM+cz9QDnnLTwDz/2gQ=="],
 
     "rubic-sdk/tronweb/@babel/runtime": ["@babel/runtime@7.26.10", "", { "dependencies": { "regenerator-runtime": "^0.14.0" } }, "sha512-2WJMeRQPHKSPemqk/awGrAiuFfzBmOIPXKizAsVhWH9YJqLZ0H+HS4c8loHGgW6utJ3E/ejXQUsiGaQy2NZ9Fw=="],
 

@@ -34,13 +34,12 @@
  */
 
 import * as Comlink from "comlink"
-import {
+import { NotaryServer, Transcript } from "./tlsn-runtime"
+import type {
     Prover as TProver,
     Presentation as TPresentation,
-    NotaryServer,
-    Transcript,
-    type Commit,
-    type Method,
+    Commit,
+    Method,
 } from "tlsn-js"
 import type { PresentationJSON } from "tlsn-js/build/types.js"
 
@@ -120,6 +119,11 @@ export class TLSNotary {
     async initialize(): Promise<void> {
         if (this.initialized) return
         if (this.initializingPromise) return this.initializingPromise
+        if (typeof Worker === "undefined") {
+            throw new Error(
+                "TLSNotary initialization requires a browser or Web Worker runtime.",
+            )
+        }
 
         this.initializingPromise = (async () => {
             try {

@@ -121,13 +121,16 @@ export {
     Presentation,
     NotaryServer,
     Transcript,
-    // Types re-exported from tlsn-js
-    type Commit,
-    type Reveal,
-    type Method,
-    type ProverConfig,
-    type LoggingLevel,
-    type LoggingConfig,
+} from "./tlsn-runtime"
+
+// Types remain the exact upstream declarations; type-only exports are erased.
+export type {
+    Commit,
+    Reveal,
+    Method,
+    ProverConfig,
+    LoggingLevel,
+    LoggingConfig,
 } from "tlsn-js"
 
 // Re-export types from tlsn-js/build/types for advanced usage

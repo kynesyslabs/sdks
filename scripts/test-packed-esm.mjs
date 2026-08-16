@@ -34,6 +34,19 @@ for (const entrypoint of typecheckedEntrypoints) {
     }
 }
 
+const optionalRuntimeEntrypoints = new Set(["./bridge/rubic"])
+const runtimeEntrypoints = Object.keys(packageMetadata.exports).filter(
+    (entrypoint) =>
+        !entrypoint.includes("*") &&
+        !optionalRuntimeEntrypoints.has(entrypoint),
+)
+
+function packageSpecifier(entrypoint) {
+    return entrypoint === "."
+        ? packageMetadata.name
+        : `${packageMetadata.name}${entrypoint.slice(1)}`
+}
+
 const compilerOptions = {
     target: "ES2022",
     module: "NodeNext",
@@ -77,6 +90,7 @@ function installConsumer(directory, packages, options = []) {
             "--ignore-scripts",
             "--no-audit",
             "--no-fund",
+            "--loglevel=error",
             ...options,
             ...packages,
         ],
@@ -190,7 +204,37 @@ try {
         [
             "--input-type=module",
             "--eval",
-            "const sdk = await import('@kynesyslabs/demosdk/websdk'); if (typeof sdk.Demos !== 'function') throw new Error('websdk did not export Demos'); const bridge = await import('@kynesyslabs/demosdk/bridge'); if (typeof bridge.RubicBridge !== 'function') throw new Error('bridge did not export RubicBridge')",
+            [
+                `const entrypoints = ${JSON.stringify(runtimeEntrypoints.map(packageSpecifier))}`,
+                "const hadSelf = Object.prototype.hasOwnProperty.call(globalThis, 'self')",
+                "for (const entrypoint of entrypoints) { try { await import(entrypoint) } catch (error) { throw new Error(`failed to import ${entrypoint}`, { cause: error }) } }",
+                "if (!hadSelf && Object.prototype.hasOwnProperty.call(globalThis, 'self')) throw new Error('package import created a browser self global')",
+                "const sdk = await import('@kynesyslabs/demosdk')",
+                "if (!sdk.tlsnotary || typeof sdk.tlsnotary.TLSNotary !== 'function') throw new Error('root did not export TLSNotary')",
+                "const websdk = await import('@kynesyslabs/demosdk/websdk')",
+                "if (typeof websdk.Demos !== 'function') throw new Error('websdk did not export Demos')",
+                "const bridge = await import('@kynesyslabs/demosdk/bridge')",
+                "if (typeof bridge.RubicBridge !== 'function') throw new Error('bridge did not export RubicBridge')",
+                "const tlsnotary = await import('@kynesyslabs/demosdk/tlsnotary')",
+                "for (const name of ['TLSNotary', 'TLSNotaryService', 'init', 'Prover', 'Presentation', 'NotaryServer', 'Transcript']) if (typeof tlsnotary[name] !== 'function') throw new Error(`tlsnotary did not export ${name}`)",
+                "const tlsnotaryClient = new tlsnotary.TLSNotary({ notaryUrl: 'https://notary.example.test' })",
+                "await tlsnotaryClient.initialize().then(() => { throw new Error('TLSNotary unexpectedly initialized in Node') }, error => { if (!/requires a browser or Web Worker runtime/u.test(String(error?.message))) throw error })",
+                "const transcript = new tlsnotary.Transcript({ sent: [65, 0, 66], recv: [67, 0, 68] })",
+                "if (transcript.sent('#') !== 'A#B' || transcript.recv('#') !== 'C#D') throw new Error('TLSNotary Transcript facade changed behavior')",
+                "const notary = tlsnotary.NotaryServer.from('wss://notary.example.test/path')",
+                "if (notary.url !== 'wss://notary.example.test/path' || notary.normalizeUrl() !== 'https://notary.example.test') throw new Error('TLSNotary NotaryServer facade changed behavior')",
+                "const headers = tlsnotary.Prover.getHeaderMap('https://api.example.test/path', 'ok', { Accept: 'text/plain' })",
+                "if (headers.get('Host')?.join(',') !== '97,112,105,46,101,120,97,109,112,108,101,46,116,101,115,116' || headers.get('Content-Length')?.join(',') !== '50') throw new Error('TLSNotary Prover header facade changed behavior')",
+                "if (tlsnotary.Prover.getHeaderMap('https://api.example.test', null).get('Content-Length')?.join(',') !== '52') throw new Error('TLSNotary Prover null-body behavior changed')",
+                "await tlsnotary.init().then(() => { throw new Error('TLSNotary init unexpectedly ran in Node') }, error => { if (!/require a browser or Web Worker runtime/u.test(String(error?.message))) throw error })",
+                "const autoInit = await import('@kynesyslabs/demosdk/tlsnotary/auto-init')",
+                "const wasmPath = autoInit.getWasmSourcePath()",
+                "if (!wasmPath.endsWith('/tlsnotary/wasm')) throw new Error(`unexpected WASM path: ${wasmPath}`)",
+                "const { stat } = await import('node:fs/promises')",
+                "if (!(await stat(wasmPath)).isDirectory()) throw new Error(`missing packed WASM directory: ${wasmPath}`)",
+                "const webpack = await import('@kynesyslabs/demosdk/tlsnotary/webpack')",
+                "if (webpack.getTlsnWasmPath() !== wasmPath) throw new Error('TLSNotary path helpers disagree')",
+            ].join(";"),
         ],
         { cwd: dacsConsumer, stdio: "inherit", env: childEnvironment },
     )
@@ -248,6 +292,15 @@ try {
         "@types/node@20.19.41",
     ])
     await assertPackagePresent(rubicConsumer, "rubic-sdk")
+    execFileSync(
+        process.execPath,
+        [
+            "--input-type=module",
+            "--eval",
+            "const rubic = await import('@kynesyslabs/demosdk/bridge/rubic'); if (!rubic.BLOCKCHAIN_NAME || !rubic.CROSS_CHAIN_TRADE_TYPE) throw new Error('optional Rubic entrypoint did not expose its runtime API')",
+        ],
+        { cwd: rubicConsumer, stdio: "inherit", env: childEnvironment },
+    )
     typecheckConsumer(rubicConsumer)
     console.log(
         `packed-esm: optional Rubic compatibility consumer typechecked on ${process.version}`,

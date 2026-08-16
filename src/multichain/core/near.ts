@@ -10,13 +10,16 @@ import bigInt from "big-integer"
 import { IPayOptions } from "."
 import { _required as required } from "@/websdk"
 import { DefaultChain } from "./types/defaultChain"
-import { Transaction } from "near-api-js/lib/transaction"
-import { baseDecode, parseNearAmount } from "@near-js/utils"
+import { Transaction } from "near-api-js/lib/transaction.js"
 import * as bip39 from "@scure/bip39"
-import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes"
+import bs58 from "bs58"
 import nacl from "tweetnacl"
-import { decodeUTF8 } from "tweetnacl-util"
+import naclUtil from "tweetnacl-util"
 import { derivePath } from "ed25519-hd-key"
+
+const { decodeUTF8 } = naclUtil
+const { parseNearAmount } = utils.format
+const baseDecode = utils.serialize.base_decode
 
 // NEAR BIP44 derivation path (coin type 397)
 const NEAR_DERIVATION_PATH = "m/44'/397'/0'"
