@@ -32,6 +32,8 @@ jobs:
               run: bun install
             - name: Build package
               run: bun run build
+            - name: Test packed Node ESM consumer
+              run: npm run test:package-esm
             - name: Debug npm version
               run: npm --version
             - name: Publish 🎉
