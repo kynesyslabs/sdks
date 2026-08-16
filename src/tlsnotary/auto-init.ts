@@ -31,6 +31,7 @@
  * ```
  */
 
+import "./tlsn-wasm-compat.js"
 import init, { type LoggingLevel } from "tlsn-js"
 
 /**

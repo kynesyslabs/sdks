@@ -54,6 +54,8 @@
  * ```
  */
 
+import "./tlsn-wasm-compat.js"
+
 // Core TLSNotary class for attestation
 export { TLSNotary } from "./TLSNotary"
 
@@ -131,4 +133,4 @@ export {
 // Re-export types from tlsn-js/build/types for advanced usage
 export type {
     PresentationJSON as TlsnPresentationJSON,
-} from "tlsn-js/build/types"
+} from "tlsn-js/build/types.js"

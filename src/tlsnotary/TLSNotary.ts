@@ -42,7 +42,7 @@ import {
     type Commit,
     type Method,
 } from "tlsn-js"
-import type { PresentationJSON } from "tlsn-js/build/types"
+import type { PresentationJSON } from "tlsn-js/build/types.js"
 
 import type {
     TLSNotaryConfig,
