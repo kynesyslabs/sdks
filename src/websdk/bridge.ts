@@ -1,6 +1,6 @@
 import { RPCResponse } from "@/types"
 import { BridgeTradePayload } from "@/types/bridge/bridgeTradePayload"
-import type { WrappedCrossChainTrade } from "@/types/bridge/rubicTradePayload"
+import type { RubicTradeWirePayload } from "@/types/bridge/rubicTradeWirePayload"
 import { Demos } from "@/websdk/demosclass"
 
 export class RubicBridge {
@@ -45,7 +45,7 @@ export class RubicBridge {
     async executeMockTrade(
         demos: Demos,
         chain: string,
-        payload: WrappedCrossChainTrade,
+        payload: RubicTradeWirePayload,
     ) {
         const request = {
             method: "bridge",

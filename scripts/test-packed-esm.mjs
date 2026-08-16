@@ -11,7 +11,6 @@ const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 const temporaryRoot = await fs.mkdtemp(
     path.join(tmpdir(), "demosdk-packed-esm-"),
 )
-const consumer = path.join(temporaryRoot, "consumer")
 const childEnvironment = {
     ...process.env,
     PATH: `${path.dirname(process.execPath)}${delimiter}${process.env.PATH ?? ""}`,
@@ -24,7 +23,6 @@ const typecheckedEntrypoints = [
     "./types",
     "./websdk",
     "./demoswork",
-    "./bridge",
     "./tlsnotary",
     "./tlsnotary/service",
     "./tlsnotary/webpack",
@@ -36,6 +34,112 @@ for (const entrypoint of typecheckedEntrypoints) {
     }
 }
 
+const compilerOptions = {
+    target: "ES2022",
+    module: "NodeNext",
+    moduleResolution: "NodeNext",
+    strict: true,
+    skipLibCheck: false,
+    noEmit: true,
+    types: ["node"],
+}
+
+async function writeConsumer(directory, source, compilerOverrides = {}) {
+    await fs.mkdir(directory)
+    await fs.writeFile(
+        path.join(directory, "package.json"),
+        `${JSON.stringify({ private: true, type: "module" }, null, 2)}\n`,
+        "utf8",
+    )
+    await fs.writeFile(path.join(directory, "consumer.ts"), source, "utf8")
+    await fs.writeFile(
+        path.join(directory, "tsconfig.json"),
+        `${JSON.stringify(
+            {
+                compilerOptions: {
+                    ...compilerOptions,
+                    ...compilerOverrides,
+                },
+                include: ["consumer.ts"],
+            },
+            null,
+            2,
+        )}\n`,
+        "utf8",
+    )
+}
+
+function installConsumer(directory, packages, options = []) {
+    execFileSync(
+        "npm",
+        [
+            "install",
+            "--ignore-scripts",
+            "--no-audit",
+            "--no-fund",
+            ...options,
+            ...packages,
+        ],
+        { cwd: directory, stdio: "inherit", env: childEnvironment },
+    )
+}
+
+function typecheckConsumer(directory) {
+    execFileSync(
+        path.join(directory, "node_modules", ".bin", "tsc"),
+        ["--project", "tsconfig.json"],
+        { cwd: directory, stdio: "inherit", env: childEnvironment },
+    )
+}
+
+async function assertPackageAbsent(directory, packageName) {
+    try {
+        await fs.access(path.join(directory, "node_modules", packageName))
+        throw new Error(
+            `packed-esm: ${packageName} was installed despite --omit=optional`,
+        )
+    } catch (error) {
+        if (error?.code !== "ENOENT") throw error
+    }
+}
+
+async function assertPackagePresent(directory, packageName) {
+    try {
+        await fs.access(path.join(directory, "node_modules", packageName))
+    } catch (error) {
+        if (error?.code === "ENOENT") {
+            throw new Error(`packed-esm: expected ${packageName} to be installed`)
+        }
+        throw error
+    }
+}
+
+const compatibilityAssertions = [
+    "void trade.type",
+    "void trade.from",
+    "void trade.to",
+    "void trade.toTokenAmountMin",
+    "void trade.feeInfo",
+    "void trade.onChainSubtype",
+    "void trade.bridgeType",
+    "void trade.isAggregator",
+    "trade.promotions = [...trade.promotions]",
+    "void trade.networkFee",
+    "void trade.platformFee",
+    "trade.apiFromAddress = null",
+    "void trade.needApprove()",
+    "void trade.approve({}, true, \"infinity\")",
+    "void trade.swap()",
+    'void trade.encode({ fromAddress: "0x" })',
+    'void trade.encodeApprove("0x", "0x", "infinity", {})',
+    "void trade.checkBlockchainRequirements()",
+    "void trade.getUsdPrice()",
+    "void trade.getTradeInfo()",
+    "wrapped.tradeType = wrapped.tradeType",
+    "wrapped.trade = wrapped.trade",
+    "wrapped.error = wrapped.error",
+]
+
 try {
     const packOutput = execFileSync(
         "npm",
@@ -45,17 +149,11 @@ try {
     const [{ filename }] = JSON.parse(packOutput)
     const tarball = path.join(temporaryRoot, filename)
 
-    await fs.mkdir(consumer)
-    await fs.writeFile(
-        path.join(consumer, "package.json"),
-        `${JSON.stringify({ private: true, type: "module" }, null, 2)}\n`,
-        "utf8",
-    )
-    await fs.writeFile(
-        path.join(consumer, "consumer.ts"),
+    const dacsConsumer = path.join(temporaryRoot, "dacs-consumer")
+    await writeConsumer(
+        dacsConsumer,
         [
             'import { Demos } from "@kynesyslabs/demosdk/websdk"',
-            'import type { CrossChainTrade, WrappedCrossChainTrade } from "@kynesyslabs/demosdk/bridge"',
             'import type { AutoInitOptions } from "@kynesyslabs/demosdk/tlsnotary/auto-init"',
             "",
             "type IsAny<Value> = 0 extends 1 & Value ? true : false",
@@ -68,89 +166,91 @@ try {
             "",
             "const autoInitOptions: AutoInitOptions = {}",
             "void autoInitOptions",
-            "const wrappedTrade = { trade: null, tradeType: \"lifi\" } satisfies WrappedCrossChainTrade",
-            "void wrappedTrade",
-            "type _CrossChainTradeRemainsExported = CrossChainTrade",
-            "",
             "// Resolve the default DACS consumer surface and every declaration",
-            "// entrypoint touched by this repair. The Rubic-native subpath remains",
-            "// opt-in because it deliberately requires the optional rubic-sdk.",
+            "// entrypoint touched by this repair. The Rubic-facing bridge type",
+            "// surface is checked separately with its optional dependency present.",
             "type _PublicEntrypoints = [",
             ...typecheckedEntrypoints.map((entrypoint) => {
-                const specifier =
-                    entrypoint === "."
-                        ? "@kynesyslabs/demosdk"
-                        : `@kynesyslabs/demosdk${entrypoint.slice(1)}`
+                const specifier = `@kynesyslabs/demosdk${entrypoint.slice(1)}`
                 return `    typeof import(${JSON.stringify(specifier)}),`
             }),
             "]",
             "",
         ].join("\n"),
-        "utf8",
     )
-    await fs.writeFile(
-        path.join(consumer, "tsconfig.json"),
-        `${JSON.stringify(
-            {
-                compilerOptions: {
-                    target: "ES2022",
-                    module: "NodeNext",
-                    moduleResolution: "NodeNext",
-                    strict: true,
-                    skipLibCheck: false,
-                    noEmit: true,
-                    types: ["node"],
-                },
-                include: ["consumer.ts"],
-            },
-            null,
-            2,
-        )}\n`,
-        "utf8",
+    installConsumer(
+        dacsConsumer,
+        [tarball, "typescript@5.9.3", "@types/node@20.19.41"],
+        ["--omit=optional"],
     )
-
-    execFileSync(
-        "npm",
-        [
-            "install",
-            "--ignore-scripts",
-            "--no-audit",
-            "--no-fund",
-            "--omit=optional",
-            tarball,
-            "typescript@5.9.3",
-            "@types/node@20.19.41",
-        ],
-        { cwd: consumer, stdio: "inherit", env: childEnvironment },
-    )
-
-    try {
-        await fs.access(path.join(consumer, "node_modules", "rubic-sdk"))
-        throw new Error(
-            "packed-esm: rubic-sdk was installed despite --omit=optional",
-        )
-    } catch (error) {
-        if (error?.code !== "ENOENT") throw error
-    }
+    await assertPackageAbsent(dacsConsumer, "rubic-sdk")
 
     execFileSync(
         process.execPath,
         [
             "--input-type=module",
             "--eval",
-            "const sdk = await import('@kynesyslabs/demosdk/websdk'); if (typeof sdk.Demos !== 'function') throw new Error('websdk did not export Demos')",
+            "const sdk = await import('@kynesyslabs/demosdk/websdk'); if (typeof sdk.Demos !== 'function') throw new Error('websdk did not export Demos'); const bridge = await import('@kynesyslabs/demosdk/bridge'); if (typeof bridge.RubicBridge !== 'function') throw new Error('bridge did not export RubicBridge')",
         ],
-        { cwd: consumer, stdio: "inherit", env: childEnvironment },
+        { cwd: dacsConsumer, stdio: "inherit", env: childEnvironment },
     )
-
-    execFileSync(
-        path.join(consumer, "node_modules", ".bin", "tsc"),
-        ["--project", "tsconfig.json"],
-        { cwd: consumer, stdio: "inherit", env: childEnvironment },
-    )
-
+    typecheckConsumer(dacsConsumer)
     console.log(
-        `packed-esm: @kynesyslabs/demosdk/websdk imported and typechecked successfully on ${process.version}`,
+        `packed-esm: dependency-free DACS consumer imported and typechecked on ${process.version}`,
+    )
+
+    // Keep the optional compatibility install independent of the no-optional
+    // proof and release its large dependency tree before installing the next.
+    await fs.rm(dacsConsumer, { recursive: true, force: true })
+
+    const rubicConsumer = path.join(temporaryRoot, "rubic-consumer")
+    await writeConsumer(
+        rubicConsumer,
+        [
+            'import type { CrossChainTrade, RubicBridge, WrappedCrossChainTrade } from "@kynesyslabs/demosdk/bridge"',
+            'import type { CrossChainTrade as NativeCrossChainTrade, WrappedCrossChainTrade as NativeWrappedCrossChainTrade } from "@kynesyslabs/demosdk/bridge/rubic"',
+            "",
+            "declare const trade: CrossChainTrade",
+            "declare let wrapped: WrappedCrossChainTrade",
+            "declare const nativeTrade: NativeCrossChainTrade",
+            "declare const nativeWrapped: NativeWrappedCrossChainTrade",
+            "type IsAny<Value> = 0 extends 1 & Value ? true : false",
+            "type ExpectFalse<Value extends false> = Value",
+            "type _DefaultTradeMustNotBeAny = ExpectFalse<IsAny<typeof trade>>",
+            "type _DefaultWrappedMustNotBeAny = ExpectFalse<IsAny<typeof wrapped>>",
+            "type _NativeTradeMustNotBeAny = ExpectFalse<IsAny<typeof nativeTrade>>",
+            "type _NativeWrappedMustNotBeAny = ExpectFalse<IsAny<typeof nativeWrapped>>",
+            ...compatibilityAssertions,
+            "const defaultFromNative: CrossChainTrade = nativeTrade",
+            "const nativeFromDefault: NativeCrossChainTrade = trade",
+            "const defaultWrappedFromNative: WrappedCrossChainTrade = nativeWrapped",
+            "const nativeWrappedFromDefault: NativeWrappedCrossChainTrade = wrapped",
+            'const wirePayload: Parameters<RubicBridge["executeMockTrade"]>[2] = nativeWrapped',
+            "void nativeTrade.needApprove()",
+            "void nativeTrade.swap()",
+            'void nativeTrade.encode({ fromAddress: "0x" })',
+            "void defaultFromNative",
+            "void nativeFromDefault",
+            "void defaultWrappedFromNative",
+            "void nativeWrappedFromDefault",
+            "void wirePayload",
+            "",
+        ].join("\n"),
+        // Rubic 5.57.4's transitive declaration graph contains known upstream
+        // errors. This consumer still strictly checks its own compatibility
+        // calls while avoiding failures inside unrelated third-party .d.ts.
+        { skipLibCheck: true },
+    )
+    installConsumer(rubicConsumer, [
+        tarball,
+        "rubic-sdk@5.57.4",
+        "typescript@5.9.3",
+        "@types/node@20.19.41",
+    ])
+    await assertPackagePresent(rubicConsumer, "rubic-sdk")
+    typecheckConsumer(rubicConsumer)
+    console.log(
+        `packed-esm: optional Rubic compatibility consumer typechecked on ${process.version}`,
     )
 } finally {
     await fs.rm(temporaryRoot, { recursive: true, force: true })

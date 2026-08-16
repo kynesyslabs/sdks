@@ -75,6 +75,7 @@
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src && npm run build:fix-esm && npm run build:copy-wasm",
         "build:fix-esm": "node scripts/fix-esm-imports.mjs build",
         "build:copy-wasm": "mkdir -p build/tlsnotary/wasm && cp node_modules/tlsn-js/build/*.wasm build/tlsnotary/wasm/ && cp node_modules/tlsn-js/build/*.js build/tlsnotary/wasm/ && cp -r node_modules/tlsn-js/build/snippets build/tlsnotary/wasm/",
+        "test:fix-esm": "node scripts/test-fix-esm-imports.mjs",
         "test:package-esm": "node scripts/test-packed-esm.mjs",
         "typedoc": "typedoc",
         "test": "jest",
@@ -174,6 +175,7 @@
         "rubic-sdk": "^5.57.4"
     },
     "devDependencies": {
+        "@jridgewell/sourcemap-codec": "^1.5.5",
         "@orbs-network/ton-access": "^2.3.3",
         "@types/cors": "^2.8.19",
         "@types/jest": "^29.5.14",

@@ -5,14 +5,11 @@ export {
     SupportedTokens,
 } from "@/types/bridge/constants"
 import RubicBridge from "./rubicBridge"
-// Rubic values and native types live behind the optional
-// `@kynesyslabs/demosdk/bridge/rubic` subpath. The default surface retains
-// package-owned structural types so existing type imports remain available
-// without making consumers install rubic-sdk.
-export type {
-    CrossChainTrade,
-    WrappedCrossChainTrade,
-} from "@/types/bridge/rubicTradePayload"
+// Preserve the historical exact Rubic type exports on this Rubic-facing
+// bridge surface. DACS/websdk declarations use a separate package-owned wire
+// type, so consumers that do not import this optional surface need not install
+// rubic-sdk.
+export type { CrossChainTrade, WrappedCrossChainTrade } from "rubic-sdk"
 
 import { methods as NativeBridgeMethods } from "./nativeBridge"
 import { supportedEVMChains, supportedNonEVMChains } from "./nativeBridgeTypes"
