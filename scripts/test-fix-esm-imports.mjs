@@ -14,8 +14,8 @@ const fixer = path.join(repository, "scripts", "fix-esm-imports.mjs")
 const temporaryRoot = await fs.mkdtemp(path.join(tmpdir(), "demosdk-esm-fixer-"))
 
 function runFixer(buildDirectory) {
-    return spawnSync(process.execPath, [fixer, buildDirectory], {
-        cwd: repository,
+    return spawnSync(process.execPath, [fixer, path.basename(buildDirectory)], {
+        cwd: path.dirname(buildDirectory),
         encoding: "utf8",
     })
 }
@@ -170,6 +170,16 @@ try {
         /Cannot safely rewrite escaped module specifier/u,
     )
     assert.equal(await fs.readFile(escapedFile, "utf8"), escapedSource)
+
+    const outsideInvocation = spawnSync(process.execPath, [fixer, mappedBuild], {
+        cwd: repository,
+        encoding: "utf8",
+    })
+    assert.notEqual(outsideInvocation.status, 0)
+    assert.match(
+        `${outsideInvocation.stdout}\n${outsideInvocation.stderr}`,
+        /Build path must be a child of the invocation directory/u,
+    )
 
     console.log(
         `fix-esm-imports: containment and source-map regressions passed on ${process.version}`,

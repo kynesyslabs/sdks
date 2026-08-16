@@ -6,13 +6,39 @@ import path from "node:path"
 import process from "node:process"
 import ts from "typescript"
 
-const requestedBuildDirectory = path.resolve(process.argv[2] ?? "build")
+const invocationInputDirectory = path.resolve(process.cwd())
+const requestedBuildDirectory = path.resolve(
+    invocationInputDirectory,
+    process.argv[2] ?? "build",
+)
+
+function isInside(root, filename) {
+    const relative = path.relative(root, filename)
+    return (
+        relative === "" ||
+        (relative !== ".." &&
+            !relative.startsWith(`..${path.sep}`) &&
+            !path.isAbsolute(relative))
+    )
+}
+
+if (
+    requestedBuildDirectory === invocationInputDirectory ||
+    !isInside(invocationInputDirectory, requestedBuildDirectory)
+) {
+    throw new Error(
+        `Build path must be a child of the invocation directory: ${requestedBuildDirectory}`,
+    )
+}
+const invocationDirectory = await fs.realpath(invocationInputDirectory)
 const buildDirectory = await fs.realpath(requestedBuildDirectory)
 if (!(await fs.stat(buildDirectory)).isDirectory()) {
     throw new Error(`Build path is not a directory: ${requestedBuildDirectory}`)
 }
-if (path.parse(buildDirectory).root === buildDirectory) {
-    throw new Error("Refusing to rewrite a filesystem root")
+if (!isInside(invocationDirectory, buildDirectory)) {
+    throw new Error(
+        `Canonical build path escapes the invocation directory: ${buildDirectory}`,
+    )
 }
 
 const copiedVendorDirectories = new Set([
@@ -20,13 +46,7 @@ const copiedVendorDirectories = new Set([
 ])
 
 function isInsideBuild(filename) {
-    const relative = path.relative(buildDirectory, filename)
-    return (
-        relative === "" ||
-        (relative !== ".." &&
-            !relative.startsWith(`..${path.sep}`) &&
-            !path.isAbsolute(relative))
-    )
+    return isInside(buildDirectory, filename)
 }
 
 function assertInsideBuild(filename, description) {
@@ -211,10 +231,72 @@ async function emittedModuleFiles(directory) {
 }
 
 function sourceMapReference(source) {
-    const match = source.match(
-        /\/\/[#@]\s*sourceMappingURL=([^\r\n]+)\s*$/u,
+    const trimmedSource = source.trimEnd()
+    const lineStart = Math.max(
+        trimmedSource.lastIndexOf("\n"),
+        trimmedSource.lastIndexOf("\r"),
     )
-    return match?.[1].trim()
+    const lastLine = trimmedSource.slice(lineStart + 1).trim()
+    if (!lastLine.startsWith("//#") && !lastLine.startsWith("//@")) {
+        return undefined
+    }
+
+    const directive = lastLine.slice(3).trimStart()
+    const marker = "sourceMappingURL="
+    return directive.startsWith(marker)
+        ? directive.slice(marker.length).trim()
+        : undefined
+}
+
+function sourceMapShift(filename, sourceFile, replacement) {
+    const start = sourceFile.getLineAndCharacterOfPosition(replacement.start)
+    const end = sourceFile.getLineAndCharacterOfPosition(replacement.end)
+    if (start.line !== end.line || /[\r\n]/u.test(replacement.replacement)) {
+        throw new Error(`Cannot safely update multiline source map for ${filename}`)
+    }
+
+    const delta = replacement.replacement.length - replacement.original.length
+    if (delta <= 0) {
+        throw new Error(
+            `ESM rewrite is not a source-map-safe insertion in ${filename}`,
+        )
+    }
+
+    let insertionOffset = 0
+    while (
+        insertionOffset < replacement.original.length &&
+        replacement.original[insertionOffset] ===
+            replacement.replacement[insertionOffset]
+    ) {
+        insertionOffset += 1
+    }
+    if (
+        replacement.replacement.slice(insertionOffset + delta) !==
+        replacement.original.slice(insertionOffset)
+    ) {
+        throw new Error(
+            `ESM rewrite is not a source-map-safe insertion in ${filename}`,
+        )
+    }
+
+    return {
+        line: end.line,
+        fromColumn: start.character + insertionOffset,
+        delta,
+    }
+}
+
+function applySourceMapShifts(decodedMappings, shiftsByLine) {
+    for (const [lineNumber, shifts] of shiftsByLine) {
+        shifts.sort((left, right) => left.fromColumn - right.fromColumn)
+        const line = decodedMappings[lineNumber] ?? []
+        for (const segment of line) {
+            const originalColumn = segment[0]
+            segment[0] += shifts
+                .filter((shift) => originalColumn >= shift.fromColumn)
+                .reduce((total, shift) => total + shift.delta, 0)
+        }
+    }
 }
 
 async function rewriteSourceMap(filename, sourceFile, source, replacements) {
@@ -266,58 +348,19 @@ async function rewriteSourceMap(filename, sourceFile, source, replacements) {
 
     const shiftsByLine = new Map()
     for (const replacement of replacements) {
-        const start = sourceFile.getLineAndCharacterOfPosition(replacement.start)
-        const end = sourceFile.getLineAndCharacterOfPosition(replacement.end)
-        if (start.line !== end.line || /[\r\n]/u.test(replacement.replacement)) {
-            throw new Error(
-                `Cannot safely update multiline source map for ${filename}`,
-            )
-        }
-        const delta = replacement.replacement.length - replacement.original.length
-        if (delta <= 0) {
-            throw new Error(
-                `ESM rewrite is not a source-map-safe insertion in ${filename}`,
-            )
-        }
-
-        let insertionOffset = 0
-        while (
-            insertionOffset < replacement.original.length &&
-            replacement.original[insertionOffset] ===
-                replacement.replacement[insertionOffset]
-        ) {
-            insertionOffset += 1
-        }
-        if (
-            replacement.replacement.slice(insertionOffset + delta) !==
-            replacement.original.slice(insertionOffset)
-        ) {
-            throw new Error(
-                `ESM rewrite is not a source-map-safe insertion in ${filename}`,
-            )
-        }
-
-        const shifts = shiftsByLine.get(end.line) ?? []
+        const shift = sourceMapShift(filename, sourceFile, replacement)
+        const shifts = shiftsByLine.get(shift.line) ?? []
         shifts.push({
-            fromColumn: start.character + insertionOffset,
-            delta,
+            fromColumn: shift.fromColumn,
+            delta: shift.delta,
         })
-        shiftsByLine.set(end.line, shifts)
+        shiftsByLine.set(shift.line, shifts)
     }
 
     const decodedMappings = decode(sourceMap.mappings).map((line) =>
         line.map((segment) => [...segment]),
     )
-    for (const [lineNumber, shifts] of shiftsByLine) {
-        shifts.sort((left, right) => left.fromColumn - right.fromColumn)
-        const line = decodedMappings[lineNumber] ?? []
-        for (const segment of line) {
-            const originalColumn = segment[0]
-            segment[0] += shifts
-                .filter((shift) => originalColumn >= shift.fromColumn)
-                .reduce((total, shift) => total + shift.delta, 0)
-        }
-    }
+    applySourceMapShifts(decodedMappings, shiftsByLine)
 
     sourceMap.mappings = encode(decodedMappings)
     return {
