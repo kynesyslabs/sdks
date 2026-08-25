@@ -68,7 +68,8 @@
         "./tlsnotary/auto-init": "./build/tlsnotary/auto-init.js",
         "./tlsnotary/wasm/*": "./build/tlsnotary/wasm/*",
         "./identity": "./build/identity/index.js",
-        "./identity/cci": "./build/identity/cci/index.js"
+        "./identity/cci": "./build/identity/cci/index.js",
+        "./identity/vlei": "./build/identity/vlei/index.js"
     },
     "scripts": {
         "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",
