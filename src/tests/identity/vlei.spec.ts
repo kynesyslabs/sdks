@@ -374,3 +374,85 @@ describe("DACS-2 VerifyResult mapping (vet recipe output)", () => {
         expect(a).toBe(b) // ...identical canonical/signing bytes out
     })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DACS conformance — checked against DACS-Standard/conformance goldens.
+// AttestationRef cases vendored verbatim from
+// vectors/security/artifact-reference-shapes-v0.1 (set hash
+// 155ef1e2ab1aa0dbb4dba23d1e1ee20b854bab8034029b4ebd0c87ad4014f858); re-vendor
+// if §7.5.2 changes. Contents are 32-byte hex placeholders, so 64 'a'/'b'/… is
+// the golden's own value, not a stand-in.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("DACS conformance (§7.5.2 AttestationRef / §7.5 VerifyResult)", () => {
+    // The closed VerificationMethod registry (DACS-2-VET §7).
+    const DACS2_METHOD_KINDS = new Set([
+        "verifiable-credential", "tlsnotary", "zktls", "consensus-backed-proxy",
+        "oauth-attested", "evm-rpc", "domain-tls-control", "self-signed", "demos-gcr-domain",
+    ])
+
+    const GOLDEN_ATTESTATION_REFS: Array<{ name: string; expected: "pass" | "fail"; value: unknown }> = [
+        { name: "storage-program", expected: "pass", value: { anchor: { kind: "storage-program", locator: "dacs4:evidence:job-308:rail:0" }, contentHash: "a".repeat(64), signer: "did:demos:orchestrator" } },
+        { name: "ipfs", expected: "pass", value: { anchor: { kind: "ipfs", locator: "bafybeigdyrzt" }, contentHash: "b".repeat(64) } },
+        { name: "https", expected: "pass", value: { anchor: { kind: "https", locator: "https://example.test/dacs/evidence/308" }, contentHash: "c".repeat(64) } },
+        { name: "legacy-flat-kind-id-rejected", expected: "fail", value: { kind: "dacs-4-evidence", name: "evidence-job-308", contentHash: "d".repeat(64) } },
+    ]
+
+    const ATTESTATION_ANCHOR_KINDS = new Set(["storage-program", "ipfs", "https"])
+    // §7.5.2 wire shape: exactly { anchor:{kind,locator}, contentHash, signer? } —
+    // the legacy flat { kind, name, contentHash } MUST NOT satisfy it.
+    function isValidAttestationRef(v: unknown): boolean {
+        if (typeof v !== "object" || v === null) return false
+        const o = v as Record<string, unknown>
+        if (!Object.keys(o).every(k => k === "anchor" || k === "contentHash" || k === "signer")) return false
+        if (typeof o.contentHash !== "string" || !/^[0-9a-f]{64}$/.test(o.contentHash)) return false
+        if ("signer" in o && typeof o.signer !== "string") return false
+        if (typeof o.anchor !== "object" || o.anchor === null) return false
+        const a = o.anchor as Record<string, unknown>
+        if (Object.keys(a).sort().join(",") !== "kind,locator") return false
+        return ATTESTATION_ANCHOR_KINDS.has(a.kind as string) && typeof a.locator === "string" && a.locator.length > 0
+    }
+
+    let demos: Demos
+    let attesterClaim: ClaimReference
+    const anchoredRef = async (v: VleiVerdict) =>
+        attestationRefFor(await signAttestation(buildAttestation(v, attesterClaim, { boundAt: 1700000000000 }), demos), { storageAddress: "dacs:stor:0xABC" })
+
+    beforeAll(async () => {
+        demos = await newConnectedDemos()
+        attesterClaim = demosClaimRefForAddress(await demos.getEd25519Address())
+    })
+
+    it.each(GOLDEN_ATTESTATION_REFS)("golden AttestationRef $name → $expected", ({ expected, value }) => {
+        expect(isValidAttestationRef(value)).toBe(expected === "pass")
+    })
+
+    it("attestationRefFor emits the §7.5.2 shape, not the rejected legacy flat one", async () => {
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
+        const ref = await anchoredRef(v)
+        expect(isValidAttestationRef(ref)).toBe(true)
+        expect(ref.anchor.kind).toBe("storage-program")
+        expect(ref).not.toHaveProperty("name") // legacy shape markers absent
+        expect(ref).not.toHaveProperty("kind")
+    })
+
+    it("VerifyResult.method is a member of the closed DACS-2 method registry (§7)", async () => {
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
+        const vr = toVerifyResult(v, await anchoredRef(v), { verifiedAt: 1700000000000 })
+        expect(DACS2_METHOD_KINDS.has(vr.method)).toBe(true)
+        expect(vr.method).toBe("verifiable-credential") // the §7.3.2 method for VC/vLEI claims
+    })
+
+    it("decision is one of the §7.5.1 four values across pass/fail/error paths", async () => {
+        const FOUR = new Set(["pass", "fail", "indeterminate", "error"])
+        const pass = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
+        const fail = await verifyChain(mockSource(baseCreds()), AA_SAID, aid("Z"), { timestamp: FIXED_TS })
+        const err = await verifyChain(mockSource({}), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        const ref = await anchoredRef(pass)
+        expect(toVerifyResult(pass, ref, { verifiedAt: 1 }).decision).toBe("pass")
+        expect(toVerifyResult(fail, ref, { verifiedAt: 1, subjectLei: LE_LEI }).decision).toBe("fail")
+        expect(toVerifyResult(err, ref, { verifiedAt: 1, subjectLei: LE_LEI }).decision).toBe("error")
+        for (const vd of [pass, fail, err]) {
+            expect(FOUR.has(toVerifyResult(vd, ref, { verifiedAt: 1, subjectLei: LE_LEI }).decision)).toBe(true)
+        }
+    })
+})
