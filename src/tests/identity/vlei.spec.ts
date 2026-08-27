@@ -26,6 +26,7 @@ import {
     type VleiKeyState,
     type VleiVerdict,
 } from "@/identity/vlei"
+import { jcsCanonicalize } from "@/identity/vlei/jcs"
 
 // ── Synthetic KERI identities + a real vLEI chain (agent-authority) ──────────
 const aid = (c: string) => `E${c.repeat(43)}`
@@ -151,6 +152,55 @@ describe("vLEI verifyChain (injected source)", () => {
         const a = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
         const b = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
         expect(a.recordDigest).toBe(b.recordDigest)
+    })
+
+    it("fails closed when the source substitutes a credential (SAID mismatch)", async () => {
+        // The source answers getCredential(LE_SAID) with an ACDC whose own sad.d
+        // is something else — a substituted / disconnected chain.
+        const creds = baseCreds()
+        creds[LE_SAID] = { ...creds[LE_SAID], sad: { ...creds[LE_SAID].sad, d: aid("X") } }
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("SAID mismatch"))).toBe(true)
+    })
+
+    it("fails closed on broken issuer→issuee lineage (I2I edge)", async () => {
+        // LE claims a different issuer than QVI's issuee: the authority was never
+        // actually delegated QVI → LE, even though every SAID and schema lines up.
+        const creds = baseCreds()
+        creds[LE_SAID] = { ...creds[LE_SAID], sad: { ...creds[LE_SAID].sad, i: aid("X") } }
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("issuer-to-issuee"))).toBe(true)
+    })
+
+    it("fails closed on a malformed authorityScope limit (no silent skip)", async () => {
+        const creds = baseCreds()
+        const aa = creds[AA_SAID]
+        aa.sad.a = {
+            ...aa.sad.a,
+            authorityScope: { ...AUTHORITY_SCOPE, perTransactionLimit: { amount: "not-a-number", currency: "USD" } },
+        }
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
+        expect(v.scope?.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("unparseable amount"))).toBe(true)
+    })
+})
+
+describe("JCS canonicalization (NFC hardening)", () => {
+    it("rejects objects whose keys collide under NFC normalisation", () => {
+        // U+00E9 (precomposed) and U+0065 U+0301 (decomposed) NFC-normalise
+        // to the same key, so this object carries two keys that collide.
+        const k1 = "\u00E9"
+        const k2 = "e\u0301"
+        const collide: Record<string, number> = { [k1]: 2, [k2]: 3 }
+        expect(Object.keys(collide)).toHaveLength(2)
+        expect(k1.normalize("NFC")).toBe(k2.normalize("NFC"))
+        expect(() => jcsCanonicalize(collide)).toThrow(/collision/)
+    })
+
+    it("still canonicalises ordinary objects (keys sorted)", () => {
+        expect(jcsCanonicalize({ b: 1, a: 2 })).toBe('{"a":2,"b":1}')
     })
 })
 

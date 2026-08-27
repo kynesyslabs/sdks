@@ -44,6 +44,12 @@ function serialize(value: unknown, seen: Set<object>): string {
         // NFC-normalise keys for output + sort, but look up values by the ORIGINAL
         // key (normalisation can change the string).
         const entries = Object.keys(rec).map(k => [k.normalize("NFC"), k] as const)
+        // Two distinct source keys can NFC-normalise to the SAME string (e.g. "é"
+        // and "é"). Emitting both yields ambiguous, duplicate-keyed JSON whose
+        // meaning depends on the reader's dedup policy — reject rather than sign it.
+        if (new Set(entries.map(e => e[0])).size !== entries.length) {
+            throw new Error("JCS: NFC-normalised key collision")
+        }
         entries.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
         const parts = entries.map(([nk, ok]) => `${JSON.stringify(nk)}:${serialize(rec[ok], seen)}`)
         out = `{${parts.join(",")}}`

@@ -50,27 +50,87 @@ function keyStateDigest(state: VleiKeyState | undefined): string {
     return state.d ?? canonicalDigest({ i: state.i, s: state.s, k: state.k })
 }
 
+/**
+ * Parse a non-negative decimal string into integer + fractional digit parts.
+ * Rejects anything that is not `\d+(\.\d+)?` (NaN, negatives, hex, `Infinity`,
+ * exponent form) so a malformed amount can never be silently coerced to a number.
+ */
+function parseNonNegDecimal(s: string): { int: string; frac: string } | null {
+    const m = /^(\d+)(?:\.(\d+))?$/.exec(s.trim())
+    return m ? { int: m[1], frac: m[2] ?? "" } : null
+}
+
+/**
+ * Compare two non-negative decimal strings exactly (no IEEE-754 rounding).
+ * Returns -1/0/1, or null when either side is unparseable — the caller treats
+ * null as fail-closed rather than letting a bad value compare as 0.
+ */
+function compareDecimal(a: string, b: string): number | null {
+    const pa = parseNonNegDecimal(a)
+    const pb = parseNonNegDecimal(b)
+    if (!pa || !pb) return null
+    const fracLen = Math.max(pa.frac.length, pb.frac.length)
+    const ai = BigInt(pa.int + pa.frac.padEnd(fracLen, "0"))
+    const bi = BigInt(pb.int + pb.frac.padEnd(fracLen, "0"))
+    return ai < bi ? -1 : ai > bi ? 1 : 0
+}
+
+/**
+ * Evaluate a proposed transaction against an `authorityScope`. FAIL-CLOSED: a
+ * restriction that is present but malformed (wrong type, unparseable amount, a
+ * limit currency the transaction cannot match) yields a reason instead of being
+ * skipped, so an out-of-authority transaction can never fall through to
+ * `ok: true`. An ABSENT restriction is unconstrained by design (allow-list).
+ */
 function evaluateScope(scope: any, tx: ProposedTx): string[] {
     const reasons: string[] = []
-    if (!scope) {
+    if (!scope || typeof scope !== "object") {
         reasons.push("credential carries no authorityScope")
         return reasons
     }
-    if (Array.isArray(scope.transactionTypes) && !scope.transactionTypes.includes(tx.type)) {
-        reasons.push(`transaction type '${tx.type}' not in authorised types`)
+    if (scope.transactionTypes !== undefined) {
+        if (!Array.isArray(scope.transactionTypes)) {
+            reasons.push("authorityScope.transactionTypes is malformed (fail-closed)")
+        } else if (!scope.transactionTypes.includes(tx.type)) {
+            reasons.push(`transaction type '${tx.type}' not in authorised types`)
+        }
     }
-    if (tx.corridor && Array.isArray(scope.corridors) && !scope.corridors.includes(tx.corridor)) {
-        reasons.push(`corridor '${tx.corridor}' not permitted`)
+    if (tx.corridor !== undefined && scope.corridors !== undefined) {
+        if (!Array.isArray(scope.corridors)) {
+            reasons.push("authorityScope.corridors is malformed (fail-closed)")
+        } else if (!scope.corridors.includes(tx.corridor)) {
+            reasons.push(`corridor '${tx.corridor}' not permitted`)
+        }
     }
-    if (tx.network && Array.isArray(scope.relyingNetworks) && !scope.relyingNetworks.includes(tx.network)) {
-        reasons.push(`network '${tx.network}' not a relying network`)
+    if (tx.network !== undefined && scope.relyingNetworks !== undefined) {
+        if (!Array.isArray(scope.relyingNetworks)) {
+            reasons.push("authorityScope.relyingNetworks is malformed (fail-closed)")
+        } else if (!scope.relyingNetworks.includes(tx.network)) {
+            reasons.push(`network '${tx.network}' not a relying network`)
+        }
     }
-    if (tx.amount && scope.perTransactionLimit) {
+    if (tx.amount !== undefined && scope.perTransactionLimit !== undefined) {
         const lim = scope.perTransactionLimit
-        if (tx.currency && lim.currency && tx.currency !== lim.currency) {
-            reasons.push(`currency ${tx.currency} != per-transaction limit currency ${lim.currency}`)
-        } else if (Number(tx.amount) > Number(lim.amount)) {
-            reasons.push(`amount ${tx.amount} exceeds per-transaction limit ${lim.amount} ${lim.currency}`)
+        if (typeof lim !== "object" || lim === null) {
+            reasons.push("authorityScope.perTransactionLimit is malformed (fail-closed)")
+        } else {
+            if (lim.currency !== undefined) {
+                if (tx.currency === undefined) {
+                    reasons.push(
+                        `per-transaction limit is denominated in ${lim.currency} but the transaction declares no currency (fail-closed)`,
+                    )
+                } else if (tx.currency !== lim.currency) {
+                    reasons.push(`currency ${tx.currency} != per-transaction limit currency ${lim.currency}`)
+                }
+            }
+            const cmp = compareDecimal(String(tx.amount), String(lim.amount))
+            if (cmp === null) {
+                reasons.push(`unparseable amount (tx='${tx.amount}', limit='${lim.amount}') (fail-closed)`)
+            } else if (cmp > 0) {
+                reasons.push(
+                    `amount ${tx.amount} exceeds per-transaction limit ${lim.amount}${lim.currency ? ` ${lim.currency}` : ""}`,
+                )
+            }
         }
     }
     return reasons
@@ -93,6 +153,9 @@ export async function verifyChain(
     const chain: ChainNode[] = []
     const keyStateDigests: Record<string, string> = {}
     const bySaid = new Map<string, ChainNode>()
+    // Edge operator per child SAID (I2I | NI2I | …), captured during the walk so
+    // the lineage check below enforces issuer↔issuee only where it applies.
+    const edgeOp = new Map<string, string>()
 
     const visited = new Set<string>()
     const queue: string[] = [leafSaid]
@@ -107,6 +170,17 @@ export async function verifyChain(
             cred = await source.getCredential(said)
         } catch {
             reasons.push(`unresolvable credential ${said} (fail-closed)`)
+            continue
+        }
+
+        // Authenticate the credential's own SAID against the key we asked for. A
+        // source that returns a different ACDC than requested (substitution, or a
+        // chain wired to an unrelated credential) must not be trusted — drop it
+        // and do not walk its edges.
+        if (cred.sad.d !== said) {
+            reasons.push(
+                `credential SAID mismatch: source returned '${cred.sad.d}' for requested '${said}' (fail-closed)`,
+            )
             continue
         }
 
@@ -147,6 +221,8 @@ export async function verifyChain(
                 } else {
                     node.edgeName = used.name
                     node.edgeTo = cred.sad.e![used.name].n
+                    // Default operator for a targeted ACDC edge is I2I (KERI).
+                    edgeOp.set(said, cred.sad.e![used.name].o ?? "I2I")
                     queue.push(node.edgeTo!)
                 }
             }
@@ -174,6 +250,21 @@ export async function verifyChain(
             reasons.push(
                 `${node.schemaName} edge '${node.edgeName}' parent schema ${parent.schemaName ?? parent.schema} not in {${edgeRule.parentSchemas.join(",")}}`,
             )
+        }
+        // Cryptographic lineage: an issuer-to-issuee edge means the authority was
+        // actually handed down the chain, so this credential's issuer must be the
+        // parent's issuee. NI2I edges reference a third party's credential (e.g. an
+        // accountable officer's ECR), where that constraint deliberately does not
+        // hold. An operator we don't model is treated as fail-closed.
+        const op = edgeOp.get(node.said) ?? "I2I"
+        if (op === "I2I") {
+            if (node.issuer !== parent.issuee) {
+                reasons.push(
+                    `${node.schemaName} edge '${node.edgeName}' is issuer-to-issuee but issuer ${node.issuer} != parent ${parent.schemaName ?? parent.schema} issuee ${parent.issuee ?? "none"}`,
+                )
+            }
+        } else if (op !== "NI2I") {
+            reasons.push(`${node.schemaName} edge '${node.edgeName}' has unrecognised operator '${op}' (fail-closed)`)
         }
     }
 
