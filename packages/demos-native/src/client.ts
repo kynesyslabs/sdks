@@ -350,7 +350,10 @@ export class Web2Proxy {
       (parsed.protocol === "https:" && parsed.port === "443")
     ) parsed.port = "";
 
-    const headers = { ...(input.options?.headers ?? {}) };
+    const headers: Record<string, string> = Object.assign(
+      Object.create(null) as Record<string, string>,
+      input.options?.headers,
+    );
     let payload: string | undefined;
     if (input.options?.payload !== undefined) {
       payload = typeof input.options.payload === "string"

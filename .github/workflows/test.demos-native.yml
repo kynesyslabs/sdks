@@ -1,6 +1,7 @@
 name: Demos native package
 
-permissions: read-all
+permissions:
+  contents: read
 
 on:
   pull_request:
