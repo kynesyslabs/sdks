@@ -43,3 +43,8 @@ The package is released only when a clean packed consumer passes
 SBOM generation, dependency-deny inspection and native/storage/identity/DAHR
 compatibility tests. The published tarball contains only `dist`, this README
 and the MIT license.
+
+Maintainers publish the exact reviewed version through the manual
+`Publish Demos native` GitHub workflow. The workflow re-runs the complete
+release contract, requires the committed version as an explicit confirmation,
+and refuses to put a prerelease on the `latest` distribution tag.

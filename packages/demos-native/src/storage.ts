@@ -46,6 +46,7 @@ export const STORAGE_PROGRAM_CONSTANTS = Object.freeze({
   MAX_JSON_NESTING_DEPTH: 64,
 });
 
+/** Send a public Storage Program node call and preserve its result envelope. */
 async function nodeCall<T>(
   rpcUrl: string,
   message: string,
@@ -65,7 +66,14 @@ async function nodeCall<T>(
   return await response.json() as { result: number; response: T; extra?: unknown };
 }
 
+// REVIEW: Keep this builder byte-compatible with the node and established SDK;
+// every wire-format change needs a fixed compatibility vector.
+/** Static builders and public reads for Demos Storage Programs. */
 export class StorageProgram {
+  /**
+   * Derive the canonical native storage address.
+   * This byte sequence must remain compatible with the node's derivation.
+   */
   static deriveStorageAddress(
     deployerAddress: string,
     programName: string,
@@ -78,6 +86,7 @@ export class StorageProgram {
     return `stor-${hash.slice(0, 40)}`;
   }
 
+  /** Build a CREATE_STORAGE_PROGRAM payload without signing or broadcasting. */
   static createStorageProgram(
     deployerAddress: string,
     programName: string,
@@ -118,6 +127,7 @@ export class StorageProgram {
     };
   }
 
+  /** Build a WRITE_STORAGE payload without signing or broadcasting. */
   static writeStorage(
     storageAddress: string,
     data: Record<string, unknown> | string,
@@ -126,18 +136,22 @@ export class StorageProgram {
     return { operation: "WRITE_STORAGE", storageAddress, data, encoding };
   }
 
+  /** Build a READ_STORAGE payload without making a network request. */
   static readStorage(storageAddress: string): StorageProgramPayload {
     return { operation: "READ_STORAGE", storageAddress };
   }
 
+  /** Return an access-control value allowing public reads. */
   static publicACL(): StorageProgramAcl {
     return { mode: "public" };
   }
 
+  /** Return an owner-only access-control value. */
   static privateACL(): StorageProgramAcl {
     return { mode: "owner" };
   }
 
+  /** Read a Storage Program by its native address, or `null` when absent. */
   static async getByAddress(
     rpcUrl: string,
     storageAddress: string,
@@ -151,6 +165,7 @@ export class StorageProgram {
     return result.result === 200 ? result.response : null;
   }
 
+  /** Search public Storage Program metadata by name. */
   static async searchByName(
     rpcUrl: string,
     nameQuery: string,

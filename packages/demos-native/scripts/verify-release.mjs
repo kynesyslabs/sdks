@@ -6,7 +6,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 
 const packageRoot = new URL("../", import.meta.url);
@@ -90,9 +89,12 @@ npm([
 ], consumer);
 const consumerAudit = JSON.parse(npm(["audit", "--omit=dev", "--json"], consumer));
 assert.equal(consumerAudit.metadata.vulnerabilities.total, 0);
-const installed = await import(pathToFileURL(
-  join(consumer, "node_modules/@kynesyslabs/demos-native/dist/index.js"),
-).href);
+const smokeModule = join(consumer, "smoke.mjs");
+writeFileSync(smokeModule, [
+  'import { Demos, StorageProgram } from "@kynesyslabs/demos-native";',
+  "export { Demos, StorageProgram };",
+].join("\n"));
+const installed = await import(smokeModule);
 assert.equal(typeof installed.Demos, "function");
 assert.equal(typeof installed.StorageProgram, "function");
 

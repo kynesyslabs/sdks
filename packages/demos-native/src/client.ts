@@ -25,6 +25,8 @@ const OS_PER_DEM = 1_000_000_000n;
 const FAILURE_CACHE_MS = 30_000;
 const RETRYABLE_STATUS = new Set([502, 503, 504]);
 
+class NonRetryableRpcError extends Error {}
+
 type NativeBuffer = forge.pki.ed25519.NativeBuffer;
 type KeyPair = { publicKey: NativeBuffer; privateKey: NativeBuffer };
 
@@ -75,6 +77,10 @@ function transformEdit(edit: GcrEdit, postFork: boolean): GcrEdit {
   return edit;
 }
 
+/**
+ * Serialize transaction content in the exact pre- or post-denomination-fork
+ * wire format used by Demos nodes.
+ */
 export function serializeTransactionContent(
   content: TransactionContent,
   postFork: boolean,
@@ -326,12 +332,20 @@ interface Web2StartOptions {
   nonce?: number;
 }
 
+// REVIEW: DAHR support intentionally exposes only the DACS create/start/anchor
+// path; broaden it only with compatibility vectors and an explicit review.
+/** A wallet-bound DAHR session used to obtain and anchor a Web2 response. */
 export class Web2Proxy {
   constructor(
     readonly sessionId: string,
     private readonly demos: Demos,
   ) {}
 
+  /**
+   * Run one HTTP(S) request through DAHR and anchor its response evidence.
+   * Requires the owning `Demos` client to remain connected with a wallet.
+   * Throws on unsafe URLs, transport failures, invalid evidence or rejection.
+   */
   async startProxy(input: {
     url: string;
     method: string;
@@ -422,6 +436,9 @@ export class Web2Proxy {
   }
 }
 
+// REVIEW: This compatibility client is deliberately limited to the DACS-used
+// native, Storage Program, identity-read and DAHR surface.
+/** Dependency-minimal Node ESM client for DACS operations on Demos. */
 export class Demos {
   readonly algorithm = "ed25519" as const;
   readonly crypto = new Ed25519Authority();
@@ -435,6 +452,7 @@ export class Demos {
     return this.crypto.connected;
   }
 
+  /** Storage Program transaction signing and authenticated native reads. */
   readonly storagePrograms = {
     sign: async (
       payload: StorageProgramPayload,
@@ -471,6 +489,7 @@ export class Demos {
     },
   };
 
+  /** Compatibility namespace for transaction confirmation and broadcast. */
   readonly tx = {
     confirm: async (
       transaction: Transaction,
@@ -482,6 +501,7 @@ export class Demos {
     ): Promise<RpcResponse> => await demos.broadcast(validity),
   };
 
+  /** Compatibility namespace for creating wallet-authenticated DAHR sessions. */
   readonly web2 = {
     createDahr: async (): Promise<Web2Proxy> => {
       if (!this.walletConnected) throw new Error("Wallet not connected");
@@ -509,6 +529,7 @@ export class Demos {
     },
   };
 
+  /** Connect to an HTTP(S) Demos RPC after a successful liveness request. */
   async connect(rpcUrl: string): Promise<boolean> {
     const response = await fetch(rpcUrl);
     if (!response.ok) throw new Error(`Demos RPC failed with HTTP ${response.status}`);
@@ -522,16 +543,19 @@ export class Demos {
     return true;
   }
 
+  /** Derive and connect the legacy-compatible Ed25519 wallet identity. */
   async connectWallet(secret: string | Uint8Array): Promise<string> {
     if (!secret) throw new Error("Master seed is required");
     this.crypto.connect(secret);
     return this.getAddress();
   }
 
+  /** Return the connected wallet's 0x-prefixed Ed25519 address. */
   getAddress(): string {
     return this.crypto.address;
   }
 
+  /** Return the connected Ed25519 address through the legacy async surface. */
   async getEd25519Address(): Promise<string> {
     return this.getAddress();
   }
@@ -556,6 +580,7 @@ export class Demos {
     request: RpcRequest,
     authenticated: boolean,
   ): Promise<RpcResponse> {
+    const rpc = this.requireRpc();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(authenticated ? await this.authHeaders() : {}),
@@ -563,7 +588,7 @@ export class Demos {
     let lastError: unknown;
     for (let attempt = 0; attempt < 4; attempt += 1) {
       try {
-        const response = await fetch(this.requireRpc(), {
+        const response = await fetch(rpc, {
           method: "POST",
           headers,
           body: JSON.stringify(request),
@@ -573,11 +598,20 @@ export class Demos {
             await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
             continue;
           }
-          throw new Error(`Demos RPC failed with HTTP ${response.status}`);
+          throw new NonRetryableRpcError(
+            `Demos RPC failed with HTTP ${response.status}`,
+          );
         }
-        return await response.json() as RpcResponse;
+        try {
+          return await response.json() as RpcResponse;
+        } catch {
+          throw new NonRetryableRpcError(
+            "Demos RPC returned an invalid JSON response",
+          );
+        }
       } catch (error) {
         lastError = error;
+        if (error instanceof NonRetryableRpcError) throw error;
         if (attempt < 3) {
           await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
           continue;
@@ -587,6 +621,10 @@ export class Demos {
     throw lastError instanceof Error ? lastError : new Error("Demos RPC failed");
   }
 
+  /**
+   * Send a raw RPC request, optionally authenticated by the connected wallet.
+   * Preserves the established result-envelope behavior on terminal failures.
+   */
   async rpcCall(
     request: RpcRequest,
     authenticated = false,
@@ -616,6 +654,10 @@ export class Demos {
     }
   }
 
+  /**
+   * Send a Demos transmission call and unwrap public `nodeCall` responses.
+   * Non-node calls require a connected wallet for authenticated headers.
+   */
   async call(
     method: string,
     message: unknown,
@@ -642,37 +684,79 @@ export class Demos {
     }
   }
 
+  /** Run an unauthenticated, read-only node call. */
   async nodeCall(message: string, args: Record<string, unknown> = {}): Promise<unknown> {
     return await this.call("nodeCall", message, args);
   }
 
+  /** Read a block by its non-negative height. */
   async getBlockByNumber(blockNumber: number): Promise<unknown> {
     return await this.nodeCall("getBlockByNumber", { blockNumber });
   }
 
+  /** Read a transaction by its Demos transaction hash. */
   async getTxByHash(hash: string): Promise<unknown> {
     return await this.nodeCall("getTxByHash", { hash });
   }
 
+  /**
+   * Read an address's transaction-history page and fail closed on a malformed
+   * or failed RPC response.
+   */
   async getTransactionHistory(
     address: string,
     type: string = "all",
     options: { start?: number; limit?: number } = {},
   ): Promise<unknown[]> {
-    return await this.nodeCall("getTransactionHistory", {
+    const history = await this.nodeCall("getTransactionHistory", {
       address,
       type,
       ...options,
-    }) as unknown[];
+    });
+    if (!Array.isArray(history)) {
+      throw new Error("Demos RPC returned no valid transaction history");
+    }
+    return history;
   }
 
+  /**
+   * Read account information, returning balance as bigint OS units.
+   * Throws when the RPC response cannot be authenticated structurally.
+   */
   async getAddressInfo(address: string): Promise<AddressInfo | null> {
-    const info = await this.nodeCall("getAddressInfo", { address }) as
-      | Record<string, unknown>
-      | null;
-    return info ? { ...info, balance: BigInt(info.balance as string ?? 0) } as AddressInfo : null;
+    const info = await this.nodeCall("getAddressInfo", { address });
+    if (info === null) return null;
+    if (
+      typeof info !== "object" ||
+      Array.isArray(info) ||
+      !Object.hasOwn(info, "balance")
+    ) {
+      throw new Error("Demos RPC returned no valid address information");
+    }
+    const rawBalance = (info as Record<string, unknown>).balance;
+    let balance: bigint;
+    if (rawBalance === null || rawBalance === undefined) {
+      balance = 0n;
+    } else if (typeof rawBalance === "bigint" && rawBalance >= 0n) {
+      balance = rawBalance;
+    } else if (
+      typeof rawBalance === "number" &&
+      Number.isSafeInteger(rawBalance) &&
+      rawBalance >= 0
+    ) {
+      balance = BigInt(rawBalance);
+    } else if (
+      typeof rawBalance === "string" &&
+      /^(?:0|[1-9]\d*)$/.test(rawBalance)
+    ) {
+      balance = BigInt(rawBalance);
+    } else {
+      throw new Error("Demos RPC returned an invalid address balance");
+    }
+    return { ...info, balance } as AddressInfo;
   }
 
+  /** Read a safe, non-negative account nonce or fail closed. */
   async getAddressNonce(address: string): Promise<number> {
     const value = await this.nodeCall("getAddressNonce", { address });
     if (Number.isSafeInteger(value) && (value as number) >= 0) {
@@ -685,6 +769,7 @@ export class Demos {
     throw new Error("Demos RPC returned no valid address nonce");
   }
 
+  /** Poll until an account nonce reaches `target`, or throw on timeout. */
   async waitForNonce(
     address: string,
     target: number,
@@ -701,6 +786,10 @@ export class Demos {
     throw new Error(`Timed out waiting for nonce ${target}`);
   }
 
+  /**
+   * Read and cache the denomination-fork state for the connected RPC.
+   * Returns `null` on an unavailable or invalid response; signing rejects it.
+   */
   async getNetworkInfo(): Promise<NetworkInfo | null> {
     const rpc = this.requireRpc();
     if (this.networkInfo && this.networkInfoRpc === rpc) return this.networkInfo;
@@ -750,6 +839,10 @@ export class Demos {
     };
   }
 
+  /**
+   * Sign a prepared transaction using the exact observed denomination mode.
+   * Refuses to sign when the fork state, wallet, fee inputs or target is invalid.
+   */
   async sign(transaction: Transaction): Promise<Transaction> {
     if (!this.walletConnected) throw new Error("Wallet not connected");
     if (!transaction.content.timestamp) transaction.content.timestamp = Date.now();
@@ -781,9 +874,16 @@ export class Demos {
     } else {
       this.applyFallbackFee(transaction);
     }
+    const activated = (await this.getNetworkInfo())?.forks?.osDenomination
+      ?.activated;
+    if (typeof activated !== "boolean") {
+      throw new Error(
+        "Demos denomination-fork state is unavailable; refusing to sign",
+      );
+    }
     const serialized = serializeTransactionContent(
       transaction.content,
-      Boolean((await this.getNetworkInfo())?.forks?.osDenomination?.activated),
+      activated,
     );
     transaction.hash = sha256Hex(serialized);
     transaction.content = JSON.parse(serialized) as TransactionContent;
@@ -795,6 +895,12 @@ export class Demos {
     return transaction;
   }
 
+  /**
+   * Prepare and sign a native transfer.
+   *
+   * `amountOs` is always expressed in OS, where 1 DEM = 1,000,000,000 OS.
+   * This method does not confirm or broadcast the returned transaction.
+   */
   async transfer(to: string, amountOs: bigint): Promise<Transaction> {
     if (amountOs < 0n) throw new Error("amount must be non-negative");
     const postFork = Boolean(
@@ -820,6 +926,7 @@ export class Demos {
     return await this.sign(transaction);
   }
 
+  /** Ask the connected RPC to validate a signed transaction. */
   async confirm(transaction: Transaction): Promise<ValidityResponse> {
     const response = await this.call(
       "execute",
@@ -835,6 +942,7 @@ export class Demos {
     return response;
   }
 
+  /** Broadcast a transaction only after a valid confirmation response. */
   async broadcast(validity: ValidityResponse): Promise<RpcResponse> {
     if (!validity.response?.data?.valid) {
       throw new Error(

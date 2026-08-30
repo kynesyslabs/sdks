@@ -235,6 +235,54 @@ test("fails closed instead of signing nonce one after an RPC failure", async () 
   );
 });
 
+test("fails closed on malformed account and history RPC results", async () => {
+  const demos = new Demos();
+  await demos.connect(rpc);
+  demos.nodeCall = async () => ({ result: 500, require_reply: false });
+  await assert.rejects(
+    demos.getAddressInfo(EXPECTED_ADDRESS),
+    /valid address information/,
+  );
+  await assert.rejects(
+    demos.getTransactionHistory(EXPECTED_ADDRESS),
+    /valid transaction history/,
+  );
+
+  demos.nodeCall = async () => ({ balance: -1 });
+  await assert.rejects(
+    demos.getAddressInfo(EXPECTED_ADDRESS),
+    /invalid address balance/,
+  );
+
+  demos.rpcCall = async () => ({
+    result: 503,
+    response: { error: "unavailable" },
+  });
+  await assert.rejects(
+    new Identities().getDemosIdsByWeb2Identity(demos, "github", "dacs"),
+    /identity lookup failed with RPC result 503/,
+  );
+});
+
+test("does not retry a definite HTTP rejection", async () => {
+  const demos = new Demos();
+  await demos.connect(rpc);
+  const before = observed.length;
+  assert.equal((await demos.rpcCall({ method: "unsupported", params: [] })).result, 500);
+  assert.equal(observed.length - before, 1);
+});
+
+test("refuses to sign without an authenticated denomination state", async () => {
+  const demos = new Demos();
+  await demos.connect(rpc);
+  await demos.connectWallet(MNEMONIC);
+  demos.getNetworkInfo = async () => null;
+  await assert.rejects(
+    demos.transfer(RECIPIENT, 1_000_000_000n),
+    /denomination-fork state is unavailable/,
+  );
+});
+
 test("runs the DACS-used DAHR create/start/anchor flow", async () => {
   const demos = new Demos();
   await demos.connect(rpc);
