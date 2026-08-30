@@ -581,6 +581,7 @@ export class Demos {
     authenticated: boolean,
   ): Promise<RpcResponse> {
     const rpc = this.requireRpc();
+    const body = JSON.stringify(request);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(authenticated ? await this.authHeaders() : {}),
@@ -588,37 +589,35 @@ export class Demos {
     let lastError: unknown;
     for (let attempt = 0; attempt < 4; attempt += 1) {
       try {
-        const response = await fetch(rpc, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(request),
-        });
-        if (!response.ok) {
-          if (RETRYABLE_STATUS.has(response.status) && attempt < 3) {
-            await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
-            continue;
-          }
-          throw new NonRetryableRpcError(
-            `Demos RPC failed with HTTP ${response.status}`,
-          );
-        }
-        try {
-          return await response.json() as RpcResponse;
-        } catch {
-          throw new NonRetryableRpcError(
-            "Demos RPC returned an invalid JSON response",
-          );
-        }
+        return await this.postOnce(rpc, headers, body);
       } catch (error) {
-        lastError = error;
         if (error instanceof NonRetryableRpcError) throw error;
-        if (attempt < 3) {
-          await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
-          continue;
-        }
+        lastError = error;
+        if (attempt === 3) break;
+        await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
       }
     }
     throw lastError instanceof Error ? lastError : new Error("Demos RPC failed");
+  }
+
+  private async postOnce(
+    rpc: string,
+    headers: Record<string, string>,
+    body: string,
+  ): Promise<RpcResponse> {
+    const response = await fetch(rpc, { method: "POST", headers, body });
+    if (!response.ok) {
+      const message = `Demos RPC failed with HTTP ${response.status}`;
+      if (RETRYABLE_STATUS.has(response.status)) throw new Error(message);
+      throw new NonRetryableRpcError(message);
+    }
+    try {
+      return await response.json() as RpcResponse;
+    } catch {
+      throw new NonRetryableRpcError(
+        "Demos RPC returned an invalid JSON response",
+      );
+    }
   }
 
   /**
@@ -714,7 +713,7 @@ export class Demos {
       ...options,
     });
     if (!Array.isArray(history)) {
-      throw new Error("Demos RPC returned no valid transaction history");
+      throw new TypeError("Demos RPC returned no valid transaction history");
     }
     return history;
   }
@@ -845,6 +844,13 @@ export class Demos {
    */
   async sign(transaction: Transaction): Promise<Transaction> {
     if (!this.walletConnected) throw new Error("Wallet not connected");
+    const activated = (await this.getNetworkInfo())?.forks?.osDenomination
+      ?.activated;
+    if (typeof activated !== "boolean") {
+      throw new TypeError(
+        "Demos denomination-fork state is unavailable; refusing to sign",
+      );
+    }
     if (!transaction.content.timestamp) transaction.content.timestamp = Date.now();
     transaction.content.from = this.getAddress();
     transaction.content.from_ed25519_address ??= this.getAddress();
@@ -873,13 +879,6 @@ export class Demos {
       };
     } else {
       this.applyFallbackFee(transaction);
-    }
-    const activated = (await this.getNetworkInfo())?.forks?.osDenomination
-      ?.activated;
-    if (typeof activated !== "boolean") {
-      throw new Error(
-        "Demos denomination-fork state is unavailable; refusing to sign",
-      );
     }
     const serialized = serializeTransactionContent(
       transaction.content,

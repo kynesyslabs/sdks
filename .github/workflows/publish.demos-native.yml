@@ -39,7 +39,7 @@ jobs:
           cache: npm
           cache-dependency-path: packages/demos-native/package-lock.json
       - name: Use trusted-publishing capable npm
-        run: npm install --global npm@11.19.0
+        run: npm install --global --ignore-scripts npm@11.19.0
       - name: Verify requested version and distribution tag
         working-directory: packages/demos-native
         env:

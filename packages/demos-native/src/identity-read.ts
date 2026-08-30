@@ -59,7 +59,7 @@ export class Identities {
       );
     }
     if (!Array.isArray(response.response)) {
-      throw new Error("Demos identity lookup returned no valid account list");
+      throw new TypeError("Demos identity lookup returned no valid account list");
     }
     return response.response as DemosAccount[];
   }
