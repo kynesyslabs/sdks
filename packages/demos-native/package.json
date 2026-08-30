@@ -1,0 +1,55 @@
+{
+  "name": "@kynesyslabs/demos-native",
+  "version": "0.1.0-alpha.0",
+  "description": "Dependency-minimal Demos native, Storage Program, identity-read and DAHR client",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage.d.ts",
+      "default": "./dist/storage.js"
+    },
+    "./identity-read": {
+      "types": "./dist/identity-read.d.ts",
+      "default": "./dist/identity-read.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    }
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "pack:check": "npm pack --dry-run --json",
+    "verify:release": "npm run test && node scripts/verify-release.mjs"
+  },
+  "dependencies": {
+    "@scure/bip39": "^2.2.0",
+    "node-forge": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.41",
+    "@types/node-forge": "^1.3.14",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

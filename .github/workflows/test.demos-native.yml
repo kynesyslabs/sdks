@@ -1,0 +1,35 @@
+name: Demos native package
+
+permissions: read-all
+
+on:
+  pull_request:
+    paths:
+      - 'packages/demos-native/**'
+      - '.github/workflows/test.demos-native.yml'
+  push:
+    paths:
+      - 'packages/demos-native/**'
+      - '.github/workflows/test.demos-native.yml'
+
+jobs:
+  release-contract:
+    name: release contract (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20.19.0', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: packages/demos-native/package-lock.json
+      - name: Install exact package dependencies
+        working-directory: packages/demos-native
+        run: npm ci --ignore-scripts
+      - name: Verify tests, audit, SBOMs, tarball and clean consumer
+        working-directory: packages/demos-native
+        run: npm run verify:release
