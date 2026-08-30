@@ -675,8 +675,14 @@ export class Demos {
 
   async getAddressNonce(address: string): Promise<number> {
     const value = await this.nodeCall("getAddressNonce", { address });
-    const parsed = typeof value === "number" ? value : Number.parseInt(String(value), 10);
-    return Number.isFinite(parsed) ? parsed : 0;
+    if (Number.isSafeInteger(value) && (value as number) >= 0) {
+      return value as number;
+    }
+    if (typeof value === "string" && /^(?:0|[1-9]\d*)$/.test(value)) {
+      const parsed = Number(value);
+      if (Number.isSafeInteger(parsed)) return parsed;
+    }
+    throw new Error("Demos RPC returned no valid address nonce");
   }
 
   async waitForNonce(

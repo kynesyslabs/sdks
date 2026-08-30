@@ -224,6 +224,17 @@ test("confirms, broadcasts and performs identity reads", async () => {
   );
 });
 
+test("fails closed instead of signing nonce one after an RPC failure", async () => {
+  const demos = new Demos();
+  await demos.connect(rpc);
+  await demos.connectWallet(MNEMONIC);
+  demos.nodeCall = async () => ({ result: 500, require_reply: false });
+  await assert.rejects(
+    demos.transfer(RECIPIENT, 1_000_000_000n),
+    /valid address nonce/,
+  );
+});
+
 test("runs the DACS-used DAHR create/start/anchor flow", async () => {
   const demos = new Demos();
   await demos.connect(rpc);
