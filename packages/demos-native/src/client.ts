@@ -38,6 +38,10 @@ function with0x(bytes: Uint8Array): string {
   return `0x${Buffer.from(bytes).toString("hex")}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function parseOs(value: Amount): bigint {
   if (typeof value === "bigint") return value;
   if (typeof value === "string") return BigInt(value);
@@ -392,9 +396,32 @@ export class Web2Proxy {
       sessionId: this.sessionId,
       payload,
       authorization: input.options?.authorization,
-    }) as RpcResponse<Record<string, unknown>>;
-    const proxyResponse = response.response as Record<string, unknown>;
-    const result = proxyResponse.response as Record<string, unknown>;
+    }) as unknown;
+    if (!isRecord(response) || response.result !== 200) {
+      throw new Error(
+        `Demos DAHR request failed with RPC result ${
+          isRecord(response) ? String(response.result) : "unknown"
+        }`,
+        { cause: isRecord(response) ? response.response : response },
+      );
+    }
+    const proxyResponse = response.response;
+    const result = isRecord(proxyResponse) ? proxyResponse.response : undefined;
+    if (
+      !isRecord(result) ||
+      !Number.isInteger(result.status) ||
+      (result.status as number) < 100 ||
+      (result.status as number) > 599 ||
+      !isRecord(result.headers) ||
+      typeof result.responseHash !== "string" ||
+      !result.responseHash ||
+      typeof result.responseHeadersHash !== "string" ||
+      !result.responseHeadersHash ||
+      typeof result.statusText !== "string" ||
+      (result.requestHash !== undefined && typeof result.requestHash !== "string")
+    ) {
+      throw new TypeError("Demos DAHR request returned invalid response evidence");
+    }
 
     const transaction = emptyTransaction();
     transaction.content.to = this.demos.getAddress();
@@ -428,7 +455,13 @@ export class Web2Proxy {
       (await this.demos.getAddressNonce(this.demos.getAddress())) + 1;
     const signed = await this.demos.sign(transaction);
     const validity = await this.demos.confirm(signed);
-    await this.demos.broadcast(validity);
+    const broadcast = await this.demos.broadcast(validity);
+    if (broadcast.result !== 200) {
+      throw new Error(
+        `Demos DAHR anchor broadcast failed with RPC result ${broadcast.result}`,
+        { cause: broadcast.response },
+      );
+    }
     return {
       ...result,
       txHash: validity.response.data.transaction.hash,
@@ -519,11 +552,19 @@ export class Demos {
           hash: "",
           signature: { type: "ed25519", data: "" },
         },
-      }) as RpcResponse<Record<string, unknown>>;
-      const inner = response.response as Record<string, unknown>;
-      const dahr = inner.dahr as Record<string, unknown> | undefined;
-      if (typeof dahr?.sessionId !== "string" || !dahr.sessionId) {
-        throw new Error("Failed to create proxy session");
+      }) as unknown;
+      if (!isRecord(response) || response.result !== 200) {
+        throw new Error(
+          `Demos DAHR session creation failed with RPC result ${
+            isRecord(response) ? String(response.result) : "unknown"
+          }`,
+          { cause: isRecord(response) ? response.response : response },
+        );
+      }
+      const inner = response.response;
+      const dahr = isRecord(inner) ? inner.dahr : undefined;
+      if (!isRecord(dahr) || typeof dahr.sessionId !== "string" || !dahr.sessionId) {
+        throw new TypeError("Demos DAHR session creation returned no valid session ID");
       }
       return new Web2Proxy(dahr.sessionId, this);
     },

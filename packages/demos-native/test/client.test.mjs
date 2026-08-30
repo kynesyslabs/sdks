@@ -5,6 +5,7 @@ import {
   Demos,
   Identities,
   StorageProgram,
+  Web2Proxy,
 } from "../dist/index.js";
 
 const MNEMONIC =
@@ -300,4 +301,59 @@ test("runs the DACS-used DAHR create/start/anchor flow", async () => {
     body.method === "web2ProxyRequest" &&
     body.params[0].message.web2Request.raw.url === "https://example.com/proof"
   ));
+});
+
+test("fails closed on rejected or malformed DAHR evidence", async () => {
+  const rejected = new Demos();
+  await rejected.connectWallet(MNEMONIC);
+  rejected.call = async () => ({
+    result: 503,
+    response: { error: "unavailable" },
+  });
+  await assert.rejects(
+    new Web2Proxy("dahr-rejected", rejected).startProxy({
+      url: "https://example.com/proof",
+      method: "GET",
+    }),
+    /DAHR request failed with RPC result 503/,
+  );
+
+  const malformed = new Demos();
+  await malformed.connectWallet(MNEMONIC);
+  malformed.call = async () => ({ result: 200, response: {} });
+  await assert.rejects(
+    new Web2Proxy("dahr-malformed", malformed).startProxy({
+      url: "https://example.com/proof",
+      method: "GET",
+    }),
+    /invalid response evidence/,
+  );
+});
+
+test("does not report a DAHR tx hash after broadcast rejection", async () => {
+  const demos = new Demos();
+  await demos.connect(rpc);
+  await demos.connectWallet(MNEMONIC);
+  demos.broadcast = async () => ({
+    result: 503,
+    response: { error: "not accepted" },
+  });
+  await assert.rejects(
+    new Web2Proxy("dahr-test", demos).startProxy({
+      url: "https://example.com/proof",
+      method: "GET",
+      options: { nonce: 8 },
+    }),
+    /DAHR anchor broadcast failed with RPC result 503/,
+  );
+});
+
+test("fails closed on a rejected DAHR session creation envelope", async () => {
+  const demos = new Demos();
+  await demos.connectWallet(MNEMONIC);
+  demos.call = async () => ({ result: 500, response: new Error("offline") });
+  await assert.rejects(
+    demos.web2.createDahr(),
+    /DAHR session creation failed with RPC result 500/,
+  );
 });
