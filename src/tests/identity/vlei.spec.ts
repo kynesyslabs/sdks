@@ -185,6 +185,52 @@ describe("vLEI verifyChain (injected source)", () => {
         expect(v.scope?.ok).toBe(false)
         expect(v.reasons.some(r => r.includes("unparseable amount"))).toBe(true)
     })
+
+    it("fails closed when a presenter relabels an I2I edge as NI2I to forge lineage", async () => {
+        // The forgery the pinned-operator rule blocks: an attacker who is NOT the QVI's
+        // issuee mints an LE credential pointing at the real QVI credential and marks the
+        // `qvi` edge NI2I so the issuer→issuee check would be skipped. The operator is
+        // pinned by governance (I2I), so this is rejected, not accepted.
+        const creds = baseCreds()
+        creds[LE_SAID] = {
+            ...creds[LE_SAID],
+            sad: { ...creds[LE_SAID].sad, i: aid("X"), e: { qvi: { n: QVI_SAID, o: "NI2I" } } },
+        }
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("contradicts the pinned"))).toBe(true)
+        expect(v.reasons.some(r => r.includes("issuer-to-issuee"))).toBe(true)
+    })
+
+    it("fails closed when the scope sets a limit but the transaction omits the amount", async () => {
+        const { amount: _amount, ...noAmountTx } = IN_SCOPE_TX
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, {
+            proposedTx: noAmountTx,
+            timestamp: FIXED_TS,
+        })
+        expect(v.scope?.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("declares no amount"))).toBe(true)
+    })
+
+    it("fails closed when the scope restricts corridors but the transaction omits one", async () => {
+        const { corridor: _corridor, ...noCorridorTx } = IN_SCOPE_TX
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, {
+            proposedTx: noCorridorTx,
+            timestamp: FIXED_TS,
+        })
+        expect(v.scope?.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("restricts corridors but the transaction declares none"))).toBe(true)
+    })
+
+    it("fails closed when the scope restricts networks but the transaction omits one", async () => {
+        const { network: _network, ...noNetworkTx } = IN_SCOPE_TX
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, {
+            proposedTx: noNetworkTx,
+            timestamp: FIXED_TS,
+        })
+        expect(v.scope?.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("relying networks but the transaction declares none"))).toBe(true)
+    })
 })
 
 describe("JCS canonicalization (NFC hardening)", () => {

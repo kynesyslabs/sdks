@@ -95,24 +95,34 @@ function evaluateScope(scope: any, tx: ProposedTx): string[] {
             reasons.push(`transaction type '${tx.type}' not in authorised types`)
         }
     }
-    if (tx.corridor !== undefined && scope.corridors !== undefined) {
+    // A restriction PRESENT in the scope but a matching field ABSENT from the
+    // transaction is fail-closed: an unstated corridor/network/amount cannot be
+    // proven in-scope, so it must not pass. (A restriction absent from the scope is
+    // unconstrained by design.)
+    if (scope.corridors !== undefined) {
         if (!Array.isArray(scope.corridors)) {
             reasons.push("authorityScope.corridors is malformed (fail-closed)")
+        } else if (tx.corridor === undefined) {
+            reasons.push("authorityScope restricts corridors but the transaction declares none (fail-closed)")
         } else if (!scope.corridors.includes(tx.corridor)) {
             reasons.push(`corridor '${tx.corridor}' not permitted`)
         }
     }
-    if (tx.network !== undefined && scope.relyingNetworks !== undefined) {
+    if (scope.relyingNetworks !== undefined) {
         if (!Array.isArray(scope.relyingNetworks)) {
             reasons.push("authorityScope.relyingNetworks is malformed (fail-closed)")
+        } else if (tx.network === undefined) {
+            reasons.push("authorityScope restricts relying networks but the transaction declares none (fail-closed)")
         } else if (!scope.relyingNetworks.includes(tx.network)) {
             reasons.push(`network '${tx.network}' not a relying network`)
         }
     }
-    if (tx.amount !== undefined && scope.perTransactionLimit !== undefined) {
+    if (scope.perTransactionLimit !== undefined) {
         const lim = scope.perTransactionLimit
         if (typeof lim !== "object" || lim === null) {
             reasons.push("authorityScope.perTransactionLimit is malformed (fail-closed)")
+        } else if (tx.amount === undefined) {
+            reasons.push("authorityScope sets a per-transaction limit but the transaction declares no amount (fail-closed)")
         } else {
             if (lim.currency !== undefined) {
                 if (tx.currency === undefined) {
@@ -221,7 +231,8 @@ export async function verifyChain(
                 } else {
                     node.edgeName = used.name
                     node.edgeTo = cred.sad.e![used.name].n
-                    // Default operator for a targeted ACDC edge is I2I (KERI).
+                    // Capture the operator the credential PRESENTS (ACDC default is I2I)
+                    // so the lineage pass can reject it when it contradicts the pinned one.
                     edgeOp.set(said, cred.sad.e![used.name].o ?? "I2I")
                     queue.push(node.edgeTo!)
                 }
@@ -251,20 +262,29 @@ export async function verifyChain(
                 `${node.schemaName} edge '${node.edgeName}' parent schema ${parent.schemaName ?? parent.schema} not in {${edgeRule.parentSchemas.join(",")}}`,
             )
         }
-        // Cryptographic lineage: an issuer-to-issuee edge means the authority was
-        // actually handed down the chain, so this credential's issuer must be the
-        // parent's issuee. NI2I edges reference a third party's credential (e.g. an
-        // accountable officer's ECR), where that constraint deliberately does not
-        // hold. An operator we don't model is treated as fail-closed.
-        const op = edgeOp.get(node.said) ?? "I2I"
-        if (op === "I2I") {
-            if (node.issuer !== parent.issuee) {
+        // Cryptographic lineage. The edge operator is taken from the GOVERNANCE-PINNED
+        // rule, never from the presented credential: otherwise a presenter could relabel
+        // an issuer-to-issuee edge as NI2I to skip the check below and splice a forged
+        // chain onto the trusted root. The operator the credential actually carries must
+        // also match the pinned one, or the credential is rejected.
+        const pinnedOp = edgeRule?.op
+        const presentedOp = edgeOp.get(node.said) ?? "I2I"
+        if (!pinnedOp) {
+            reasons.push(`${node.schemaName} edge '${node.edgeName}' is not modelled (fail-closed)`)
+        } else {
+            if (presentedOp !== pinnedOp) {
+                reasons.push(
+                    `${node.schemaName} edge '${node.edgeName}' operator '${presentedOp}' contradicts the pinned '${pinnedOp}' (fail-closed)`,
+                )
+            }
+            // I2I: authority was handed down, so this issuer must be the parent's issuee.
+            // NI2I references a third party's credential (e.g. the accountable officer's
+            // ECR) and deliberately carries no such bond.
+            if (pinnedOp === "I2I" && node.issuer !== parent.issuee) {
                 reasons.push(
                     `${node.schemaName} edge '${node.edgeName}' is issuer-to-issuee but issuer ${node.issuer} != parent ${parent.schemaName ?? parent.schema} issuee ${parent.issuee ?? "none"}`,
                 )
             }
-        } else if (op !== "NI2I") {
-            reasons.push(`${node.schemaName} edge '${node.edgeName}' has unrecognised operator '${op}' (fail-closed)`)
         }
     }
 

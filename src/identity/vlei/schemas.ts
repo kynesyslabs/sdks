@@ -44,6 +44,14 @@ export const SCHEMA_NAME_BY_SAID: Record<string, SchemaName> = Object.fromEntrie
 export interface EdgeRule {
     name: string
     parentSchemas: SchemaName[]
+    /**
+     * The operator this edge is REQUIRED to carry, per GLEIF governance. Pinned
+     * here and never read from the presented credential, so a presenter cannot
+     * relabel an issuer-to-issuee edge as NI2I to skip the lineage check.
+     * I2I: authority handed down — this credential's issuer must equal the parent's
+     * issuee. NI2I: a reference to a third party's credential, with no lineage bond.
+     */
+    op: "I2I" | "NI2I"
 }
 export interface ChainRule {
     /** Accepted parent edges; the credential must carry exactly one. */
@@ -56,21 +64,21 @@ export interface ChainRule {
 
 export const CHAIN_RULES: Record<SchemaName, ChainRule> = {
     QVI: { isRoot: true },
-    LE: { edges: [{ name: "qvi", parentSchemas: ["QVI"] }] },
+    LE: { edges: [{ name: "qvi", parentSchemas: ["QVI"], op: "I2I" }] },
     ECR: {
         edges: [
-            { name: "le", parentSchemas: ["LE"] },
-            { name: "auth", parentSchemas: ["ECR_AUTH"] },
+            { name: "le", parentSchemas: ["LE"], op: "I2I" },
+            { name: "auth", parentSchemas: ["ECR_AUTH"], op: "I2I" },
         ],
     },
-    ECR_AUTH: { edges: [{ name: "le", parentSchemas: ["LE"] }] },
-    OOR: { edges: [{ name: "auth", parentSchemas: ["OOR_AUTH"] }] },
-    OOR_AUTH: { edges: [{ name: "le", parentSchemas: ["LE"] }] },
+    ECR_AUTH: { edges: [{ name: "le", parentSchemas: ["LE"], op: "I2I" }] },
+    OOR: { edges: [{ name: "auth", parentSchemas: ["OOR_AUTH"], op: "I2I" }] },
+    OOR_AUTH: { edges: [{ name: "le", parentSchemas: ["LE"], op: "I2I" }] },
     AGENT_AUTHORITY: {
         isAgentAuthority: true,
         edges: [
-            { name: "le", parentSchemas: ["LE"] }, // Flow 1: entity grants directly
-            { name: "ecr", parentSchemas: ["ECR"] }, // Flow 2: via accountable officer's ECR
+            { name: "le", parentSchemas: ["LE"], op: "I2I" }, // Flow 1: entity grants directly
+            { name: "ecr", parentSchemas: ["ECR"], op: "NI2I" }, // Flow 2: reference to the accountable officer's ECR
         ],
     },
 }
