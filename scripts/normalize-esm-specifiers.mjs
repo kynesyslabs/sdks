@@ -40,7 +40,8 @@ async function rewriteSpecifiers(sourceFile, source) {
 
     for (const pattern of patterns) {
         const matches = [...output.matchAll(pattern)]
-        for (const match of matches.reverse()) {
+        matches.reverse()
+        for (const match of matches) {
             const resolved = await resolveSpecifier(sourceFile, match[3])
             if (resolved === match[3]) continue
 

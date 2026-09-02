@@ -11,13 +11,21 @@ import { IPayOptions } from "."
 import { _required as required } from "@/websdk"
 import { DefaultChain } from "./types/defaultChain"
 import { Transaction } from "near-api-js/lib/transaction.js"
-import nearUtils from "@near-js/utils"
+import * as nearUtilsNamespace from "@near-js/utils"
 import * as bip39 from "@scure/bip39"
 import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes/index.js"
 import nacl from "tweetnacl"
-import naclUtil from "tweetnacl-util"
+import * as naclUtilNamespace from "tweetnacl-util"
 import { derivePath } from "ed25519-hd-key"
 
+type NearUtils = typeof import("@near-js/utils")
+type NaclUtil = typeof import("tweetnacl-util")
+
+const nearUtilsDefault = (nearUtilsNamespace as unknown as { default?: NearUtils }).default
+const nearUtils = "baseDecode" in nearUtilsNamespace ? nearUtilsNamespace : nearUtilsDefault
+const naclUtilDefault = (naclUtilNamespace as unknown as { default?: NaclUtil }).default
+const naclUtil = "decodeUTF8" in naclUtilNamespace ? naclUtilNamespace : naclUtilDefault
+if (!nearUtils || !naclUtil) throw new TypeError("NEAR encoding dependencies are unavailable")
 const { decodeUTF8 } = naclUtil
 const { baseDecode, parseNearAmount } = nearUtils
 

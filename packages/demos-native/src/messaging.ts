@@ -387,7 +387,7 @@ export class L2PSMessagingPeer {
       timestamp,
     );
     if (!Array.isArray(result.messages) || typeof result.hasMore !== "boolean") {
-      throw new Error("Invalid history response from L2PS messaging server");
+      throw new TypeError("Invalid history response from L2PS messaging server");
     }
     return result as unknown as L2PSHistoryPage;
   }
@@ -557,39 +557,27 @@ export class L2PSMessagingPeer {
     });
   }
 
-  #handleRawMessage(data: RawData): void {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(rawDataToString(data));
-    } catch {
-      this.#emitError({ code: "INVALID_MESSAGE", message: "Invalid L2PS JSON frame" });
-      return;
-    }
-    const frame = serverFrame(parsed);
-    if (!frame) {
-      this.#emitError({ code: "INVALID_MESSAGE", message: "Invalid L2PS protocol frame" });
-      return;
-    }
+  #resolvePending(frame: IncomingFrame): boolean {
     const pending = frame.requestId ? this.#pending.get(frame.requestId) : undefined;
-    if (pending) {
-      if (frame.type === "error") {
-        clearTimeout(pending.timer);
-        this.#pending.delete(frame.requestId!);
-        pending.reject(new Error(
-          typeof frame.payload.message === "string"
-            ? frame.payload.message
-            : "L2PS server rejected the request",
-        ));
-        return;
-      }
-      if (pending.expectedTypes.has(frame.type)) {
-        clearTimeout(pending.timer);
-        this.#pending.delete(frame.requestId!);
-        pending.resolve(frame.payload);
-        return;
-      }
+    if (!pending || !frame.requestId) return false;
+    if (frame.type === "error") {
+      clearTimeout(pending.timer);
+      this.#pending.delete(frame.requestId);
+      pending.reject(new Error(
+        typeof frame.payload.message === "string"
+          ? frame.payload.message
+          : "L2PS server rejected the request",
+      ));
+      return true;
     }
+    if (!pending.expectedTypes.has(frame.type)) return false;
+    clearTimeout(pending.timer);
+    this.#pending.delete(frame.requestId);
+    pending.resolve(frame.payload);
+    return true;
+  }
 
+  #handleNotification(frame: IncomingFrame): void {
     if (frame.type === "message") {
       this.#messageHandlers.forEach((handler) => {
         handler(frame.payload as unknown as L2PSIncomingMessage);
@@ -617,6 +605,22 @@ export class L2PSMessagingPeer {
           : {}),
       });
     }
+  }
+
+  #handleRawMessage(data: RawData): void {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawDataToString(data));
+    } catch {
+      this.#emitError({ code: "INVALID_MESSAGE", message: "Invalid L2PS JSON frame" });
+      return;
+    }
+    const frame = serverFrame(parsed);
+    if (!frame) {
+      this.#emitError({ code: "INVALID_MESSAGE", message: "Invalid L2PS protocol frame" });
+      return;
+    }
+    if (!this.#resolvePending(frame)) this.#handleNotification(frame);
   }
 
   #handleClose(socket: WebSocket): void {

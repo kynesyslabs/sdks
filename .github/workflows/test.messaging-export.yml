@@ -28,17 +28,17 @@ jobs:
       matrix:
         node: ['20.19.0', '22']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: '1.2.19'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node }}
       - name: Install dependencies without lifecycle scripts
-        run: bun install --ignore-scripts
+        run: bun install --ignore-scripts --frozen-lockfile
       - name: Build package
         run: bun run build
       - name: Verify clean root and messaging imports

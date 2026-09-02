@@ -2,7 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from 'node:url';
 
 const execAsync = promisify(exec);
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
