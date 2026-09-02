@@ -201,7 +201,7 @@ function rawDataToString(data: RawData): string {
 
 function isLoopbackHostname(hostname: string): boolean {
   return hostname === "localhost" || hostname === "[::1]" ||
-    /^127(?:\.[0-9]{1,3}){3}$/.test(hostname);
+    /^127(?:\.\d{1,3}){3}$/.test(hostname);
 }
 
 function canonicalBase64(
@@ -481,7 +481,7 @@ export class L2PSMessagingPeer {
       throw new TypeError("Invalid history response from L2PS messaging server");
     }
     const messages = result.messages.map(storedMessage);
-    if (messages.some((message) => message === undefined)) {
+    if (messages.includes(undefined)) {
       throw new TypeError("Invalid history entry from L2PS messaging server");
     }
     return { messages: messages as L2PSStoredMessage[], hasMore: result.hasMore };
