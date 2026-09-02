@@ -220,6 +220,33 @@ function serverFrame(value: unknown): IncomingFrame | undefined {
   };
 }
 
+function incomingMessage(value: Record<string, unknown>): L2PSIncomingMessage | undefined {
+  if (!PUBLIC_KEY.test(value.from as string) || !HASH.test(value.messageHash as string) ||
+    !isRecord(value.encrypted) ||
+    (value.offline !== undefined && typeof value.offline !== "boolean")) {
+    return undefined;
+  }
+  try {
+    const ciphertext = canonicalString(value.encrypted.ciphertext as string, "ciphertext");
+    const nonce = canonicalString(value.encrypted.nonce as string, "nonce");
+    const ephemeralKey = value.encrypted.ephemeralKey === undefined
+      ? undefined
+      : canonicalString(value.encrypted.ephemeralKey as string, "ephemeralKey");
+    return {
+      from: value.from as string,
+      encrypted: {
+        ciphertext,
+        nonce,
+        ...(ephemeralKey === undefined ? {} : { ephemeralKey }),
+      },
+      messageHash: value.messageHash as string,
+      ...(value.offline === undefined ? {} : { offline: value.offline }),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Dependency-minimal Node client for the existing Demos L2PS messaging server.
  * The server transports caller-owned ciphertext; this class does not define an
@@ -579,8 +606,13 @@ export class L2PSMessagingPeer {
 
   #handleNotification(frame: IncomingFrame): void {
     if (frame.type === "message") {
+      const message = incomingMessage(frame.payload);
+      if (!message) {
+        this.#emitError({ code: "INVALID_MESSAGE", message: "Invalid L2PS message payload" });
+        return;
+      }
       this.#messageHandlers.forEach((handler) => {
-        handler(frame.payload as unknown as L2PSIncomingMessage);
+        handler(message);
       });
       return;
     }

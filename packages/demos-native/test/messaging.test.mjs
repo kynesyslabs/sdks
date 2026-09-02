@@ -123,6 +123,11 @@ async function createMessagingServer() {
   return {
     url: `ws://127.0.0.1:${address.port}`,
     sendCount: () => sendCount,
+    sendFrame(publicKey, type, payload) {
+      const socket = connections.get(publicKey);
+      assert.ok(socket, `connection for ${publicKey} must exist`);
+      socket.send(JSON.stringify({ type, payload, timestamp: Date.now() }));
+    },
     async close() {
       for (const socket of connections.values()) socket.close();
       await new Promise((resolve) => server.close(resolve));
@@ -200,4 +205,29 @@ test("configuration and effect identifiers fail closed", async () => {
     buyer.disconnect();
     await server.close();
   }
+});
+
+test("malformed incoming payloads reach onError, not application handlers", async (t) => {
+  const server = await createMessagingServer();
+  const buyer = peer(server.url, BUYER);
+  t.after(async () => {
+    buyer.disconnect();
+    await server.close();
+  });
+  await buyer.connect();
+
+  let delivered = false;
+  buyer.onMessage(() => { delivered = true; });
+  const rejected = new Promise((resolve) => buyer.onError(resolve));
+  server.sendFrame(BUYER, "message", {
+    from: "not-a-public-key",
+    encrypted: { ciphertext: "ciphertext", nonce: "nonce" },
+    messageHash: "44".repeat(32),
+  });
+
+  assert.deepEqual(await rejected, {
+    code: "INVALID_MESSAGE",
+    message: "Invalid L2PS message payload",
+  });
+  assert.equal(delivered, false);
 });
