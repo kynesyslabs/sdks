@@ -1,0 +1,15 @@
+# DACS channel-message fixtures
+
+Vendored byte-for-byte from DACS-Standard PR #367 commit
+`10e1b3d697747b82c9372693a2a6e8383e7b2c87`:
+
+- `canonical-channel-message-v0.6.json`: file SHA-256
+  `0b79fdd410548fe818541351ed4cff18284de361711e774a064c47847acfb46b`;
+  42 current/dispatch vectors with canonical-vector hash
+  `16665e581726d08dccf3b6d5bb91a1d36686ab1861fbdb7fceea117b7447b748`.
+- `channel-message-replay-v0.1.json`: file SHA-256
+  `ce43b226e358e15cb126b4b7d53b8638648c14ca55250eb57e6db68e451ba13f`;
+  15 frozen historical read/import-only vectors with recorded vector hash
+  `3f0664c434a6727f7578434cba9ea47b804e0dff12249081c7abdd4fdc03803b`.
+
+The implementation remains provisional until that Standard PR is adopted.

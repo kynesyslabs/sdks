@@ -92,13 +92,15 @@ assert.equal(consumerAudit.metadata.vulnerabilities.total, 0);
 const smokeModule = join(consumer, "smoke.mjs");
 writeFileSync(smokeModule, [
   'import { Demos, StorageProgram } from "@kynesyslabs/demos-native";',
+  'import { verifyCanonicalChannelMessage } from "@kynesyslabs/demos-native/channel-codec";',
   'import { L2PSMessagingPeer } from "@kynesyslabs/demos-native/messaging";',
-  "export { Demos, StorageProgram, L2PSMessagingPeer };",
+  "export { Demos, StorageProgram, L2PSMessagingPeer, verifyCanonicalChannelMessage };",
 ].join("\n"));
 const installed = await import(smokeModule);
 assert.equal(typeof installed.Demos, "function");
 assert.equal(typeof installed.StorageProgram, "function");
 assert.equal(typeof installed.L2PSMessagingPeer, "function");
+assert.equal(typeof installed.verifyCanonicalChannelMessage, "function");
 
 process.stdout.write(JSON.stringify({
   schema: "demos-native-release-verification/v1",
