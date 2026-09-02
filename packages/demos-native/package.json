@@ -1,6 +1,6 @@
 {
   "name": "@kynesyslabs/demos-native",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Dependency-minimal Demos native, messaging, Storage Program, identity-read and DAHR client",
   "type": "module",
   "license": "MIT",
@@ -9,6 +9,7 @@
   },
   "files": [
     "dist/",
+    "docs/",
     "README.md",
     "LICENSE"
   ],
@@ -35,6 +36,10 @@
       "types": "./dist/channel-codec.d.ts",
       "default": "./dist/channel-codec.js"
     },
+    "./transcript-encryption": {
+      "types": "./dist/transcript-encryption.d.ts",
+      "default": "./dist/transcript-encryption.js"
+    },
     "./types": {
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
@@ -48,6 +53,7 @@
     "verify:release": "npm run test && node scripts/verify-release.mjs"
   },
   "dependencies": {
+    "@noble/post-quantum": "0.4.1",
     "@scure/bip39": "^2.2.0",
     "node-forge": "^1.4.0",
     "ws": "^8.18.3"

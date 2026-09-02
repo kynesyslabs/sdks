@@ -94,13 +94,15 @@ writeFileSync(smokeModule, [
   'import { Demos, StorageProgram } from "@kynesyslabs/demos-native";',
   'import { verifyCanonicalChannelMessage } from "@kynesyslabs/demos-native/channel-codec";',
   'import { L2PSMessagingPeer } from "@kynesyslabs/demos-native/messaging";',
-  "export { Demos, StorageProgram, L2PSMessagingPeer, verifyCanonicalChannelMessage };",
+  'import { openEncryptedChannelTranscript } from "@kynesyslabs/demos-native/transcript-encryption";',
+  "export { Demos, StorageProgram, L2PSMessagingPeer, verifyCanonicalChannelMessage, openEncryptedChannelTranscript };",
 ].join("\n"));
 const installed = await import(smokeModule);
 assert.equal(typeof installed.Demos, "function");
 assert.equal(typeof installed.StorageProgram, "function");
 assert.equal(typeof installed.L2PSMessagingPeer, "function");
 assert.equal(typeof installed.verifyCanonicalChannelMessage, "function");
+assert.equal(typeof installed.openEncryptedChannelTranscript, "function");
 
 process.stdout.write(JSON.stringify({
   schema: "demos-native-release-verification/v1",
