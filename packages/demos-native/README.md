@@ -59,6 +59,40 @@ connection lifecycle operations. It transports caller-provided ciphertext as
 opaque bytes and does not define a DACS channel signature or transcript
 encryption format.
 
+## DACS channel codec (provisional)
+
+The `channel-codec` subpath implements the proposed DACS-3 v0.6 current wire
+from DACS-Standard PR #367 at commit
+`10e1b3d697747b82c9372693a2a6e8383e7b2c87`. It is provisional until that
+Standard change is adopted; do not claim current DACS-3 conformance before
+then.
+
+```ts
+import {
+  createCanonicalChannelMessage,
+  verifyCanonicalChannelMessage,
+} from "@kynesyslabs/demos-native/channel-codec";
+
+const message = await createCanonicalChannelMessage(unsignedMessage, {
+  signer: primaryClaim,
+  algorithm: "ed25519",
+  sign: signExactBytes,
+});
+
+const verdict = await verifyCanonicalChannelMessage(
+  receivedMessage,
+  channelContext,
+  resolveAuthenticatedPrimaryKey,
+);
+```
+
+The verifier reconstructs the signed bytes, retains unknown signed members,
+requires canonical unpadded Base64URL, dispatches from the authenticated key
+algorithm, and applies channel/sequence replay policy only after signature
+verification. Historical v4.0.16 messages are accepted only through the
+separately named `importLegacyDemosChannelMessage()` read/import operation.
+There is intentionally no legacy producer and no decoder or domain fallback.
+
 ## Release gates
 
 The package is released only when a clean packed consumer passes

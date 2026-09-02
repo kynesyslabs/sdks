@@ -1,6 +1,6 @@
 {
   "name": "@kynesyslabs/demos-native",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Dependency-minimal Demos native, messaging, Storage Program, identity-read and DAHR client",
   "type": "module",
   "license": "MIT",
@@ -30,6 +30,10 @@
     "./messaging": {
       "types": "./dist/messaging.d.ts",
       "default": "./dist/messaging.js"
+    },
+    "./channel-codec": {
+      "types": "./dist/channel-codec.d.ts",
+      "default": "./dist/channel-codec.js"
     },
     "./types": {
       "types": "./dist/types.d.ts",
