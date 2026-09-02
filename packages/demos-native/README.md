@@ -93,6 +93,19 @@ verification. Historical v4.0.16 messages are accepted only through the
 separately named `importLegacyDemosChannelMessage()` read/import operation.
 There is intentionally no legacy producer and no decoder or domain fallback.
 
+## Encrypted transcript suite (candidate)
+
+The `transcript-encryption` subpath supplies the executable candidate suite
+`{ suiteId: "dacs-transcript-mlkem768-a256gcm", suiteVersion: 1 }`. Its exact
+key binding, ML-KEM, AEAD, AAD, wrapping, hashing, rotation, revocation and
+failure contracts are in
+[`docs/transcript-encryption-profile.md`](docs/transcript-encryption-profile.md).
+
+This is specification input for DACS-Standard #351, not an adopted DACS-3
+format. The suite does not by itself replace the required authenticated
+plaintext transcript, all-member anchor consent, signed encrypted envelope or
+SR-2 receipt verification.
+
 ## Release gates
 
 The package is released only when a clean packed consumer passes

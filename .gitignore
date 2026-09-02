@@ -11,6 +11,8 @@ package-lock.json
 packages/demos-native/dist/
 yarn.lock
 docs
+!packages/demos-native/docs/
+!packages/demos-native/docs/**
 *.pkl
 .setup_done
 __pycache__

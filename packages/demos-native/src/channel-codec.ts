@@ -92,6 +92,9 @@ export interface ChannelMessageSigner {
   sign(payload: Uint8Array): Uint8Array | Promise<Uint8Array>;
 }
 
+export type DacsJsonSignature = ChannelMessageSignature;
+export type DacsJsonSigner = ChannelMessageSigner;
+
 export type ChannelMessageOutcome =
   | "pass"
   | "fail"
@@ -362,6 +365,17 @@ export function canonicalChannelMessageSigningBytes(message: unknown): Uint8Arra
   return Buffer.concat([CURRENT_DOMAIN_BYTES, Buffer.from(digestHex, "ascii")]);
 }
 
+/** Build a CORE SIG-1/SIG-2 payload for a trusted, registered DACS domain. */
+export function dacsJsonSigningBytes(domain: string, unsigned: unknown): Uint8Array {
+  if (!/^dacs-[a-z0-9-]+:v[1-9][0-9]*:$/.test(domain)) {
+    throw new TypeError("DACS signature domain is malformed");
+  }
+  const digest = createHash("sha256")
+    .update(Buffer.from(canonicalizeDacsJson(unsigned), "utf8"))
+    .digest("hex");
+  return Buffer.concat([Buffer.from(domain, "utf8"), Buffer.from(digest, "ascii")]);
+}
+
 function legacyChannelMessageSigningBytes(message: Record<string, unknown>): Uint8Array {
   return Buffer.concat([LEGACY_DOMAIN_BYTES, messageDigest(message)]);
 }
@@ -442,6 +456,64 @@ function validSignatureEncoding(
 ): boolean {
   if (algorithm === "ecdsa-secp256k1") return validCanonicalLowSEcdsa(signature);
   return signature.length === 64;
+}
+
+/** Create a canonical version-1 signature envelope for a DACS JSON scope. */
+export async function createDacsJsonSignature(
+  unsigned: unknown,
+  domain: string,
+  signer: DacsJsonSigner,
+): Promise<DacsJsonSignature> {
+  if (!isCanonicalClaimReference(signer.signer) ||
+    !ALGORITHMS.has(signer.algorithm) || typeof signer.sign !== "function") {
+    throw new TypeError("Invalid DACS JSON signer");
+  }
+  const signature = Buffer.from(await signer.sign(dacsJsonSigningBytes(domain, unsigned)));
+  if (!validSignatureEncoding(signer.algorithm, signature)) {
+    throw new TypeError("Signer returned an invalid algorithm-specific signature");
+  }
+  return {
+    signatureVersion: "1",
+    signer: signer.signer,
+    algorithm: signer.algorithm,
+    value: signature.toString("base64url"),
+  };
+}
+
+/** Verify one exact DACS JSON scope without decoder, domain, or key fallback. */
+export async function verifyDacsJsonSignature(
+  unsigned: unknown,
+  domain: string,
+  signature: unknown,
+  expectedSigner: string,
+  resolver: ChannelSigningKeyResolver,
+): Promise<ChannelMessageVerificationResult> {
+  if (!isCanonicalClaimReference(expectedSigner) || !isRecord(signature) ||
+    !hasExactKeys(signature, ["signatureVersion", "signer", "algorithm", "value"]) ||
+    signature.signatureVersion !== "1" ||
+    !ALGORITHMS.has(signature.algorithm as ChannelSignatureAlgorithm) ||
+    !isCanonicalClaimReference(signature.signer)) {
+    return result("error", "malformed-dacs-signature");
+  }
+  let signatureBytes: Buffer;
+  try {
+    signatureBytes = decodeBase64Url(signature.value);
+  } catch {
+    return result("error", "non-canonical-signature-value");
+  }
+  if (signature.signer !== expectedSigner) return result("fail", "unexpected-signer");
+  const key = await resolveKey(signature.signer, resolver);
+  if (!key) return result("indeterminate", "signing-key-unavailable");
+  if (!ALGORITHMS.has(key.algorithm) || key.algorithm !== signature.algorithm) {
+    return result("fail", "signature-algorithm-key-mismatch");
+  }
+  try {
+    return verifyWithKey(key, signatureBytes, dacsJsonSigningBytes(domain, unsigned))
+      ? result("pass", "verified")
+      : result("fail", "signature-invalid");
+  } catch {
+    return result("error", "invalid-authenticated-key");
+  }
 }
 
 function verifyWithKey(
