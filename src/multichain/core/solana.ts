@@ -19,7 +19,7 @@ import {
 
 // nacl is needed for signing and verifying messages
 import nacl from "tweetnacl"
-import { decodeBase64, decodeUTF8, encodeBase64 } from "tweetnacl-util"
+import naclUtil from "tweetnacl-util"
 
 import base58 from "bs58"
 import * as bip39 from "bip39"
@@ -35,6 +35,8 @@ import {
 } from "./types/interfaces"
 import { required } from "./utils"
 import { sign } from "@ton/crypto"
+
+const { decodeBase64, decodeUTF8, encodeBase64 } = naclUtil
 
 /* LICENSE
 

@@ -1,0 +1,45 @@
+name: Demos messaging exports
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'bun.lock'
+      - 'src/**'
+      - 'scripts/verify-messaging-export.mjs'
+      - '.github/workflows/test.messaging-export.yml'
+  push:
+    paths:
+      - 'package.json'
+      - 'bun.lock'
+      - 'src/**'
+      - 'scripts/verify-messaging-export.mjs'
+      - '.github/workflows/test.messaging-export.yml'
+
+jobs:
+  packed-consumer:
+    name: packed consumer (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20.19.0', '22']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.19'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install dependencies without lifecycle scripts
+        run: bun install --ignore-scripts
+      - name: Build package
+        run: bun run build
+      - name: Verify clean root and messaging imports
+        run: npm run test:messaging-export

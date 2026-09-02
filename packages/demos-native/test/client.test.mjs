@@ -138,6 +138,8 @@ after(async () => {
 test("derives the existing Demos Ed25519 wallet identity", async () => {
   const demos = new Demos();
   assert.equal(await demos.connectWallet(MNEMONIC), EXPECTED_ADDRESS);
+  assert.match(await demos.signMessage("register:test:1"), /^[0-9a-f]{128}$/);
+  await assert.rejects(demos.signMessage(""), /must be a non-empty string/);
   await assert.rejects(
     new Demos().connectWallet("not a valid mnemonic"),
     /Invalid mnemonic/,

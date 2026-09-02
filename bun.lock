@@ -6,6 +6,7 @@
       "name": "@kynesyslabs/demosdk",
       "dependencies": {
         "@aptos-labs/ts-sdk": "^1.39.0",
+        "@near-js/utils": "0.3.0",
         "@bitcoinerlab/secp256k1": "^1.2.0",
         "@coral-xyz/anchor": "^0.32.1",
         "@cosmjs/proto-signing": "^0.32.4",
@@ -68,6 +69,7 @@
         "superdilithium": "^2.0.6",
         "tlsn-js": "0.1.0-alpha.12.0",
         "tronweb": "^6.3.0",
+        "tweetnacl-util": "^0.15.1",
         "web3": "^4.16.0",
         "xrpl": "^3.1.0",
       },

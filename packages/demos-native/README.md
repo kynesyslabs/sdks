@@ -1,13 +1,15 @@
 # `@kynesyslabs/demos-native`
 
-A dependency-minimal, Node ESM Demos client for native DEM transfers, Storage
-Programs, public identity reads and DAHR requests. It exists for services that
-must not install the full multichain `@kynesyslabs/demosdk` dependency graph.
+A dependency-minimal, Node ESM Demos client for native DEM transfers, L2PS
+messaging, Storage Programs, public identity reads and DAHR requests. It exists
+for services that must not install the full multichain
+`@kynesyslabs/demosdk` dependency graph.
 
 ```ts
 import { Demos } from "@kynesyslabs/demos-native";
 import { StorageProgram } from "@kynesyslabs/demos-native/storage";
 import { Identities } from "@kynesyslabs/demos-native/identity-read";
+import { L2PSMessagingPeer } from "@kynesyslabs/demos-native/messaging";
 
 const demos = new Demos();
 await demos.connect(process.env.DEMOS_RPC!);
@@ -35,6 +37,27 @@ Amounts passed to `transfer()` are OS `bigint` values (1 DEM = 10^9 OS).
 Transactions retain the current pre-/post-denomination-fork wire serializer and
 property ordering. Callers remain responsible for durable nonce/effect
 journaling and ambiguous-broadcast reconciliation.
+
+The supported L2PS messaging entry point exposes the existing Demos messaging
+server protocol without owning an agent key:
+
+```ts
+const peer = new L2PSMessagingPeer({
+  serverUrl: process.env.DEMOS_L2PS_URL!,
+  publicKey: demos.getAddress().slice(2),
+  l2psUid: process.env.DEMOS_L2PS_UID!,
+  signFn: (message) => demos.signMessage(message),
+});
+
+await peer.connect();
+const history = await peer.history(remotePublicKey, { limit: 100 });
+```
+
+`signFn` is injected and receives only the exact Demos registration/history
+proof string. The peer exposes send, paged history, inbound-message and
+connection lifecycle operations. It transports caller-provided ciphertext as
+opaque bytes and does not define a DACS channel signature or transcript
+encryption format.
 
 ## Release gates
 
