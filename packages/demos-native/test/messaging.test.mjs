@@ -10,6 +10,8 @@ const BUYER = "11".repeat(32);
 const SELLER = "22".repeat(32);
 const SIGNATURE = "33".repeat(64);
 const L2PS_UID = "rfq-test-subnet";
+const CIPHERTEXT = Buffer.alloc(16, 4).toString("base64");
+const NONCE = Buffer.alloc(12, 5).toString("base64");
 
 function response(socket, request, type, payload) {
   socket.send(JSON.stringify({
@@ -168,13 +170,13 @@ test("two peers send, receive and reconcile history after restart", async (t) =>
   const inbound = new Promise((resolve) => seller.onMessage(resolve));
   const result = await buyer.send(
     SELLER,
-    { ciphertext: "Y2lwaGVydGV4dA==", nonce: "bm9uY2U=" },
+    { ciphertext: CIPHERTEXT, nonce: NONCE },
     messageHash,
   );
   assert.deepEqual(result, { messageHash, l2psStatus: "submitted" });
   assert.deepEqual(await inbound, {
     from: BUYER,
-    encrypted: { ciphertext: "Y2lwaGVydGV4dA==", nonce: "bm9uY2U=" },
+    encrypted: { ciphertext: CIPHERTEXT, nonce: NONCE },
     messageHash,
   });
   assert.equal(server.sendCount(), 1);
@@ -207,6 +209,10 @@ test("configuration and effect identifiers fail closed", async () => {
       buyer.send(SELLER, { ciphertext: "x", nonce: "y" }, "not-a-hash"),
       /messageHash must be 32-byte lowercase hex/,
     );
+    await assert.rejects(
+      buyer.send(SELLER, { ciphertext: CIPHERTEXT, nonce: "bm9uY2U=" }, "44".repeat(32)),
+      /encrypted payload must use canonical AES-GCM wire encoding/,
+    );
     assert.equal(server.sendCount(), 0);
   } finally {
     buyer.disconnect();
@@ -227,8 +233,8 @@ test("malformed incoming payloads reach onError, not application handlers", asyn
   buyer.onMessage(() => { delivered = true; });
   const rejected = new Promise((resolve) => buyer.onError(resolve));
   server.sendFrame(BUYER, "message", {
-    from: "not-a-public-key",
-    encrypted: { ciphertext: "ciphertext", nonce: "nonce" },
+    from: BUYER,
+    encrypted: { ciphertext: "not@base64", nonce: NONCE },
     messageHash: "44".repeat(32),
   });
 

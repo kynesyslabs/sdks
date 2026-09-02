@@ -131,6 +131,7 @@ interface PendingResponse {
 const PUBLIC_KEY = /^[0-9a-f]{64}$/;
 const HASH = /^[0-9a-f]{64}$/;
 const SIGNATURE = /^[0-9a-f]{128}$/;
+const BASE64 = /^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?$/;
 const MAX_STRING = 4_096;
 const MAX_L2PS_UID = 512;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
@@ -203,6 +204,22 @@ function isLoopbackHostname(hostname: string): boolean {
     /^127(?:\.[0-9]{1,3}){3}$/.test(hostname);
 }
 
+function canonicalBase64(
+  value: unknown,
+  label: string,
+  length: { exact?: number; minimum?: number } = {},
+): string {
+  const encoded = canonicalString(value as string, label);
+  if (!BASE64.test(encoded)) throw new TypeError(`${label} must be canonical base64`);
+  const decoded = Buffer.from(encoded, "base64");
+  if (decoded.toString("base64") !== encoded ||
+    (length.exact !== undefined && decoded.length !== length.exact) ||
+    (length.minimum !== undefined && decoded.length < length.minimum)) {
+    throw new TypeError(`${label} has an invalid canonical base64 length`);
+  }
+  return encoded;
+}
+
 function serverFrame(value: unknown): IncomingFrame | undefined {
   if (!isRecord(value) || typeof value.type !== "string" || !isRecord(value.payload)) {
     return undefined;
@@ -237,11 +254,11 @@ function serverFrame(value: unknown): IncomingFrame | undefined {
 function encryptedMessage(value: unknown): SerializedEncryptedMessage | undefined {
   if (!isRecord(value)) return undefined;
   try {
-    const ciphertext = canonicalString(value.ciphertext as string, "ciphertext");
-    const nonce = canonicalString(value.nonce as string, "nonce");
+    const ciphertext = canonicalBase64(value.ciphertext, "ciphertext", { minimum: 16 });
+    const nonce = canonicalBase64(value.nonce, "nonce", { exact: 12 });
     const ephemeralKey = value.ephemeralKey === undefined
       ? undefined
-      : canonicalString(value.ephemeralKey as string, "ephemeralKey");
+      : publicKey(value.ephemeralKey as string, "ephemeralKey");
     return {
       ciphertext,
       nonce,
@@ -412,20 +429,15 @@ export class L2PSMessagingPeer {
     if (!HASH.test(messageHash)) {
       throw new TypeError("messageHash must be 32-byte lowercase hex");
     }
-    const ciphertext = canonicalString(encrypted.ciphertext, "ciphertext");
-    const nonce = canonicalString(encrypted.nonce, "nonce");
-    const ephemeralKey = encrypted.ephemeralKey === undefined
-      ? undefined
-      : canonicalString(encrypted.ephemeralKey, "ephemeralKey");
+    const validatedEncrypted = encryptedMessage(encrypted);
+    if (!validatedEncrypted) {
+      throw new TypeError("encrypted payload must use canonical AES-GCM wire encoding");
+    }
     const result = await this.#request(
       "send",
       {
         to: recipient,
-        encrypted: {
-          ciphertext,
-          nonce,
-          ...(ephemeralKey === undefined ? {} : { ephemeralKey }),
-        },
+        encrypted: validatedEncrypted,
         messageHash,
       },
       ["message_sent", "message_queued"],
