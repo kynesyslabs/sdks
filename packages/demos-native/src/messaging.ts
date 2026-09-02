@@ -139,6 +139,15 @@ const DEFAULT_RECONNECT_ATTEMPTS = 10;
 const DEFAULT_RECONNECT_DELAY_MS = 1_000;
 const MAX_TIMEOUT_MS = 120_000;
 const MAX_HISTORY_LIMIT = 1_000;
+const MESSAGE_STATUSES = new Set<L2PSMessageStatus>([
+  "delivered",
+  "queued",
+  "sent",
+  "failed",
+  "l2ps_pending",
+  "l2ps_batched",
+  "l2ps_confirmed",
+]);
 
 function integerOption(
   value: number | undefined,
@@ -189,6 +198,11 @@ function rawDataToString(data: RawData): string {
   return data.toString("utf8");
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "[::1]" ||
+    /^127(?:\.[0-9]{1,3}){3}$/.test(hostname);
+}
+
 function serverFrame(value: unknown): IncomingFrame | undefined {
   if (!isRecord(value) || typeof value.type !== "string" || !isRecord(value.payload)) {
     return undefined;
@@ -220,27 +234,62 @@ function serverFrame(value: unknown): IncomingFrame | undefined {
   };
 }
 
-function incomingMessage(value: Record<string, unknown>): L2PSIncomingMessage | undefined {
-  if (!PUBLIC_KEY.test(value.from as string) || !HASH.test(value.messageHash as string) ||
-    !isRecord(value.encrypted) ||
-    (value.offline !== undefined && typeof value.offline !== "boolean")) {
+function encryptedMessage(value: unknown): SerializedEncryptedMessage | undefined {
+  if (!isRecord(value)) return undefined;
+  try {
+    const ciphertext = canonicalString(value.ciphertext as string, "ciphertext");
+    const nonce = canonicalString(value.nonce as string, "nonce");
+    const ephemeralKey = value.ephemeralKey === undefined
+      ? undefined
+      : canonicalString(value.ephemeralKey as string, "ephemeralKey");
+    return {
+      ciphertext,
+      nonce,
+      ...(ephemeralKey === undefined ? {} : { ephemeralKey }),
+    };
+  } catch {
     return undefined;
   }
+}
+
+function incomingMessage(value: Record<string, unknown>): L2PSIncomingMessage | undefined {
+  const encrypted = encryptedMessage(value.encrypted);
+  if (typeof value.from !== "string" || !PUBLIC_KEY.test(value.from) ||
+    typeof value.messageHash !== "string" || !HASH.test(value.messageHash) ||
+    !encrypted || (value.offline !== undefined && typeof value.offline !== "boolean")) {
+    return undefined;
+  }
+  return {
+    from: value.from,
+    encrypted,
+    messageHash: value.messageHash,
+    ...(value.offline === undefined ? {} : { offline: value.offline }),
+  };
+}
+
+function storedMessage(value: unknown): L2PSStoredMessage | undefined {
+  if (!isRecord(value) || typeof value.from !== "string" || !PUBLIC_KEY.test(value.from) ||
+    typeof value.to !== "string" || !PUBLIC_KEY.test(value.to) ||
+    typeof value.messageHash !== "string" || !HASH.test(value.messageHash) ||
+    (value.l2psTxHash !== null &&
+      (typeof value.l2psTxHash !== "string" || !HASH.test(value.l2psTxHash))) ||
+    !Number.isSafeInteger(value.timestamp) || (value.timestamp as number) < 0 ||
+    !MESSAGE_STATUSES.has(value.status as L2PSMessageStatus)) {
+    return undefined;
+  }
+  const encrypted = encryptedMessage(value.encrypted);
+  if (!encrypted) return undefined;
   try {
-    const ciphertext = canonicalString(value.encrypted.ciphertext as string, "ciphertext");
-    const nonce = canonicalString(value.encrypted.nonce as string, "nonce");
-    const ephemeralKey = value.encrypted.ephemeralKey === undefined
-      ? undefined
-      : canonicalString(value.encrypted.ephemeralKey as string, "ephemeralKey");
     return {
-      from: value.from as string,
-      encrypted: {
-        ciphertext,
-        nonce,
-        ...(ephemeralKey === undefined ? {} : { ephemeralKey }),
-      },
-      messageHash: value.messageHash as string,
-      ...(value.offline === undefined ? {} : { offline: value.offline }),
+      id: canonicalString(value.id as string, "history message id"),
+      from: value.from,
+      to: value.to,
+      messageHash: value.messageHash,
+      encrypted,
+      l2psUid: canonicalString(value.l2psUid as string, "history l2psUid", MAX_L2PS_UID),
+      l2psTxHash: value.l2psTxHash as string | null,
+      timestamp: value.timestamp as number,
+      status: value.status as L2PSMessageStatus,
     };
   } catch {
     return undefined;
@@ -279,6 +328,9 @@ export class L2PSMessagingPeer {
     const parsed = new URL(canonicalString(config.serverUrl, "serverUrl"));
     if (parsed.protocol !== "ws:" && parsed.protocol !== "wss:") {
       throw new TypeError("serverUrl must use ws: or wss:");
+    }
+    if (parsed.protocol === "ws:" && !isLoopbackHostname(parsed.hostname)) {
+      throw new TypeError("remote L2PS servers must use authenticated wss:");
     }
     this.#serverUrl = parsed.href;
     this.#publicKey = publicKey(config.publicKey, "publicKey");
@@ -416,7 +468,11 @@ export class L2PSMessagingPeer {
     if (!Array.isArray(result.messages) || typeof result.hasMore !== "boolean") {
       throw new TypeError("Invalid history response from L2PS messaging server");
     }
-    return result as unknown as L2PSHistoryPage;
+    const messages = result.messages.map(storedMessage);
+    if (messages.some((message) => message === undefined)) {
+      throw new TypeError("Invalid history entry from L2PS messaging server");
+    }
+    return { messages: messages as L2PSStoredMessage[], hasMore: result.hasMore };
   }
 
   async discover(): Promise<string[]> {

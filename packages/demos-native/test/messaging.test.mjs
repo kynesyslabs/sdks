@@ -123,6 +123,9 @@ async function createMessagingServer() {
   return {
     url: `ws://127.0.0.1:${address.port}`,
     sendCount: () => sendCount,
+    addStoredMessage(message) {
+      messages.push(message);
+    },
     sendFrame(publicKey, type, payload) {
       const socket = connections.get(publicKey);
       assert.ok(socket, `connection for ${publicKey} must exist`);
@@ -192,6 +195,10 @@ test("configuration and effect identifiers fail closed", async () => {
     () => peer("https://example.com", BUYER),
     /serverUrl must use ws: or wss:/,
   );
+  assert.throws(
+    () => peer("ws://example.com", BUYER),
+    /remote L2PS servers must use authenticated wss:/,
+  );
   const server = await createMessagingServer();
   const buyer = peer(server.url, BUYER);
   try {
@@ -230,4 +237,29 @@ test("malformed incoming payloads reach onError, not application handlers", asyn
     message: "Invalid L2PS message payload",
   });
   assert.equal(delivered, false);
+});
+
+test("malformed history records never reach reconciliation callers", async (t) => {
+  const server = await createMessagingServer();
+  const buyer = peer(server.url, BUYER);
+  t.after(async () => {
+    buyer.disconnect();
+    await server.close();
+  });
+  server.addStoredMessage({
+    id: "malformed-history-record",
+    from: SELLER,
+    to: BUYER,
+    messageHash: "44".repeat(32),
+    encrypted: { ciphertext: "ciphertext", nonce: "nonce" },
+    l2psUid: L2PS_UID,
+    l2psTxHash: null,
+    timestamp: "not-an-integer",
+    status: "delivered",
+  });
+  await buyer.connect();
+  await assert.rejects(
+    buyer.history(SELLER),
+    /Invalid history entry from L2PS messaging server/,
+  );
 });
