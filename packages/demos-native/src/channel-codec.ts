@@ -367,7 +367,7 @@ export function canonicalChannelMessageSigningBytes(message: unknown): Uint8Arra
 
 /** Build a CORE SIG-1/SIG-2 payload for a trusted, registered DACS domain. */
 export function dacsJsonSigningBytes(domain: string, unsigned: unknown): Uint8Array {
-  if (!/^dacs-[a-z0-9-]+:v[1-9][0-9]*:$/.test(domain)) {
+  if (!/^dacs-[a-z\d-]+:v[1-9]\d*:$/.test(domain)) {
     throw new TypeError("DACS signature domain is malformed");
   }
   const digest = createHash("sha256")

@@ -152,9 +152,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function exactKeys(record: Record<string, unknown>, expected: readonly string[]): boolean {
-  const actual = Object.keys(record).sort();
-  const wanted = [...expected].sort();
-  return actual.length === wanted.length && actual.every((key, index) => key === wanted[index]);
+  const actual = Object.keys(record);
+  return actual.length === expected.length &&
+    expected.every((key) => Object.hasOwn(record, key));
 }
 
 function canonicalString(value: unknown, label: string, maximum = 512): string {
