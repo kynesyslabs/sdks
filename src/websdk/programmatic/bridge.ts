@@ -1,7 +1,22 @@
-import { NativeBridgeMethods } from "@/bridge"
+import { methods as NativeBridgeMethods } from "@/bridge/nativeBridge"
 import type { BridgeOperationCompiled } from "@/bridge/nativeBridgeTypes"
 import type { ProgrammaticContext } from "./context"
 import type { ProgrammaticTxOptions, ProgrammaticTxResult } from "./types"
+
+/** Native bridge operations exposed by the programmatic transaction facade. */
+export interface ProgrammaticBridgeNamespace {
+    /**
+     * Submit a compiled bridge operation as a `nativeBridge` transaction,
+     * end to end.
+     *
+     * @param compiled - The compiled bridge operation returned by the RPC.
+     * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+     */
+    submit(
+        compiled: BridgeOperationCompiled,
+        opts?: ProgrammaticTxOptions,
+    ): Promise<ProgrammaticTxResult>
+}
 
 /**
  * Native bridge operations as one-call programmatic transactions.
@@ -13,7 +28,9 @@ import type { ProgrammaticTxOptions, ProgrammaticTxResult } from "./types"
  * the transaction step, collapsing `generateOperationTx → confirm → broadcast`
  * into a single call that auto-broadcasts within the configured fee ceiling.
  */
-export function createBridgeNamespace(ctx: ProgrammaticContext) {
+export function createBridgeNamespace(
+    ctx: ProgrammaticContext,
+): ProgrammaticBridgeNamespace {
     return {
         /**
          * Submit a compiled bridge operation as a `nativeBridge` transaction,
