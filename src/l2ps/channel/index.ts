@@ -78,3 +78,17 @@ export {
     type RfqLike,
     type ChannelSessionView,
 } from "./finalize"
+
+export {
+    SealedEnvelopeSession,
+    commitmentHex,
+    SEALED_ENVELOPE_DOMAIN_PREFIX,
+    type SealedEnvelopeState,
+    type SealedEnvelopeOutcome,
+    type SealedEnvelopeSessionOpts,
+    type SealedCommitBody,
+    type SealedRevealBody,
+    type SealedAbortBody,
+    type SealedCommitment,
+    type RevealedBid,
+} from "./sealedEnvelope"
