@@ -44,6 +44,8 @@ export const SCHEMA_NAME_BY_SAID: Record<string, SchemaName> = Object.fromEntrie
 export interface EdgeRule {
     name: string
     parentSchemas: SchemaName[]
+    /** Trusted lineage requirement; presenter metadata cannot override it. */
+    operator: "I2I" | "NI2I"
 }
 export interface ChainRule {
     /** Accepted parent edges; the credential must carry exactly one. */
@@ -56,21 +58,21 @@ export interface ChainRule {
 
 export const CHAIN_RULES: Record<SchemaName, ChainRule> = {
     QVI: { isRoot: true },
-    LE: { edges: [{ name: "qvi", parentSchemas: ["QVI"] }] },
+    LE: { edges: [{ name: "qvi", parentSchemas: ["QVI"], operator: "I2I" }] },
     ECR: {
         edges: [
-            { name: "le", parentSchemas: ["LE"] },
-            { name: "auth", parentSchemas: ["ECR_AUTH"] },
+            { name: "le", parentSchemas: ["LE"], operator: "I2I" },
+            { name: "auth", parentSchemas: ["ECR_AUTH"], operator: "I2I" },
         ],
     },
-    ECR_AUTH: { edges: [{ name: "le", parentSchemas: ["LE"] }] },
-    OOR: { edges: [{ name: "auth", parentSchemas: ["OOR_AUTH"] }] },
-    OOR_AUTH: { edges: [{ name: "le", parentSchemas: ["LE"] }] },
+    ECR_AUTH: { edges: [{ name: "le", parentSchemas: ["LE"], operator: "I2I" }] },
+    OOR: { edges: [{ name: "auth", parentSchemas: ["OOR_AUTH"], operator: "I2I" }] },
+    OOR_AUTH: { edges: [{ name: "le", parentSchemas: ["LE"], operator: "I2I" }] },
     AGENT_AUTHORITY: {
         isAgentAuthority: true,
         edges: [
-            { name: "le", parentSchemas: ["LE"] }, // Flow 1: entity grants directly
-            { name: "ecr", parentSchemas: ["ECR"] }, // Flow 2: via accountable officer's ECR
+            { name: "le", parentSchemas: ["LE"], operator: "I2I" }, // Flow 1: entity grants directly
+            { name: "ecr", parentSchemas: ["ECR"], operator: "NI2I" }, // Flow 2: via accountable officer's ECR
         ],
     },
 }

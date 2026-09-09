@@ -185,6 +185,89 @@ describe("vLEI verifyChain (injected source)", () => {
         expect(v.scope?.ok).toBe(false)
         expect(v.reasons.some(r => r.includes("unparseable amount"))).toBe(true)
     })
+
+    it("rejects forged lineage even when the presenter declares NI2I", async () => {
+        const creds = baseCreds()
+        creds[LE_SAID].sad.i = aid("X")
+        creds[LE_SAID].sad.e!.qvi.o = "NI2I"
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.reachedRoot).toBe(true)
+        expect(v.delegation?.ok).toBe(true)
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("operator"))).toBe(true)
+    })
+
+    it.each([
+        [LE_SAID, "qvi"],
+        [AA_SAID, "le"],
+    ])("rejects an unexpected NI2I operator on %s's %s edge", async (said, edge) => {
+        const creds = baseCreds()
+        creds[said].sad.e![edge].o = "NI2I"
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+    })
+
+    it.each(["direct", "authorised"])("preserves Flow 2 with a %s ECR and checks LE revocation", async variant => {
+        const creds = baseCreds()
+        const ecrSaid = "EecrSaid"
+        const authSaid = "EecrAuthSaid"
+        creds[authSaid] = {
+            sad: {
+                d: authSaid, s: VLEI_SCHEMAS.ECR_AUTH, i: LE_AID,
+                a: { i: QVI_AID }, e: { le: { n: LE_SAID } },
+            },
+            status: { s: "0" },
+        }
+        creds[ecrSaid] = {
+            sad: {
+                d: ecrSaid, s: VLEI_SCHEMAS.ECR,
+                i: variant === "direct" ? LE_AID : QVI_AID,
+                a: { i: OFFICER_AID },
+                e: variant === "direct" ? { le: { n: LE_SAID } } : { auth: { n: authSaid } },
+            },
+            status: { s: "0" },
+        }
+        creds[AA_SAID].sad.e = { ecr: { n: ecrSaid, o: "NI2I" } }
+        const source = mockSource(creds)
+        const valid = await verifyChain(source, AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
+        expect(valid.ok).toBe(true)
+        expect(valid.reasons).toEqual([])
+        expect(valid.chain.some(n => n.said === LE_SAID)).toBe(true)
+        creds[LE_SAID].status = { s: "1" }
+        const revoked = await verifyChain(source, AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(revoked.ok).toBe(false)
+        expect(revoked.reasons.some(r => r.includes("status=1"))).toBe(true)
+    })
+
+    it.each(["corridor", "network", "amount", "currency"] as const)("rejects a restricted tx with omitted %s", async field => {
+        const tx = { ...IN_SCOPE_TX }
+        delete tx[field]
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, { proposedTx: tx, timestamp: FIXED_TS })
+        expect(v.scope?.ok).toBe(false)
+        expect(v.ok).toBe(false)
+        expect(v.scope?.reasons.some(r => r.includes(field))).toBe(true)
+    })
+
+    it("rejects a type-only tx when amount, corridor and network are restricted", async () => {
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, {
+            proposedTx: { type: IN_SCOPE_TX.type }, timestamp: FIXED_TS,
+        })
+        expect(v.scope?.ok).toBe(false)
+        expect(v.ok).toBe(false)
+        for (const field of ["amount", "corridor", "network", "currency"]) {
+            expect(v.scope?.reasons.some(r => r.includes(field))).toBe(true)
+        }
+    })
+
+    it("keeps absent scope restrictions unconstrained", async () => {
+        const creds = baseCreds()
+        creds[AA_SAID].sad.a!.authorityScope = { transactionTypes: AUTHORITY_SCOPE.transactionTypes }
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, {
+            proposedTx: { type: IN_SCOPE_TX.type }, timestamp: FIXED_TS,
+        })
+        expect(v.scope?.ok).toBe(true)
+        expect(v.ok).toBe(true)
+    })
 })
 
 describe("JCS canonicalization (NFC hardening)", () => {
@@ -200,7 +283,7 @@ describe("JCS canonicalization (NFC hardening)", () => {
     })
 
     it("still canonicalises ordinary objects (keys sorted)", () => {
-        expect(jcsCanonicalize({ b: 1, a: 2 })).toBe('{"a":2,"b":1}')
+        expect(jcsCanonicalize({ b: 1, a: 2 })).toBe("{\"a\":2,\"b\":1}")
     })
 })
 
