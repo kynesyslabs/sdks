@@ -78,7 +78,9 @@ export const CHAIN_RULES: Record<SchemaName, ChainRule> = {
         isAgentAuthority: true,
         edges: [
             { name: "le", parentSchemas: ["LE"], operator: "I2I" }, // Flow 1: entity grants directly
-            { name: "ecr", parentSchemas: ["ECR"], operator: "NI2I" }, // Flow 2: reference to the accountable officer's ECR
+            // Flow 2: reference to the accountable officer's ECR. NI2I carries no issuer
+            // bond, so verifyChain separately requires the AA issuer to be the legal entity.
+            { name: "ecr", parentSchemas: ["ECR"], operator: "NI2I" },
         ],
     },
 }

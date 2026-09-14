@@ -4,7 +4,8 @@
  * an injected `VleiCredentialSource` so the SDK takes no KERI-client dependency.
  *
  *   Step 1/2  key-state retrieval + digest per AID; for an agent-authority leaf,
- *             the delegated agent AID's delegation seal (`di` = delegator) is checked
+ *             the AA must be issued by the legal entity its lineage reaches, and the
+ *             agent AID's delegator (`di`) must be that same legal entity
  *   Step 3    ACDC chain walk: schema-SAID pin + edge topology back to the root
  *   Step 4    TEL revocation per credential, time-of-use, FAIL-CLOSED
  *   Step 5    verdict + recordDigest, plus (optional) authorityScope evaluation
@@ -151,6 +152,63 @@ function evaluateScope(scope: any, tx: ProposedTx): string[] {
     return reasons
 }
 
+/**
+ * Follow an agent-authority credential's parent edges to the legal-entity vLEI
+ * it rests on. Returns the intermediate credentials walked (ECR, ECR_AUTH) and
+ * the LE node, which is absent when the lineage is broken.
+ */
+function lineageToLegalEntity(
+    aa: ChainNode,
+    bySaid: Map<string, ChainNode>,
+): { intermediates: ChainNode[]; le?: ChainNode } {
+    const intermediates: ChainNode[] = []
+    const seen = new Set<string>([aa.said])
+    let cur = aa
+    while (cur.edgeTo && !seen.has(cur.edgeTo)) {
+        const parent = bySaid.get(cur.edgeTo)
+        if (!parent) break
+        if (parent.schemaName === "LE") return { intermediates, le: parent }
+        seen.add(parent.said)
+        intermediates.push(parent)
+        cur = parent
+    }
+    return { intermediates }
+}
+
+/**
+ * Agent authority is granted by the legal entity itself, in both flows. The
+ * Flow 2 `ecr` edge is NI2I (it only names the accountable officer), so without
+ * this binding any AID — including an entity's own agent — could reference a
+ * real officer's ECR and mint authority that verifies under that entity's LEI.
+ */
+function entityBindingReasons(aa: ChainNode, le: ChainNode | undefined, intermediates: ChainNode[]): string[] {
+    if (!le) return ["agent-authority credential does not chain to a legal-entity vLEI (fail-closed)"]
+    const reasons: string[] = []
+    if (!le.issuee) {
+        reasons.push("legal-entity vLEI carries no issuee AID (fail-closed)")
+    } else if (aa.issuer !== le.issuee) {
+        reasons.push(`agent-authority issuer ${aa.issuer} is not the legal entity ${le.issuee} (fail-closed)`)
+    }
+    const lei = le.attributes?.LEI
+    if (typeof lei !== "string" || lei === "") {
+        reasons.push("legal-entity vLEI carries no LEI (fail-closed)")
+        return reasons
+    }
+    // The officer's ECR (and its ECR_AUTH) must describe the same entity, or an
+    // officer role at one LEI could be presented as authority for another.
+    for (const n of intermediates) {
+        if (n.attributes?.LEI !== lei) {
+            reasons.push(
+                `${n.schemaName ?? n.schema} LEI ${n.attributes?.LEI ?? "none"} != legal entity LEI ${lei} (fail-closed)`,
+            )
+        }
+    }
+    if (aa.attributes?.LEI !== undefined && aa.attributes.LEI !== lei) {
+        reasons.push(`AGENT_AUTHORITY LEI ${aa.attributes.LEI} != legal entity LEI ${lei} (fail-closed)`)
+    }
+    return reasons
+}
+
 export interface VerifyChainOpts {
     proposedTx?: ProposedTx
     keyControl?: KeyControlProof
@@ -292,19 +350,28 @@ export async function verifyChain(
         }
     }
 
-    // Step 2 (full) — delegated agent AID for an agent-authority credential.
-    let delegation: DelegationCheck | undefined
     const aaNode = chain.find(n => n.schemaName && CHAIN_RULES[n.schemaName].isAgentAuthority)
     const accountableOfficer = aaNode?.attributes?.accountableOfficer as string | undefined
+    const entityLineage = aaNode ? lineageToLegalEntity(aaNode, bySaid) : undefined
+    if (aaNode && entityLineage) {
+        reasons.push(...entityBindingReasons(aaNode, entityLineage.le, entityLineage.intermediates))
+    }
+
+    // Step 2 (full) — delegated agent AID for an agent-authority credential. The
+    // expected delegator is the legal entity from the walked lineage, never the AA
+    // issuer: the issuer is presenter-controlled, and binding to it would let a
+    // self-delegated AID (or an agent re-delegating) satisfy the check.
+    let delegation: DelegationCheck | undefined
     if (aaNode && aaNode.issuee) {
         const ks = await keyState(source, aaNode.issuee)
         keyStateDigests[aaNode.issuee] = keyStateDigest(ks)
         const di = ks?.di
-        const ok = !!di && di === aaNode.issuer
-        delegation = { agentAid: aaNode.issuee, delegator: di, expectedDelegator: aaNode.issuer, ok }
+        const entityAid = entityLineage?.le?.issuee
+        const ok = !!di && !!entityAid && di === entityAid
+        delegation = { agentAid: aaNode.issuee, delegator: di, expectedDelegator: entityAid ?? "", ok }
         if (!ok) {
             reasons.push(
-                `agent AID ${aaNode.issuee} is not delegated by the issuing entity ${aaNode.issuer} (di=${di ?? "none"})`,
+                `agent AID ${aaNode.issuee} is not delegated by the legal entity ${entityAid ?? "(unresolved)"} (di=${di ?? "none"})`,
             )
         }
     }

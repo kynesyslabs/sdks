@@ -71,7 +71,40 @@ const KEY_STATES: Record<string, VleiKeyState> = {
     [AGENT_AID]: { d: "ksA", di: LE_AID }, // delegated by LE → delegation ok
 }
 
-function mockSource(creds: Record<string, VleiCredential>): VleiCredentialSource {
+const ECR_SAID = "EecrSaid"
+const ECR_AUTH_SAID = "EecrAuthSaid"
+type EcrVariant = "direct" | "authorised"
+
+/**
+ * Flow 2: AA ─ecr▶ ECR, where the ECR is either issued by the LE itself (─le▶ LE)
+ * or by the QVI under an LE-issued ECR_AUTH (─auth▶ ECR_AUTH ─le▶ LE).
+ */
+function flow2Creds(variant: EcrVariant): Record<string, VleiCredential> {
+    const creds = baseCreds()
+    creds[ECR_AUTH_SAID] = {
+        sad: {
+            d: ECR_AUTH_SAID, s: VLEI_SCHEMAS.ECR_AUTH, i: LE_AID,
+            a: { i: QVI_AID, AID: OFFICER_AID, LEI: LE_LEI }, e: { le: { n: LE_SAID } },
+        },
+        status: { s: "0" },
+    }
+    creds[ECR_SAID] = {
+        sad: {
+            d: ECR_SAID, s: VLEI_SCHEMAS.ECR,
+            i: variant === "direct" ? LE_AID : QVI_AID,
+            a: { i: OFFICER_AID, LEI: LE_LEI },
+            e: variant === "direct" ? { le: { n: LE_SAID } } : { auth: { n: ECR_AUTH_SAID } },
+        },
+        status: { s: "0" },
+    }
+    creds[AA_SAID].sad.e = { ecr: { n: ECR_SAID, o: "NI2I" } }
+    return creds
+}
+
+function mockSource(
+    creds: Record<string, VleiCredential>,
+    keyStates: Record<string, VleiKeyState> = KEY_STATES,
+): VleiCredentialSource {
     return {
         async getCredential(said) {
             const c = creds[said]
@@ -79,7 +112,7 @@ function mockSource(creds: Record<string, VleiCredential>): VleiCredentialSource
             return c
         },
         async getKeyState(a) {
-            return KEY_STATES[a]
+            return keyStates[a]
         },
     }
 }
@@ -261,27 +294,8 @@ describe("vLEI verifyChain (injected source)", () => {
         expect(v.reasons.some(r => r.includes("operator 'XYZ' contradicts the pinned 'I2I'"))).toBe(true)
     })
 
-    it.each(["direct", "authorised"])("preserves Flow 2 with a %s ECR and checks LE revocation", async variant => {
-        const creds = baseCreds()
-        const ecrSaid = "EecrSaid"
-        const authSaid = "EecrAuthSaid"
-        creds[authSaid] = {
-            sad: {
-                d: authSaid, s: VLEI_SCHEMAS.ECR_AUTH, i: LE_AID,
-                a: { i: QVI_AID }, e: { le: { n: LE_SAID } },
-            },
-            status: { s: "0" },
-        }
-        creds[ecrSaid] = {
-            sad: {
-                d: ecrSaid, s: VLEI_SCHEMAS.ECR,
-                i: variant === "direct" ? LE_AID : QVI_AID,
-                a: { i: OFFICER_AID },
-                e: variant === "direct" ? { le: { n: LE_SAID } } : { auth: { n: authSaid } },
-            },
-            status: { s: "0" },
-        }
-        creds[AA_SAID].sad.e = { ecr: { n: ecrSaid, o: "NI2I" } }
+    it.each(["direct", "authorised"] as const)("preserves Flow 2 with a %s ECR and checks LE revocation", async variant => {
+        const creds = flow2Creds(variant)
         const source = mockSource(creds)
         const valid = await verifyChain(source, AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
         expect(valid.ok).toBe(true)
@@ -321,6 +335,147 @@ describe("vLEI verifyChain (injected source)", () => {
         })
         expect(v.scope?.ok).toBe(true)
         expect(v.ok).toBe(true)
+    })
+})
+
+describe("vLEI agent-authority is bound to the legal entity", () => {
+    const ATTACKER_AID = aid("X")
+    const ROGUE_AGENT_AID = aid("Y")
+    const OTHER_LEI = "5493001KJTIIGC8Y1R12"
+    const notTheEntity = (issuer: string, entity: string) => (r: string) =>
+        r.includes(`agent-authority issuer ${issuer} is not the legal entity ${entity}`)
+
+    /** An AID the attacker controls, issuing to an agent it delegated itself. */
+    function forgeAa(creds: Record<string, VleiCredential>, issuer: string, agent: string, delegator: string) {
+        creds[AA_SAID].sad.i = issuer
+        creds[AA_SAID].sad.a = {
+            ...creds[AA_SAID].sad.a,
+            i: agent,
+            authorityScope: { ...AUTHORITY_SCOPE, perTransactionLimit: { amount: "999999999999", currency: "USD" } },
+        }
+        return { ...KEY_STATES, [issuer]: { d: `ks-${issuer}` }, [agent]: { d: `ks-${agent}`, di: delegator } }
+    }
+
+    it("passes a legitimate Flow 1 chain with the delegator bound to the legal entity", async () => {
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, {
+            proposedTx: IN_SCOPE_TX, keyControl: keyControl(IN_SCOPE_TX), timestamp: FIXED_TS,
+        })
+        expect(v.reasons).toEqual([])
+        expect(v.ok).toBe(true)
+        expect(v.delegation).toEqual({ agentAid: AGENT_AID, delegator: LE_AID, expectedDelegator: LE_AID, ok: true })
+    })
+
+    it.each(["direct", "authorised"] as const)("passes a legitimate Flow 2 chain with a %s ECR", async variant => {
+        const v = await verifyChain(mockSource(flow2Creds(variant)), AA_SAID, GLEIF_ROOT, {
+            proposedTx: IN_SCOPE_TX, keyControl: keyControl(IN_SCOPE_TX), timestamp: FIXED_TS,
+        })
+        expect(v.reasons).toEqual([])
+        expect(v.ok).toBe(true)
+        expect(v.delegation).toEqual({ agentAid: AGENT_AID, delegator: LE_AID, expectedDelegator: LE_AID, ok: true })
+    })
+
+    it.each(["direct", "authorised"] as const)(
+        "rejects a Flow 2 agent-authority issued by an unrelated AID against a real %s ECR",
+        async variant => {
+            const creds = flow2Creds(variant)
+            const keyStates = forgeAa(creds, ATTACKER_AID, ROGUE_AGENT_AID, ATTACKER_AID)
+            const v = await verifyChain(mockSource(creds, keyStates), AA_SAID, GLEIF_ROOT, {
+                proposedTx: { ...IN_SCOPE_TX, amount: "999999999" }, timestamp: FIXED_TS,
+            })
+            expect(v.ok).toBe(false)
+            expect(v.reasons.some(notTheEntity(ATTACKER_AID, LE_AID))).toBe(true)
+            expect(v.delegation).toMatchObject({ delegator: ATTACKER_AID, expectedDelegator: LE_AID, ok: false })
+        },
+    )
+
+    it("rejects sub-delegation: the entity's own agent issuing authority to an AID it delegated", async () => {
+        const SUB_AGENT_AID = aid("S")
+        const creds = flow2Creds("direct")
+        const keyStates = forgeAa(creds, AGENT_AID, SUB_AGENT_AID, AGENT_AID)
+        const v = await verifyChain(mockSource(creds, keyStates), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(notTheEntity(AGENT_AID, LE_AID))).toBe(true)
+        expect(v.delegation).toMatchObject({ delegator: AGENT_AID, expectedDelegator: LE_AID, ok: false })
+    })
+
+    it("rejects a Flow 1 agent-authority issued by a non-entity AID over an `le` edge", async () => {
+        const creds = baseCreds()
+        const keyStates = forgeAa(creds, ATTACKER_AID, ROGUE_AGENT_AID, ATTACKER_AID)
+        const v = await verifyChain(mockSource(creds, keyStates), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(notTheEntity(ATTACKER_AID, LE_AID))).toBe(true)
+        expect(v.delegation).toMatchObject({ expectedDelegator: LE_AID, ok: false })
+    })
+
+    it("rejects an agent delegated by someone other than the legal entity, even when the entity issued the AA", async () => {
+        const keyStates = { ...KEY_STATES, [AGENT_AID]: { d: "ksA", di: ATTACKER_AID } }
+        const v = await verifyChain(mockSource(flow2Creds("direct"), keyStates), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.delegation).toMatchObject({ delegator: ATTACKER_AID, expectedDelegator: LE_AID, ok: false })
+    })
+
+    it.each(["direct", "authorised"] as const)("rejects a %s ECR whose LEI is not the legal entity's", async variant => {
+        const creds = flow2Creds(variant)
+        creds[ECR_SAID].sad.a!.LEI = OTHER_LEI
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes(`ECR LEI ${OTHER_LEI} != legal entity LEI ${LE_LEI}`))).toBe(true)
+    })
+
+    it("rejects an ECR_AUTH whose LEI is not the legal entity's", async () => {
+        const creds = flow2Creds("authorised")
+        creds[ECR_AUTH_SAID].sad.a!.LEI = OTHER_LEI
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes(`ECR_AUTH LEI ${OTHER_LEI} != legal entity LEI ${LE_LEI}`))).toBe(true)
+    })
+
+    it("rejects an ECR that carries no LEI (fail-closed)", async () => {
+        const creds = flow2Creds("direct")
+        delete creds[ECR_SAID].sad.a!.LEI
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes(`ECR LEI none != legal entity LEI ${LE_LEI}`))).toBe(true)
+    })
+
+    it("rejects an agent-authority that names a different LEI than its legal entity", async () => {
+        const creds = baseCreds()
+        creds[AA_SAID].sad.a!.LEI = OTHER_LEI
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes(`AGENT_AUTHORITY LEI ${OTHER_LEI} != legal entity LEI ${LE_LEI}`))).toBe(true)
+    })
+
+    it("rejects an entity's authority pointing at another legal entity's officer ECR", async () => {
+        // Entity A issues the AA, but references an ECR that lives under entity B:
+        // the LE reached through the ECR is B, so A is not the granting entity.
+        const OTHER_LE_AID = aid("M")
+        const OTHER_LE_SAID = "EotherLeSaid"
+        const creds = flow2Creds("direct")
+        creds[OTHER_LE_SAID] = {
+            sad: {
+                d: OTHER_LE_SAID, s: VLEI_SCHEMAS.LE, i: QVI_AID,
+                a: { i: OTHER_LE_AID, LEI: OTHER_LEI }, e: { qvi: { n: QVI_SAID } },
+            },
+            status: { s: "0" },
+        }
+        creds[ECR_SAID].sad.i = OTHER_LE_AID
+        creds[ECR_SAID].sad.a!.LEI = OTHER_LEI
+        creds[ECR_SAID].sad.e = { le: { n: OTHER_LE_SAID } }
+        const keyStates = { ...KEY_STATES, [OTHER_LE_AID]: { d: "ksM" } }
+        const v = await verifyChain(mockSource(creds, keyStates), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(notTheEntity(LE_AID, OTHER_LE_AID))).toBe(true)
+        expect(v.delegation).toMatchObject({ delegator: LE_AID, expectedDelegator: OTHER_LE_AID, ok: false })
+    })
+
+    it("rejects an agent-authority whose lineage never reaches a legal-entity vLEI", async () => {
+        const creds = flow2Creds("direct")
+        delete creds[LE_SAID]
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("does not chain to a legal-entity vLEI"))).toBe(true)
+        expect(v.delegation?.ok).toBe(false)
     })
 })
 
