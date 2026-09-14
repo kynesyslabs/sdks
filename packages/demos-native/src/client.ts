@@ -596,6 +596,18 @@ export class Demos {
     return this.crypto.address;
   }
 
+  /** Sign an exact UTF-8 protocol proof and return raw lowercase-hex Ed25519. */
+  async signMessage(message: string): Promise<string> {
+    if (typeof message !== "string" || message.length === 0) {
+      throw new TypeError("Message to sign must be a non-empty string");
+    }
+    const signed = await this.crypto.sign(
+      "ed25519",
+      new TextEncoder().encode(message),
+    );
+    return Buffer.from(signed.signature).toString("hex");
+  }
+
   /** Return the connected Ed25519 address through the legacy async surface. */
   async getEd25519Address(): Promise<string> {
     return this.getAddress();

@@ -33,7 +33,14 @@
         "!build/tests"
     ],
     "exports": {
-        ".": "./build/index.js",
+        ".": {
+            "node": {
+                "types": "./build/index.node.d.ts",
+                "default": "./build/index.node.js"
+            },
+            "types": "./build/index.d.ts",
+            "default": "./build/index.js"
+        },
         "./types": "./build/types/index.js",
         "./websdk": "./build/websdk/index.js",
         "./demoswork": "./build/demoswork/index.js",
@@ -52,6 +59,7 @@
         "./xm-localsdk": "./build/multichain/localsdk/index.js",
         "./wallet": "./build/wallet/index.js",
         "./abstraction": "./build/abstraction/index.js",
+        "./instant-messaging": "./build/instant_messaging/index.js",
         "./l2ps": "./build/l2ps/index.js",
         "./utils": "./build/utils/index.js",
         "./encryption": "./build/encryption/index.js",
@@ -72,7 +80,7 @@
     },
     "scripts": {
         "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",
-        "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src && npm run build:copy-wasm",
+        "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src && node scripts/normalize-esm-specifiers.mjs && npm run build:copy-wasm",
         "build:copy-wasm": "mkdir -p build/tlsnotary/wasm && cp node_modules/tlsn-js/build/*.wasm build/tlsnotary/wasm/ && cp node_modules/tlsn-js/build/*.js build/tlsnotary/wasm/ && cp -r node_modules/tlsn-js/build/snippets build/tlsnotary/wasm/",
         "typedoc": "typedoc",
         "test": "jest",
@@ -100,9 +108,11 @@
         "test:aptos": "node --require ts-node/register --require tsconfig-paths/register --test src/tests/multichain/aptos.node.spec.ts",
         "test:aptos:only": "node --require ts-node/register --require tsconfig-paths/register --test --test-only src/tests/multichain/aptos.node.spec.ts",
         "test:canonical": "jest --testPathPattern=utils.test.ts --verbose",
-        "test:dacs-native": "npm --prefix packages/demos-native run verify:release"
+        "test:dacs-native": "npm --prefix packages/demos-native run verify:release",
+        "test:messaging-export": "node scripts/verify-messaging-export.mjs"
     },
     "dependencies": {
+        "@near-js/utils": "0.3.0",
         "@aptos-labs/ts-sdk": "^1.39.0",
         "@bitcoinerlab/secp256k1": "^1.2.0",
         "@coral-xyz/anchor": "^0.32.1",
@@ -165,6 +175,7 @@
         "superdilithium": "^2.0.6",
         "tlsn-js": "0.1.0-alpha.12.0",
         "tronweb": "^6.3.0",
+        "tweetnacl-util": "^0.15.1",
         "web3": "^4.16.0",
         "xrpl": "^3.1.0"
     },
