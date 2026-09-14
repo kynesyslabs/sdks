@@ -54,6 +54,8 @@
  * ```
  */
 
+import "./tlsn-wasm-compat.js"
+
 // Core TLSNotary class for attestation
 export { TLSNotary } from "./TLSNotary"
 
@@ -119,16 +121,19 @@ export {
     Presentation,
     NotaryServer,
     Transcript,
-    // Types re-exported from tlsn-js
-    type Commit,
-    type Reveal,
-    type Method,
-    type ProverConfig,
-    type LoggingLevel,
-    type LoggingConfig,
+} from "./tlsn-runtime"
+
+// Types remain the exact upstream declarations; type-only exports are erased.
+export type {
+    Commit,
+    Reveal,
+    Method,
+    ProverConfig,
+    LoggingLevel,
+    LoggingConfig,
 } from "tlsn-js"
 
 // Re-export types from tlsn-js/build/types for advanced usage
 export type {
     PresentationJSON as TlsnPresentationJSON,
-} from "tlsn-js/build/types"
+} from "tlsn-js/build/types.js"

@@ -1,5 +1,6 @@
-// Node-safe root surface. TLSNotary is browser-only and remains available
-// through the explicit `@kynesyslabs/demosdk/tlsnotary` browser subpath.
+// Node root surface. It matches the default root: TLSNotary loads tlsn-js only
+// when an operation runs, so importing it is safe in Node and init() refuses
+// outside a browser or worker.
 export * as types from "./types"
 export * as encryption from "./encryption"
 export * as utils from "./utils"
@@ -18,3 +19,4 @@ export * as instantMessaging from "./instant_messaging"
 export * as storage from "./storage"
 export * as escrow from "./escrow"
 export * as ipfs from "./ipfs"
+export * as tlsnotary from "./tlsnotary"

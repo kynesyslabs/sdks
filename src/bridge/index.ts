@@ -5,11 +5,10 @@ export {
     SupportedTokens,
 } from "@/types/bridge/constants"
 import RubicBridge from "./rubicBridge"
-// Rubic value enums/errors (BLOCKCHAIN_NAME, CROSS_CHAIN_TRADE_TYPE, RubicSdkError)
-// now live behind the optional `@kynesyslabs/demosdk/bridge/rubic` subpath, so
-// importing this barrel (or `websdk`) never eagerly loads `rubic-sdk` — whose
-// unresolvable peer-dep tree broke clean installs. The types stay here via
-// `export type` (erased at build time — no runtime pull).
+// Preserve the historical exact Rubic type exports on this Rubic-facing
+// bridge surface. DACS/websdk declarations use a separate package-owned wire
+// type, so consumers that do not import this optional surface need not install
+// rubic-sdk.
 export type { CrossChainTrade, WrappedCrossChainTrade } from "rubic-sdk"
 
 import { methods as NativeBridgeMethods } from "./nativeBridge"
