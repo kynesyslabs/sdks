@@ -237,6 +237,8 @@ try {
                 "const headers = tlsnotary.Prover.getHeaderMap('https://api.example.test/path', 'ok', { Accept: 'text/plain' })",
                 "if (headers.get('Host')?.join(',') !== '97,112,105,46,101,120,97,109,112,108,101,46,116,101,115,116' || headers.get('Content-Length')?.join(',') !== '50') throw new Error('TLSNotary Prover header facade changed behavior')",
                 "if (tlsnotary.Prover.getHeaderMap('https://api.example.test', null).get('Content-Length')?.join(',') !== '52') throw new Error('TLSNotary Prover null-body behavior changed')",
+                "const portHeaders = tlsnotary.Prover.getHeaderMap('https://api.example.test:8443/path', '\\u00e9')",
+                "if (Buffer.from(portHeaders.get('Host')).toString() !== 'api.example.test:8443' || Buffer.from(portHeaders.get('Content-Length')).toString() !== '2') throw new Error('TLSNotary Prover headers must keep a non-default port and count UTF-8 bytes')",
                 "await tlsnotary.init().then(() => { throw new Error('TLSNotary init unexpectedly ran in Node') }, error => { if (!/require a browser or Web Worker runtime/u.test(String(error?.message))) throw error })",
                 "const autoInit = await import('@kynesyslabs/demosdk/tlsnotary/auto-init')",
                 "const wasmPath = autoInit.getWasmSourcePath()",

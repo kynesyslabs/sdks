@@ -97,6 +97,26 @@ function transcriptText(bytes: number[], redactedSymbol: string): string {
     return output
 }
 
+/**
+ * Default request headers for an attested request. tlsn-js uses the hostname
+ * (dropping a non-default port) and counts Content-Length in UTF-16 units;
+ * Host keeps the port here and Content-Length counts UTF-8 bytes.
+ */
+function defaultRequestHeaders(url: string, body?: unknown): Record<string, string> {
+    const headers: Record<string, string> = {
+        Host: new URL(url).host,
+        Connection: "close",
+    }
+    if (typeof body === "string") {
+        headers["Content-Length"] = Buffer.byteLength(body).toString()
+    } else if (typeof body === "object") {
+        headers["Content-Length"] = Buffer.byteLength(JSON.stringify(body)).toString()
+    } else if (typeof body === "number") {
+        headers["Content-Length"] = Buffer.byteLength(body.toString()).toString()
+    }
+    return headers
+}
+
 const init: TlsnModule["default"] = async (config) => {
     const runtime = await loadTlsnRuntime()
     await runtime.default(config)
@@ -121,21 +141,8 @@ class LazyProver {
         body?: unknown,
         headers: Record<string, string> = {},
     ): Map<string, number[]> {
-        const defaults: Record<string, string> = {
-            Host: new URL(url).hostname,
-            Connection: "close",
-        }
-
-        if (typeof body === "string") {
-            defaults["Content-Length"] = body.length.toString()
-        } else if (typeof body === "object") {
-            defaults["Content-Length"] = JSON.stringify(body).length.toString()
-        } else if (typeof body === "number") {
-            defaults["Content-Length"] = body.toString().length.toString()
-        }
-
         return new Map(
-            Object.entries({ ...defaults, ...headers }).map(([name, value]) => [
+            Object.entries({ ...defaultRequestHeaders(url, body), ...headers }).map(([name, value]) => [
                 name,
                 Buffer.from(value).toJSON().data,
             ]),
@@ -162,7 +169,13 @@ class LazyProver {
             InstanceType<TlsnModule["Prover"]>["sendRequest"]
         >[1],
     ): ReturnType<InstanceType<TlsnModule["Prover"]>["sendRequest"]> {
-        return (await this.#instance()).sendRequest(wsProxyUrl, request)
+        // tlsn-js spreads caller headers over its own defaults, so passing the
+        // corrected defaults here fixes the bytes actually sent. Explicit
+        // caller headers still win.
+        return (await this.#instance()).sendRequest(wsProxyUrl, {
+            ...request,
+            headers: { ...defaultRequestHeaders(request.url, request.body), ...request.headers },
+        })
     }
 
     async notarize(
