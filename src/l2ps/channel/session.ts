@@ -11,6 +11,11 @@ import {
     verifyChannelMessage,
 } from "./envelope"
 import type { ChannelIdRegistry } from "./channelIdRegistry"
+import {
+    checkLiveness,
+    type LivenessPolicy,
+    type LivenessState,
+} from "./liveness"
 
 export interface ChannelSessionOpts {
     channelId: string
@@ -23,6 +28,28 @@ export interface ChannelSessionOpts {
      * channelId here and throws on reuse.
      */
     channelIdRegistry?: ChannelIdRegistry
+    /**
+     * Clock for CH-4 liveness. Injectable so delivery bounds are testable
+     * without waiting on wall time.
+     *
+     * Defaults to a MONOTONIC source. A wall clock steps backwards (NTP, a
+     * manual correction) and a backwards step would push the deadline out until
+     * real time caught up — the stall would go unnoticed for exactly as long as
+     * the jump. Supply your own only if it is monotonic too.
+     */
+    now?: () => number
+}
+
+/**
+ * Monotonic milliseconds — never steps backwards, unlike `Date.now()`.
+ *
+ * @returns A monotonically non-decreasing timestamp in ms.
+ */
+function monotonicNow(): number {
+    return typeof performance !== "undefined" &&
+        typeof performance.now === "function"
+        ? performance.now()
+        : Date.now()
 }
 
 /**
@@ -48,6 +75,11 @@ export class ChannelSession {
     private opened = false
     private highestSeen = 0
     private readonly transcript: ChannelMessage[] = []
+    private readonly clock: () => number
+    /** Local times — CH-4 is measured on what THIS member observed, never on
+     * a peer's self-reported `sentAt`. */
+    private openedAt = 0
+    private lastActivityAt = 0
 
     constructor(opts: ChannelSessionOpts) {
         if (!opts.channelId) throw new Error("ChannelSession: channelId required")
@@ -63,6 +95,7 @@ export class ChannelSession {
         this.me = opts.me
         this.demos = opts.demos
         this.registry = opts.channelIdRegistry
+        this.clock = opts.now ?? monotonicNow
     }
 
     /**
@@ -74,6 +107,24 @@ export class ChannelSession {
             throw new Error("ChannelSession: already opened")
         if (this.registry) await this.registry.register(this.channelId)
         this.opened = true
+        this.openedAt = this.clock()
+        this.lastActivityAt = this.openedAt
+    }
+
+    /**
+     * CH-4 — is the channel still within its delivery bounds, as observed by
+     * THIS member? Returns a state rather than throwing: a counterparty going
+     * quiet is an expected outcome, and the member reacts by aborting the
+     * negotiation (CH-5), which is a policy decision this layer doesn't make.
+     */
+    liveness(policy?: LivenessPolicy, now?: number): LivenessState {
+        this.assertOpened()
+        return checkLiveness({
+            openedAt: this.openedAt,
+            lastActivityAt: this.lastActivityAt,
+            policy,
+            now: now ?? this.clock(),
+        })
     }
 
     /**
@@ -107,6 +158,7 @@ export class ChannelSession {
         }
         const signed = await signChannelMessage(unsigned, this.demos)
         this.transcript.push(signed)
+        this.lastActivityAt = this.clock()
         return signed
     }
 
@@ -139,6 +191,7 @@ export class ChannelSession {
             )
         this.highestSeen = msg.sequence
         this.transcript.push(msg)
+        this.lastActivityAt = this.clock()
     }
 
     /** Read-only snapshot of all messages this session has signed or accepted. */

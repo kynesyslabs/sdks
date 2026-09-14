@@ -44,6 +44,14 @@ export {
 export { ChannelSession, type ChannelSessionOpts } from "./session"
 
 export {
+    checkLiveness,
+    DEFAULT_LIVENESS,
+    type CheckLivenessOpts,
+    type LivenessPolicy,
+    type LivenessState,
+} from "./liveness"
+
+export {
     buildUnsignedTranscript,
     exportTranscript,
     signTranscript,
