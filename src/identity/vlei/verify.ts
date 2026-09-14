@@ -77,10 +77,11 @@ function compareDecimal(a: string, b: string): number | null {
 
 /**
  * Evaluate a proposed transaction against an `authorityScope`. FAIL-CLOSED: a
- * restriction that is present but malformed (wrong type, unparseable amount, a
- * limit currency the transaction cannot match) yields a reason instead of being
- * skipped, so an out-of-authority transaction can never fall through to
- * `ok: true`. An ABSENT restriction is unconstrained by design (allow-list).
+ * restriction that is present but malformed or lacks transaction evidence (wrong
+ * type, missing/unparseable amount, a limit currency the transaction cannot match)
+ * yields a reason instead of being skipped, so an out-of-authority transaction
+ * can never fall through to `ok: true`. An ABSENT restriction is unconstrained
+ * by design (allow-list).
  */
 function evaluateScope(scope: any, tx: ProposedTx): string[] {
     const reasons: string[] = []
@@ -103,7 +104,7 @@ function evaluateScope(scope: any, tx: ProposedTx): string[] {
         if (!Array.isArray(scope.corridors)) {
             reasons.push("authorityScope.corridors is malformed (fail-closed)")
         } else if (tx.corridor === undefined) {
-            reasons.push("authorityScope restricts corridors but the transaction declares none (fail-closed)")
+            reasons.push("authorityScope restricts corridors but the transaction declares no corridor (fail-closed)")
         } else if (!scope.corridors.includes(tx.corridor)) {
             reasons.push(`corridor '${tx.corridor}' not permitted`)
         }
@@ -112,7 +113,7 @@ function evaluateScope(scope: any, tx: ProposedTx): string[] {
         if (!Array.isArray(scope.relyingNetworks)) {
             reasons.push("authorityScope.relyingNetworks is malformed (fail-closed)")
         } else if (tx.network === undefined) {
-            reasons.push("authorityScope restricts relying networks but the transaction declares none (fail-closed)")
+            reasons.push("authorityScope restricts relying networks but the transaction declares no network (fail-closed)")
         } else if (!scope.relyingNetworks.includes(tx.network)) {
             reasons.push(`network '${tx.network}' not a relying network`)
         }
@@ -121,9 +122,9 @@ function evaluateScope(scope: any, tx: ProposedTx): string[] {
         const lim = scope.perTransactionLimit
         if (typeof lim !== "object" || lim === null) {
             reasons.push("authorityScope.perTransactionLimit is malformed (fail-closed)")
-        } else if (tx.amount === undefined) {
-            reasons.push("authorityScope sets a per-transaction limit but the transaction declares no amount (fail-closed)")
         } else {
+            // The currency check runs even when the amount is missing, so the verdict
+            // lists every unmet restriction rather than stopping at the first one.
             if (lim.currency !== undefined) {
                 if (tx.currency === undefined) {
                     reasons.push(
@@ -133,13 +134,17 @@ function evaluateScope(scope: any, tx: ProposedTx): string[] {
                     reasons.push(`currency ${tx.currency} != per-transaction limit currency ${lim.currency}`)
                 }
             }
-            const cmp = compareDecimal(String(tx.amount), String(lim.amount))
-            if (cmp === null) {
-                reasons.push(`unparseable amount (tx='${tx.amount}', limit='${lim.amount}') (fail-closed)`)
-            } else if (cmp > 0) {
-                reasons.push(
-                    `amount ${tx.amount} exceeds per-transaction limit ${lim.amount}${lim.currency ? ` ${lim.currency}` : ""}`,
-                )
+            if (tx.amount === undefined) {
+                reasons.push("authorityScope sets a per-transaction limit but the transaction declares no amount (fail-closed)")
+            } else {
+                const cmp = compareDecimal(String(tx.amount), String(lim.amount))
+                if (cmp === null) {
+                    reasons.push(`unparseable amount (tx='${tx.amount}', limit='${lim.amount}') (fail-closed)`)
+                } else if (cmp > 0) {
+                    reasons.push(
+                        `amount ${tx.amount} exceeds per-transaction limit ${lim.amount}${lim.currency ? ` ${lim.currency}` : ""}`,
+                    )
+                }
             }
         }
     }
@@ -163,8 +168,7 @@ export async function verifyChain(
     const chain: ChainNode[] = []
     const keyStateDigests: Record<string, string> = {}
     const bySaid = new Map<string, ChainNode>()
-    // Edge operator per child SAID (I2I | NI2I | …), captured during the walk so
-    // the lineage check below enforces issuer↔issuee only where it applies.
+    // Presented edge operators, checked against the pinned schema rules below.
     const edgeOp = new Map<string, string>()
 
     const visited = new Set<string>()
@@ -267,7 +271,7 @@ export async function verifyChain(
         // an issuer-to-issuee edge as NI2I to skip the check below and splice a forged
         // chain onto the trusted root. The operator the credential actually carries must
         // also match the pinned one, or the credential is rejected.
-        const pinnedOp = edgeRule?.op
+        const pinnedOp = edgeRule?.operator
         const presentedOp = edgeOp.get(node.said) ?? "I2I"
         if (!pinnedOp) {
             reasons.push(`${node.schemaName} edge '${node.edgeName}' is not modelled (fail-closed)`)
