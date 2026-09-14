@@ -69,19 +69,44 @@ export async function loadTlsnRuntime(): Promise<TlsnModule> {
     return runtimePromise
 }
 
+/** Construct a tlsn-js object on first use, retrying if the runtime failed to load. */
+function lazyRuntimeInstance<T>(create: (runtime: TlsnModule) => T): () => Promise<T> {
+    let instance: Promise<T> | undefined
+    return () =>
+        (instance ??= loadTlsnRuntime()
+            .then(create)
+            .catch((error: unknown) => {
+                instance = undefined
+                throw error
+            }))
+}
+
+/**
+ * Decode transcript bytes as UTF-8, with one redaction symbol per redacted
+ * (zero) byte. tlsn-js decodes byte by byte, which corrupts multibyte text.
+ */
+function transcriptText(bytes: number[], redactedSymbol: string): string {
+    let output = ""
+    let start = 0
+    for (let index = 0; index <= bytes.length; index++) {
+        if (index < bytes.length && bytes[index] !== 0) continue
+        if (index > start) output += Buffer.from(bytes.slice(start, index)).toString("utf8")
+        if (index < bytes.length) output += redactedSymbol
+        start = index + 1
+    }
+    return output
+}
+
 const init: TlsnModule["default"] = async (config) => {
     const runtime = await loadTlsnRuntime()
     await runtime.default(config)
 }
 
 class LazyProver {
-    readonly #config: ConstructorParameters<TlsnModule["Prover"]>[0]
-    #runtimeInstance:
-        | Promise<InstanceType<TlsnModule["Prover"]>>
-        | undefined
+    readonly #instance: () => Promise<InstanceType<TlsnModule["Prover"]>>
 
     constructor(config: ConstructorParameters<TlsnModule["Prover"]>[0]) {
-        this.#config = config
+        this.#instance = lazyRuntimeInstance((runtime) => new runtime.Prover(config))
     }
 
     static async notarize(
@@ -115,13 +140,6 @@ class LazyProver {
                 Buffer.from(value).toJSON().data,
             ]),
         )
-    }
-
-    async #instance(): Promise<InstanceType<TlsnModule["Prover"]>> {
-        this.#runtimeInstance ??= loadTlsnRuntime().then(
-            ({ Prover: RuntimeProver }) => new RuntimeProver(this.#config),
-        )
-        return this.#runtimeInstance
     }
 
     async free(): Promise<void> {
@@ -163,21 +181,10 @@ class LazyProver {
 }
 
 class LazyPresentation {
-    readonly #params: ConstructorParameters<TlsnModule["Presentation"]>[0]
-    #runtimeInstance:
-        | Promise<InstanceType<TlsnModule["Presentation"]>>
-        | undefined
+    readonly #instance: () => Promise<InstanceType<TlsnModule["Presentation"]>>
 
     constructor(params: ConstructorParameters<TlsnModule["Presentation"]>[0]) {
-        this.#params = params
-    }
-
-    async #instance(): Promise<InstanceType<TlsnModule["Presentation"]>> {
-        this.#runtimeInstance ??= loadTlsnRuntime().then(
-            ({ Presentation: RuntimePresentation }) =>
-                new RuntimePresentation(this.#params),
-        )
-        return this.#runtimeInstance
+        this.#instance = lazyRuntimeInstance((runtime) => new runtime.Presentation(params))
     }
 
     async free(): Promise<void> {
@@ -288,25 +295,11 @@ class CompatibleTranscript {
     }
 
     recv(redactedSymbol = "*"): string {
-        return this.#recv.reduce(
-            (output, value) =>
-                output +
-                (value === 0
-                    ? redactedSymbol
-                    : Buffer.from([value]).toString()),
-            "",
-        )
+        return transcriptText(this.#recv, redactedSymbol)
     }
 
     sent(redactedSymbol = "*"): string {
-        return this.#sent.reduce(
-            (output, value) =>
-                output +
-                (value === 0
-                    ? redactedSymbol
-                    : Buffer.from([value]).toString()),
-            "",
-        )
+        return transcriptText(this.#sent, redactedSymbol)
     }
 
     text = (redactedSymbol = "*"): { sent: string; recv: string } => ({

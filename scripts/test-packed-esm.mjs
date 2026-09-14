@@ -230,6 +230,8 @@ try {
                 "await tlsnotaryClient.initialize().then(() => { throw new Error('TLSNotary unexpectedly initialized in Node') }, error => { if (!/requires a browser or Web Worker runtime/u.test(String(error?.message))) throw error })",
                 "const transcript = new tlsnotary.Transcript({ sent: [65, 0, 66], recv: [67, 0, 68] })",
                 "if (transcript.sent('#') !== 'A#B' || transcript.recv('#') !== 'C#D') throw new Error('TLSNotary Transcript facade changed behavior')",
+                "const multibyte = new tlsnotary.Transcript({ sent: [0xc3, 0xa9, 0, 0x41], recv: [0xe2, 0x82, 0xac] })",
+                "if (multibyte.sent('#') !== '\\u00e9#A' || multibyte.recv() !== '\\u20ac') throw new Error('TLSNotary Transcript did not decode multibyte UTF-8')",
                 "const notary = tlsnotary.NotaryServer.from('wss://notary.example.test/path')",
                 "if (notary.url !== 'wss://notary.example.test/path' || notary.normalizeUrl() !== 'https://notary.example.test') throw new Error('TLSNotary NotaryServer facade changed behavior')",
                 "const headers = tlsnotary.Prover.getHeaderMap('https://api.example.test/path', 'ok', { Accept: 'text/plain' })",
