@@ -8,7 +8,7 @@ import {
 } from "near-api-js"
 import bigInt from "big-integer"
 import { IPayOptions } from "."
-import { _required as required } from "@/websdk"
+import { _required as required } from "@/websdk/utils/required"
 import { DefaultChain } from "./types/defaultChain"
 import { Transaction } from "near-api-js/lib/transaction.js"
 import * as nearUtilsNamespace from "@near-js/utils"

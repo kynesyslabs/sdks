@@ -2,8 +2,7 @@
 
 import * as forge from "node-forge"
 
-import * as websdk from "@/websdk"
-import { DemosTransactions } from "@/websdk"
+import type { Demos } from "@/websdk/demosclass"
 import { PasskeyGenerator } from "./passkeys/passkeys"
 import { Cryptography } from "@/encryption/Cryptography"
 import { Address } from "@/types/blockchain/WalletTypes"
@@ -72,7 +71,9 @@ export default class Wallet {
     /* SECTION nodeCalls */
 
     async getBalance(): Promise<void> {
-        let info = await websdk.demos.getAddressInfo(this.ed25519_hex.publicKey)
+        // REVIEW: Keep this lazy; eager demos loading reintroduces the initialization cycle.
+        const { demos } = await import("@/websdk/demos")
+        await demos.getAddressInfo(this.ed25519_hex.publicKey)
         // TODO Implement this and other nodeCalls
         // return info.native.balance
     }
@@ -109,7 +110,7 @@ export default class Wallet {
     async transfer(
         to: Address,
         amount: number | bigint,
-        demos: websdk.Demos,
+        demos: Demos,
     ): Promise<RPCResponseWithValidityData> {
         // Delegate to demos.pay so we get the sub-DEM guard, the
         // serializerGate, and the canonical native-send tx shape (with
@@ -123,7 +124,7 @@ export default class Wallet {
     // NOTE  This is a quick wrapper to avoid having to write the same code over and over again
     async broadcast(
         validityData: RPCResponseWithValidityData,
-        demos: websdk.Demos,
+        demos: Demos,
     ): Promise<any> {
         return await demos.broadcast(validityData)
     }

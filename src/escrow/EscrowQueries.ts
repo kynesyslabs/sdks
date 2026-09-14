@@ -9,7 +9,7 @@ KyneSys Labs: https://www.kynesys.xyz/
 
 */
 
-import { Demos } from "@/websdk"
+import type { Demos } from "@/websdk/demosclass"
 import { EscrowTransaction } from "./EscrowTransaction"
 
 /**
