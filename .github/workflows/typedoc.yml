@@ -36,8 +36,18 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
       - name: Clone target repository
+        env:
+          DEPLOY_KEY: ${{ secrets.API_DOCS_DEPLOY_KEY }}
         run: |
-          git clone https://${{ secrets.API_DOCS_PAT }}@github.com/${{ github.repository_owner }}/demosdk-api-ref.git target_repo
+          # A deploy key is scoped to the docs mirror alone, unlike the account-wide PAT it replaces.
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_docs
+          chmod 600 ~/.ssh/id_docs
+          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts
+          echo "GIT_SSH_COMMAND=ssh -i ~/.ssh/id_docs -o IdentitiesOnly=yes" >> "$GITHUB_ENV"
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/id_docs -o IdentitiesOnly=yes" \
+            git clone git@github.com:${{ github.repository_owner }}/demosdk-api-ref.git target_repo
 
       - name: Copy docs to target repository
         run: |
