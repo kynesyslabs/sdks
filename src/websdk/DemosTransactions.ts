@@ -382,7 +382,10 @@ export const DemosTransactions = {
      * @param opts.failFastOnBroadcastError - If true, throw `BroadcastFailedError`
      *   immediately when the broadcast can't contact the node. Defaults to false.
      *
-     * @returns The original broadcast response and the terminal status.
+     * @returns The transaction hash, the original broadcast response, and the
+     *   terminal status. The hash is the node-recalculated one the status polls
+     *   ran against, so it is the identifier an explorer or a later
+     *   `getTransactionStatus` call will resolve.
      */
     broadcastAndWait: async function (
         validationData: RPCResponseWithValidityData,
@@ -393,6 +396,7 @@ export const DemosTransactions = {
             failFastOnBroadcastError?: boolean
         },
     ): Promise<{
+        hash: string
         broadcast: RPCResponse
         status: { state: "included" | "failed"; blockNumber?: number }
     }> {
@@ -497,6 +501,7 @@ export const DemosTransactions = {
                     const blockNumber: number | undefined =
                         (statusRes as any).blockNumber
                     return {
+                        hash: txHash,
                         broadcast: broadcastRes,
                         status: { state, blockNumber },
                     }
