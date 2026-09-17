@@ -7,6 +7,7 @@ This library contains all the functions that are used to interact with the demos
 import axios from "axios"
 import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
+import { txSignaturePreimage } from "./utils/txSignaturePreimage"
 import { TransportError } from "./TransportError"
 
 // NOTE Including custom libraries from Demos
@@ -859,10 +860,16 @@ export class Demos {
         // round-trips through the canonical post-fork-or-pre-fork shape
         // and matches the bytes hashed.
         raw_tx.content = JSON.parse(serialized) as TransactionContent
-        const signature = await this.crypto.sign(
-            this.algorithm,
-            new TextEncoder().encode(raw_tx.hash),
+        // The signed bytes are domain-separated once the node has activated
+        // `signatureDomain`: a signature then says it is a Demos transaction
+        // on one named chain, instead of being indistinguishable from a
+        // signature over any other 64-hex string.
+        const signedBytes = txSignaturePreimage(
+            raw_tx.hash,
+            await this._chainIdCached(),
+            await this._isSignatureDomainActiveCached(),
         )
+        const signature = await this.crypto.sign(this.algorithm, signedBytes)
 
         // INFO: We only dual-sign when signing with PQC keypairs
         let dual_sign = this.dual_sign && this.algorithm !== "ed25519"
@@ -870,7 +877,7 @@ export class Demos {
         if (dual_sign) {
             const ed25519_signature = await this.crypto.sign(
                 "ed25519",
-                new TextEncoder().encode(raw_tx.hash),
+                signedBytes,
             )
             raw_tx.ed25519_signature = uint8ArrayToHex(
                 ed25519_signature.signature,
@@ -1883,6 +1890,29 @@ export class Demos {
     private async _isPostForkCached(): Promise<boolean> {
         const info = await this.getNetworkInfo()
         return Boolean(info?.forks?.osDenomination?.activated)
+    }
+
+    /**
+     * @internal
+     * Whether the target node verifies the domain-separated transaction
+     * preimage. `false` is the safe default: a node that predates the fork,
+     * or one that cannot be reached, still expects the legacy bytes, and
+     * signing the new preimage for it would produce transactions it rejects.
+     */
+    private async _isSignatureDomainActiveCached(): Promise<boolean> {
+        const info = await this.getNetworkInfo()
+        return Boolean(info?.forks?.signatureDomain?.activated)
+    }
+
+    /**
+     * @internal
+     * The chain id the signature binds to, from the same cached call. Only
+     * read when the fork is active, where the node always reports one — a
+     * node with no chain id cannot activate the fork.
+     */
+    private async _chainIdCached(): Promise<number> {
+        const info = await this.getNetworkInfo()
+        return typeof info?.chainId === "number" ? info.chainId : 0
     }
 
     /**
