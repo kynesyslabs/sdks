@@ -5,16 +5,28 @@ permissions:
   contents: read
   id-token: write
 
-# INFO: Run workflow on changes to the sdks
+# Releases come from main only. An unrestricted `push:` let any branch publish
+# the `latest` dist-tag: a commit whose message starts with "release", pushed to
+# a throwaway branch, was enough to ship that branch's build to every consumer.
 on:
   push:
+    branches:
+      - main
   workflow_dispatch:
+
+# Two release pushes in a row must not race for the same dist-tag.
+concurrency:
+  group: publish-demosdk
+  cancel-in-progress: false
 
 jobs:
     build:
         name: Build
         runs-on: ubuntu-latest
-        if: startsWith(github.event.head_commit.message, 'release')
+        # `head_commit` is null outside `push`, so a manual dispatch evaluates to
+        # false and publishes nothing — the branch guard above is the boundary
+        # that matters, this stays as the release-intent marker.
+        if: github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release')
         steps:
             - uses: actions/checkout@v4
             - name: Setup Bun
