@@ -1537,9 +1537,20 @@ export class Demos {
     }
 
     /**
-     * Get address nonce.
+     * The **confirmed** nonce of an address: the highest nonce the chain has
+     * included for it, not the value to sign the next transaction with.
+     *
+     * The node validates a transaction with `nonce > confirmed` and reports
+     * `Expected >= confirmed + 1` when it doesn't hold, so a caller passing an
+     * explicit nonce wants {@link getNextNonce}, or no `nonce` option at all —
+     * the builders resolve it themselves. This holds for every transaction
+     * type: a web2/DAHR request consumes a nonce exactly like a transfer does.
+     *
+     * Pending transactions do not move this value; it advances on inclusion.
+     * For dependent sends see {@link waitForNonce} or {@link enableAutoNonce}.
      *
      * @param address - The address
+     * @returns The confirmed nonce, or 0 when the node reports none.
      */
     async getAddressNonce(address: string): Promise<number> {
         const nonceValue = await this.nodeCall("getAddressNonce", {
@@ -1558,6 +1569,33 @@ export class Demos {
         }
 
         return 0
+    }
+
+    /**
+     * The nonce to sign the next transaction from `address` with: the confirmed
+     * nonce plus one, which is the lowest value the node accepts.
+     *
+     * Use it whenever a nonce is derived by hand — deriving a storage address,
+     * anchoring after a web2/DAHR request, or any flow that pre-computes what
+     * it is about to send. Passing {@link getAddressNonce} directly is the
+     * off-by-one the node rejects with `[NONCE ERROR] Expected >= n+1, got: n`.
+     *
+     * It reads the chain, so it does not account for transactions this client
+     * has already broadcast but the chain has not included yet. For several
+     * sends in a row, use {@link enableAutoNonce} (local sequencing) or
+     * {@link waitForNonce} (wait for inclusion).
+     *
+     * @example
+     * ```ts
+     * const nonce = await demos.getNextNonce(address)
+     * const tx = await demos.store(bytes, { nonce })
+     * ```
+     *
+     * @param address - The address
+     * @returns The confirmed nonce + 1.
+     */
+    async getNextNonce(address: string): Promise<number> {
+        return (await this.getAddressNonce(address)) + 1
     }
 
     /**
