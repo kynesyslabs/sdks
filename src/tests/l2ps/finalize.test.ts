@@ -28,18 +28,18 @@ async function newConnectedDemos(): Promise<{
 }
 
 /** Run a real signed offer→accept so the session holds a verifiable transcript. */
-async function agreedSession() {
+async function agreedSession(channelId = CHANNEL) {
     const alice = await newConnectedDemos()
     const bob = await newConnectedDemos()
     const members = [alice.claim, bob.claim]
     const aSes = new ChannelSession({
-        channelId: CHANNEL,
+        channelId,
         members,
         me: alice.claim,
         demos: alice.demos,
     })
     const bSes = new ChannelSession({
-        channelId: CHANNEL,
+        channelId,
         members,
         me: bob.claim,
         demos: bob.demos,
@@ -241,5 +241,30 @@ describe("finalizeRfq — WI-C transcript anchor on terminal", () => {
                 policy: "none",
             }),
         ).rejects.toThrow(/session mismatch/)
+    })
+
+    it("rejects a populated different channel with the same accepted sequence and terms", async () => {
+        const fromA = await agreedSession("ch-finalize-a")
+        const fromB = await agreedSession("ch-finalize-b")
+        expect(fromA.aRfq.outcome().acceptedSequence).toBe(fromB.aRfq.outcome().acceptedSequence)
+        await expect(finalizeRfq({
+            rfq: fromA.aRfq,
+            session: fromB.aSes,
+            signer: fromB.alice.claim,
+            demos: fromB.alice.demos,
+            policy: "none",
+        })).rejects.toThrow(/session mismatch/)
+    })
+
+    it("rejects a different signed exchange even if a channel ID was reused", async () => {
+        const fromA = await agreedSession("ch-finalize-reused")
+        const fromB = await agreedSession("ch-finalize-reused")
+        await expect(finalizeRfq({
+            rfq: fromA.aRfq,
+            session: fromB.aSes,
+            signer: fromB.alice.claim,
+            demos: fromB.alice.demos,
+            policy: "none",
+        })).rejects.toThrow(/session mismatch/)
     })
 })

@@ -18,10 +18,12 @@ import { Demos } from "@/websdk/demosclass"
 import type { ChannelMessage } from "@/l2ps/channel/types"
 import type { AgreementDocument } from "@/l2ps/agreement/types"
 import { coSignAgreement } from "@/l2ps/agreement/agreement"
+import { matchesAcceptedRfq } from "@/l2ps/channel/acceptedRfq"
 
 /** Minimal RFQ outcome surface — structural for testability. */
 export interface CommittableOutcome {
     state: string
+    channelId?: string
     agreedTerms?: unknown
     acceptedSequence?: number
 }
@@ -89,31 +91,23 @@ export async function commitRfq(opts: CommitRfqOpts): Promise<AgreementDocument>
             "commitRfq: accepted outcome carries no acceptedSequence — cannot bind the agreement to the proposal",
         )
 
-    // The RFQ state machine carries no channelId, so nothing stops an accepted
-    // RFQ from one channel being paired with another channel's session — which
-    // would mint a document naming a channel that never agreed those terms.
-    // Bind them the way finalizeRfq does: this session must actually carry the
-    // accepted proposal and the accept that points at it.
-    const messages = opts.session.messages()
-    const hasProposal = messages.some((m) => m.sequence === acceptedSequence)
-    const hasAccept = messages.some(
-        (m) =>
-            m.type === "accept" &&
-            (m.body as { acceptedSequence?: number } | undefined)?.acceptedSequence ===
-                acceptedSequence,
-    )
-    if (!hasProposal || !hasAccept)
+    // Sequence numbers can collide across channels. Require the RFQ's
+    // authenticated channel and exact accepted terms to match this transcript.
+    const channelId = opts.session.channelId
+    const members = [...opts.session.members]
+    const messages = [...opts.session.messages()]
+    if (!matchesAcceptedRfq(outcome, channelId, messages))
         throw new Error(
             `commitRfq: this session does not carry the accepted proposal (seq ${acceptedSequence}) ` +
                 "and its matching accept — the RFQ belongs to a different channel",
         )
 
     return coSignAgreement({
-        channelId: opts.session.channelId,
+        channelId,
         // The parties ARE the membership — that is the invariant, not a copy of
         // it. coSignAgreement then enforces exactly one signer per party, which
         // here IS the §0 check, with claim normalisation applied.
-        parties: [...opts.session.members],
+        parties: members,
         body: outcome.agreedTerms,
         signers: opts.signers,
         agreedAt: opts.agreedAt,

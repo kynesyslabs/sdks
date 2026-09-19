@@ -185,12 +185,12 @@ describe("SR-4 definition of done — end to end", () => {
 })
 
 describe("commitRfq — what it refuses", () => {
-    async function accepted() {
+    async function accepted(channelId = "ch-c1") {
         const alice = await newConnectedDemos()
         const bob = await newConnectedDemos()
         const members = [alice.claim, bob.claim]
-        const aSes = new ChannelSession({ channelId: "ch-c1", members, me: alice.claim, demos: alice.demos })
-        const bSes = new ChannelSession({ channelId: "ch-c1", members, me: bob.claim, demos: bob.demos })
+        const aSes = new ChannelSession({ channelId, members, me: alice.claim, demos: alice.demos })
+        const bSes = new ChannelSession({ channelId, members, me: bob.claim, demos: bob.demos })
         await aSes.open()
         await bSes.open()
         let bRfq!: RfqSession
@@ -282,6 +282,48 @@ describe("commitRfq — what it refuses", () => {
             }),
         ).rejects.toThrow(/belongs to a different channel/)
         void alice, bob
+    })
+
+    it("refuses a populated different channel with the same accepted sequence and terms", async () => {
+        const fromA = await accepted("ch-collision-a")
+        await fromA.aRfq.offer({ price: 100 })
+        await fromA.bRfq.counter({ price: 90 })
+        await fromA.aRfq.accept()
+
+        const fromB = await accepted("ch-collision-b")
+        await fromB.aRfq.offer({ price: 100 })
+        await fromB.bRfq.counter({ price: 90 })
+        await fromB.aRfq.accept()
+        expect(fromA.aRfq.outcome().acceptedSequence).toBe(fromB.aRfq.outcome().acceptedSequence)
+
+        await expect(commitRfq({
+            rfq: fromA.aRfq,
+            session: fromB.aSes,
+            signers: [
+                { claim: fromB.alice.claim, demos: fromB.alice.demos },
+                { claim: fromB.bob.claim, demos: fromB.bob.demos },
+            ],
+        })).rejects.toThrow(/different channel/)
+    })
+
+    it("refuses a different signed exchange even if a channel ID was reused", async () => {
+        const fromA = await accepted("ch-reused")
+        await fromA.aRfq.offer({ price: 100 })
+        await fromA.bRfq.counter({ price: 90 })
+        await fromA.aRfq.accept()
+
+        const fromB = await accepted("ch-reused")
+        await fromB.aRfq.offer({ price: 100 })
+        await fromB.bRfq.counter({ price: 90 })
+        await fromB.aRfq.accept()
+        await expect(commitRfq({
+            rfq: fromA.aRfq,
+            session: fromB.aSes,
+            signers: [
+                { claim: fromB.alice.claim, demos: fromB.alice.demos },
+                { claim: fromB.bob.claim, demos: fromB.bob.demos },
+            ],
+        })).rejects.toThrow(/different channel/)
     })
 
     it("refuses an outcome that disagrees with the reported state", async () => {

@@ -20,6 +20,7 @@
 
 import type { ChannelMessage, ChannelMessageType } from "./types"
 import type { ClaimReference } from "../../identity/cci"
+import { envelopeHashHex, stripChannelMessageSignature } from "./canonical"
 
 /** Terminal + in-progress states (CH-5). */
 export type RfqState = "open" | "accepted" | "rejected" | "aborted"
@@ -39,6 +40,8 @@ export interface RfqEndBody {
 
 /** A standing proposal on the table. */
 export interface StandingProposal {
+    channelId: string
+    messageHash: string
     sequence: number
     sender: ClaimReference
     terms: unknown
@@ -46,6 +49,11 @@ export interface StandingProposal {
 
 export interface RfqOutcome {
     state: RfqState
+    /** Authenticated channel carrying the accepted proposal and acceptance. */
+    channelId?: string
+    /** Hashes of the exact signed exchange, not only its channel-local sequences. */
+    acceptedProposalHash?: string
+    acceptMessageHash?: string
     /** Set when `state === "accepted"`: the terms that were agreed. */
     agreedTerms?: unknown
     /** Sequence of the proposal that was accepted. */
@@ -149,8 +157,13 @@ export class RfqSession {
             body,
             repliesTo: accepted.sequence,
         })
+        if (msg.channelId !== accepted.channelId)
+            throw new Error("RfqSession: acceptance changed channel")
         this.settle({
             state: "accepted",
+            channelId: accepted.channelId,
+            acceptedProposalHash: accepted.messageHash,
+            acceptMessageHash: envelopeHashHex(stripChannelMessageSignature(msg)),
             agreedTerms: accepted.terms,
             acceptedSequence: accepted.sequence,
         })
@@ -227,8 +240,13 @@ export class RfqSession {
                             this._standing?.sequence ?? "none"
                         }`,
                     )
+                if (msg.channelId !== accepted.channelId)
+                    throw new Error("RfqSession: acceptance changed channel")
                 this.settle({
                     state: "accepted",
+                    channelId: accepted.channelId,
+                    acceptedProposalHash: accepted.messageHash,
+                    acceptMessageHash: envelopeHashHex(stripChannelMessageSignature(msg)),
                     agreedTerms: accepted.terms,
                     acceptedSequence: seq,
                 })
@@ -255,6 +273,8 @@ export class RfqSession {
     private acceptProposal(msg: ChannelMessage): void {
         const terms = (msg.body as RfqProposalBody)?.terms
         const proposal: StandingProposal = {
+            channelId: msg.channelId,
+            messageHash: envelopeHashHex(stripChannelMessageSignature(msg)),
             sequence: msg.sequence,
             sender: msg.sender,
             terms,
@@ -272,6 +292,8 @@ export class RfqSession {
         const body: RfqProposalBody = { terms }
         const msg = await this.sendFn({ type, body, repliesTo })
         const proposal: StandingProposal = {
+            channelId: msg.channelId,
+            messageHash: envelopeHashHex(stripChannelMessageSignature(msg)),
             sequence: msg.sequence,
             sender: this.me,
             terms,
