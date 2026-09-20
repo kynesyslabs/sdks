@@ -1,3 +1,5 @@
+import { readFileSync } from "fs"
+import { join } from "path"
 import {
     normaliseNotaryKey,
     notaryKeyMatches,
@@ -69,5 +71,35 @@ describe("NotaryKeyMismatchError", () => {
         expect(error.presentationKey).toBe(OTHER_KEY)
         expect(error.expectedKey).toBe(NOTARY_KEY)
         expect(error.message).toContain("different notary")
+    })
+})
+
+describe("the mismatch error reaches consumers", () => {
+    /**
+     * `verify()` throws this, so an application has to be able to tell
+     * "signed by a notary you do not trust" apart from a malformed proof.
+     * Without the re-export the only way to do that was to match on the
+     * message, which is not a contract anyone should depend on.
+     */
+    it("is re-exported from the tlsnotary entry point", () => {
+        // Read rather than imported: the entry point pulls in the tlsn-js
+        // WASM bundle, which needs a browser to load. The export line is what
+        // the package contract rests on, so that is what this pins.
+        const entryPoint = readFileSync(
+            join(__dirname, "..", "tlsnotary", "index.ts"),
+            "utf8",
+        )
+
+        expect(entryPoint).toMatch(
+            /export\s*\{[^}]*NotaryKeyMismatchError[^}]*\}\s*from\s*["']\.\/notaryKey["']/,
+        )
+    })
+
+    it("survives an instanceof check", () => {
+        const error = new NotaryKeyMismatchError("ab".repeat(32), "cd".repeat(32))
+
+        expect(error).toBeInstanceOf(NotaryKeyMismatchError)
+        expect(error).toBeInstanceOf(Error)
+        expect(error.name).toBe("NotaryKeyMismatchError")
     })
 })

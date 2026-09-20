@@ -448,6 +448,11 @@ export class TLSNotary {
      *
      * @param presentationJSON - The presentation to verify
      * @returns Verification result with extracted data
+     * @throws {NotaryKeyMismatchError} When `notaryPublicKey` is configured
+     * and the presentation was signed by a different notary. A presentation
+     * proves that *some* notary signed the transcript, so this is the check
+     * that makes it evidence — catch it to tell that apart from a malformed
+     * proof. Exported from `@kynesyslabs/demosdk/tlsnotary`.
      *
      * @example
      * ```typescript
