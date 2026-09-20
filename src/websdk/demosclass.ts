@@ -121,12 +121,25 @@ export class Demos {
     private _cachedNetworkInfoFailedAt: number = 0
     private _cachedNetworkInfoWarned: boolean = false
     /**
+     * When the successful answer was cached. Only consulted while some fork
+     * the node reported is still pending — see `_cachedAnswerStillHolds`.
+     */
+    private _cachedNetworkInfoAt: number = 0
+    /**
      * TTL for the failed-detection memo. After this elapses we re-attempt
      * `getNetworkInfo` so a transient outage doesn't poison the instance
      * forever. The warn-once flag is sticky across retries — operators
      * still see the warning exactly once per instance lifetime.
      */
     private static readonly _NETWORK_INFO_FAILURE_TTL_MS = 30_000
+
+    /**
+     * How long a successful answer is trusted while it still reports a fork
+     * as pending. A fork that has activated never deactivates, so that answer
+     * is cached for the instance's life; "not yet" is a statement about the
+     * current height and stops being true as the chain advances.
+     */
+    private static readonly _NETWORK_INFO_PENDING_FORK_TTL_MS = 30_000
 
     /**
      * Client-side nonce sequencer. Opt-in via {@link enableAutoNonce}. When
@@ -207,6 +220,7 @@ export class Demos {
                 this._cachedNetworkInfoRpcUrl = null
                 this._cachedNetworkInfoFailed = false
                 this._cachedNetworkInfoFailedAt = 0
+                this._cachedNetworkInfoAt = 0
                 // Local nonce counters are tied to the previous node's state;
                 // drop them so the next auto-nonce reservation reseeds from
                 // the new node.
@@ -1815,7 +1829,8 @@ export class Demos {
         // paths still see correct behaviour.
         if (
             this._cachedNetworkInfo &&
-            this._cachedNetworkInfoRpcUrl === this.rpc_url
+            this._cachedNetworkInfoRpcUrl === this.rpc_url &&
+            this._cachedAnswerStillHolds()
         ) {
             return this._cachedNetworkInfo
         }
@@ -1828,6 +1843,7 @@ export class Demos {
             this._cachedNetworkInfoRpcUrl = null
             this._cachedNetworkInfoFailed = false
             this._cachedNetworkInfoFailedAt = 0
+            this._cachedNetworkInfoAt = 0
         }
         // Honour the failed-cache TTL so a transient outage doesn't lock
         // the instance into pre-fork mode forever. After the TTL we'll
@@ -1860,6 +1876,7 @@ export class Demos {
         ) {
             this._cachedNetworkInfo = fresh as NetworkInfo
             this._cachedNetworkInfoRpcUrl = this.rpc_url
+            this._cachedNetworkInfoAt = Date.now()
             // A successful detection clears any stale failure memo for
             // the current rpc_url.
             this._cachedNetworkInfoFailed = false
@@ -1879,6 +1896,33 @@ export class Demos {
             )
         }
         return null
+    }
+
+    /**
+     * @internal
+     * Whether the cached answer can still be trusted.
+     *
+     * An activated fork stays activated, so an answer where everything the
+     * node reported is already active never goes stale. An answer carrying a
+     * fork that has not activated yet is only true of the height it was
+     * fetched at: a long-lived instance that cached "not yet" and kept it
+     * would sign the legacy preimage forever, and every transaction it
+     * produced after the chain crossed the activation height would be
+     * rejected until the process restarted. So that answer expires.
+     */
+    private _cachedAnswerStillHolds(): boolean {
+        const forks = this._cachedNetworkInfo?.forks
+        if (!forks) return false
+
+        const pending = Object.values(forks).some(
+            fork => fork && fork.activated === false,
+        )
+        if (!pending) return true
+
+        return (
+            Date.now() - this._cachedNetworkInfoAt <
+            Demos._NETWORK_INFO_PENDING_FORK_TTL_MS
+        )
     }
 
     /**
@@ -1925,6 +1969,7 @@ export class Demos {
         this._cachedNetworkInfoRpcUrl = null
         this._cachedNetworkInfoFailed = false
         this._cachedNetworkInfoFailedAt = 0
+        this._cachedNetworkInfoAt = 0
         this._cachedNetworkInfoWarned = false
     }
 

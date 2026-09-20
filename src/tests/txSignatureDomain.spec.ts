@@ -1,9 +1,12 @@
-import { Demos } from "@/websdk"
+import { Demos, DemosTransactions } from "@/websdk"
+import { DemosWebAuth } from "@/websdk/DemosWebAuth"
 import type { SigningAlgorithm } from "@/types"
 import {
     txSignaturePreimage,
     TX_SIGNATURE_DOMAIN,
 } from "@/websdk/utils/txSignaturePreimage"
+import { Cryptography } from "@/encryption"
+import { hexToUint8Array } from "@/encryption/unifiedCrypto"
 
 const HASH = "7c".repeat(32)
 
@@ -88,5 +91,69 @@ describe("what the signer commits to", () => {
         const { hash, seen } = await signedBytesFor(null)
 
         expect(new TextDecoder().decode(seen[0])).toBe(hash)
+    })
+})
+
+describe("the deprecated standalone signer", () => {
+    /**
+     * It has no `Demos` instance, so it cannot ask a node anything. Left as
+     * it was, it signed the bare hash unconditionally — meaning a consumer
+     * still on this reachable, exported API produced signatures that an
+     * activated node rejects, with no way to opt in.
+     */
+    async function signWith(options: {
+        algorithm: "ed25519"
+        chainId?: number
+    }) {
+        // Built through the real transaction path, then handed to the
+        // standalone signer — the same sequence a consumer on the deprecated
+        // API follows.
+        const demos = demosSeeing(PRE_FORK)
+        await demos.connectWallet(
+            "test test test test test test test test test test test junk",
+            { algorithm: "ed25519" },
+        )
+        const built = await demos.pay("0x" + "ab".repeat(32), 1_000_000_000n)
+
+        return DemosTransactions.sign(
+            built,
+            {
+                publicKey: hexToUint8Array(built.content.from as string),
+                privateKey: (demos as never as { keypair: { privateKey: Uint8Array } })
+                    .keypair.privateKey,
+            } as never,
+            options,
+        )
+    }
+
+    it("still signs the legacy preimage by default", async () => {
+        const tx = await signWith({ algorithm: "ed25519" })
+
+        expect(
+            Cryptography.verify(
+                tx.hash,
+                Buffer.from(hexToUint8Array(tx.signature.data)),
+                Buffer.from(hexToUint8Array(tx.content.from as string)),
+            ),
+        ).toBe(true)
+    })
+
+    it("binds to a chain when given one", async () => {
+        const tx = await signWith({ algorithm: "ed25519", chainId: 7 })
+
+        expect(
+            Cryptography.verify(
+                `${TX_SIGNATURE_DOMAIN}7:${tx.hash}`,
+                Buffer.from(hexToUint8Array(tx.signature.data)),
+                Buffer.from(hexToUint8Array(tx.content.from as string)),
+            ),
+        ).toBe(true)
+        expect(
+            Cryptography.verify(
+                tx.hash,
+                Buffer.from(hexToUint8Array(tx.signature.data)),
+                Buffer.from(hexToUint8Array(tx.content.from as string)),
+            ),
+        ).toBe(false)
     })
 })
