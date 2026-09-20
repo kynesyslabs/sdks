@@ -105,6 +105,33 @@ describe("D402Server.validatePayment", () => {
         ).toBe(true)
     })
 
+    it("matches the pinned payer whatever case either side uses", () => {
+        // Both are hex addresses and nothing promises a casing, so a
+        // requirement written in upper case used to turn away the very payer
+        // it pinned — a paying user denied the thing they paid for.
+        expect(
+            server().validatePayment(
+                verification(),
+                requirement({ payer: PAYER.toUpperCase() }),
+            ),
+        ).toBe(true)
+        expect(
+            server().validatePayment(
+                verification({ verified_from: PAYER.toUpperCase() }),
+                requirement({ payer: PAYER }),
+            ),
+        ).toBe(true)
+    })
+
+    it("refuses when the payer is pinned and the node reports none", () => {
+        expect(
+            server().validatePayment(
+                verification({ verified_from: undefined }),
+                requirement({ payer: PAYER }),
+            ),
+        ).toBe(false)
+    })
+
     it("still refuses a short payment", () => {
         expect(
             server().validatePayment(

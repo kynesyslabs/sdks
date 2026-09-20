@@ -234,9 +234,13 @@ export class D402Server {
         // Check the payer when the caller pinned one. The proof is a public
         // transaction hash, so an unpinned requirement is a bearer token:
         // whoever repeats the hash gets the access that was paid for.
+        // Compared case-insensitively: both sides are hex addresses and the
+        // node does not promise a casing, so a requirement written in upper
+        // case would otherwise turn away the very payer it pinned.
         if (
             requirement.payer &&
-            verification.verified_from !== requirement.payer
+            verification.verified_from?.toLowerCase() !==
+                requirement.payer.toLowerCase()
         ) {
             return false
         }
