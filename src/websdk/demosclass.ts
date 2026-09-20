@@ -7,6 +7,7 @@ This library contains all the functions that are used to interact with the demos
 import axios from "axios"
 import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
+import { txSignaturePreimage } from "./utils/txSignaturePreimage"
 import { TransportError } from "./TransportError"
 
 // NOTE Including custom libraries from Demos
@@ -120,12 +121,25 @@ export class Demos {
     private _cachedNetworkInfoFailedAt: number = 0
     private _cachedNetworkInfoWarned: boolean = false
     /**
+     * When the successful answer was cached. Only consulted while some fork
+     * the node reported is still pending — see `_cachedAnswerStillHolds`.
+     */
+    private _cachedNetworkInfoAt: number = 0
+    /**
      * TTL for the failed-detection memo. After this elapses we re-attempt
      * `getNetworkInfo` so a transient outage doesn't poison the instance
      * forever. The warn-once flag is sticky across retries — operators
      * still see the warning exactly once per instance lifetime.
      */
     private static readonly _NETWORK_INFO_FAILURE_TTL_MS = 30_000
+
+    /**
+     * How long a successful answer is trusted while it still reports a fork
+     * as pending. A fork that has activated never deactivates, so that answer
+     * is cached for the instance's life; "not yet" is a statement about the
+     * current height and stops being true as the chain advances.
+     */
+    private static readonly _NETWORK_INFO_PENDING_FORK_TTL_MS = 30_000
 
     /**
      * Client-side nonce sequencer. Opt-in via {@link enableAutoNonce}. When
@@ -206,6 +220,7 @@ export class Demos {
                 this._cachedNetworkInfoRpcUrl = null
                 this._cachedNetworkInfoFailed = false
                 this._cachedNetworkInfoFailedAt = 0
+                this._cachedNetworkInfoAt = 0
                 // Local nonce counters are tied to the previous node's state;
                 // drop them so the next auto-nonce reservation reseeds from
                 // the new node.
@@ -859,10 +874,16 @@ export class Demos {
         // round-trips through the canonical post-fork-or-pre-fork shape
         // and matches the bytes hashed.
         raw_tx.content = JSON.parse(serialized) as TransactionContent
-        const signature = await this.crypto.sign(
-            this.algorithm,
-            new TextEncoder().encode(raw_tx.hash),
+        // The signed bytes are domain-separated once the node has activated
+        // `signatureDomain`: a signature then says it is a Demos transaction
+        // on one named chain, instead of being indistinguishable from a
+        // signature over any other 64-hex string.
+        const signedBytes = txSignaturePreimage(
+            raw_tx.hash,
+            await this._chainIdCached(),
+            await this._isSignatureDomainActiveCached(),
         )
+        const signature = await this.crypto.sign(this.algorithm, signedBytes)
 
         // INFO: We only dual-sign when signing with PQC keypairs
         let dual_sign = this.dual_sign && this.algorithm !== "ed25519"
@@ -870,7 +891,7 @@ export class Demos {
         if (dual_sign) {
             const ed25519_signature = await this.crypto.sign(
                 "ed25519",
-                new TextEncoder().encode(raw_tx.hash),
+                signedBytes,
             )
             raw_tx.ed25519_signature = uint8ArrayToHex(
                 ed25519_signature.signature,
@@ -1808,7 +1829,8 @@ export class Demos {
         // paths still see correct behaviour.
         if (
             this._cachedNetworkInfo &&
-            this._cachedNetworkInfoRpcUrl === this.rpc_url
+            this._cachedNetworkInfoRpcUrl === this.rpc_url &&
+            this._cachedAnswerStillHolds()
         ) {
             return this._cachedNetworkInfo
         }
@@ -1821,6 +1843,7 @@ export class Demos {
             this._cachedNetworkInfoRpcUrl = null
             this._cachedNetworkInfoFailed = false
             this._cachedNetworkInfoFailedAt = 0
+            this._cachedNetworkInfoAt = 0
         }
         // Honour the failed-cache TTL so a transient outage doesn't lock
         // the instance into pre-fork mode forever. After the TTL we'll
@@ -1853,6 +1876,7 @@ export class Demos {
         ) {
             this._cachedNetworkInfo = fresh as NetworkInfo
             this._cachedNetworkInfoRpcUrl = this.rpc_url
+            this._cachedNetworkInfoAt = Date.now()
             // A successful detection clears any stale failure memo for
             // the current rpc_url.
             this._cachedNetworkInfoFailed = false
@@ -1876,6 +1900,33 @@ export class Demos {
 
     /**
      * @internal
+     * Whether the cached answer can still be trusted.
+     *
+     * An activated fork stays activated, so an answer where everything the
+     * node reported is already active never goes stale. An answer carrying a
+     * fork that has not activated yet is only true of the height it was
+     * fetched at: a long-lived instance that cached "not yet" and kept it
+     * would sign the legacy preimage forever, and every transaction it
+     * produced after the chain crossed the activation height would be
+     * rejected until the process restarted. So that answer expires.
+     */
+    private _cachedAnswerStillHolds(): boolean {
+        const forks = this._cachedNetworkInfo?.forks
+        if (!forks) return false
+
+        const pending = Object.values(forks).some(
+            fork => fork && fork.activated === false,
+        )
+        if (!pending) return true
+
+        return (
+            Date.now() - this._cachedNetworkInfoAt <
+            Demos._NETWORK_INFO_PENDING_FORK_TTL_MS
+        )
+    }
+
+    /**
+     * @internal
      * Cached fork-status accessor. Returns `osDenomination` activation
      * status as a boolean. `false` is the safe default (legacy wire
      * format) when the node is unreachable or pre-P3c.
@@ -1883,6 +1934,29 @@ export class Demos {
     private async _isPostForkCached(): Promise<boolean> {
         const info = await this.getNetworkInfo()
         return Boolean(info?.forks?.osDenomination?.activated)
+    }
+
+    /**
+     * @internal
+     * Whether the target node verifies the domain-separated transaction
+     * preimage. `false` is the safe default: a node that predates the fork,
+     * or one that cannot be reached, still expects the legacy bytes, and
+     * signing the new preimage for it would produce transactions it rejects.
+     */
+    private async _isSignatureDomainActiveCached(): Promise<boolean> {
+        const info = await this.getNetworkInfo()
+        return Boolean(info?.forks?.signatureDomain?.activated)
+    }
+
+    /**
+     * @internal
+     * The chain id the signature binds to, from the same cached call. Only
+     * read when the fork is active, where the node always reports one — a
+     * node with no chain id cannot activate the fork.
+     */
+    private async _chainIdCached(): Promise<number> {
+        const info = await this.getNetworkInfo()
+        return typeof info?.chainId === "number" ? info.chainId : 0
     }
 
     /**
@@ -1895,6 +1969,7 @@ export class Demos {
         this._cachedNetworkInfoRpcUrl = null
         this._cachedNetworkInfoFailed = false
         this._cachedNetworkInfoFailedAt = 0
+        this._cachedNetworkInfoAt = 0
         this._cachedNetworkInfoWarned = false
     }
 
