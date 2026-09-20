@@ -84,6 +84,13 @@ The SDK provides multiple entry points:
 - `@kynesyslabs/demosdk/types` - TypeScript type definitions
 - `@kynesyslabs/demosdk/l2ps` - Layer 2 payment solutions
 
+The L2PS channel export includes an [experimental basic sealed-bid
+helper](./documentation/l2ps/experimental-sealed-bid.md). It verifies one
+bidder's signed commitment/opening pair; it does **not** prove that all bids
+across separate channels were included, enforce a shared deadline, or provide
+a DACS v0.6 conformant complete auction. The separate profile question is
+tracked in [DACS-Standard issue #407](https://github.com/DACS-Agent-commerce/DACS-Standard/issues/407).
+
 ## Quick Start
 
 ### Initialize and Connect Wallet

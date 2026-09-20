@@ -78,3 +78,13 @@ export {
     type RfqLike,
     type ChannelSessionView,
 } from "./finalize"
+
+export {
+    EXPERIMENTAL_SEALED_BID_DOMAIN,
+    EXPERIMENTAL_SEALED_BID_SCHEME,
+    createExperimentalSealedBid,
+    verifyExperimentalSealedBidOpening,
+    type ExperimentalSealedBidContext,
+    type ExperimentalSealedBidCommitBody,
+    type ExperimentalSealedBidOpeningBody,
+} from "./experimentalSealedBid"
