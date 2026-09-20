@@ -231,11 +231,24 @@ export class D402Server {
             return false
         }
 
-        // Check resource ID in memo (format: "resourceId:xyz")
-        const memo = verification.verified_memo || ''
-        const expectedMemoPrefix = `resourceId:${requirement.resourceId}`
+        // Check the payer when the caller pinned one. The proof is a public
+        // transaction hash, so an unpinned requirement is a bearer token:
+        // whoever repeats the hash gets the access that was paid for.
+        // Compared case-insensitively: both sides are hex addresses and the
+        // node does not promise a casing, so a requirement written in upper
+        // case would otherwise turn away the very payer it pinned.
+        if (
+            requirement.payer &&
+            verification.verified_from?.toLowerCase() !==
+                requirement.payer.toLowerCase()
+        ) {
+            return false
+        }
 
-        if (!memo.startsWith(expectedMemoPrefix)) {
+        // Check the resource the payment names.
+        const memo = verification.verified_memo || ''
+
+        if (!memoNamesResource(memo, requirement.resourceId)) {
             return false
         }
 
@@ -260,4 +273,19 @@ export class D402Server {
     clearCache(): void {
         this.paymentCache.clear()
     }
+}
+
+/**
+ * Does this memo name exactly this resource?
+ *
+ * The memo is `resourceId:<id>`, optionally followed by ` - <description>`
+ * (see `D402Client.createPayment`). Matching it with `startsWith` compared a
+ * prefix, not the id: a payment for `user-12` also satisfied a requirement
+ * for `user-1`, so paying for one resource could unlock a different one that
+ * happens to share a prefix, is priced the same and is paid to the same
+ * recipient.
+ */
+export function memoNamesResource(memo: string, resourceId: string): boolean {
+    const expected = `resourceId:${resourceId}`
+    return memo === expected || memo.startsWith(`${expected} - `)
 }
