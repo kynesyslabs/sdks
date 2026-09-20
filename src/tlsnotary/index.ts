@@ -95,6 +95,16 @@ export { default } from "./TLSNotary"
 // Helper function exports
 export { calculateStorageFee } from "./helpers"
 
+// Comparing a presentation's signer against the notary you pinned.
+// `NotaryKeyMismatchError` is thrown by `verify()`, so consumers need it here
+// to tell "signed by someone else" apart from a malformed proof with an
+// `instanceof` check rather than by matching on a message.
+export {
+    NotaryKeyMismatchError,
+    normaliseNotaryKey,
+    notaryKeyMatches,
+} from "./notaryKey"
+
 // Auto-init helper for simplified WASM setup
 export {
     initTlsn,

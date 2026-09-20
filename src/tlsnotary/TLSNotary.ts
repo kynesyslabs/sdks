@@ -34,6 +34,10 @@
  */
 
 import * as Comlink from "comlink"
+import {
+    notaryKeyMatches,
+    NotaryKeyMismatchError,
+} from "./notaryKey"
 import { NotaryServer, Transcript } from "./tlsn-runtime"
 import type {
     Prover as TProver,
@@ -444,6 +448,11 @@ export class TLSNotary {
      *
      * @param presentationJSON - The presentation to verify
      * @returns Verification result with extracted data
+     * @throws {NotaryKeyMismatchError} When `notaryPublicKey` is configured
+     * and the presentation was signed by a different notary. A presentation
+     * proves that *some* notary signed the transcript, so this is the check
+     * that makes it evidence — catch it to tell that apart from a malformed
+     * proof. Exported from `@kynesyslabs/demosdk/tlsnotary`.
      *
      * @example
      * ```typescript
@@ -492,13 +501,29 @@ export class TLSNotary {
                 )
             }
 
+            const verifyingKey = Buffer.from(vk.data).toString("hex")
+
+            // The presentation proves that SOME notary signed this transcript.
+            // Comparing its signer against the notary we trust is what makes it
+            // evidence — without it, a presentation notarised by whoever
+            // produced it verifies exactly like a real one.
+            if (
+                this.config.notaryPublicKey &&
+                !notaryKeyMatches(verifyingKey, this.config.notaryPublicKey)
+            ) {
+                throw new NotaryKeyMismatchError(
+                    verifyingKey,
+                    this.config.notaryPublicKey,
+                )
+            }
+
             return {
                 time: verifierOutput.connection_info.time,
                 serverName: verifierOutput.server_name,
                 sent: transcript.sent(),
                 recv: transcript.recv(),
                 notaryKey,
-                verifyingKey: Buffer.from(vk.data).toString("hex"),
+                verifyingKey,
             }
         } finally {
             // Free WASM memory to prevent leaks
