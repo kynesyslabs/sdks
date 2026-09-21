@@ -71,6 +71,19 @@ describe("RfqSession — negotiate-rfq state machine", () => {
         })).toThrow(/not in members/)
     })
 
+    it("rejects exact duplicates separated by locale-equivalent identities", () => {
+        const composed = "x:\u00e9" as ClaimReference
+        const decomposed = "x:e\u0301" as ClaimReference
+        expect(composed.localeCompare(decomposed)).toBe(0)
+
+        expect(() => new RfqSession({
+            channelId: "ch",
+            members: [composed, decomposed, composed],
+            me: composed,
+            send: async () => { throw new Error("unused") },
+        })).toThrow(/duplicate RFQ session member/)
+    })
+
     it("offer → counter → accept settles agreedTerms on both sides", async () => {
         const { aSes, bSes } = harness()
 

@@ -15,6 +15,14 @@ function canonicalClaim(ref: ClaimReference): ClaimReference {
     return `${scheme}:${normalizeDemosAddress(identifier)}` as ClaimReference
 }
 
+function compareCanonicalClaims(left: string, right: string): number {
+    const localeOrder = left.localeCompare(right)
+    if (localeOrder !== 0) return localeOrder
+    if (left < right) return -1
+    if (left > right) return 1
+    return 0
+}
+
 /** Canonical, order-independent channel membership; duplicate identities fail. */
 export function canonicalRfqMembers(
     members: ReadonlyArray<ClaimReference>,
@@ -23,7 +31,7 @@ export function canonicalRfqMembers(
 
     const canonical = members
         .map(canonicalClaim)
-        .sort((left, right) => left.localeCompare(right))
+        .sort(compareCanonicalClaims)
     for (let i = 1; i < canonical.length; i++) {
         if (canonical[i] === canonical[i - 1])
             throw new Error(`duplicate RFQ session member "${canonical[i]}"`)
