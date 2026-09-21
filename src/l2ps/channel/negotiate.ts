@@ -21,6 +21,11 @@
 import type { ChannelMessage, ChannelMessageType } from "./types"
 import type { ClaimReference } from "../../identity/cci"
 import { envelopeHashHex, stripChannelMessageSignature } from "./canonical"
+import {
+    canonicalRfqMembers,
+    isRfqMember,
+    sameRfqMembers,
+} from "./acceptedRfq"
 
 /** Terminal + in-progress states (CH-5). */
 export type RfqState = "open" | "accepted" | "rejected" | "aborted"
@@ -63,6 +68,10 @@ export interface RfqOutcome {
 }
 
 export interface RfqSessionOpts {
+    /** Authenticated channel identity expected on every message, when available. */
+    channelId?: string
+    /** Complete authenticated membership, enabling explicit outcome binding. */
+    members?: ReadonlyArray<ClaimReference>
     /** This party's CCI primary claim. */
     me: ClaimReference
     /**
@@ -90,6 +99,8 @@ const RFQ_TYPES: ReadonlySet<ChannelMessageType> = new Set<ChannelMessageType>([
 ])
 
 export class RfqSession {
+    private readonly channelId: string | undefined
+    private readonly members: ReadonlyArray<ClaimReference> | undefined
     private readonly me: ClaimReference
     private readonly sendFn: RfqSessionOpts["send"]
     private readonly onStateChange?: (o: RfqOutcome) => void
@@ -102,6 +113,16 @@ export class RfqSession {
     private _outcome: RfqOutcome = { state: "open" }
 
     constructor(opts: RfqSessionOpts) {
+        if (opts.channelId !== undefined && !opts.channelId)
+            throw new Error("RfqSession: channelId must not be empty")
+        const members = opts.members === undefined
+            ? undefined
+            : canonicalRfqMembers(opts.members)
+        if (members && !isRfqMember(members, opts.me))
+            throw new Error(`RfqSession: me (${opts.me}) is not in members`)
+
+        this.channelId = opts.channelId
+        this.members = members && Object.freeze(members)
         this.me = opts.me
         this.sendFn = opts.send
         this.onStateChange = opts.onStateChange
@@ -146,7 +167,7 @@ export class RfqSession {
         // counterparty agreeing to the terms on the table. Accepting a
         // self-authored standing proposal would settle the negotiation
         // (and produce a transcript) without the other side ever agreeing.
-        if (this._standing.sender === this.me)
+        if (sameRfqMembers([this._standing.sender], [this.me]))
             throw new Error(
                 "RfqSession: cannot accept your own proposal — wait for the counterparty",
             )
@@ -157,16 +178,7 @@ export class RfqSession {
             body,
             repliesTo: accepted.sequence,
         })
-        if (msg.channelId !== accepted.channelId)
-            throw new Error("RfqSession: acceptance changed channel")
-        this.settle({
-            state: "accepted",
-            channelId: accepted.channelId,
-            acceptedProposalHash: accepted.messageHash,
-            acceptMessageHash: envelopeHashHex(stripChannelMessageSignature(msg)),
-            agreedTerms: accepted.terms,
-            acceptedSequence: accepted.sequence,
-        })
+        this.settleAccepted(accepted, msg)
         return msg
     }
 
@@ -196,8 +208,12 @@ export class RfqSession {
      */
     onIncoming(msg: ChannelMessage): void {
         if (!RFQ_TYPES.has(msg.type)) return
-        if (msg.sender === this.me) return // our own echo, already applied
+        if (sameRfqMembers([msg.sender], [this.me])) return // own echo, already applied
         if (this._state !== "open") return // terminal — ignore trailing traffic
+        if (this.channelId && msg.channelId !== this.channelId)
+            throw new Error("RfqSession: message changed channel")
+        if (this.members && !isRfqMember(this.members, msg.sender))
+            throw new Error(`RfqSession: sender "${msg.sender}" is not a member`)
 
         switch (msg.type) {
             case "offer": {
@@ -240,16 +256,7 @@ export class RfqSession {
                             this._standing?.sequence ?? "none"
                         }`,
                     )
-                if (msg.channelId !== accepted.channelId)
-                    throw new Error("RfqSession: acceptance changed channel")
-                this.settle({
-                    state: "accepted",
-                    channelId: accepted.channelId,
-                    acceptedProposalHash: accepted.messageHash,
-                    acceptMessageHash: envelopeHashHex(stripChannelMessageSignature(msg)),
-                    agreedTerms: accepted.terms,
-                    acceptedSequence: seq,
-                })
+                this.settleAccepted(accepted, msg)
                 break
             }
             case "reject": {
@@ -291,6 +298,14 @@ export class RfqSession {
     ): Promise<ChannelMessage> {
         const body: RfqProposalBody = { terms }
         const msg = await this.sendFn({ type, body, repliesTo })
+        if (this.channelId && msg.channelId !== this.channelId)
+            throw new Error("RfqSession: proposal changed channel")
+        if (!sameRfqMembers([msg.sender], [this.me]))
+            throw new Error(
+                "RfqSession: proposal sender is not this session's identity",
+            )
+        if (msg.type !== type)
+            throw new Error(`RfqSession: send returned ${msg.type}, expected ${type}`)
         const proposal: StandingProposal = {
             channelId: msg.channelId,
             messageHash: envelopeHashHex(stripChannelMessageSignature(msg)),
@@ -302,6 +317,39 @@ export class RfqSession {
         this._standing = proposal
         this.onProposal?.(proposal)
         return msg
+    }
+
+    private settleAccepted(
+        accepted: StandingProposal,
+        accept: ChannelMessage,
+    ): void {
+        if (accept.channelId !== accepted.channelId ||
+            (this.channelId && accept.channelId !== this.channelId))
+            throw new Error("RfqSession: acceptance changed channel")
+        if (accept.type !== "accept" ||
+            (accept.body as RfqAcceptBody)?.acceptedSequence !== accepted.sequence ||
+            accept.refs?.repliesTo !== accepted.sequence)
+            throw new Error("RfqSession: malformed acceptance reference")
+        if (this.members && !isRfqMember(this.members, accept.sender))
+            throw new Error(
+                `RfqSession: accept sender "${accept.sender}" is not a member`,
+            )
+        if (sameRfqMembers([accept.sender], [accepted.sender]))
+            throw new Error(
+                "RfqSession: proposal author cannot accept their own proposal",
+            )
+
+        const acceptMessageHash = envelopeHashHex(
+            stripChannelMessageSignature(accept),
+        )
+        this.settle({
+            state: "accepted",
+            channelId: accepted.channelId,
+            acceptedProposalHash: accepted.messageHash,
+            acceptMessageHash,
+            agreedTerms: accepted.terms,
+            acceptedSequence: accepted.sequence,
+        })
     }
 
     private settle(outcome: RfqOutcome): void {

@@ -101,6 +101,11 @@ export async function finalizeRfq(
     // points at. A stale or mismatched session would otherwise let us
     // export/anchor a transcript that does not back the agreement.
     const outcome = opts.rfq.outcome()
+    if (outcome.state !== "accepted") {
+        throw new Error(
+            `finalizeRfq: negotiation outcome is "${outcome.state}", not "accepted"`,
+        )
+    }
     const acceptedSequence = outcome.acceptedSequence
     if (acceptedSequence === undefined) {
         throw new Error(
@@ -110,7 +115,7 @@ export async function finalizeRfq(
     const channelId = opts.session.channelId
     const members = [...opts.session.members]
     const messages = [...opts.session.messages()]
-    if (!matchesAcceptedRfq(outcome, channelId, messages)) {
+    if (!matchesAcceptedRfq(outcome, channelId, members, messages)) {
         throw new Error(
             `finalizeRfq: session transcript does not contain the accepted proposal ` +
                 `(seq ${acceptedSequence}) and its matching accept — session mismatch`,

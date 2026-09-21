@@ -24,6 +24,8 @@ import { matchesAcceptedRfq } from "@/l2ps/channel/acceptedRfq"
 export interface CommittableOutcome {
     state: string
     channelId?: string
+    acceptedProposalHash?: string
+    acceptMessageHash?: string
     agreedTerms?: unknown
     acceptedSequence?: number
 }
@@ -96,7 +98,7 @@ export async function commitRfq(opts: CommitRfqOpts): Promise<AgreementDocument>
     const channelId = opts.session.channelId
     const members = [...opts.session.members]
     const messages = [...opts.session.messages()]
-    if (!matchesAcceptedRfq(outcome, channelId, messages))
+    if (!matchesAcceptedRfq(outcome, channelId, members, messages))
         throw new Error(
             `commitRfq: this session does not carry the accepted proposal (seq ${acceptedSequence}) ` +
                 "and its matching accept — the RFQ belongs to a different channel",

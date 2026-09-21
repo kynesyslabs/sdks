@@ -45,6 +45,8 @@ function harness() {
             return msg
         }
 
+    // Deliberately use the original public constructor shape: channelId and
+    // members remain optional for source compatibility.
     aSes = new RfqSession({ me: A, send: mkSend(A, () => bSes) })
     bSes = new RfqSession({ me: B, send: mkSend(B, () => aSes) })
     return { aSes, bSes }
@@ -53,6 +55,22 @@ function harness() {
 const tick = () => new Promise(r => setTimeout(r, 0))
 
 describe("RfqSession — negotiate-rfq state machine", () => {
+    it("requires a unique exact membership containing this party", () => {
+        const send = async () => { throw new Error("unused") }
+        expect(() => new RfqSession({
+            channelId: "ch",
+            members: [A, A],
+            me: A,
+            send,
+        })).toThrow(/duplicate RFQ session member/)
+        expect(() => new RfqSession({
+            channelId: "ch",
+            members: [B],
+            me: A,
+            send,
+        })).toThrow(/not in members/)
+    })
+
     it("offer → counter → accept settles agreedTerms on both sides", async () => {
         const { aSes, bSes } = harness()
 

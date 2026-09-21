@@ -9,8 +9,6 @@
  * Only the SR-2 anchor is injected (the real one deploys a storage program and
  * needs a live node); everything else here is the real code path.
  */
-import { Demos, DemosWebAuth } from "@/websdk"
-import { demosClaimRefForAddress, type ClaimReference } from "@/identity/cci"
 import L2PS from "@/l2ps/l2ps"
 import {
     createMembershipBinding,
@@ -27,16 +25,9 @@ import {
 } from "@/l2ps/channel"
 import { agreementHash, commitRfq, verifyAgreement } from "@/l2ps/agreement"
 import type { AnchorEncryptedTranscriptOpts, AttestationRef } from "@/l2ps/anchor"
+import { newConnectedDemos } from "./helpers"
 
 const CHANNEL = "ch-dod-e2e-1"
-
-async function newConnectedDemos(): Promise<{ demos: Demos; claim: ClaimReference }> {
-    const auth = new DemosWebAuth()
-    await auth.create()
-    const demos = new Demos()
-    await demos.connectWallet(auth.keypair.privateKey as Uint8Array)
-    return { demos, claim: demosClaimRefForAddress(await demos.getEd25519Address()) }
-}
 
 describe("SR-4 definition of done — end to end", () => {
     it("binding → CCI-signed exchange → anchored transcript → committed agreement", async () => {
@@ -93,6 +84,8 @@ describe("SR-4 definition of done — end to end", () => {
 
         let bRfq!: RfqSession
         const aRfq = new RfqSession({
+            channelId: CHANNEL,
+            members,
             me: alice.claim,
             send: async (o) => {
                 const m = await aSes.sendOutgoing(o)
@@ -102,6 +95,8 @@ describe("SR-4 definition of done — end to end", () => {
             },
         })
         bRfq = new RfqSession({
+            channelId: CHANNEL,
+            members,
             me: bob.claim,
             send: async (o) => {
                 const m = await bSes.sendOutgoing(o)
@@ -185,7 +180,7 @@ describe("SR-4 definition of done — end to end", () => {
 })
 
 describe("commitRfq — what it refuses", () => {
-    async function accepted(channelId = "ch-c1") {
+    async function accepted(channelId = "ch-c1", bindOutcome = true) {
         const alice = await newConnectedDemos()
         const bob = await newConnectedDemos()
         const members = [alice.claim, bob.claim]
@@ -195,6 +190,7 @@ describe("commitRfq — what it refuses", () => {
         await bSes.open()
         let bRfq!: RfqSession
         const aRfq = new RfqSession({
+            ...(bindOutcome && { channelId, members }),
             me: alice.claim,
             send: async (o) => {
                 const m = await aSes.sendOutgoing(o)
@@ -204,6 +200,7 @@ describe("commitRfq — what it refuses", () => {
             },
         })
         bRfq = new RfqSession({
+            ...(bindOutcome && { channelId, members }),
             me: bob.claim,
             send: async (o) => {
                 const m = await bSes.sendOutgoing(o)
@@ -214,6 +211,25 @@ describe("commitRfq — what it refuses", () => {
         })
         return { alice, bob, members, aSes, aRfq, bRfq }
     }
+
+    it("commits a safely verified legacy RfqSession outcome", async () => {
+        const { alice, bob, aSes, aRfq, bRfq } = await accepted(
+            "ch-legacy-rfq",
+            false,
+        )
+        await aRfq.offer({ price: 100 })
+        await bRfq.counter({ price: 90 })
+        await aRfq.accept()
+        const doc = await commitRfq({
+            rfq: aRfq,
+            session: aSes,
+            signers: [
+                { claim: alice.claim, demos: alice.demos },
+                { claim: bob.claim, demos: bob.demos },
+            ],
+        })
+        expect(verifyAgreement(doc, { members: aSes.members }).ok).toBe(true)
+    })
 
     it("refuses a negotiation that was not accepted", async () => {
         const { alice, bob, aSes, aRfq, bRfq } = await accepted()
@@ -319,6 +335,35 @@ describe("commitRfq — what it refuses", () => {
         await expect(commitRfq({
             rfq: fromA.aRfq,
             session: fromB.aSes,
+            signers: [
+                { claim: fromB.alice.claim, demos: fromB.alice.demos },
+                { claim: fromB.bob.claim, demos: fromB.bob.demos },
+            ],
+        })).rejects.toThrow(/different channel/)
+    })
+
+    it("refuses cross-pairing an exact signed exchange with different members under a reused channel ID", async () => {
+        const fromA = await accepted("ch-reused-splice")
+        await fromA.aRfq.offer({ price: 100 })
+        await fromA.bRfq.counter({ price: 90 })
+        await fromA.aRfq.accept()
+
+        const fromB = await accepted("ch-reused-splice")
+        await fromB.aRfq.offer({ price: 100 })
+        await fromB.bRfq.counter({ price: 90 })
+        await fromB.aRfq.accept()
+
+        // This is the dangerous structural-session splice: the channel ID and
+        // exact A exchange match A's outcome, but the claimed membership and
+        // agreement signers are the unrelated B pair. The old matcher accepted it.
+        const crossPairedSession = {
+            channelId: "ch-reused-splice",
+            members: fromB.members,
+            messages: () => fromA.aSes.messages(),
+        }
+        await expect(commitRfq({
+            rfq: fromA.aRfq,
+            session: crossPairedSession,
             signers: [
                 { claim: fromB.alice.claim, demos: fromB.alice.demos },
                 { claim: fromB.bob.claim, demos: fromB.bob.demos },
