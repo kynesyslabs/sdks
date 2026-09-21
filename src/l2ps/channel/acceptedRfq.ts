@@ -21,7 +21,9 @@ export function canonicalRfqMembers(
 ): ClaimReference[] {
     if (!members?.length) throw new Error("RFQ session members required")
 
-    const canonical = members.map(canonicalClaim).sort()
+    const canonical = members
+        .map(canonicalClaim)
+        .sort((left, right) => left.localeCompare(right))
     for (let i = 1; i < canonical.length; i++) {
         if (canonical[i] === canonical[i - 1])
             throw new Error(`duplicate RFQ session member "${canonical[i]}"`)

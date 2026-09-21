@@ -210,10 +210,7 @@ export class RfqSession {
         if (!RFQ_TYPES.has(msg.type)) return
         if (sameRfqMembers([msg.sender], [this.me])) return // own echo, already applied
         if (this._state !== "open") return // terminal — ignore trailing traffic
-        if (this.channelId && msg.channelId !== this.channelId)
-            throw new Error("RfqSession: message changed channel")
-        if (this.members && !isRfqMember(this.members, msg.sender))
-            throw new Error(`RfqSession: sender "${msg.sender}" is not a member`)
+        this.assertIncomingScope(msg)
 
         switch (msg.type) {
             case "offer": {
@@ -274,6 +271,13 @@ export class RfqSession {
                 break
             }
         }
+    }
+
+    private assertIncomingScope(msg: ChannelMessage): void {
+        if (this.channelId && msg.channelId !== this.channelId)
+            throw new Error("RfqSession: message changed channel")
+        if (this.members && !isRfqMember(this.members, msg.sender))
+            throw new Error(`RfqSession: sender "${msg.sender}" is not a member`)
     }
 
     /** Record a verified inbound offer/counter as the standing proposal. */
