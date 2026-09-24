@@ -41,7 +41,7 @@ describe("Demos.getL2PSHistory", () => {
         const { message, args } = calls[0]
         expect(message).toBe("getL2PSAccountTransactions")
 
-        const expected = l2psHistoryAuthMessage(args.address, Number(args.timestamp))
+        const expected = l2psHistoryAuthMessage(SUBNET, args.address, Number(args.timestamp))
         expect(
             Cryptography.verify(
                 expected,
@@ -57,7 +57,7 @@ describe("Demos.getL2PSHistory", () => {
         await demos.getL2PSHistory(SUBNET)
 
         const { args } = calls[0]
-        const prefixed = `\x19Demos Signed Message:\n${l2psHistoryAuthMessage(args.address, Number(args.timestamp))}`
+        const prefixed = `\x19Demos Signed Message:\n${l2psHistoryAuthMessage(SUBNET, args.address, Number(args.timestamp))}`
         expect(
             Cryptography.verify(
                 prefixed,
@@ -102,5 +102,56 @@ describe("Demos.getL2PSHistory", () => {
             demos.getL2PSHistory(SUBNET, { address: "ab".repeat(32) }),
         ).rejects.toThrow(/connected identity/)
         expect(calls).toHaveLength(0)
+    })
+})
+
+describe("what the signature covers", () => {
+    it("names the subnet, so one signature cannot read another", async () => {
+        const { demos, calls } = await connectedDemos()
+
+        await demos.getL2PSHistory(SUBNET)
+
+        const { args } = calls[0]
+        expect(
+            Cryptography.verify(
+                l2psHistoryAuthMessage("some-other-subnet", args.address, Number(args.timestamp)),
+                Buffer.from(hexToUint8Array(args.signature)),
+                Buffer.from(hexToUint8Array(args.address)),
+            ),
+        ).toBe(false)
+    })
+
+    it("builds a request on an instance that has no identity yet", async () => {
+        // The underlying accessor throws a bare property access rather than
+        // reporting absence, so this used to fail with a TypeError.
+        const demos = new Demos()
+        const calls: any[] = []
+        ;(demos as any).nodeCall = async (message: string, args: any) => {
+            calls.push({ message, args })
+            return { transactions: [], count: 0, hasMore: false }
+        }
+
+        await demos.getL2PSHistory(SUBNET)
+
+        expect(calls[0].args.address).toMatch(/^(0x)?[0-9a-f]{64}$/)
+    })
+})
+
+describe("the since cursor", () => {
+    it("is applied even when the node ignores it", async () => {
+        const demos = new Demos()
+        ;(demos as any).nodeCall = async () => ({
+            transactions: [
+                { hash: "old", timestamp: "100" },
+                { hash: "new", timestamp: "300" },
+            ],
+            count: 2,
+            hasMore: false,
+        })
+        await demos.connectWallet(demos.newMnemonic())
+
+        const page = await demos.getL2PSHistory(SUBNET, { since: 200 })
+
+        expect(page.transactions.map(t => t.hash)).toEqual(["new"])
     })
 })

@@ -38,7 +38,11 @@ export interface L2PSHistoryPage {
     address: string
     transactions: L2PSHistoryEntry[]
     count: number
-    /** True when more transactions match beyond this page. */
+    /**
+     * True when the node holds at least one more matching transaction beyond
+     * this page. It looks one row past the page to answer, so a full last page
+     * reports false rather than inviting a request for an empty one.
+     */
     hasMore: boolean
 }
 
@@ -56,12 +60,20 @@ export interface L2PSHistoryOptions {
     since?: number
 }
 
-/** The message a reader signs to prove the address is theirs. */
+/**
+ * The message a reader signs.
+ *
+ * It names the subnet as well as the address. Leaving the subnet out would
+ * make one signature valid for a read of any subnet the node serves, so
+ * anything able to relay the request could point it at a different one and
+ * still present a signature that verifies.
+ */
 export function l2psHistoryAuthMessage(
+    l2psUid: string,
     address: string,
     timestamp: number,
 ): string {
-    return `getL2PSHistory:${address}:${timestamp}`
+    return `getL2PSHistory:${l2psUid}:${address}:${timestamp}`
 }
 
 /**

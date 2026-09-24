@@ -1593,7 +1593,16 @@ export class Demos {
         l2psUid: string,
         options: L2PSHistoryOptions = {},
     ): Promise<L2PSHistoryPage> {
-        if (!(await this.crypto.getIdentity("ed25519"))) {
+        // `getIdentity` reaches into the keypair rather than returning
+        // something falsy, so on a fresh instance it throws a bare property
+        // access instead of reporting that there is no identity yet.
+        let hasIdentity = false
+        try {
+            hasIdentity = Boolean(await this.crypto.getIdentity("ed25519"))
+        } catch {
+            hasIdentity = false
+        }
+        if (!hasIdentity) {
             await this.crypto.generateIdentity("ed25519")
         }
         const identity = await this.getEd25519Address()
@@ -1615,13 +1624,13 @@ export class Demos {
         // Signed as raw bytes, not as a personal message: this is a protocol
         // message the node verifies verbatim, and a display prefix would make
         // the signature fail to verify there.
-        const message = l2psHistoryAuthMessage(address, timestamp)
+        const message = l2psHistoryAuthMessage(l2psUid, address, timestamp)
         const signature = await this.crypto.sign(
             "ed25519",
             new TextEncoder().encode(message),
         )
 
-        return (await this.nodeCall("getL2PSAccountTransactions", {
+        const page = (await this.nodeCall("getL2PSAccountTransactions", {
             l2psUid,
             address,
             signature: uint8ArrayToHex(signature.signature),
@@ -1630,6 +1639,21 @@ export class Demos {
             offset: options.offset,
             since: options.since,
         })) as L2PSHistoryPage
+
+        // `since` is applied again here. A node older than the paired change
+        // ignores the field, and silently returning history from before the
+        // caller's cursor is worse than returning less: it looks like the
+        // filter worked.
+        if (options.since && Array.isArray(page?.transactions)) {
+            const since = options.since
+            return {
+                ...page,
+                transactions: page.transactions.filter(
+                    tx => Number(tx.timestamp) > since,
+                ),
+            }
+        }
+        return page
     }
 
     /**
