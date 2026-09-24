@@ -297,7 +297,76 @@ export interface GCREditNetworkUpgradeVote {
     txhash: string
 }
 
+
+/*
+ * Atomic Work edits.
+ *
+ * These are what a committed atomic Work becomes when a block applies it. They
+ * are deliberately profile-free: a resource slot is keyed by an opaque key the
+ * profile derives, never by a profile's own fields, so generic atomic support
+ * implies no particular profile. A block applies a Work's edits as one set or
+ * not at all; there is no per-edit rollback path for them.
+ */
+
+/** Compare-and-set on a contended resource slot. */
+export interface GCREditResourceSlot {
+    type: "resource-slot-cas"
+    isRollback: boolean
+    txhash: string
+    /** Derived by the profile from authenticated inputs; never caller-chosen. */
+    resourceKey: string
+    /** The slot state the edit requires; anything else rejects it. */
+    expected: { state: "vacant" | "rolled-back"; generation: number }
+    transition: "reserve" | "settle" | "rollback"
+    workId: string
+    conflictDigest: string
+}
+
+/** One attempt at executing a Work, for the single-winner ledger. */
+export interface GCREditWorkAttempt {
+    type: "work-attempt"
+    isRollback: boolean
+    txhash: string
+    workId: string
+    attemptId: string
+    canonicalBytesHash: string
+    attemptClass?: "normal" | "replacement" | "replay"
+    replacementFor?: string | null
+}
+
+/** The receipt commitment, committed in the same transition as the effects. */
+export interface GCREditWorkReceipt {
+    type: "work-receipt"
+    isRollback: boolean
+    txhash: string
+    workId: string
+    receiptCommitment: string
+    effectsRoot: string
+    inputHash: string
+    outputHash: string
+}
+
+/** A storage write that says whether it may replace what is there. */
+export interface GCREditStoragePut {
+    type: "storage-program-put"
+    isRollback: boolean
+    txhash: string
+    /** Derived from writer, name and discriminator; never caller-chosen. */
+    target: string
+    writer: string
+    name: string
+    discriminator: string
+    mode: "create-only" | "compare-and-set"
+    valueDigest: string
+    /** Required by compare-and-set: the digest the writer expects to replace. */
+    expectedPriorDigest?: string | null
+}
+
 export type GCREdit =
+    | GCREditResourceSlot
+    | GCREditWorkAttempt
+    | GCREditWorkReceipt
+    | GCREditStoragePut
     | GCREditBalance
     | GCREditNonce
     | GCREditAssign
