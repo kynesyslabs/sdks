@@ -366,6 +366,12 @@ export interface GCREditStoragePut {
     valueDigest: string
     /** Required by compare-and-set: the digest the writer expects to replace. */
     expectedPriorDigest?: string | null
+    /**
+     * The value itself, carried in the signed transaction. Must be JCS
+     * representable (no non-integer or unsafe numbers); `valueDigest` is
+     * sha256 of its JCS form.
+     */
+    value: unknown
 }
 
 export type GCREdit =
