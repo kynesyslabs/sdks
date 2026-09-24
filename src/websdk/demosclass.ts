@@ -37,6 +37,11 @@ import {
     RPCResponseWithValidityData,
 } from "@/types/communication/rpc"
 //import { l2psCalls } from "@/l2ps"
+import {
+    l2psHistoryAuthMessage,
+    type L2PSHistoryOptions,
+    type L2PSHistoryPage,
+} from "@/l2ps/history"
 import type { IBufferized } from "./types/IBuffer"
 import { IKeyPair } from "./types/KeyPair"
 import { _required as required } from "./utils/required"
@@ -1558,6 +1563,97 @@ export class Demos {
         }
 
         return 0
+    }
+
+    /**
+     * Read an account's transaction history from an L2PS subnet.
+     *
+     * Subnet transactions are encrypted, so no explorer can resolve them and
+     * the node will not hand an account's history to anyone but its owner:
+     * the request carries a signature over `getL2PSHistory:<address>:<ts>`,
+     * which this signs with the connected identity.
+     *
+     * Two things follow from that, worth knowing before you call it. The node
+     * answers for its own copy of the subnet, so ask a node that belongs to
+     * the subnet. And the timestamp is checked against the node's clock with
+     * about five minutes of slack, so a machine whose clock has drifted gets
+     * a 401 rather than an empty page.
+     *
+     * @param l2psUid - The subnet to read.
+     * @param options - Address to read (defaults to the connected identity),
+     * and `limit` / `offset` / `since` paging.
+     *
+     * @example
+     * const page = await demos.getL2PSHistory(subnetUid, { limit: 50 })
+     * const newer = await demos.getL2PSHistory(subnetUid, {
+     *     since: Number(page.transactions[0].timestamp),
+     * })
+     */
+    async getL2PSHistory(
+        l2psUid: string,
+        options: L2PSHistoryOptions = {},
+    ): Promise<L2PSHistoryPage> {
+        // `getIdentity` reaches into the keypair rather than returning
+        // something falsy, so on a fresh instance it throws a bare property
+        // access instead of reporting that there is no identity yet.
+        let hasIdentity = false
+        try {
+            hasIdentity = Boolean(await this.crypto.getIdentity("ed25519"))
+        } catch {
+            hasIdentity = false
+        }
+        if (!hasIdentity) {
+            await this.crypto.generateIdentity("ed25519")
+        }
+        const identity = await this.getEd25519Address()
+
+        // Reading someone else's history is not a thing this can do: the node
+        // verifies the signature against the address in the request, so an
+        // address that is not ours would come back a 403 with nothing to say
+        // why.
+        if (options.address && options.address !== identity) {
+            throw new Error(
+                "getL2PSHistory can only read the connected identity's history: " +
+                    `asked for ${options.address.slice(0, 16)}…, connected as ${identity.slice(0, 16)}…`,
+            )
+        }
+
+        const address = identity
+        const timestamp = Date.now()
+
+        // Signed as raw bytes, not as a personal message: this is a protocol
+        // message the node verifies verbatim, and a display prefix would make
+        // the signature fail to verify there.
+        const message = l2psHistoryAuthMessage(l2psUid, address, timestamp)
+        const signature = await this.crypto.sign(
+            "ed25519",
+            new TextEncoder().encode(message),
+        )
+
+        const page = (await this.nodeCall("getL2PSAccountTransactions", {
+            l2psUid,
+            address,
+            signature: uint8ArrayToHex(signature.signature),
+            timestamp: timestamp.toString(),
+            limit: options.limit,
+            offset: options.offset,
+            since: options.since,
+        })) as L2PSHistoryPage
+
+        // `since` is applied again here. A node older than the paired change
+        // ignores the field, and silently returning history from before the
+        // caller's cursor is worse than returning less: it looks like the
+        // filter worked.
+        if (options.since && Array.isArray(page?.transactions)) {
+            const since = options.since
+            return {
+                ...page,
+                transactions: page.transactions.filter(
+                    tx => Number(tx.timestamp) > since,
+                ),
+            }
+        }
+        return page
     }
 
     /**
