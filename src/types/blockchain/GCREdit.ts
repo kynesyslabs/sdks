@@ -317,9 +317,15 @@ export interface GCREditResourceSlot {
     resourceKey: string
     /** The slot state the edit requires; anything else rejects it. */
     expected: { state: "vacant" | "rolled-back"; generation: number }
-    transition: "reserve" | "settle" | "rollback"
+    /**
+     * A Work commits in one transaction, so a slot moves straight to its
+     * terminal state; in-flight exists only while the Work runs.
+     */
+    transition: "settle" | "rollback"
     workId: string
     conflictDigest: string
+    /** The receipt committed in the same transaction that justifies the move. */
+    receiptCommitment: string
 }
 
 /** One attempt at executing a Work, for the single-winner ledger. */
