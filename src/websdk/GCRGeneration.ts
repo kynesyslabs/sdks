@@ -230,6 +230,12 @@ export class GCRGeneration {
                 })
                 break
             }
+            case "atomicWork": {
+                gcrEdits.push(
+                    ...this.atomicWorkEdits(tx, isRollback),
+                )
+                break
+            }
         }
 
         // SECTION Operations valid for all tx types
@@ -275,6 +281,66 @@ export class GCRGeneration {
         }
 
         return gcrEdits
+    }
+
+    private static readonly ATOMIC_WORK_EDIT_TYPES = new Set([
+        "work-attempt",
+        "work-receipt",
+        "resource-slot-cas",
+        "storage-program-put",
+    ])
+
+    /**
+     * The edits of one Work, taken from the signed payload in order, with the
+     * sender's transfers placed right after the attempt. Only Work edit kinds
+     * are accepted from the payload: anything else (a balance credit, say)
+     * would let a sender sign state changes the Work itself does not own.
+     */
+    private static atomicWorkEdits(
+        tx: Transaction,
+        isRollback: boolean,
+    ): GCREdit[] {
+        const payload = this.requirePayload<{
+            edits: unknown
+            transfers?: unknown
+        }>(tx.content, "atomicWork")
+        if (!Array.isArray(payload.edits) || payload.edits.length === 0) {
+            throw new Error("[GCRGeneration] atomicWork.edits must be a non-empty array")
+        }
+        const transfers = payload.transfers ?? []
+        if (!Array.isArray(transfers)) {
+            throw new Error("[GCRGeneration] atomicWork.transfers must be an array")
+        }
+
+        const transferEdits: GCREdit[] = []
+        for (const t of transfers as { to?: unknown; amount?: unknown }[]) {
+            if (typeof t?.to !== "string" || !t.to) {
+                throw new Error("[GCRGeneration] atomicWork transfer needs a recipient")
+            }
+            if (typeof t.amount !== "string" || !/^[1-9]\d*$/.test(t.amount)) {
+                throw new Error(
+                    "[GCRGeneration] atomicWork transfer amount must be a positive integer string",
+                )
+            }
+            const base = { type: "balance", isRollback, txhash: tx.hash, amount: t.amount }
+            transferEdits.push(
+                { ...base, operation: "remove", account: tx.content.from_ed25519_address } as GCREdit,
+                { ...base, operation: "add", account: t.to } as GCREdit,
+            )
+        }
+
+        const out: GCREdit[] = []
+        payload.edits.forEach((raw, i) => {
+            const edit = raw as { type?: unknown }
+            if (typeof edit?.type !== "string" || !this.ATOMIC_WORK_EDIT_TYPES.has(edit.type)) {
+                throw new Error(
+                    `[GCRGeneration] atomicWork.edits[${i}] is not a Work edit`,
+                )
+            }
+            out.push({ ...(raw as object), isRollback, txhash: tx.hash } as GCREdit)
+            if (i === 0) out.push(...transferEdits)
+        })
+        return out
     }
 
     public static async createGasEdit(

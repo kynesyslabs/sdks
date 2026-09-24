@@ -19,6 +19,8 @@ export interface NativeTablesHashes {
     native_gcr: string
     native_subnets_txs: string
     native_tlsnotary: string
+    /** Present from the `atomicWork` fork on: Work winners, slots and writes. */
+    native_atomic_work?: string
 }
 
 export interface BlockContent {

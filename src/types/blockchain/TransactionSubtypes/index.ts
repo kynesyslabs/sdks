@@ -23,6 +23,8 @@ export * from './ValidatorExitTransaction'
 // Stackable-genesis governance (Phase 1 / upgradable_network)
 export * from './NetworkUpgradeTransaction'
 export * from './NetworkUpgradeVoteTransaction'
+// Atomic Works (all-or-nothing)
+export * from './AtomicWorkTransaction'
 
 // Re-export all transaction types as a union
 import { L2PSTransaction } from './L2PSTransaction'
