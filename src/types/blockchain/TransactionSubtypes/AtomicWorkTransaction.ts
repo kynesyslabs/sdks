@@ -29,6 +29,13 @@ export interface AtomicWorkTransfer {
  * sender only, so the payload cannot move anyone else's funds.
  */
 export interface AtomicWorkPayload {
+    /**
+     * The unsigned intent the Work was agreed as. The node recomputes the
+     * attempt's workId and canonicalBytesHash from it and checks its profile.
+     */
+    intent: Record<string, unknown>
+    /** Per-operation role authorizations, as the intent's profile defines them. */
+    authorizations?: Record<string, unknown>[]
     edits: AtomicWorkEdit[]
     transfers?: AtomicWorkTransfer[]
 }
