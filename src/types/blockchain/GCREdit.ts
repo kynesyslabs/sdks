@@ -324,8 +324,6 @@ export interface GCREditResourceSlot {
     transition: "settle" | "rollback"
     workId: string
     conflictDigest: string
-    /** The receipt committed in the same transaction that justifies the move. */
-    receiptCommitment: string
 }
 
 /** One attempt at executing a Work, for the single-winner ledger. */
@@ -338,18 +336,6 @@ export interface GCREditWorkAttempt {
     canonicalBytesHash: string
     attemptClass?: "normal" | "replacement" | "replay"
     replacementFor?: string | null
-}
-
-/** The receipt commitment, committed in the same transition as the effects. */
-export interface GCREditWorkReceipt {
-    type: "work-receipt"
-    isRollback: boolean
-    txhash: string
-    workId: string
-    receiptCommitment: string
-    effectsRoot: string
-    inputHash: string
-    outputHash: string
 }
 
 /** A storage write that says whether it may replace what is there. */
@@ -377,7 +363,6 @@ export interface GCREditStoragePut {
 export type GCREdit =
     | GCREditResourceSlot
     | GCREditWorkAttempt
-    | GCREditWorkReceipt
     | GCREditStoragePut
     | GCREditBalance
     | GCREditNonce

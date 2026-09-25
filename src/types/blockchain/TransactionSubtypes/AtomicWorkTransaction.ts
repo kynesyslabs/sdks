@@ -3,7 +3,6 @@ import {
     GCREditResourceSlot,
     GCREditStoragePut,
     GCREditWorkAttempt,
-    GCREditWorkReceipt,
 } from "../GCREdit"
 
 type Unsigned<T> = Omit<T, "isRollback" | "txhash">
@@ -11,7 +10,6 @@ type Unsigned<T> = Omit<T, "isRollback" | "txhash">
 /** A Work edit as the sender signs it; the node fills rollback and tx hash. */
 export type AtomicWorkEdit =
     | Unsigned<GCREditWorkAttempt>
-    | Unsigned<GCREditWorkReceipt>
     | Unsigned<GCREditResourceSlot>
     | Unsigned<GCREditStoragePut>
 
@@ -26,7 +24,9 @@ export interface AtomicWorkTransfer {
  * Payload for an `atomicWork` tx: one Work, applied all-or-nothing.
  *
  * `edits` starts with the Work's attempt. Transfers are debited from the
- * sender only, so the payload cannot move anyone else's funds.
+ * sender only, so the payload cannot move anyone else's funds. There is no
+ * receipt here: it commits to the block the Work lands in, so the node
+ * builds it and commits to it in the same transition as the effects.
  */
 export interface AtomicWorkPayload {
     /**

@@ -193,7 +193,6 @@ export {
     GCREditNetworkUpgradeVote,
     GCREditResourceSlot,
     GCREditWorkAttempt,
-    GCREditWorkReceipt,
     GCREditStoragePut,
     Web2GCRData,
     XmGCRData,

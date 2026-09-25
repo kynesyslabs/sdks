@@ -285,7 +285,6 @@ export class GCRGeneration {
 
     private static readonly ATOMIC_WORK_EDIT_TYPES = new Set([
         "work-attempt",
-        "work-receipt",
         "resource-slot-cas",
         "storage-program-put",
     ])
