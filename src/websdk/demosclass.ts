@@ -545,8 +545,9 @@ export class Demos {
      * @param options.pollIntervalMs - Delay between inclusion polls. Defaults to 500.
      * @param options.failFastOnBroadcastError - Reject immediately if the broadcast
      *   RPC errors, instead of polling for a terminal status.
-     * @returns `{ broadcast, status }` — the broadcast RPC response and the
-     *   terminal on-chain status (`included` | `failed`, with optional `blockNumber`).
+     * @returns `{ hash, broadcast, status }` — the transaction hash, the
+     *   broadcast RPC response and the terminal on-chain status
+     *   (`included` | `failed`, with optional `blockNumber`).
      */
     async payAndWait(
         to: string,
@@ -587,8 +588,9 @@ export class Demos {
      * @param options.pollIntervalMs - Delay between inclusion polls. Defaults to 500.
      * @param options.failFastOnBroadcastError - Reject immediately if the broadcast
      *   RPC errors, instead of polling for a terminal status.
-     * @returns `{ broadcast, status }` — the broadcast RPC response and the
-     *   terminal on-chain status (`included` | `failed`, with optional `blockNumber`).
+     * @returns `{ hash, broadcast, status }` — the transaction hash, the
+     *   broadcast RPC response and the terminal on-chain status
+     *   (`included` | `failed`, with optional `blockNumber`).
      */
     async transferAndWait(
         to: string,
@@ -731,6 +733,8 @@ export class Demos {
      * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
      * @param opts.failFastOnBroadcastError - Reject immediately if the broadcast
      *   RPC errors, instead of polling for a terminal status.
+     * @returns `{ hash, broadcast, status }` — the transaction hash, the
+     *   broadcast RPC response and the terminal on-chain status.
      */
     broadcastAndWait(
         validationData: RPCResponseWithValidityData,
