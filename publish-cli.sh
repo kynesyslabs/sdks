@@ -158,23 +158,28 @@ run_build() {
 # at a time: a release pushed while another is publishing or queued can replace
 # that queued one, which would then never publish.
 release_preflight() {
-    local branch in_flight
+    local branch in_flight problem=""
     branch=$(git rev-parse --abbrev-ref HEAD)
     if [ "$branch" != "main" ]; then
         echo -e "${RED}Releases are published from main only; you are on '$branch'.${NC}"
         exit 1
     fi
     if ! command -v gh >/dev/null 2>&1; then
-        echo -e "${RED}The GitHub CLI (gh) is needed to check that no release is already publishing.${NC}"
-        exit 1
-    fi
-    if ! in_flight=$(gh run list --repo kynesyslabs/sdks --workflow publish.yml --branch main --limit 20 \
+        problem="The GitHub CLI (gh) is needed to check that no release is already publishing."
+    elif ! in_flight=$(gh run list --repo kynesyslabs/sdks --workflow publish.yml --branch main --limit 20 \
         --json status -q '[.[] | select(.status != "completed")] | length'); then
-        echo -e "${RED}Could not check for a release already publishing; not releasing.${NC}"
-        exit 1
+        problem="Could not check for a release already publishing."
+    elif [ "$in_flight" != "0" ]; then
+        problem="A release is still publishing or queued; wait for it to finish."
     fi
-    if [ "$in_flight" != "0" ]; then
-        echo -e "${RED}A release is still publishing or queued; wait for it to finish.${NC}"
+    if [ -n "$problem" ]; then
+        # A dry run changes nothing, so it previews anyway and says what a
+        # real release would stop on.
+        if [ "$DRY_RUN" = true ]; then
+            echo -e "${YELLOW}[dry-run] A real release would stop here: $problem${NC}"
+            return 0
+        fi
+        echo -e "${RED}$problem Not releasing.${NC}"
         exit 1
     fi
 }
