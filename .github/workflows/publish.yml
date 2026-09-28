@@ -14,9 +14,11 @@ on:
       - main
   workflow_dispatch:
 
-# Two release pushes in a row must not race for the same dist-tag.
+# One group per commit: a shared group keeps a single pending run, so a third
+# release pushed while the first publishes would silently drop the second.
+# Ordering between releases is handled at the dist-tag instead (see Publish).
 concurrency:
-  group: publish-demosdk
+  group: publish-demosdk-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -30,7 +32,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - name: Setup Bun
-              uses: oven-sh/setup-bun@v1
+              uses: oven-sh/setup-bun@f4d14e03ff726c06358e5557344e1da148b56cf7 # v1
               with:
                   bun-version: latest
             - name: Setup Node (for npm publish via OIDC)
@@ -47,6 +49,15 @@ jobs:
             - name: Debug npm version
               run: npm --version
             - name: Publish 🎉
-              # --tag latest forces dist-tag bypassing semver max-version check
-              # (orphan 6.0.1 on registry would otherwise block latest assignment)
-              run: npm publish --provenance --access public --tag latest
+              # Releases run in parallel now, so one can finish after a newer
+              # one. `latest` only moves forward: a version older than the
+              # current `latest` still publishes, under `previous`. Compared
+              # against the latest tag, not the highest version, because of the
+              # orphan 6.0.1 on the registry.
+              run: |
+                  VERSION=$(node -p "require('./package.json').version")
+                  CURRENT=$(npm view @kynesyslabs/demosdk dist-tags.latest 2>/dev/null || echo 0.0.0)
+                  NEWEST=$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -n1)
+                  if [ "$NEWEST" = "$VERSION" ]; then TAG=latest; else TAG=previous; fi
+                  echo "publishing $VERSION as $TAG (latest is $CURRENT)"
+                  npm publish --provenance --access public --tag "$TAG"

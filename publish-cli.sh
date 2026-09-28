@@ -110,7 +110,7 @@ bump_version() {
         echo -e "${CYAN}[dry-run]${NC} Would bump ${YELLOW}v${current_version}${NC} → ${GREEN}v${new_version}${NC}"
         echo -e "${CYAN}[dry-run]${NC} Would run: bun run build"
         echo -e "${CYAN}[dry-run]${NC} Would commit: ${BOLD}release v${new_version}${NC}"
-        echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+        echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
         echo -e "${GREEN}✓ Dry run complete — no changes made${NC}"
         exit 0
     fi
@@ -152,21 +152,33 @@ run_build() {
     echo -e "${GREEN}✓ Build successful${NC}"
 }
 
+# Releases publish from main only (see .github/workflows/publish.yml): a
+# release commit pushed from any other branch would start no workflow.
+require_main() {
+    local branch
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$branch" != "main" ]; then
+        echo -e "${RED}Releases are published from main only; you are on '$branch'.${NC}"
+        exit 1
+    fi
+}
+
 commit_and_push() {
     local version=$1
     local commit_msg="release v$version"
 
     if [ "$DRY_RUN" = true ]; then
         echo -e "${CYAN}[dry-run]${NC} Would commit: ${BOLD}$commit_msg${NC}"
-        echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+        echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
         return 0
     fi
 
+    require_main
     git add package.json
     git commit -m "$commit_msg"
     echo -e "${GREEN}✓ Committed version bump${NC}"
 
-    git push
+    git push origin main
     echo -e "${GREEN}✓ Pushed to remote${NC}"
     echo -e "${BLUE}🚀 Release workflow should start shortly for v${version}${NC}"
 }
@@ -177,16 +189,17 @@ redo_release() {
 
     if [ "$DRY_RUN" = true ]; then
         echo -e "${CYAN}[dry-run]${NC} Would create empty commit: ${BOLD}$commit_msg${NC}"
-        echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+        echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
         return 0
     fi
 
+    require_main
     confirm "This will create a new commit for the same version and trigger the release workflow."
 
     git commit --allow-empty -m "$commit_msg"
     echo -e "${GREEN}✓ Created empty commit for release v${current_version}${NC}"
 
-    git push
+    git push origin main
     echo -e "${GREEN}✓ Pushed to remote${NC}"
     echo -e "${BLUE}🚀 Release workflow should start shortly for v${current_version}${NC}"
 }
@@ -244,7 +257,7 @@ if [ -n "$EXPLICIT_VERSION" ]; then
         echo -e "${CYAN}[dry-run]${NC} Would run: bun run build"
         echo -e "${CYAN}[dry-run]${NC} Would set version to ${GREEN}v${EXPLICIT_VERSION}${NC}"
         echo -e "${CYAN}[dry-run]${NC} Would commit: ${BOLD}release v${EXPLICIT_VERSION}${NC}"
-        echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+        echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
         echo -e "${GREEN}✓ Dry run complete — no changes made${NC}"
         exit 0
     fi
@@ -328,7 +341,7 @@ else console.log((m+1)+'.0.0');
     echo -e "${CYAN}[dry-run]${NC} Would run: bun run build"
     echo -e "${CYAN}[dry-run]${NC} Would bump ${YELLOW}v${current_version}${NC} → ${GREEN}v${next}${NC}"
     echo -e "${CYAN}[dry-run]${NC} Would commit: ${BOLD}release v${next}${NC}"
-    echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+    echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
     echo -e "${GREEN}✓ Dry run complete — no changes made${NC}"
     exit 0
 fi
