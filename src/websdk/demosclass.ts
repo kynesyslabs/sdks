@@ -8,6 +8,7 @@ import axios from "axios"
 import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
 import { txSignaturePreimage } from "./utils/txSignaturePreimage"
+import { personalMessagePreimage } from "./utils/personalMessage"
 import { TransportError } from "./TransportError"
 
 // NOTE Including custom libraries from Demos
@@ -676,8 +677,12 @@ export class Demos {
                 const authMessage = Hashing.sha256(
                     `${identityStr}:${timestamp}`,
                 )
+                // raw: the node verifies this header against the unprefixed
+                // sha256 (`verifySignature.ts`), so the personal-message
+                // prefix would fail auth until the node follows.
                 const { data } = await this.signMessage(authMessage, {
                     algorithm: "ed25519",
+                    raw: true,
                 })
                 headers["identity"] = identityStr
                 headers["signature"] = data
@@ -909,14 +914,26 @@ export class Demos {
     /**
      * Signs a message.
      *
+     * The signature covers the domain-separated preimage
+     * `\x19Demos Signed Message:\n<byte length><message>`, not the bare
+     * message bytes. A transaction signature covers `TextEncoder(tx.hash)`, so
+     * unprefixed a caller-chosen message of 64 hex characters produced a
+     * signature equally valid as a transaction signature: a site asking for a
+     * "login challenge" could hand over the hash of a transaction it had
+     * built and keep what the user believed was a login. The two preimages can
+     * no longer collide.
+     *
      * @param message - The message to sign
      * @param options - The options for the message signing
      * @param options.algorithm - The algorithm to use for the message signing. Defaults to the connected wallet's algorithm.
+     * @param options.raw - Sign the unprefixed bytes, for verifiers that still
+     *   expect the legacy preimage (the node's auth headers). Never route a
+     *   caller-supplied message through it.
      * @returns The signature of the message
      */
     async signMessage(
         message: string | Buffer,
-        options?: { algorithm?: SigningAlgorithm },
+        options?: { algorithm?: SigningAlgorithm; raw?: boolean },
     ): Promise<{ type: SigningAlgorithm; data: string }> {
         const algorithm = options?.algorithm || this.algorithm
 
@@ -933,7 +950,12 @@ export class Demos {
             messageBuffer = message
         }
 
-        const signature = await this.crypto.sign(algorithm, messageBuffer)
+        const signature = await this.crypto.sign(
+            algorithm,
+            options?.raw
+                ? messageBuffer
+                : personalMessagePreimage(messageBuffer),
+        )
 
         return { type: algorithm, data: uint8ArrayToHex(signature.signature) }
     }
@@ -946,6 +968,10 @@ export class Demos {
      * @param publicKey - The public key of the message
      * @param options - The options for the message verification
      * @param options.algorithm - The algorithm to use for the message verification. Defaults to the connected wallet's algorithm or ed25519 if no wallet is connected.
+     * @param options.raw - Verify against the unprefixed bytes, for signatures
+     *   produced by `signMessage(..., { raw: true })` or by an SDK older than
+     *   the domain-separated preimage. Off by default: accepting the legacy
+     *   form lets a transaction signature stand in for a message signature.
      *
      * @returns Whether the message is verified
      */
@@ -953,7 +979,7 @@ export class Demos {
         message: string | Buffer,
         signature: string,
         publicKey: string,
-        options?: { algorithm?: SigningAlgorithm },
+        options?: { algorithm?: SigningAlgorithm; raw?: boolean },
     ): Promise<boolean> {
         const algorithm = options?.algorithm || this.algorithm
 
@@ -968,7 +994,9 @@ export class Demos {
             algorithm: algorithm,
             signature: hexToUint8Array(signature),
             publicKey: hexToUint8Array(publicKey),
-            message: messageBuffer,
+            message: options?.raw
+                ? messageBuffer
+                : personalMessagePreimage(messageBuffer),
         })
 
         return verified

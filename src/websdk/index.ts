@@ -25,6 +25,10 @@ export { sha256 } from "./utils/sha256"
 export { bufferize } from "./utils/bufferizer"
 export { required, _required } from "./utils/required"
 export { forgeToString, stringToForge } from "./utils/forge_converter"
+export {
+    personalMessagePreimage,
+    DEMOS_MESSAGE_PREFIX,
+} from "./utils/personalMessage"
 export * as skeletons from "./utils/skeletons"
 
 // Crypto utilities (useful for developers)
