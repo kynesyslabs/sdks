@@ -113,4 +113,10 @@ describe("signMessage domain separation", () => {
 
         expect(data).toBe(uint8ArrayToHex(direct.signature))
     })
+
+    it("refuses binary messages that are not valid UTF-8, which the signers would rewrite", () => {
+        expect(() => personalMessagePreimage(Uint8Array.from([0x68, 0xff, 0x69]))).toThrow("valid UTF-8")
+        expect(() => personalMessagePreimage(Uint8Array.from([0x68, 0xfe, 0x69]))).toThrow("valid UTF-8")
+        expect(personalMessagePreimage(new TextEncoder().encode("héllo")).length).toBeGreaterThan(0)
+    })
 })

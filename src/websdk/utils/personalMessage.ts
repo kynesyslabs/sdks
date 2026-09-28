@@ -36,6 +36,17 @@ export function personalMessagePreimage(
         typeof message === "string"
             ? new TextEncoder().encode(message)
             : message
+    // The signers hand the preimage on as text, so bytes that are not valid
+    // UTF-8 would be replaced before signing: the signature would cover other
+    // bytes than this function returns, and distinct binary messages could
+    // sign alike. Only messages that survive that round trip are accepted.
+    try {
+        new TextDecoder("utf-8", { fatal: true }).decode(body)
+    } catch {
+        throw new Error(
+            "A personal message must be valid UTF-8; sign binary data as a hex or base64 string",
+        )
+    }
     const header = new TextEncoder().encode(
         `${DEMOS_MESSAGE_PREFIX}${body.length}`,
     )
