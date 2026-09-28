@@ -238,7 +238,7 @@ git push origin main
 
 For simplicity, a `publish` script is included (and `publish-cli.sh` for non-interactive use). Both refuse to run off `main`. By default it will ask to forward the version, but you can re-publish the same version number with `./publish -r`.
 
-Each release push runs its own workflow, so none is dropped. `latest` only moves forward: a release that finishes after a newer one is published under the `previous` dist-tag.
+Releases publish one at a time, in push order. Both scripts also refuse to release while a previous publish is running or queued (they check with the GitHub CLI, `gh`), since a release pushed then could replace the queued one before it publishes.
 
 ## Documentation
 

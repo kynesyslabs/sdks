@@ -14,11 +14,12 @@ on:
       - main
   workflow_dispatch:
 
-# One group per commit: a shared group keeps a single pending run, so a third
-# release pushed while the first publishes would silently drop the second.
-# Ordering between releases is handled at the dist-tag instead (see Publish).
+# Releases publish one at a time, in push order, so `latest` never moves
+# backward. A group holds only one pending run, so a third release pushed while
+# one publishes would drop the second; the release scripts refuse to push while
+# a publish is running or queued, which keeps it from getting there.
 concurrency:
-  group: publish-demosdk-${{ github.sha }}
+  group: publish-demosdk
   cancel-in-progress: false
 
 jobs:
@@ -49,15 +50,6 @@ jobs:
             - name: Debug npm version
               run: npm --version
             - name: Publish 🎉
-              # Releases run in parallel now, so one can finish after a newer
-              # one. `latest` only moves forward: a version older than the
-              # current `latest` still publishes, under `previous`. Compared
-              # against the latest tag, not the highest version, because of the
-              # orphan 6.0.1 on the registry.
-              run: |
-                  VERSION=$(node -p "require('./package.json').version")
-                  CURRENT=$(npm view @kynesyslabs/demosdk dist-tags.latest 2>/dev/null || echo 0.0.0)
-                  NEWEST=$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -n1)
-                  if [ "$NEWEST" = "$VERSION" ]; then TAG=latest; else TAG=previous; fi
-                  echo "publishing $VERSION as $TAG (latest is $CURRENT)"
-                  npm publish --provenance --access public --tag "$TAG"
+              # --tag latest forces dist-tag bypassing semver max-version check
+              # (orphan 6.0.1 on registry would otherwise block latest assignment)
+              run: npm publish --provenance --access public --tag latest

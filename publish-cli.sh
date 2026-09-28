@@ -152,13 +152,29 @@ run_build() {
     echo -e "${GREEN}✓ Build successful${NC}"
 }
 
-# Releases publish from main only (see .github/workflows/publish.yml): a
-# release commit pushed from any other branch would start no workflow.
-require_main() {
-    local branch
+# Checked before anything is built or changed, dry runs included.
+# Releases publish from main only (see .github/workflows/publish.yml): a release
+# commit pushed from any other branch starts no workflow. And they publish one
+# at a time: a release pushed while another is publishing or queued can replace
+# that queued one, which would then never publish.
+release_preflight() {
+    local branch in_flight
     branch=$(git rev-parse --abbrev-ref HEAD)
     if [ "$branch" != "main" ]; then
         echo -e "${RED}Releases are published from main only; you are on '$branch'.${NC}"
+        exit 1
+    fi
+    if ! command -v gh >/dev/null 2>&1; then
+        echo -e "${RED}The GitHub CLI (gh) is needed to check that no release is already publishing.${NC}"
+        exit 1
+    fi
+    if ! in_flight=$(gh run list --repo kynesyslabs/sdks --workflow publish.yml --branch main --limit 20 \
+        --json status -q '[.[] | select(.status != "completed")] | length'); then
+        echo -e "${RED}Could not check for a release already publishing; not releasing.${NC}"
+        exit 1
+    fi
+    if [ "$in_flight" != "0" ]; then
+        echo -e "${RED}A release is still publishing or queued; wait for it to finish.${NC}"
         exit 1
     fi
 }
@@ -173,7 +189,6 @@ commit_and_push() {
         return 0
     fi
 
-    require_main
     git add package.json
     git commit -m "$commit_msg"
     echo -e "${GREEN}✓ Committed version bump${NC}"
@@ -193,7 +208,6 @@ redo_release() {
         return 0
     fi
 
-    require_main
     confirm "This will create a new commit for the same version and trigger the release workflow."
 
     git commit --allow-empty -m "$commit_msg"
@@ -241,6 +255,8 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+release_preflight
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 # ─── Explicit version mode ───────────────────────────────────────────────────
