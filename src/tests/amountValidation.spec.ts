@@ -1,4 +1,4 @@
-import { Demos } from "@/websdk/demosclass"
+import { Demos } from "@/websdk"
 import { DemosTransactions } from "@/websdk/DemosTransactions"
 import { EscrowTransaction } from "@/escrow/EscrowTransaction"
 import { SubDemPrecisionError } from "@/denomination/networkInfo"
