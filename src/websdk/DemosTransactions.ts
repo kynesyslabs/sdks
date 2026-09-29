@@ -1,4 +1,5 @@
 import forge from "node-forge"
+import { AtomicWorkPayload } from "@/types/blockchain/TransactionSubtypes/AtomicWorkTransaction"
 
 import { Demos } from "./demosclass"
 import { sha256 } from "./utils/sha256"
@@ -130,6 +131,52 @@ export const DemosTransactions = {
                 args: [to, wireAmount],
             },
         ]
+
+        return await demos.sign(tx)
+    },
+    /**
+     * Create a signed `atomicWork` transaction: one Work whose edits and
+     * transfers the node applies all together or not at all.
+     *
+     * The payload is signed as given; the node regenerates the edits from it
+     * and refuses the transaction if they differ from what was shipped.
+     * Transfer amounts are OS, as decimal strings.
+     *
+     * ⚠️ Only signs — broadcast with `demos.confirm` + `demos.broadcast`.
+     */
+    async atomicWork(
+        payload: AtomicWorkPayload,
+        demos: Demos,
+        options?: { nonce?: number },
+    ) {
+        required(demos.keypair, "Wallet not connected")
+
+        // The pre-fork wire format rewrites every edit amount as a DEM number,
+        // while the node regenerates the transfer edits with the OS strings
+        // in the payload, so the edits would never match (and sub-DEM
+        // amounts would be truncated). A Work is post-fork only.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (!(await (demos as any)._isPostForkCached())) {
+            throw new Error(
+                "[DemosTransactions] atomicWork needs a node past the osDenomination fork",
+            )
+        }
+
+        const tx = DemosTransactions.empty()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
+        )
+
+        tx.content.to = publicKeyHex.startsWith("0x") ? publicKeyHex : "0x" + publicKeyHex
+        tx.content.nonce = nonce
+        tx.content.amount = 0
+        tx.content.type = "atomicWork"
+        tx.content.timestamp = Date.now()
+        tx.content.data = ["atomicWork", payload]
 
         return await demos.sign(tx)
     },

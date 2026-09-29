@@ -25,6 +25,7 @@ import { ValidatorUnstakePayload } from "./TransactionSubtypes/ValidatorUnstakeT
 import { ValidatorExitPayload } from "./TransactionSubtypes/ValidatorExitTransaction"
 import { NetworkUpgradePayload } from "./TransactionSubtypes/NetworkUpgradeTransaction"
 import { NetworkUpgradeVotePayload } from "./TransactionSubtypes/NetworkUpgradeVoteTransaction"
+import { AtomicWorkPayload } from "./TransactionSubtypes/AtomicWorkTransaction"
 import { CustomCharges } from "./CustomCharges"
 
 // TODO Implement multisignature transactions
@@ -60,6 +61,7 @@ export type TransactionContentData =
     | ["validatorExit", ValidatorExitPayload]
     | ["networkUpgrade", NetworkUpgradePayload]
     | ["networkUpgradeVote", NetworkUpgradeVotePayload]
+    | ["atomicWork", AtomicWorkPayload]
 
 // NOTE: This type replaced the above _TransactionContent
 // It uses a DemoScript to handle the data field as per the DEMOS specifications
@@ -92,6 +94,7 @@ export interface TransactionContent {
     | "validatorExit"
     | "networkUpgrade"
     | "networkUpgradeVote"
+    | "atomicWork"
     from: string
     from_ed25519_address: string
     to: string
