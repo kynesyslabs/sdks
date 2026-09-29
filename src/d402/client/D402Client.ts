@@ -31,18 +31,10 @@ export class D402Client {
             throw new Error('Wallet not connected')
         }
 
-        // Get user's public key and nonce
-        const { publicKey } = await this.demos.crypto.getIdentity('ed25519')
-        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(
-            options?.nonce,
-            () => this.demos.getAddressNonce(publicKeyHex),
-            this.demos._nonceReserver(publicKeyHex),
-        )
-
-        // The payee is also the transaction's own recipient. sign() refuses a
+        // The payee is also the transaction's own recipient: sign() refuses a
         // transaction without one, so leaving it only inside `data` made
-        // every payment built here unsignable.
+        // every payment built here unsignable. Checked before a nonce is
+        // reserved, so a refused payment leaves no gap under auto-nonce.
         const recipient = requirement.recipient?.startsWith("0x")
             ? requirement.recipient
             : `0x${requirement.recipient ?? ""}`
@@ -51,6 +43,15 @@ export class D402Client {
                 `d402 payment recipient must be a 32-byte hex address, got "${requirement.recipient}"`,
             )
         }
+
+        // Get user's public key and nonce
+        const { publicKey } = await this.demos.crypto.getIdentity('ed25519')
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => this.demos.getAddressNonce(publicKeyHex),
+            this.demos._nonceReserver(publicKeyHex),
+        )
 
         // Create transaction skeleton
         const tx = structuredClone(skeletons.transaction)
@@ -78,7 +79,8 @@ export class D402Client {
     }
 
     /**
-     * Sign, confirm, broadcast and wait for a d402_payment transaction.
+     * Sign, confirm and broadcast a d402_payment transaction, then wait for it
+     * to be included.
      *
      * Goes through the node's `confirm` + broadcast path, the one every other
      * send uses. It used to call a `broadcastNativeTransaction` RPC the node
@@ -86,8 +88,9 @@ export class D402Client {
      *
      * @param payment Unsigned payment transaction from createPayment()
      * @param options.timeoutMs How long to wait for inclusion (default 60 s)
-     * @returns Success only once the payment is included, with its hash and
-     * block number
+     * @returns `success` once the payment is in a block. If the wait runs out
+     * first, `pending` is set with the hash: the payment may still land, so
+     * resume with {@link waitForSettlement} instead of paying again.
      */
     async settle(
         payment: Transaction,
@@ -98,26 +101,52 @@ export class D402Client {
             const signedTx = await this.demos.sign(payment)
             hash = signedTx.hash
             const validity = await this.demos.confirm(signedTx)
-            const result = await this.demos.broadcastAndWait(validity, {
-                timeoutMs: options?.timeoutMs,
-                pollIntervalMs: options?.pollIntervalMs,
-            })
-            hash = result.hash || hash
-            if (result.status.state === 'included') {
-                return { success: true, hash, blockNumber: result.status.blockNumber }
-            }
-            return {
-                success: false,
-                hash,
-                blockNumber: result.status.blockNumber,
-                message: 'Payment transaction failed on chain',
-            }
+            // The hash the node recalculated is the one it will index.
+            hash = validity?.response?.data?.transaction?.hash || hash
+            await this.demos.broadcast(validity)
         } catch (error: any) {
-            return {
-                success: false,
-                hash,
-                message: error?.message || 'Settlement error',
+            return { success: false, hash, message: error?.message || 'Settlement error' }
+        }
+        return this.waitForSettlement(hash, options)
+    }
+
+    /**
+     * Wait for a broadcast payment to be included.
+     *
+     * Reads the transaction back with `getTxByHash`, which every node
+     * version serves; a node only returns it once it is in a block.
+     *
+     * @param hash The payment's transaction hash
+     * @returns `success` when included and confirmed, a failure when
+     * included as failed, and `pending` if not seen before the timeout.
+     */
+    async waitForSettlement(
+        hash: string,
+        options?: { timeoutMs?: number; pollIntervalMs?: number },
+    ): Promise<D402SettlementResult> {
+        const timeoutMs = options?.timeoutMs ?? 60_000
+        const pollIntervalMs = options?.pollIntervalMs ?? 1_000
+        const deadline = Date.now() + timeoutMs
+        for (let first = true; first || Date.now() < deadline; first = false) {
+            if (!first) await new Promise(r => setTimeout(r, pollIntervalMs))
+            let tx: any
+            try {
+                tx = await this.demos.getTxByHash(hash)
+            } catch {
+                continue
             }
+            if (!tx || typeof tx !== 'object') continue
+            const blockNumber = tx.blockNumber ?? undefined
+            if (String(tx.status) === 'failed') {
+                return { success: false, hash, blockNumber, message: 'Payment transaction failed on chain' }
+            }
+            return { success: true, hash, blockNumber }
+        }
+        return {
+            success: false,
+            pending: true,
+            hash,
+            message: 'Payment broadcast but not yet included; resume with waitForSettlement',
         }
     }
 
@@ -155,7 +184,13 @@ export class D402Client {
         const result = await this.settle(payment)
 
         if (!result.success) {
-            throw new Error(`Payment failed: ${result.message}`)
+            // A pending payment may still land: surface its hash so the
+            // caller waits on it instead of paying a second time.
+            throw new Error(
+                result.pending
+                    ? `Payment pending (${result.hash}): ${result.message}`
+                    : `Payment failed: ${result.message}`,
+            )
         }
 
         // Retry original request with payment proof header

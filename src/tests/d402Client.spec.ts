@@ -3,23 +3,28 @@ import { D402Client } from "@/d402/client/D402Client"
 
 /**
  * A d402 payment built by the client has to be signable, and settling it has
- * to go through an RPC the node implements. Each case runs the real
+ * to go through RPCs every node serves. Each case runs the real
  * createPayment, sign and settle; only the node's answers are stubbed.
  */
 const PAYEE = "0x" + "bb".repeat(32)
 const REQUIREMENT = { amount: "1000", recipient: PAYEE, resourceId: "report-42" }
 
 interface NodeScript {
-    finalState?: "included" | "failed"
+    /** What getTxByHash answers: a stored tx, or nothing yet. */
+    stored?: { status: "confirmed" | "failed" } | null
     rejectConfirm?: boolean
 }
 
 async function clientWithNode(script: NodeScript = {}) {
     const demos = new Demos()
     const calls: string[] = []
-    ;(demos as any).nodeCall = async (message: string) => {
+    ;(demos as any).nodeCall = async (message: string, data: any) => {
         calls.push(`nodeCall:${message}`)
         if (message === "getAddressNonce") return 4
+        if (message === "getTxByHash") {
+            const stored = script.stored === undefined ? { status: "confirmed" } : script.stored
+            return stored ? { hash: data.hash, blockNumber: 250197, ...stored } : "error"
+        }
         return null
     }
     ;(demos as any)._getNetworkParametersCached = async () => null
@@ -36,14 +41,13 @@ async function clientWithNode(script: NodeScript = {}) {
             }
         }
         if (extra === "broadcastTx") return { result: 200, response: { message: "ok" } }
-        if (message === "getTransactionStatus") {
-            return { state: script.finalState ?? "included", blockNumber: 250197 }
-        }
         throw new Error(`unexpected call ${method} ${message} ${extra}`)
     }
     await demos.connectWallet(demos.newMnemonic())
     return { client: new D402Client(demos), demos, calls }
 }
+
+const fast = { timeoutMs: 30, pollIntervalMs: 5 }
 
 describe("D402Client", () => {
     it("builds a payment whose transaction names the payee, so it can be signed", async () => {
@@ -69,27 +73,47 @@ describe("D402Client", () => {
         )
     })
 
-    it("settles through confirm and broadcast, and reports the block it landed in", async () => {
+    it("leaves no nonce gap under auto-nonce when a payment is refused", async () => {
+        const { client, demos } = await clientWithNode()
+        demos.enableAutoNonce()
+
+        await expect(client.createPayment({ ...REQUIREMENT, recipient: "merchant" })).rejects.toThrow()
+        const next = await client.createPayment(REQUIREMENT)
+        expect(next.content.nonce).toBe(5)
+    })
+
+    it("settles through confirm and broadcast, and reads inclusion back by hash", async () => {
         const { client, calls } = await clientWithNode()
 
-        const result = await client.settle(await client.createPayment(REQUIREMENT))
+        const result = await client.settle(await client.createPayment(REQUIREMENT), fast)
 
         expect(result).toMatchObject({ success: true, blockNumber: 250197 })
         expect(result.hash).toMatch(/^[0-9a-f]{64}$/)
-        expect(calls).toContain("execute:confirmTx")
-        expect(calls).toContain("execute:broadcastTx")
-        expect(calls.some(c => c.includes("broadcastNativeTransaction"))).toBe(false)
+        expect(calls).toEqual(expect.arrayContaining(["execute:confirmTx", "execute:broadcastTx", "nodeCall:getTxByHash"]))
+        expect(calls.some(c => c.includes("broadcastNativeTransaction") || c.includes("getTransactionStatus"))).toBe(false)
     })
 
-    it("reports failure when the payment fails on chain or is not valid", async () => {
-        const failed = await clientWithNode({ finalState: "failed" })
-        const onChain = await failed.client.settle(await failed.client.createPayment(REQUIREMENT))
-        expect(onChain.success).toBe(false)
-        expect(onChain.hash).toMatch(/^[0-9a-f]{64}$/)
+    it("reports a payment that failed on chain, or that the node refused, as failed", async () => {
+        const failed = await clientWithNode({ stored: { status: "failed" } })
+        const onChain = await failed.client.settle(await failed.client.createPayment(REQUIREMENT), fast)
+        expect(onChain).toMatchObject({ success: false, blockNumber: 250197 })
+        expect(onChain.pending).toBeUndefined()
 
         const invalid = await clientWithNode({ rejectConfirm: true })
-        const refused = await invalid.client.settle(await invalid.client.createPayment(REQUIREMENT))
+        const refused = await invalid.client.settle(await invalid.client.createPayment(REQUIREMENT), fast)
         expect(refused.success).toBe(false)
         expect(refused.message).toContain("insufficient balance")
+    })
+
+    it("reports a payment not yet seen as pending, with its hash, not as failed", async () => {
+        const slow = await clientWithNode({ stored: null })
+        const result = await slow.client.settle(await slow.client.createPayment(REQUIREMENT), fast)
+
+        expect(result).toMatchObject({ success: false, pending: true })
+        expect(result.hash).toMatch(/^[0-9a-f]{64}$/)
+
+        // Once it lands, the same hash resolves without a second payment.
+        const landed = await clientWithNode()
+        expect(await landed.client.waitForSettlement(result.hash, fast)).toMatchObject({ success: true, hash: result.hash })
     })
 })
