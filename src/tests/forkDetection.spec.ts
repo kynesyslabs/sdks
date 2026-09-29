@@ -1,4 +1,4 @@
-import { Demos } from "@/websdk/demosclass"
+import { Demos } from "@/websdk"
 import { SubDemPrecisionError } from "@/denomination/networkInfo"
 
 // REVIEW: P4 commit 4 — fork-detection + sub-DEM rejection + warn-once

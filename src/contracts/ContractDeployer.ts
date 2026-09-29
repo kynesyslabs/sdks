@@ -13,7 +13,7 @@ import { ContractInstance } from './ContractInstance'
 import { ContractDeployPayload } from '../types/blockchain/TransactionSubtypes/ContractDeployTransaction'
 import { RPCRequest } from '../types/communication/rpc'
 import { uint8ArrayToHex } from '../encryption/unifiedCrypto'
-import { assertValidNonce } from '@/utils'
+import { resolveNonce } from '@/utils'
 import * as skeletons from '../websdk/utils/skeletons'
 
 export class ContractDeployer {
@@ -160,9 +160,11 @@ export class ContractDeployer {
     ): Promise<any> {
         const { publicKey } = await this.demos.crypto.getIdentity('ed25519')
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = options.nonce !== undefined
-            ? assertValidNonce(options.nonce)
-            : await this.demos.getAddressNonce(publicKeyHex)
+        const nonce = await resolveNonce(
+            options.nonce,
+            () => this.demos.getAddressNonce(publicKeyHex),
+            this.demos._nonceReserver(publicKeyHex),
+        )
 
         const tx = structuredClone(skeletons.transaction)
         tx.content.type = 'contractDeploy'

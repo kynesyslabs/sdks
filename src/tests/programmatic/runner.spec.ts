@@ -311,7 +311,7 @@ describe("runProgrammaticTx — source resolution", () => {
         const result = await runProgrammaticTx(demos, unsignedTx)
 
         expect(sign).toHaveBeenCalledTimes(1)
-        expect(sign).toHaveBeenCalledWith(unsignedTx)
+        expect(sign).toHaveBeenCalledWith(unsignedTx, undefined)
         expect(confirm).toHaveBeenCalledTimes(1)
         expect(result.broadcasted).toBe(true)
     })
@@ -352,7 +352,7 @@ describe("runProgrammaticTx — source resolution", () => {
         await runProgrammaticTx(demos, tokenShapeTx)
 
         expect(sign).toHaveBeenCalledTimes(1)
-        expect(sign).toHaveBeenCalledWith(tokenShapeTx)
+        expect(sign).toHaveBeenCalledWith(tokenShapeTx, undefined)
         expect(confirm).toHaveBeenCalledTimes(1)
     })
 })
