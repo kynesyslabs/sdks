@@ -304,11 +304,11 @@ export class GCRGeneration {
             transfers?: unknown
         }>(tx.content, "atomicWork")
         if (!Array.isArray(payload.edits) || payload.edits.length === 0) {
-            throw new Error("[GCRGeneration] atomicWork.edits must be a non-empty array")
+            throw new TypeError("[GCRGeneration] atomicWork.edits must be a non-empty array")
         }
         const transfers = payload.transfers ?? []
         if (!Array.isArray(transfers)) {
-            throw new Error("[GCRGeneration] atomicWork.transfers must be an array")
+            throw new TypeError("[GCRGeneration] atomicWork.transfers must be an array")
         }
 
         const transferEdits: GCREdit[] = []
