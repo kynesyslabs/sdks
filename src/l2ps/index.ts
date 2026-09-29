@@ -14,3 +14,4 @@ export {
 export * as binding from "./binding"
 export * as channel from "./channel"
 export * as anchor from "./anchor"
+export * as agreement from "./agreement"
