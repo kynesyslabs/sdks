@@ -362,7 +362,12 @@ export async function verifyChain(
     // issuer: the issuer is presenter-controlled, and binding to it would let a
     // self-delegated AID (or an agent re-delegating) satisfy the check.
     let delegation: DelegationCheck | undefined
-    if (aaNode && aaNode.issuee) {
+    if (aaNode && !aaNode.issuee) {
+        // An agent-authority credential exists to name the agent it
+        // authorises. Without one there is no AID to check delegation or key
+        // control against, and passing would attest authority for nobody.
+        reasons.push("agent-authority credential names no delegated agent AID (sad.a.i); failing closed")
+    } else if (aaNode && aaNode.issuee) {
         const ks = await keyState(source, aaNode.issuee)
         keyStateDigests[aaNode.issuee] = keyStateDigest(ks)
         const di = ks?.di

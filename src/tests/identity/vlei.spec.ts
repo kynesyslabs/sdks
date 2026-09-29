@@ -148,6 +148,20 @@ describe("vLEI verifyChain (injected source)", () => {
         expect(v.chain.map(n => n.schemaName)).toEqual(["AGENT_AUTHORITY", "LE", "QVI"])
     })
 
+    it("fails closed on an agent-authority credential that names no agent", async () => {
+        const creds = baseCreds()
+        const { i: _dropped, ...attributes } = (creds[AA_SAID].sad as any).a
+        ;(creds[AA_SAID].sad as any).a = attributes
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, {
+            proposedTx: IN_SCOPE_TX,
+            keyControl: keyControl(IN_SCOPE_TX),
+            timestamp: FIXED_TS,
+        })
+        expect(v.ok).toBe(false)
+        expect(v.delegation).toBeUndefined()
+        expect(v.reasons.some(r => r.includes("names no delegated agent AID"))).toBe(true)
+    })
+
     it("fails against a WRONG trusted root", async () => {
         const v = await verifyChain(mockSource(baseCreds()), AA_SAID, aid("Z"), { timestamp: FIXED_TS })
         expect(v.ok).toBe(false)
