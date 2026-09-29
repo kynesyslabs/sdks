@@ -338,8 +338,7 @@ export interface GCREditWorkAttempt {
     replacementFor?: string | null
 }
 
-/** A storage write that says whether it may replace what is there. */
-export interface GCREditStoragePut {
+interface GCREditStoragePutBase {
     type: "storage-program-put"
     isRollback: boolean
     txhash: string
@@ -348,10 +347,7 @@ export interface GCREditStoragePut {
     writer: string
     name: string
     discriminator: string
-    mode: "create-only" | "compare-and-set"
     valueDigest: string
-    /** Required by compare-and-set: the digest the writer expects to replace. */
-    expectedPriorDigest?: string | null
     /**
      * The value itself, carried in the signed transaction. Must be JCS
      * representable (no non-integer or unsafe numbers); `valueDigest` is
@@ -359,6 +355,21 @@ export interface GCREditStoragePut {
      */
     value: unknown
 }
+
+/**
+ * A storage write that says whether it may replace what is there. The mode
+ * decides whether a prior digest is part of the edit, so a compare-and-set
+ * without one does not type-check.
+ */
+export type GCREditStoragePut = GCREditStoragePutBase &
+    (
+        | { mode: "create-only"; expectedPriorDigest?: null }
+        | {
+              mode: "compare-and-set"
+              /** The digest the writer expects to replace. */
+              expectedPriorDigest: string
+          }
+    )
 
 export type GCREdit =
     | GCREditResourceSlot

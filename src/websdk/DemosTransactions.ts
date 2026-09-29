@@ -150,6 +150,17 @@ export const DemosTransactions = {
     ) {
         required(demos.keypair, "Wallet not connected")
 
+        // The pre-fork wire format rewrites every edit amount as a DEM number,
+        // while the node regenerates the transfer edits with the OS strings
+        // in the payload, so the edits would never match (and sub-DEM
+        // amounts would be truncated). A Work is post-fork only.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (!(await (demos as any)._isPostForkCached())) {
+            throw new Error(
+                "[DemosTransactions] atomicWork needs a node past the osDenomination fork",
+            )
+        }
+
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)

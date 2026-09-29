@@ -51,6 +51,7 @@ import { ValidatorUnstakeTransaction } from './ValidatorUnstakeTransaction'
 import { ValidatorExitTransaction } from './ValidatorExitTransaction'
 import { NetworkUpgradeTransaction } from './NetworkUpgradeTransaction'
 import { NetworkUpgradeVoteTransaction } from './NetworkUpgradeVoteTransaction'
+import { AtomicWorkTransaction } from './AtomicWorkTransaction'
 
 export type SpecificTransaction =
     | L2PSTransaction
@@ -78,3 +79,4 @@ export type SpecificTransaction =
     | ValidatorExitTransaction
     | NetworkUpgradeTransaction
     | NetworkUpgradeVoteTransaction
+    | AtomicWorkTransaction

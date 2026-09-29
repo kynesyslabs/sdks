@@ -313,8 +313,13 @@ export class GCRGeneration {
 
         const transferEdits: GCREdit[] = []
         for (const t of transfers as { to?: unknown; amount?: unknown }[]) {
-            if (typeof t?.to !== "string" || !t.to) {
-                throw new Error("[GCRGeneration] atomicWork transfer needs a recipient")
+            // The recipient becomes the key of a balance credit, so anything
+            // that is not an account address would park the funds where no
+            // wallet can reach them. Same rule as a transaction's own `to`.
+            if (typeof t?.to !== "string" || !/^0x[0-9a-f]{64}$/i.test(t.to)) {
+                throw new Error(
+                    "[GCRGeneration] atomicWork transfer recipient must be a 0x-prefixed 32-byte hex address",
+                )
             }
             if (typeof t.amount !== "string" || !/^[1-9]\d*$/.test(t.amount)) {
                 throw new Error(
@@ -326,6 +331,12 @@ export class GCRGeneration {
                 { ...base, operation: "remove", account: tx.content.from_ed25519_address } as GCREdit,
                 { ...base, operation: "add", account: t.to } as GCREdit,
             )
+        }
+
+        // The attempt leads: the single-winner ledger is keyed on it, and the
+        // transfers are placed right after it.
+        if ((payload.edits[0] as { type?: unknown })?.type !== "work-attempt") {
+            throw new Error("[GCRGeneration] atomicWork.edits must start with its work-attempt")
         }
 
         const out: GCREdit[] = []

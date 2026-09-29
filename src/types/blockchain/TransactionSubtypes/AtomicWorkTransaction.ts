@@ -5,7 +5,9 @@ import {
     GCREditWorkAttempt,
 } from "../GCREdit"
 
-type Unsigned<T> = Omit<T, "isRollback" | "txhash">
+// Distributes over unions, so a storage put keeps the link between its mode
+// and its prior digest once the node-filled fields are taken off.
+type Unsigned<T> = T extends unknown ? Omit<T, "isRollback" | "txhash"> : never
 
 /** A Work edit as the sender signs it; the node fills rollback and tx hash. */
 export type AtomicWorkEdit =
