@@ -1,6 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2"
 import { jcsCanonicalize } from "./jcs"
-import { bytesToHex, signatureFromHex, signatureToHex } from "./hex"
+import { bytesToHex, signatureFromHex, signatureToHex } from "@/utils/hex"
 import type { UnsignedVleiAttestation, VleiAttestation } from "./types"
 
 /**

@@ -27,7 +27,7 @@ import {
 } from "@/identity/cci"
 import { Demos } from "@/websdk/demosclass"
 import { jcsCanonicalize } from "./jcs"
-import { bytesToHex } from "./hex"
+import { bytesToHex } from "@/utils/hex"
 import { canonicalDigest } from "./canonical"
 import type { AnchorAttestationResult } from "./anchor"
 import type { VleiAttestation, VleiVerdict } from "./types"
