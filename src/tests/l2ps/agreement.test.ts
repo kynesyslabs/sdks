@@ -97,6 +97,36 @@ describe("WI-D AgreementDocument — commit", () => {
             }),
         ).rejects.toThrow(/duplicate signer/)
     })
+
+    it("refuses a party that could never sign", async () => {
+        const a = await newConnectedDemos()
+        const evm = "evm:0xabc0000000000000000000000000000000000001" as ClaimReference
+        // Only demos: claims can sign, so this document could never be
+        // fully signed; say so before anyone signs anything.
+        expect(() =>
+            buildUnsignedAgreement({ channelId: CHANNEL, parties: [a.claim, evm], body: TERMS }),
+        ).toThrow(/must be a demos: ClaimReference/)
+
+        const signSpy = jest.spyOn(a.demos.crypto, "sign")
+        await expect(
+            coSignAgreement({
+                channelId: CHANNEL,
+                parties: [a.claim, evm],
+                body: TERMS,
+                signers: [{ claim: a.claim, demos: a.demos }],
+            }),
+        ).rejects.toThrow(/must be a demos: ClaimReference/)
+        expect(signSpy).not.toHaveBeenCalled()
+    })
+
+    it("refuses a party listed twice, however it is spelled", async () => {
+        const a = await newConnectedDemos()
+        const at = a.claim.indexOf(":")
+        const shouted = `${a.claim.slice(0, at)}:${a.claim.slice(at + 1).toUpperCase()}` as ClaimReference
+        expect(() =>
+            buildUnsignedAgreement({ channelId: CHANNEL, parties: [a.claim, shouted], body: TERMS }),
+        ).toThrow(/duplicate party/)
+    })
 })
 
 describe("WI-D AgreementDocument — what it refuses", () => {

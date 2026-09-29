@@ -55,11 +55,13 @@ function claimIn(list: ReadonlyArray<ClaimReference>, ref: ClaimReference): bool
  * Build the unsigned document shell.
  *
  * @param opts.channelId - The session the agreement was negotiated in.
- * @param opts.parties - Every identity that must co-sign.
+ * @param opts.parties - Every identity that must co-sign: `demos:` claims,
+ * each once.
  * @param opts.body - The agreed terms (impl-defined).
  * @param opts.agreedAt - Unix ms; defaults to now.
  * @param opts.refs - Optional back-references into the negotiation.
  * @returns The document without signatures.
+ * @throws If a party is not a `demos:` claim or is listed twice.
  */
 export function buildUnsignedAgreement(opts: {
     channelId: string
@@ -71,6 +73,22 @@ export function buildUnsignedAgreement(opts: {
     if (!opts.channelId) throw new Error("buildUnsignedAgreement: channelId required")
     if (!opts.parties?.length)
         throw new Error("buildUnsignedAgreement: parties required")
+
+    // Only a demos: claim can sign (`signAgreement`), so any other party
+    // would make a document that can never be fully signed. A party listed
+    // twice is one signer counted as two.
+    const seen = new Set<string>()
+    for (const party of opts.parties) {
+        if (!isDemosClaim(party))
+            throw new Error(
+                `buildUnsignedAgreement: party must be a demos: ClaimReference, got "${party}"`,
+            )
+        const k = claimKey(party)
+        if (seen.has(k))
+            throw new Error(`buildUnsignedAgreement: duplicate party "${party}"`)
+        seen.add(k)
+    }
+
     return {
         agreementVersion: "1",
         channelId: opts.channelId,
