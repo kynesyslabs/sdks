@@ -12,7 +12,10 @@ const REQUIREMENT = { amount: "1000", recipient: PAYEE, resourceId: "report-42" 
 interface NodeScript {
     /** What getTxByHash answers: a stored tx, or nothing yet. */
     stored?: { status: "confirmed" | "failed" } | null
+    /** getTxByHash answers with an error object instead, as on a transport failure. */
+    lookupError?: boolean
     rejectConfirm?: boolean
+    rejectBroadcast?: boolean
 }
 
 async function clientWithNode(script: NodeScript = {}) {
@@ -21,6 +24,9 @@ async function clientWithNode(script: NodeScript = {}) {
     ;(demos as any).nodeCall = async (message: string, data: any) => {
         calls.push(`nodeCall:${message}`)
         if (message === "getAddressNonce") return 4
+        if (message === "getTxByHash" && script.lookupError) {
+            return { result: 500, response: { code: "ECONNRESET" }, require_reply: false, extra: null }
+        }
         if (message === "getTxByHash") {
             const stored = script.stored === undefined ? { status: "confirmed" } : script.stored
             return stored ? { hash: data.hash, blockNumber: 250197, ...stored } : "error"
@@ -40,7 +46,11 @@ async function clientWithNode(script: NodeScript = {}) {
                 },
             }
         }
-        if (extra === "broadcastTx") return { result: 200, response: { message: "ok" } }
+        if (extra === "broadcastTx") {
+            return script.rejectBroadcast
+                ? { result: 400, response: { message: "nonce already used" } }
+                : { result: 200, response: { message: "ok" } }
+        }
         throw new Error(`unexpected call ${method} ${message} ${extra}`)
     }
     await demos.connectWallet(demos.newMnemonic())
@@ -115,5 +125,22 @@ describe("D402Client", () => {
         // Once it lands, the same hash resolves without a second payment.
         const landed = await clientWithNode()
         expect(await landed.client.waitForSettlement(result.hash, fast)).toMatchObject({ success: true, hash: result.hash })
+    })
+
+    it("reports a payment the node refused at broadcast as failed, not pending", async () => {
+        const { client, calls } = await clientWithNode({ rejectBroadcast: true })
+        const result = await client.settle(await client.createPayment(REQUIREMENT), fast)
+
+        expect(result).toMatchObject({ success: false })
+        expect(result.pending).toBeUndefined()
+        expect(result.message).toContain("nonce already used")
+        expect(calls).not.toContain("nodeCall:getTxByHash")
+    })
+
+    it("never takes a lookup error for an included payment", async () => {
+        const { client } = await clientWithNode({ lookupError: true })
+        const result = await client.settle(await client.createPayment(REQUIREMENT), fast)
+
+        expect(result).toMatchObject({ success: false, pending: true })
     })
 })

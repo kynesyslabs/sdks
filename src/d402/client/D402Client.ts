@@ -9,7 +9,7 @@ import type { Transaction } from '@/types'
 import type { D402PaymentRequirement, D402SettlementResult } from './types'
 import { uint8ArrayToHex } from '@/encryption/unifiedCrypto'
 import * as skeletons from '../../websdk/utils/skeletons'
-import { resolveNonce } from '@/utils'
+import { resolveNonce, sleep, validateEd25519Address } from '@/utils'
 
 export class D402Client {
     private demos: Demos
@@ -38,7 +38,7 @@ export class D402Client {
         const recipient = requirement.recipient?.startsWith("0x")
             ? requirement.recipient
             : `0x${requirement.recipient ?? ""}`
-        if (!/^0x[0-9a-f]{64}$/i.test(recipient)) {
+        if (!validateEd25519Address(recipient)) {
             throw new Error(
                 `d402 payment recipient must be a 32-byte hex address, got "${requirement.recipient}"`,
             )
@@ -103,7 +103,17 @@ export class D402Client {
             const validity = await this.demos.confirm(signedTx)
             // The hash the node recalculated is the one it will index.
             hash = validity?.response?.data?.transaction?.hash || hash
-            await this.demos.broadcast(validity)
+            // A node that refuses the transaction answers without throwing;
+            // waiting on it would report a refused payment as pending.
+            const broadcast = await this.demos.broadcast(validity)
+            if (broadcast?.result !== 200) {
+                const reason = broadcast?.response?.message ?? broadcast?.response ?? broadcast?.extra
+                return {
+                    success: false,
+                    hash,
+                    message: `Broadcast refused (${broadcast?.result}): ${typeof reason === 'string' ? reason : JSON.stringify(reason)}`,
+                }
+            }
         } catch (error: any) {
             return { success: false, hash, message: error?.message || 'Settlement error' }
         }
@@ -128,15 +138,21 @@ export class D402Client {
         const pollIntervalMs = options?.pollIntervalMs ?? 1_000
         const deadline = Date.now() + timeoutMs
         for (let first = true; first || Date.now() < deadline; first = false) {
-            if (!first) await new Promise(r => setTimeout(r, pollIntervalMs))
+            if (!first) await sleep(pollIntervalMs)
             let tx: any
             try {
                 tx = await this.demos.getTxByHash(hash)
             } catch {
                 continue
             }
-            if (!tx || typeof tx !== 'object') continue
-            const blockNumber = tx.blockNumber ?? undefined
+            // Only this transaction, stored in a block, counts. A transport
+            // failure comes back as an error object rather than a throw, and
+            // must not pass for an included payment.
+            const sameHash =
+                typeof tx?.hash === 'string' &&
+                tx.hash.replace(/^0x/i, '').toLowerCase() === hash.replace(/^0x/i, '').toLowerCase()
+            if (!sameHash || typeof tx.blockNumber !== 'number') continue
+            const blockNumber = tx.blockNumber
             if (String(tx.status) === 'failed') {
                 return { success: false, hash, blockNumber, message: 'Payment transaction failed on chain' }
             }
