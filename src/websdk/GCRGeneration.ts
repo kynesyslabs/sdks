@@ -22,6 +22,7 @@ import {
     STORAGE_PROGRAM_CONSTANTS,
 } from "@/types/blockchain/TransactionSubtypes/StorageProgramTransaction"
 import { OS_PER_DEM } from "@/denomination"
+import { validateEd25519Address } from "@/utils"
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -316,7 +317,7 @@ export class GCRGeneration {
             // The recipient becomes the key of a balance credit, so anything
             // that is not an account address would park the funds where no
             // wallet can reach them. Same rule as a transaction's own `to`.
-            if (typeof t?.to !== "string" || !/^0x[0-9a-f]{64}$/i.test(t.to)) {
+            if (typeof t?.to !== "string" || !validateEd25519Address(t.to)) {
                 throw new Error(
                     "[GCRGeneration] atomicWork transfer recipient must be a 0x-prefixed 32-byte hex address",
                 )
