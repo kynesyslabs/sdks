@@ -14,7 +14,7 @@ import { resolveNonce } from '@/utils'
 export class D402Client {
     private demos: Demos
 
-    constructor(demos: Demos) {``
+    constructor(demos: Demos) {
         this.demos = demos
     }
 
@@ -34,9 +34,23 @@ export class D402Client {
         // Get user's public key and nonce
         const { publicKey } = await this.demos.crypto.getIdentity('ed25519')
         const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
-        const nonce = await resolveNonce(options?.nonce, () =>
-            this.demos.getAddressNonce(publicKeyHex),
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => this.demos.getAddressNonce(publicKeyHex),
+            this.demos._nonceReserver(publicKeyHex),
         )
+
+        // The payee is also the transaction's own recipient. sign() refuses a
+        // transaction without one, so leaving it only inside `data` made
+        // every payment built here unsignable.
+        const recipient = requirement.recipient?.startsWith("0x")
+            ? requirement.recipient
+            : `0x${requirement.recipient ?? ""}`
+        if (!/^0x[0-9a-f]{64}$/i.test(recipient)) {
+            throw new Error(
+                `d402 payment recipient must be a 32-byte hex address, got "${requirement.recipient}"`,
+            )
+        }
 
         // Create transaction skeleton
         const tx = structuredClone(skeletons.transaction)
@@ -48,6 +62,7 @@ export class D402Client {
 
         // Fill in transaction details
         tx.content.type = 'd402_payment'
+        tx.content.to = recipient
         tx.content.nonce = nonce
         tx.content.timestamp = Date.now()
         tx.content.data = [
@@ -63,38 +78,45 @@ export class D402Client {
     }
 
     /**
-     * Sign and broadcast a d402_payment transaction
+     * Sign, confirm, broadcast and wait for a d402_payment transaction.
+     *
+     * Goes through the node's `confirm` + broadcast path, the one every other
+     * send uses. It used to call a `broadcastNativeTransaction` RPC the node
+     * does not implement, so every settlement failed.
+     *
      * @param payment Unsigned payment transaction from createPayment()
-     * @returns Settlement result with transaction hash
+     * @param options.timeoutMs How long to wait for inclusion (default 60 s)
+     * @returns Success only once the payment is included, with its hash and
+     * block number
      */
-    async settle(payment: Transaction): Promise<D402SettlementResult> {
+    async settle(
+        payment: Transaction,
+        options?: { timeoutMs?: number; pollIntervalMs?: number },
+    ): Promise<D402SettlementResult> {
+        let hash = ''
         try {
-            // Sign the transaction
             const signedTx = await this.demos.sign(payment)
-
-            // Broadcast to network via RPC
-            const result = await this.demos.nodeCall('broadcastNativeTransaction', {
-                transaction: signedTx
+            hash = signedTx.hash
+            const validity = await this.demos.confirm(signedTx)
+            const result = await this.demos.broadcastAndWait(validity, {
+                timeoutMs: options?.timeoutMs,
+                pollIntervalMs: options?.pollIntervalMs,
             })
-
-            if (result.success) {
-                return {
-                    success: true,
-                    hash: signedTx.hash,
-                    blockNumber: result.blockNumber
-                }
-            } else {
-                return {
-                    success: false,
-                    hash: signedTx.hash,
-                    message: result.message || 'Settlement failed'
-                }
+            hash = result.hash || hash
+            if (result.status.state === 'included') {
+                return { success: true, hash, blockNumber: result.status.blockNumber }
+            }
+            return {
+                success: false,
+                hash,
+                blockNumber: result.status.blockNumber,
+                message: 'Payment transaction failed on chain',
             }
         } catch (error: any) {
             return {
                 success: false,
-                hash: '',
-                message: error.message || 'Settlement error'
+                hash,
+                message: error?.message || 'Settlement error',
             }
         }
     }
