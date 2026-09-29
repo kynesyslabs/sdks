@@ -103,10 +103,13 @@ export class D402Client {
             const validity = await this.demos.confirm(signedTx)
             // The hash the node recalculated is the one it will index.
             hash = validity?.response?.data?.transaction?.hash || hash
-            // A node that refuses the transaction answers without throwing;
-            // waiting on it would report a refused payment as pending.
+            // A node that refuses the transaction answers 4xx without
+            // throwing; waiting on it would report a refused payment as
+            // pending. Anything else (a 5xx, a lost response) is ambiguous:
+            // the payment may have been accepted, so it is checked by hash.
             const broadcast = await this.demos.broadcast(validity)
-            if (broadcast?.result !== 200) {
+            const status = Number(broadcast?.result)
+            if (status >= 400 && status < 500) {
                 const reason = broadcast?.response?.message ?? broadcast?.response ?? broadcast?.extra
                 return {
                     success: false,

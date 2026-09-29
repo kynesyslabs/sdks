@@ -16,6 +16,8 @@ interface NodeScript {
     lookupError?: boolean
     rejectConfirm?: boolean
     rejectBroadcast?: boolean
+    /** The broadcast answer is lost or a 5xx, though the node took the payment. */
+    ambiguousBroadcast?: boolean
 }
 
 async function clientWithNode(script: NodeScript = {}) {
@@ -47,6 +49,7 @@ async function clientWithNode(script: NodeScript = {}) {
             }
         }
         if (extra === "broadcastTx") {
+            if (script.ambiguousBroadcast) return { result: 500, response: { code: "ECONNRESET" }, require_reply: false, extra: null }
             return script.rejectBroadcast
                 ? { result: 400, response: { message: "nonce already used" } }
                 : { result: 200, response: { message: "ok" } }
@@ -142,5 +145,13 @@ describe("D402Client", () => {
         const result = await client.settle(await client.createPayment(REQUIREMENT), fast)
 
         expect(result).toMatchObject({ success: false, pending: true })
+    })
+
+    it("checks an ambiguous broadcast by hash instead of calling it refused", async () => {
+        const { client, calls } = await clientWithNode({ ambiguousBroadcast: true })
+        const result = await client.settle(await client.createPayment(REQUIREMENT), fast)
+
+        expect(calls).toContain("nodeCall:getTxByHash")
+        expect(result).toMatchObject({ success: true, blockNumber: 250197 })
     })
 })
