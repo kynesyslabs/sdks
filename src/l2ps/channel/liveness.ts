@@ -56,30 +56,31 @@ export type LivenessState =
       }
 
 /**
- * A clock in milliseconds that never runs backwards.
- *
- * `performance.now()` where the runtime has it. Elsewhere it is built from
- * `Date.now()` by adding up only its forward steps: a wall clock that jumps
- * back (NTP, a manual correction) costs the interval up to the next read,
- * and then time keeps moving. Returning `Date.now()` as is would move the
- * deadline out by the size of the jump; holding at the highest value seen
- * would stop time until the wall clock caught up. Either way a stall would
- * go unnoticed for as long as the jump.
+ * A clock in milliseconds that never runs backwards and ignores wall-clock
+ * corrections: `performance.now()`, or `process.hrtime` where only that
+ * exists. Anything built on `Date.now()` moves when NTP or an administrator
+ * moves the wall clock, in either direction, which would expire a live
+ * channel early or keep a stalled one alive.
  *
  * Each call returns an independent clock; one session keeps one.
+ *
+ * @throws If the runtime has neither source. Pass `now` to the session then.
  */
 export function monotonicClock(): () => number {
     if (typeof performance !== "undefined" && typeof performance.now === "function")
         return () => performance.now()
 
-    let lastWall = Date.now()
-    let elapsed = 0
-    return () => {
-        const wall = Date.now()
-        if (wall > lastWall) elapsed += wall - lastWall
-        lastWall = wall
-        return elapsed
+    const hrtime = (globalThis as { process?: { hrtime?: { bigint?: () => bigint } } }).process
+        ?.hrtime
+    if (typeof hrtime?.bigint === "function") {
+        const read = hrtime.bigint.bind(hrtime)
+        const origin = read()
+        return () => Number((read() - origin) / 1_000_000n)
     }
+
+    throw new Error(
+        "monotonicClock: this runtime has no monotonic time source; pass a monotonic `now` to the session",
+    )
 }
 
 export interface CheckLivenessOpts {

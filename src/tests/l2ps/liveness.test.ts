@@ -170,34 +170,41 @@ describe("CH-4 ChannelSession.liveness — detect the stall, then abort", () => 
 })
 
 describe("CH-4 monotonicClock — where performance.now() is missing", () => {
-    let wall = 1_000_000
     const realPerformance = globalThis.performance
+    const realHrtime = process.hrtime
 
     beforeEach(() => {
-        wall = 1_000_000
-        jest.spyOn(Date, "now").mockImplementation(() => wall)
-        // The runtimes this fallback exists for.
         Object.defineProperty(globalThis, "performance", { value: undefined, configurable: true })
     })
 
     afterEach(() => {
         jest.restoreAllMocks()
         Object.defineProperty(globalThis, "performance", { value: realPerformance, configurable: true })
+        process.hrtime = realHrtime
     })
 
-    it("keeps moving forward after the wall clock steps back", () => {
+    it("does not move when the wall clock is corrected, in either direction", () => {
+        let wall = 1_000_000
+        jest.spyOn(Date, "now").mockImplementation(() => wall)
+        let mono = 5_000_000_000n
+        process.hrtime = Object.assign(() => [0, 0] as [number, number], { bigint: () => mono }) as any
+
         const clock = monotonicClock()
         expect(clock()).toBe(0)
-        wall += 500
-        expect(clock()).toBe(500)
-
-        wall -= 10_000 // NTP steps the wall clock back
-        expect(clock()).toBe(500)
-        wall += 200
-        expect(clock()).toBe(700) // time moves again at once, not 10s later
+        wall += 60_000 // NTP steps forward a minute
+        expect(clock()).toBe(0)
+        wall -= 120_000 // and back two
+        expect(clock()).toBe(0)
+        mono += 250_000_000n // 250 ms of real time
+        expect(clock()).toBe(250)
     })
 
-    it("lets a session detect the stall on time across a backwards step", async () => {
+    it("lets a session detect the stall on time whatever the wall clock does", async () => {
+        let wall = 1_000_000
+        jest.spyOn(Date, "now").mockImplementation(() => wall)
+        let mono = 0n
+        process.hrtime = Object.assign(() => [0, 0] as [number, number], { bigint: () => mono }) as any
+
         const me = await newConnectedDemos()
         const peer = await newConnectedDemos()
         const session = new ChannelSession({
@@ -208,19 +215,18 @@ describe("CH-4 monotonicClock — where performance.now() is missing", () => {
         })
         await session.open()
 
-        wall += 60
+        wall += 60_000 // a forward correction must not expire a live turn
         expect(session.liveness({ turnTimeoutMs: 100 }).status).toBe("alive")
-
-        wall -= 30_000 // a 30s backwards step while the counterparty is quiet
-        expect(session.liveness({ turnTimeoutMs: 100 }).status).toBe("alive")
-
-        // 40 ms more is 100 ms of counted time, so the 100 ms bound is spent.
-        // With the wall clock as the fallback it would read "alive" until the
-        // wall clock had made up the 30 s.
-        wall += 40
+        wall -= 30_000 // nor a backward one keep a stalled turn alive
+        mono += 100_000_000n
         expect(session.liveness({ turnTimeoutMs: 100 })).toMatchObject({
             status: "stalled",
             reason: "turn-timeout",
         })
+    })
+
+    it("refuses to guess when the runtime has no monotonic source", () => {
+        process.hrtime = undefined as any
+        expect(() => monotonicClock()).toThrow("no monotonic time source")
     })
 })
