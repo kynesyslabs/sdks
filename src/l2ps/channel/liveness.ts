@@ -55,13 +55,45 @@ export type LivenessState =
           deadlineAt: number
       }
 
+/**
+ * A clock in milliseconds that never runs backwards.
+ *
+ * `performance.now()` where the runtime has it. Elsewhere it is built from
+ * `Date.now()` by adding up only its forward steps: a wall clock that jumps
+ * back (NTP, a manual correction) costs the interval up to the next read,
+ * and then time keeps moving. Returning `Date.now()` as is would move the
+ * deadline out by the size of the jump; holding at the highest value seen
+ * would stop time until the wall clock caught up. Either way a stall would
+ * go unnoticed for as long as the jump.
+ *
+ * Each call returns an independent clock; one session keeps one.
+ */
+export function monotonicClock(): () => number {
+    if (typeof performance !== "undefined" && typeof performance.now === "function")
+        return () => performance.now()
+
+    let lastWall = Date.now()
+    let elapsed = 0
+    return () => {
+        const wall = Date.now()
+        if (wall > lastWall) elapsed += wall - lastWall
+        lastWall = wall
+        return elapsed
+    }
+}
+
 export interface CheckLivenessOpts {
-    /** Local time the session opened. */
+    /** When the session opened, on the same monotonic clock as `now`. */
     openedAt: number
-    /** Local time this member last sent or accepted a message. */
+    /** When this member last sent or accepted a message, on the same clock. */
     lastActivityAt: number
     policy?: LivenessPolicy
-    now?: number
+    /**
+     * The current time, on the same monotonic clock as the other two. There
+     * is no default: a wall-clock default would compare two different time
+     * bases whenever the caller's are monotonic.
+     */
+    now: number
 }
 
 /**
@@ -88,7 +120,7 @@ export function checkLiveness(opts: CheckLivenessOpts): LivenessState {
     // "alive" forever — a broken clock must fail loud, not silently disable the
     // only thing bounding delivery.
     for (const [name, t] of [
-        ["now", opts.now ?? Date.now()],
+        ["now", opts.now],
         ["openedAt", opts.openedAt],
         ["lastActivityAt", opts.lastActivityAt],
     ] as const) {
@@ -98,12 +130,15 @@ export function checkLiveness(opts: CheckLivenessOpts): LivenessState {
             )
     }
 
-    const now = opts.now ?? Date.now()
-    // Wall clocks step backwards (NTP, a manual correction). Left alone that
-    // pushes the deadline out until real time catches up — the stall would go
-    // unnoticed for exactly as long as the jump. Treat any backwards move as no
-    // progress at all rather than as fresh activity.
-    const msSinceLastActivity = Math.max(0, now - opts.lastActivityAt)
+    const now = opts.now
+    // Only a clock that ran backwards puts now before the last activity, and
+    // with one the deadline below would move out by the size of the jump.
+    // Say so rather than report "alive" on a clock that cannot bound anything.
+    if (now < opts.lastActivityAt || now < opts.openedAt)
+        throw new Error(
+            `checkLiveness: now (${now}) is earlier than the recorded activity; the clock is not monotonic`,
+        )
+    const msSinceLastActivity = now - opts.lastActivityAt
     const turnDeadlineAt = opts.lastActivityAt + policy.turnTimeoutMs
 
     // The session cap is absolute: a channel that keeps chattering past it is

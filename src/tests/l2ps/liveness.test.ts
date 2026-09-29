@@ -1,6 +1,6 @@
 import { Demos, DemosWebAuth } from "@/websdk"
 import { demosClaimRefForAddress, type ClaimReference } from "@/identity/cci"
-import { ChannelSession, checkLiveness, DEFAULT_LIVENESS } from "@/l2ps/channel"
+import { ChannelSession, checkLiveness, DEFAULT_LIVENESS, monotonicClock } from "@/l2ps/channel"
 
 const CHANNEL = "ch-liveness-1"
 
@@ -54,8 +54,8 @@ describe("CH-4 checkLiveness — the pure bound", () => {
         // thing bounding delivery would quietly stop working.
         for (const bad of [
             { ...base, now: NaN },
-            { ...base, openedAt: NaN },
-            { ...base, lastActivityAt: NaN },
+            { ...base, now: 1_000, openedAt: NaN },
+            { ...base, now: 1_000, lastActivityAt: NaN },
         ]) {
             expect(() => checkLiveness({ ...bad, policy: { turnTimeoutMs: 100 } })).toThrow(
                 /finite timestamp/,
@@ -63,23 +63,24 @@ describe("CH-4 checkLiveness — the pure bound", () => {
         }
     })
 
-    it("a clock that steps backwards does not extend the deadline", () => {
-        // Defensive: with a monotonic clock this cannot happen, but a caller
-        // passing wall-clock times must not get "fresh activity" out of a jump.
-        const r = checkLiveness({
-            openedAt: 1_000,
-            lastActivityAt: 5_000,
-            policy: { turnTimeoutMs: 100 },
-            now: 4_000, // NTP stepped us back
-        })
-        expect(r.msSinceLastActivity).toBe(0)
+    it("refuses a now earlier than the recorded activity instead of extending the deadline", () => {
+        // Only a clock that ran backwards produces this, and with it the turn
+        // deadline would move out by the size of the jump.
+        expect(() =>
+            checkLiveness({
+                openedAt: 1_000,
+                lastActivityAt: 5_000,
+                policy: { turnTimeoutMs: 100 },
+                now: 4_000,
+            }),
+        ).toThrow(/not monotonic/)
     })
 
     it("rejects a nonsensical policy", () => {
-        expect(() => checkLiveness({ ...base, policy: { turnTimeoutMs: 0 } })).toThrow(/positive number/)
-        expect(() => checkLiveness({ ...base, policy: { turnTimeoutMs: -1 } })).toThrow(/positive number/)
+        expect(() => checkLiveness({ ...base, now: 1_000, policy: { turnTimeoutMs: 0 } })).toThrow(/positive number/)
+        expect(() => checkLiveness({ ...base, now: 1_000, policy: { turnTimeoutMs: -1 } })).toThrow(/positive number/)
         expect(() =>
-            checkLiveness({ ...base, policy: { turnTimeoutMs: 100, sessionTimeoutMs: 0 } }),
+            checkLiveness({ ...base, now: 1_000, policy: { turnTimeoutMs: 100, sessionTimeoutMs: 0 } }),
         ).toThrow(/positive number/)
         expect(DEFAULT_LIVENESS.turnTimeoutMs).toBeGreaterThan(0)
     })
@@ -165,5 +166,61 @@ describe("CH-4 ChannelSession.liveness — detect the stall, then abort", () => 
             demos: me.demos,
         })
         expect(() => s.liveness()).toThrow(/call open\(\)/)
+    })
+})
+
+describe("CH-4 monotonicClock — where performance.now() is missing", () => {
+    let wall = 1_000_000
+    const realPerformance = globalThis.performance
+
+    beforeEach(() => {
+        wall = 1_000_000
+        jest.spyOn(Date, "now").mockImplementation(() => wall)
+        // The runtimes this fallback exists for.
+        Object.defineProperty(globalThis, "performance", { value: undefined, configurable: true })
+    })
+
+    afterEach(() => {
+        jest.restoreAllMocks()
+        Object.defineProperty(globalThis, "performance", { value: realPerformance, configurable: true })
+    })
+
+    it("keeps moving forward after the wall clock steps back", () => {
+        const clock = monotonicClock()
+        expect(clock()).toBe(0)
+        wall += 500
+        expect(clock()).toBe(500)
+
+        wall -= 10_000 // NTP steps the wall clock back
+        expect(clock()).toBe(500)
+        wall += 200
+        expect(clock()).toBe(700) // time moves again at once, not 10s later
+    })
+
+    it("lets a session detect the stall on time across a backwards step", async () => {
+        const me = await newConnectedDemos()
+        const peer = await newConnectedDemos()
+        const session = new ChannelSession({
+            channelId: CHANNEL,
+            members: [me.claim, peer.claim],
+            me: me.claim,
+            demos: me.demos,
+        })
+        await session.open()
+
+        wall += 60
+        expect(session.liveness({ turnTimeoutMs: 100 }).status).toBe("alive")
+
+        wall -= 30_000 // a 30s backwards step while the counterparty is quiet
+        expect(session.liveness({ turnTimeoutMs: 100 }).status).toBe("alive")
+
+        // 40 ms more is 100 ms of counted time, so the 100 ms bound is spent.
+        // With the wall clock as the fallback it would read "alive" until the
+        // wall clock had made up the 30 s.
+        wall += 40
+        expect(session.liveness({ turnTimeoutMs: 100 })).toMatchObject({
+            status: "stalled",
+            reason: "turn-timeout",
+        })
     })
 })

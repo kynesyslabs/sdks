@@ -46,6 +46,7 @@ export { ChannelSession, type ChannelSessionOpts } from "./session"
 export {
     checkLiveness,
     DEFAULT_LIVENESS,
+    monotonicClock,
     type CheckLivenessOpts,
     type LivenessPolicy,
     type LivenessState,

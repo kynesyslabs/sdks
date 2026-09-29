@@ -13,6 +13,7 @@ import {
 import type { ChannelIdRegistry } from "./channelIdRegistry"
 import {
     checkLiveness,
+    monotonicClock,
     type LivenessPolicy,
     type LivenessState,
 } from "./liveness"
@@ -38,18 +39,6 @@ export interface ChannelSessionOpts {
      * the jump. Supply your own only if it is monotonic too.
      */
     now?: () => number
-}
-
-/**
- * Monotonic milliseconds — never steps backwards, unlike `Date.now()`.
- *
- * @returns A monotonically non-decreasing timestamp in ms.
- */
-function monotonicNow(): number {
-    return typeof performance !== "undefined" &&
-        typeof performance.now === "function"
-        ? performance.now()
-        : Date.now()
 }
 
 /**
@@ -95,7 +84,7 @@ export class ChannelSession {
         this.me = opts.me
         this.demos = opts.demos
         this.registry = opts.channelIdRegistry
-        this.clock = opts.now ?? monotonicNow
+        this.clock = opts.now ?? monotonicClock()
     }
 
     /**
