@@ -61,19 +61,41 @@ export class Identities {
     }
 
     /**
-     * Create a web2 proof payload for use with web2 identity inference.
+     * Create a web2 proof payload to publish on the account being claimed.
      *
-     * @param keypair The keypair of the demos account.
-     * @returns The web2 proof payload string.
+     * Pass the claim (`context` + `username`) and the signature is bound to
+     * it: the signed message is
+     * `demos-web2:v1:<context>:<username>:<ed25519Address>`, matching the
+     * node's `web2BoundProofMessage`. Without the claim the payload signs the
+     * legacy constant `"dw2p"`, which is the shape this replaces — that
+     * signature says only that the key took part, so a proof copied out of a
+     * public post is a valid proof under whatever handle it is republished
+     * on, and its signer can claim that handle.
+     *
+     * Nodes accept both shapes until the `web2ProofBinding` fork activates;
+     * after that, only the bound one.
+     *
+     * @param demos A connected Demos instance.
+     * @param claim The identity being claimed. Omit only to talk to a node
+     *   that predates the bound shape.
+     * @returns The proof payload string (`demos:dw2p:<algorithm>:<signature>`).
      */
-    async createWeb2ProofPayload(demos: Demos) {
-        const message = "dw2p"
+    async createWeb2ProofPayload(
+        demos: Demos,
+        claim?: { context: "twitter" | "github" | "discord"; username: string },
+    ) {
+        const sender = await demos.getEd25519Address()
+        const message = claim
+            ? `demos-web2:v1:${claim.context}:${claim.username.toLowerCase()}:${sender.toLowerCase()}`
+            : "dw2p"
         const signature = await demos.crypto.sign(
             demos.algorithm,
             new TextEncoder().encode(message),
         )
 
-        return `demos:${message}:${demos.algorithm}:${uint8ArrayToHex(
+        // The published tag stays "dw2p": it is what the node's parsers scan
+        // posts for, and what identifies the string as a Demos proof.
+        return `demos:dw2p:${demos.algorithm}:${uint8ArrayToHex(
             signature.signature,
         )}`
     }

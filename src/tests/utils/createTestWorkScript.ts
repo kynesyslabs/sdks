@@ -1,23 +1,31 @@
 import chainProviders from "@/tests/multichain/chainProviders"
-import { getNewUID } from "."
-import { DemosWork, prepareDemosWorkPayload } from "../work"
-import { prepareWeb2Step, prepareXMStep } from "../workstep"
+import { getNewUID } from "@/demoswork/utils"
+import { DemosWork, prepareDemosWorkPayload } from "@/demoswork/work"
+import { prepareWeb2Step, prepareXMStep } from "@/demoswork/workstep"
 
 import { EVM } from "@/multichain/core"
 import { XmStepResult } from "@/types/demoswork/steps"
 import { Demos, DemosWebAuth } from "@/websdk"
 import { Transaction } from "@/types"
-import { ConditionalOperation } from "../operations/conditional"
-import { BaseOperation } from "../operations/baseoperation"
+import { ConditionalOperation } from "@/demoswork/operations/conditional"
+import { BaseOperation } from "@/demoswork/operations/baseoperation"
 
 export default async function createTestWorkScript(): Promise<Transaction> {
     const work = new DemosWork()
 
     const uid = getNewUID()
     const evm = await EVM.create(chainProviders.eth.sepolia)
-    await evm.connectWallet(
-        "e0a00e307c21850cde41b18bae307a492c471b463b60ce5b631fdb80503b23f7",
-    )
+    // The key used to sit here as a literal, in a file that shipped inside the
+    // published package (only `build/tests` is excluded from `files`), so it
+    // was a private key handed to every consumer. Treat that one as burned;
+    // this reads whatever key the run supplies instead.
+    const privateKey = process.env.DEMOS_TEST_EVM_PRIVATE_KEY
+    if (!privateKey) {
+        throw new Error(
+            "createTestWorkScript needs DEMOS_TEST_EVM_PRIVATE_KEY (a funded Sepolia test key)",
+        )
+    }
+    await evm.connectWallet(privateKey)
     const payload = await evm.preparePay(evm.getAddress(), "0.0001")
     const sendEth = prepareXMStep({
         operations: {

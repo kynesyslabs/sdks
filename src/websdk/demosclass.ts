@@ -7,6 +7,8 @@ This library contains all the functions that are used to interact with the demos
 import axios from "axios"
 import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
+import { txSignaturePreimage } from "./utils/txSignaturePreimage"
+import { personalMessagePreimage } from "./utils/personalMessage"
 import { TransportError } from "./TransportError"
 
 // NOTE Including custom libraries from Demos
@@ -120,12 +122,25 @@ export class Demos {
     private _cachedNetworkInfoFailedAt: number = 0
     private _cachedNetworkInfoWarned: boolean = false
     /**
+     * When the successful answer was cached. Only consulted while some fork
+     * the node reported is still pending — see `_cachedAnswerStillHolds`.
+     */
+    private _cachedNetworkInfoAt: number = 0
+    /**
      * TTL for the failed-detection memo. After this elapses we re-attempt
      * `getNetworkInfo` so a transient outage doesn't poison the instance
      * forever. The warn-once flag is sticky across retries — operators
      * still see the warning exactly once per instance lifetime.
      */
     private static readonly _NETWORK_INFO_FAILURE_TTL_MS = 30_000
+
+    /**
+     * How long a successful answer is trusted while it still reports a fork
+     * as pending. A fork that has activated never deactivates, so that answer
+     * is cached for the instance's life; "not yet" is a statement about the
+     * current height and stops being true as the chain advances.
+     */
+    private static readonly _NETWORK_INFO_PENDING_FORK_TTL_MS = 30_000
 
     /**
      * Client-side nonce sequencer. Opt-in via {@link enableAutoNonce}. When
@@ -206,6 +221,7 @@ export class Demos {
                 this._cachedNetworkInfoRpcUrl = null
                 this._cachedNetworkInfoFailed = false
                 this._cachedNetworkInfoFailedAt = 0
+                this._cachedNetworkInfoAt = 0
                 // Local nonce counters are tied to the previous node's state;
                 // drop them so the next auto-nonce reservation reseeds from
                 // the new node.
@@ -529,8 +545,9 @@ export class Demos {
      * @param options.pollIntervalMs - Delay between inclusion polls. Defaults to 500.
      * @param options.failFastOnBroadcastError - Reject immediately if the broadcast
      *   RPC errors, instead of polling for a terminal status.
-     * @returns `{ broadcast, status }` — the broadcast RPC response and the
-     *   terminal on-chain status (`included` | `failed`, with optional `blockNumber`).
+     * @returns `{ hash, broadcast, status }` — the transaction hash, the
+     *   broadcast RPC response and the terminal on-chain status
+     *   (`included` | `failed`, with optional `blockNumber`).
      */
     async payAndWait(
         to: string,
@@ -571,8 +588,9 @@ export class Demos {
      * @param options.pollIntervalMs - Delay between inclusion polls. Defaults to 500.
      * @param options.failFastOnBroadcastError - Reject immediately if the broadcast
      *   RPC errors, instead of polling for a terminal status.
-     * @returns `{ broadcast, status }` — the broadcast RPC response and the
-     *   terminal on-chain status (`included` | `failed`, with optional `blockNumber`).
+     * @returns `{ hash, broadcast, status }` — the transaction hash, the
+     *   broadcast RPC response and the terminal on-chain status
+     *   (`included` | `failed`, with optional `blockNumber`).
      */
     async transferAndWait(
         to: string,
@@ -661,8 +679,12 @@ export class Demos {
                 const authMessage = Hashing.sha256(
                     `${identityStr}:${timestamp}`,
                 )
+                // raw: the node verifies this header against the unprefixed
+                // sha256 (`verifySignature.ts`), so the personal-message
+                // prefix would fail auth until the node follows.
                 const { data } = await this.signMessage(authMessage, {
                     algorithm: "ed25519",
+                    raw: true,
                 })
                 headers["identity"] = identityStr
                 headers["signature"] = data
@@ -711,6 +733,8 @@ export class Demos {
      * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
      * @param opts.failFastOnBroadcastError - Reject immediately if the broadcast
      *   RPC errors, instead of polling for a terminal status.
+     * @returns `{ hash, broadcast, status }` — the transaction hash, the
+     *   broadcast RPC response and the terminal on-chain status.
      */
     broadcastAndWait(
         validationData: RPCResponseWithValidityData,
@@ -859,10 +883,16 @@ export class Demos {
         // round-trips through the canonical post-fork-or-pre-fork shape
         // and matches the bytes hashed.
         raw_tx.content = JSON.parse(serialized) as TransactionContent
-        const signature = await this.crypto.sign(
-            this.algorithm,
-            new TextEncoder().encode(raw_tx.hash),
+        // The signed bytes are domain-separated once the node has activated
+        // `signatureDomain`: a signature then says it is a Demos transaction
+        // on one named chain, instead of being indistinguishable from a
+        // signature over any other 64-hex string.
+        const signedBytes = txSignaturePreimage(
+            raw_tx.hash,
+            await this._chainIdCached(),
+            await this._isSignatureDomainActiveCached(),
         )
+        const signature = await this.crypto.sign(this.algorithm, signedBytes)
 
         // INFO: We only dual-sign when signing with PQC keypairs
         let dual_sign = this.dual_sign && this.algorithm !== "ed25519"
@@ -870,7 +900,7 @@ export class Demos {
         if (dual_sign) {
             const ed25519_signature = await this.crypto.sign(
                 "ed25519",
-                new TextEncoder().encode(raw_tx.hash),
+                signedBytes,
             )
             raw_tx.ed25519_signature = uint8ArrayToHex(
                 ed25519_signature.signature,
@@ -888,14 +918,26 @@ export class Demos {
     /**
      * Signs a message.
      *
+     * The signature covers the domain-separated preimage
+     * `\x19Demos Signed Message:\n<byte length><message>`, not the bare
+     * message bytes. A transaction signature covers `TextEncoder(tx.hash)`, so
+     * unprefixed a caller-chosen message of 64 hex characters produced a
+     * signature equally valid as a transaction signature: a site asking for a
+     * "login challenge" could hand over the hash of a transaction it had
+     * built and keep what the user believed was a login. The two preimages can
+     * no longer collide.
+     *
      * @param message - The message to sign
      * @param options - The options for the message signing
      * @param options.algorithm - The algorithm to use for the message signing. Defaults to the connected wallet's algorithm.
+     * @param options.raw - Sign the unprefixed bytes, for verifiers that still
+     *   expect the legacy preimage (the node's auth headers). Never route a
+     *   caller-supplied message through it.
      * @returns The signature of the message
      */
     async signMessage(
         message: string | Buffer,
-        options?: { algorithm?: SigningAlgorithm },
+        options?: { algorithm?: SigningAlgorithm; raw?: boolean },
     ): Promise<{ type: SigningAlgorithm; data: string }> {
         const algorithm = options?.algorithm || this.algorithm
 
@@ -912,7 +954,12 @@ export class Demos {
             messageBuffer = message
         }
 
-        const signature = await this.crypto.sign(algorithm, messageBuffer)
+        const signature = await this.crypto.sign(
+            algorithm,
+            options?.raw
+                ? messageBuffer
+                : personalMessagePreimage(messageBuffer),
+        )
 
         return { type: algorithm, data: uint8ArrayToHex(signature.signature) }
     }
@@ -925,6 +972,10 @@ export class Demos {
      * @param publicKey - The public key of the message
      * @param options - The options for the message verification
      * @param options.algorithm - The algorithm to use for the message verification. Defaults to the connected wallet's algorithm or ed25519 if no wallet is connected.
+     * @param options.raw - Verify against the unprefixed bytes, for signatures
+     *   produced by `signMessage(..., { raw: true })` or by an SDK older than
+     *   the domain-separated preimage. Off by default: accepting the legacy
+     *   form lets a transaction signature stand in for a message signature.
      *
      * @returns Whether the message is verified
      */
@@ -932,7 +983,7 @@ export class Demos {
         message: string | Buffer,
         signature: string,
         publicKey: string,
-        options?: { algorithm?: SigningAlgorithm },
+        options?: { algorithm?: SigningAlgorithm; raw?: boolean },
     ): Promise<boolean> {
         const algorithm = options?.algorithm || this.algorithm
 
@@ -947,7 +998,9 @@ export class Demos {
             algorithm: algorithm,
             signature: hexToUint8Array(signature),
             publicKey: hexToUint8Array(publicKey),
-            message: messageBuffer,
+            message: options?.raw
+                ? messageBuffer
+                : personalMessagePreimage(messageBuffer),
         })
 
         return verified
@@ -1537,9 +1590,20 @@ export class Demos {
     }
 
     /**
-     * Get address nonce.
+     * The **confirmed** nonce of an address: the highest nonce the chain has
+     * included for it, not the value to sign the next transaction with.
+     *
+     * The node validates a transaction with `nonce > confirmed` and reports
+     * `Expected >= confirmed + 1` when it doesn't hold, so a caller passing an
+     * explicit nonce wants {@link getNextNonce}, or no `nonce` option at all —
+     * the builders resolve it themselves. This holds for every transaction
+     * type: a web2/DAHR request consumes a nonce exactly like a transfer does.
+     *
+     * Pending transactions do not move this value; it advances on inclusion.
+     * For dependent sends see {@link waitForNonce} or {@link enableAutoNonce}.
      *
      * @param address - The address
+     * @returns The confirmed nonce, or 0 when the node reports none.
      */
     async getAddressNonce(address: string): Promise<number> {
         const nonceValue = await this.nodeCall("getAddressNonce", {
@@ -1558,6 +1622,33 @@ export class Demos {
         }
 
         return 0
+    }
+
+    /**
+     * The nonce to sign the next transaction from `address` with: the confirmed
+     * nonce plus one, which is the lowest value the node accepts.
+     *
+     * Use it whenever a nonce is derived by hand — deriving a storage address,
+     * anchoring after a web2/DAHR request, or any flow that pre-computes what
+     * it is about to send. Passing {@link getAddressNonce} directly is the
+     * off-by-one the node rejects with `[NONCE ERROR] Expected >= n+1, got: n`.
+     *
+     * It reads the chain, so it does not account for transactions this client
+     * has already broadcast but the chain has not included yet. For several
+     * sends in a row, use {@link enableAutoNonce} (local sequencing) or
+     * {@link waitForNonce} (wait for inclusion).
+     *
+     * @example
+     * ```ts
+     * const nonce = await demos.getNextNonce(address)
+     * const tx = await demos.store(bytes, { nonce })
+     * ```
+     *
+     * @param address - The address
+     * @returns The confirmed nonce + 1.
+     */
+    async getNextNonce(address: string): Promise<number> {
+        return (await this.getAddressNonce(address)) + 1
     }
 
     /**
@@ -1808,7 +1899,8 @@ export class Demos {
         // paths still see correct behaviour.
         if (
             this._cachedNetworkInfo &&
-            this._cachedNetworkInfoRpcUrl === this.rpc_url
+            this._cachedNetworkInfoRpcUrl === this.rpc_url &&
+            this._cachedAnswerStillHolds()
         ) {
             return this._cachedNetworkInfo
         }
@@ -1821,6 +1913,7 @@ export class Demos {
             this._cachedNetworkInfoRpcUrl = null
             this._cachedNetworkInfoFailed = false
             this._cachedNetworkInfoFailedAt = 0
+            this._cachedNetworkInfoAt = 0
         }
         // Honour the failed-cache TTL so a transient outage doesn't lock
         // the instance into pre-fork mode forever. After the TTL we'll
@@ -1853,6 +1946,7 @@ export class Demos {
         ) {
             this._cachedNetworkInfo = fresh as NetworkInfo
             this._cachedNetworkInfoRpcUrl = this.rpc_url
+            this._cachedNetworkInfoAt = Date.now()
             // A successful detection clears any stale failure memo for
             // the current rpc_url.
             this._cachedNetworkInfoFailed = false
@@ -1876,6 +1970,33 @@ export class Demos {
 
     /**
      * @internal
+     * Whether the cached answer can still be trusted.
+     *
+     * An activated fork stays activated, so an answer where everything the
+     * node reported is already active never goes stale. An answer carrying a
+     * fork that has not activated yet is only true of the height it was
+     * fetched at: a long-lived instance that cached "not yet" and kept it
+     * would sign the legacy preimage forever, and every transaction it
+     * produced after the chain crossed the activation height would be
+     * rejected until the process restarted. So that answer expires.
+     */
+    private _cachedAnswerStillHolds(): boolean {
+        const forks = this._cachedNetworkInfo?.forks
+        if (!forks) return false
+
+        const pending = Object.values(forks).some(
+            fork => fork && fork.activated === false,
+        )
+        if (!pending) return true
+
+        return (
+            Date.now() - this._cachedNetworkInfoAt <
+            Demos._NETWORK_INFO_PENDING_FORK_TTL_MS
+        )
+    }
+
+    /**
+     * @internal
      * Cached fork-status accessor. Returns `osDenomination` activation
      * status as a boolean. `false` is the safe default (legacy wire
      * format) when the node is unreachable or pre-P3c.
@@ -1883,6 +2004,29 @@ export class Demos {
     private async _isPostForkCached(): Promise<boolean> {
         const info = await this.getNetworkInfo()
         return Boolean(info?.forks?.osDenomination?.activated)
+    }
+
+    /**
+     * @internal
+     * Whether the target node verifies the domain-separated transaction
+     * preimage. `false` is the safe default: a node that predates the fork,
+     * or one that cannot be reached, still expects the legacy bytes, and
+     * signing the new preimage for it would produce transactions it rejects.
+     */
+    private async _isSignatureDomainActiveCached(): Promise<boolean> {
+        const info = await this.getNetworkInfo()
+        return Boolean(info?.forks?.signatureDomain?.activated)
+    }
+
+    /**
+     * @internal
+     * The chain id the signature binds to, from the same cached call. Only
+     * read when the fork is active, where the node always reports one — a
+     * node with no chain id cannot activate the fork.
+     */
+    private async _chainIdCached(): Promise<number> {
+        const info = await this.getNetworkInfo()
+        return typeof info?.chainId === "number" ? info.chainId : 0
     }
 
     /**
@@ -1895,6 +2039,7 @@ export class Demos {
         this._cachedNetworkInfoRpcUrl = null
         this._cachedNetworkInfoFailed = false
         this._cachedNetworkInfoFailedAt = 0
+        this._cachedNetworkInfoAt = 0
         this._cachedNetworkInfoWarned = false
     }
 

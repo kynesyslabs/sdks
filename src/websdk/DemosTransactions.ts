@@ -18,6 +18,7 @@ import { Enigma } from "@/encryption/PQC/enigma"
 import { BroadcastTimeoutError } from "./BroadcastTimeoutError"
 import { BroadcastFailedError } from "./BroadcastFailedError"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
+import { txSignaturePreimage } from "./utils/txSignaturePreimage"
 import { OS_PER_DEM } from "@/denomination"
 import { resolveNonce } from "@/utils"
 
@@ -231,9 +232,20 @@ export const DemosTransactions = {
      * Signs a transaction after hashing its content.
      *
      * @deprecated Use demos.sign(tx) instead
-     * 
+     *
+     * This path has no `Demos` instance and so cannot ask the node anything:
+     * it assumes the pre-fork wire shape, and unless `chainId` is passed it
+     * signs the legacy bare-hash preimage. A node that has activated
+     * `signatureDomain` verifies `demos-tx:v1:<chainId>:<hash>` instead and
+     * rejects what this produces. Callers who cannot move to `demos.sign(tx)`
+     * yet should read the chain id from `getNetworkInfo` and pass it here
+     * once the fork is active on their target network.
+     *
      * @param raw_tx - The transaction to be signed.
      * @param keypair - The keypair to use for signing.
+     * @param options.algorithm - The algorithm related to the keypair.
+     * @param options.chainId - The network id to bind the signature to. Omit
+     *   for the legacy preimage, which only pre-fork nodes accept.
      * @returns A Promise that resolves to the signed transaction.
      */
     sign: async function (
@@ -241,6 +253,7 @@ export const DemosTransactions = {
         keypair: IKeyPair,
         options: {
             algorithm: SigningAlgorithm
+            chainId?: number
         },
     ): Promise<Transaction> {
         required(keypair, "Private key not provided")
@@ -278,8 +291,17 @@ export const DemosTransactions = {
         // the bytes we just signed. See the equivalent block in
         // `Demos.sign` for the full rationale (myc#13).
         raw_tx.content = JSON.parse(serialized) as Transaction["content"]
+        // Built through the shared helper so these bytes cannot drift from
+        // the ones `Demos.sign` and the node produce.
+        const signedBytes = new TextDecoder().decode(
+            txSignaturePreimage(
+                raw_tx.hash,
+                options.chainId ?? 0,
+                typeof options.chainId === "number",
+            ),
+        )
         raw_tx.signature = await DemosTransactions.signWithAlgorithm(
-            raw_tx.hash,
+            signedBytes,
             keypair,
             { algorithm: options.algorithm },
         )
@@ -429,7 +451,10 @@ export const DemosTransactions = {
      * @param opts.failFastOnBroadcastError - If true, throw `BroadcastFailedError`
      *   immediately when the broadcast can't contact the node. Defaults to false.
      *
-     * @returns The original broadcast response and the terminal status.
+     * @returns The transaction hash, the original broadcast response, and the
+     *   terminal status. The hash is the node-recalculated one the status polls
+     *   ran against, so it is the identifier an explorer or a later
+     *   `getTransactionStatus` call will resolve.
      */
     broadcastAndWait: async function (
         validationData: RPCResponseWithValidityData,
@@ -440,6 +465,7 @@ export const DemosTransactions = {
             failFastOnBroadcastError?: boolean
         },
     ): Promise<{
+        hash: string
         broadcast: RPCResponse
         status: { state: "included" | "failed"; blockNumber?: number }
     }> {
@@ -544,6 +570,7 @@ export const DemosTransactions = {
                     const blockNumber: number | undefined =
                         (statusRes as any).blockNumber
                     return {
+                        hash: txHash,
                         broadcast: broadcastRes,
                         status: { state, blockNumber },
                     }
