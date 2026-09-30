@@ -11,6 +11,8 @@ import type {
     CachedPayment
 } from './types'
 import { demToOs, parseOsString } from '@/denomination'
+import { normalizeHexAddress } from '@/utils'
+import { d402Memo } from '../memo'
 
 /**
  * Normalise a D402 dual-shape amount carrier to OS `bigint`.
@@ -97,75 +99,29 @@ export class D402Server {
             }
         }
 
-        // Fetch transaction from RPC
-        // Note: We need to get the full transaction, not just verify
-        // The /d402/verify endpoint expects a full transaction object
-        // So we'll fetch the transaction first, then verify it
-
         try {
-            const txResponse = await fetch(`${this.rpcUrl}/getTransaction`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hash: txHash })
+            const tx = await this.fetchStoredTx(txHash)
+            const payment = tx ? paymentFromStoredTx(tx, txHash) : null
+            if (!payment) {
+                return { valid: false, timestamp: Date.now() }
+            }
+
+            const timestamp = Date.now()
+            this.paymentCache.set(txHash, {
+                txHash,
+                ...payment,
+                timestamp,
+                expiresAt: timestamp + (this.cacheTTL * 1000)
             })
-
-            if (!txResponse.ok) {
-                return {
-                    valid: false,
-                    timestamp: Date.now()
-                }
-            }
-
-            const tx = await txResponse.json()
-
-            // Verify the transaction
-            const verifyResponse = await fetch(`${this.rpcUrl}/d402/verify`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ transaction: tx })
-            })
-
-            if (!verifyResponse.ok) {
-                return {
-                    valid: false,
-                    timestamp: Date.now()
-                }
-            }
-
-            const verification = await verifyResponse.json()
-
-            if (verification.valid) {
-                // Extract payment details from transaction
-                const paymentData = tx.content.data[1]
-                const memo = paymentData.memo || ''
-
-                // Cache the verified payment
-                const cachedPayment: CachedPayment = {
-                    txHash,
-                    from: verification.verified_from,
-                    to: verification.verified_to,
-                    amount: verification.verified_amount,
-                    memo,
-                    timestamp: verification.timestamp,
-                    expiresAt: Date.now() + (this.cacheTTL * 1000)
-                }
-                this.paymentCache.set(txHash, cachedPayment)
-
-                return {
-                    valid: true,
-                    verified_from: verification.verified_from,
-                    verified_to: verification.verified_to,
-                    verified_amount: verification.verified_amount,
-                    verified_memo: memo,
-                    timestamp: verification.timestamp
-                }
-            }
 
             return {
-                valid: false,
-                timestamp: Date.now()
+                valid: true,
+                verified_from: payment.from,
+                verified_to: payment.to,
+                verified_amount: payment.amount,
+                verified_memo: payment.memo,
+                timestamp
             }
-
         } catch (error) {
             console.error('D402Server: Verification error:', error)
             return {
@@ -173,6 +129,42 @@ export class D402Server {
                 timestamp: Date.now()
             }
         }
+    }
+
+    /**
+     * Read a transaction back from the node with the `getTxByHash` nodeCall,
+     * the lookup every node release serves. The node answers only once the
+     * transaction is stored in a block; anything else comes back as an
+     * error or the string "error".
+     */
+    private async fetchStoredTx(txHash: string): Promise<any> {
+        const response = await fetch(this.rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                method: 'nodeCall',
+                params: [
+                    {
+                        type: 'nodeCall',
+                        message: 'getTxByHash',
+                        sender: null,
+                        receiver: null,
+                        timestamp: null,
+                        data: { hash: txHash },
+                        extra: '',
+                        muid: randomMuid()
+                    }
+                ]
+            })
+        })
+        if (!response.ok) {
+            return null
+        }
+        const reply = await response.json()
+        if (Number(reply?.result) !== 200) {
+            return null
+        }
+        return reply.response
     }
 
     /**
@@ -204,8 +196,15 @@ export class D402Server {
             return false
         }
 
-        // Check recipient matches
-        if (verification.verified_to !== requirement.recipient) {
+        // Check recipient matches. Both sides are spelled canonically first:
+        // a requirement written without `0x` or in upper case names the same
+        // account the node reports.
+        if (
+            !verification.verified_to ||
+            typeof requirement.recipient !== 'string' ||
+            normalizeHexAddress(verification.verified_to) !==
+                normalizeHexAddress(requirement.recipient)
+        ) {
             return false
         }
 
@@ -248,7 +247,7 @@ export class D402Server {
         // Check the resource the payment names.
         const memo = verification.verified_memo || ''
 
-        if (!memoNamesResource(memo, requirement.resourceId)) {
+        if (!memoNamesResource(memo, requirement.resourceId, requirement.description)) {
             return false
         }
 
@@ -279,13 +278,84 @@ export class D402Server {
  * Does this memo name exactly this resource?
  *
  * The memo is `resourceId:<id>`, optionally followed by ` - <description>`
- * (see `D402Client.createPayment`). Matching it with `startsWith` compared a
- * prefix, not the id: a payment for `user-12` also satisfied a requirement
- * for `user-1`, so paying for one resource could unlock a different one that
- * happens to share a prefix, is priced the same and is paid to the same
- * recipient.
+ * (see `D402Client.createPayment`). Only the two memos the client builds for
+ * this requirement are accepted. Taking any ` - ` suffix as a description
+ * matched a prefix, not the id: a payment for `a - b` (an id that itself
+ * contains ` - `) or for `user-12` could unlock `a` or `user-1`.
  */
-export function memoNamesResource(memo: string, resourceId: string): boolean {
-    const expected = `resourceId:${resourceId}`
-    return memo === expected || memo.startsWith(`${expected} - `)
+export function memoNamesResource(
+    memo: string,
+    resourceId: string,
+    description?: string,
+): boolean {
+    return (
+        memo === d402Memo(resourceId) ||
+        (!!description && memo === d402Memo(resourceId, description))
+    )
+}
+
+/**
+ * The payment a stored transaction makes, or null when it is not a d402
+ * payment that landed: another transaction's answer, a failed or unmined
+ * transaction, or one of another type proves nothing.
+ *
+ * The credited account and amount are read from the balance credit the node
+ * applied, and must agree with the signed payload the memo comes from.
+ */
+function paymentFromStoredTx(
+    tx: any,
+    txHash: string,
+): { from: string; to: string; amount: number | string; memo: string } | null {
+    if (!tx || typeof tx !== 'object') return null
+    const sameHash =
+        typeof tx.hash === 'string' &&
+        tx.hash.replace(/^0x/i, '').toLowerCase() ===
+            txHash.replace(/^0x/i, '').toLowerCase()
+    if (!sameHash || typeof tx.blockNumber !== 'number') return null
+    if (String(tx.status) !== 'confirmed') return null
+
+    const content = tx.content
+    if (content?.type !== 'd402_payment') return null
+    const data = Array.isArray(content.data) ? content.data : []
+    const payload = data[0] === 'd402_payment' ? data[1] : null
+    if (!payload || typeof payload.to !== 'string') return null
+
+    const from = content.from_ed25519_address ?? content.from
+    if (typeof from !== 'string' || !from) return null
+
+    const credit = Array.isArray(content.gcr_edits)
+        ? content.gcr_edits.find(
+              (e: any) => e?.type === 'balance' && e?.operation === 'add',
+          )
+        : undefined
+    const to = typeof credit?.account === 'string' ? credit.account : payload.to
+    const amount = credit?.amount ?? payload.amount
+    if (typeof to !== 'string' || (typeof amount !== 'number' && typeof amount !== 'string')) {
+        return null
+    }
+
+    // The credit is what moved; the payload is what was signed. They are
+    // compared exactly, as the node keys the credit by the payload's string.
+    if (to !== payload.to) return null
+    try {
+        if (
+            _normalizeD402AmountToOsBigint(amount) !==
+            _normalizeD402AmountToOsBigint(payload.amount)
+        ) {
+            return null
+        }
+    } catch {
+        return null
+    }
+
+    return {
+        from,
+        to,
+        amount,
+        memo: typeof payload.memo === 'string' ? payload.memo : '',
+    }
+}
+
+function randomMuid(): string {
+    return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
