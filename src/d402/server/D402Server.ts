@@ -11,6 +11,7 @@ import type {
     CachedPayment
 } from './types'
 import { demToOs, parseOsString } from '@/denomination'
+import { randomUUID } from 'crypto'
 import { normalizeHexAddress } from '@/utils'
 import { d402Memo } from '../memo'
 
@@ -361,5 +362,7 @@ function paymentFromStoredTx(
 }
 
 function randomMuid(): string {
-    return globalThis.crypto.randomUUID()
+    // The server side runs on Node; the module import works on every
+    // supported version, where globalThis.crypto does not (Node 18).
+    return randomUUID()
 }
