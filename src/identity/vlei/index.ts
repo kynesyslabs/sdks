@@ -4,7 +4,8 @@
  * A relying party verifies a KERI/ACDC vLEI chain (`verifyChain`), distils the
  * verdict into a signed, digest-only attestation (`buildAttestation` /
  * `signAttestation`), and anchors it into the subject's DACS-1 bundle as a CCI
- * claim (`anchorAttestation`) that anyone can resolve back (`resolveAttestation`).
+ * claim (`anchorAttestation`) that anyone can resolve back from the attesters they
+ * trust (`resolveAttestation`).
  *
  * Built on the SDK's `identity/cci` (primary-claim signing) and
  * `storage/StorageProgram` (SR-2). The verifier reads KERI state through an
@@ -45,6 +46,7 @@ export {
     resolveAttestation,
     attestationProgramName,
     type AnchorAttestationResult,
+    type ResolveAttestationOpts,
 } from "./anchor"
 export {
     VERIFYRESULT_DOMAIN_PREFIX,

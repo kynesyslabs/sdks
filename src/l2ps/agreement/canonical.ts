@@ -24,7 +24,10 @@ export const AGREEMENT_DOMAIN_PREFIX = "dacs-agreement:v1:"
  * @param value - The value to walk.
  * @param path - Human-readable path used in the error message.
  * @param seen - Cycle guard; callers should not pass this.
- * @throws If any nested number is not finite.
+ * Integers beyond `Number.MAX_SAFE_INTEGER` are refused for the same reason:
+ * several wire literals collapse to one double.
+ *
+ * @throws If any nested number is not finite or is an unsafe integer.
  */
 function assertInjectivelySerialisable(
     value: unknown,
@@ -35,6 +38,13 @@ function assertInjectivelySerialisable(
         if (!Number.isFinite(value))
             throw new Error(
                 `agreement: ${path} is ${String(value)}, which canonicalises to null and would collide with a real null`,
+            )
+        // Past 2^53 distinct decimal literals parse to the same double, so the
+        // signed bytes would not be the amount the wire text states — and a
+        // rewritten literal would still verify.
+        if (Number.isInteger(value) && !Number.isSafeInteger(value))
+            throw new Error(
+                `agreement: ${path} is ${String(value)}, not a safe integer; encode large amounts as strings`,
             )
         return
     }
@@ -60,7 +70,7 @@ function assertInjectivelySerialisable(
  * @param unsigned - The document without its signatures.
  * @returns Lowercase hex sha256 of the canonical bytes.
  * @throws If the document cannot be canonicalised injectively (a non-finite
- * number, or anything `canonicalJSONStringify` rejects — `undefined`, bigint,
+ * number or unsafe integer, or anything `canonicalJSONStringify` rejects — `undefined`, bigint,
  * a class instance, a cycle). Callers that must not throw — such as
  * `verifyAgreement` — catch this.
  */

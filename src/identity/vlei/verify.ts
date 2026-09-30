@@ -13,7 +13,7 @@
  * The verifier trusts nothing from the presenter: schema SAIDs are pinned
  * (`schemas.ts`) and the chain root must be issued by `trustedRootAid`.
  */
-import { CHAIN_RULES, SCHEMA_NAME_BY_SAID } from "./schemas"
+import { CHAIN_RULES, SCHEMA_NAME_BY_SAID, type SchemaName } from "./schemas"
 import { canonicalDigest } from "./canonical"
 import type {
     ChainNode,
@@ -28,6 +28,11 @@ import type {
 /** sha256 over the canonical proposed transaction — the value a proof binds to. */
 export function txDigest(tx: ProposedTx): string {
     return canonicalDigest(tx)
+}
+
+/** Own-property lookup: a presented `sad.s` such as "constructor" must not hit the prototype. */
+function pinnedSchemaName(said: string): SchemaName | undefined {
+    return Object.prototype.hasOwnProperty.call(SCHEMA_NAME_BY_SAID, said) ? SCHEMA_NAME_BY_SAID[said] : undefined
 }
 
 function normalizeKeyState(ks: VleiKeyState | VleiKeyState[] | undefined): VleiKeyState | undefined {
@@ -228,6 +233,16 @@ export async function verifyChain(
     const bySaid = new Map<string, ChainNode>()
     // Presented edge operators, checked against the pinned schema rules below.
     const edgeOp = new Map<string, string>()
+    // Missing data is retryable; everything else is a contradiction. Reasons that
+    // only follow from missing data (an absent parent, an unreached root) are kept
+    // apart so they neither read as contradictions nor mask real ones.
+    const unresolved: string[] = []
+    const unresolvedSaids = new Set<string>()
+    const consequential = new Set<string>()
+    const pushConsequential = (r: string) => {
+        consequential.add(r)
+        reasons.push(r)
+    }
 
     const visited = new Set<string>()
     const queue: string[] = [leafSaid]
@@ -241,7 +256,10 @@ export async function verifyChain(
         try {
             cred = await source.getCredential(said)
         } catch {
-            reasons.push(`unresolvable credential ${said} (fail-closed)`)
+            const r = `unresolvable credential ${said} (fail-closed)`
+            unresolved.push(r)
+            unresolvedSaids.add(said)
+            reasons.push(r)
             continue
         }
 
@@ -257,7 +275,7 @@ export async function verifyChain(
         }
 
         const schema = cred.sad.s
-        const schemaName = SCHEMA_NAME_BY_SAID[schema]
+        const schemaName = pinnedSchemaName(schema)
         const node: ChainNode = {
             said,
             schema,
@@ -316,7 +334,9 @@ export async function verifyChain(
         const edgeRule = CHAIN_RULES[node.schemaName].edges?.find(e => e.name === node.edgeName)
         const parent = bySaid.get(node.edgeTo)
         if (!parent) {
-            reasons.push(`${node.schemaName} edge target ${node.edgeTo} not in presented chain`)
+            const r = `${node.schemaName} edge target ${node.edgeTo} not in presented chain`
+            if (unresolvedSaids.has(node.edgeTo)) pushConsequential(r)
+            else reasons.push(r)
             continue
         }
         if (edgeRule && (!parent.schemaName || !edgeRule.parentSchemas.includes(parent.schemaName))) {
@@ -354,8 +374,12 @@ export async function verifyChain(
     const accountableOfficer = aaNode?.attributes?.accountableOfficer as string | undefined
     const entityLineage = aaNode ? lineageToLegalEntity(aaNode, bySaid) : undefined
     if (aaNode && entityLineage) {
-        reasons.push(...entityBindingReasons(aaNode, entityLineage.le, entityLineage.intermediates))
+        const binding = entityBindingReasons(aaNode, entityLineage.le, entityLineage.intermediates)
+        // Without the legal entity in hand the binding was never checked, only missed.
+        if (!entityLineage.le && unresolvedSaids.size) binding.forEach(pushConsequential)
+        else reasons.push(...binding)
     }
+    const chainReasonCount = reasons.length
 
     // Step 2 (full) — delegated agent AID for an agent-authority credential. The
     // expected delegator is the legal entity from the walked lineage, never the AA
@@ -368,16 +392,29 @@ export async function verifyChain(
         // control against, and passing would attest authority for nobody.
         reasons.push("agent-authority credential names no delegated agent AID (sad.a.i); failing closed")
     } else if (aaNode && aaNode.issuee) {
-        const ks = await keyState(source, aaNode.issuee)
+        let ks: VleiKeyState | undefined
+        let ksUnresolvable = false
+        try {
+            ks = normalizeKeyState(await source.getKeyState(aaNode.issuee))
+        } catch {
+            ksUnresolvable = true
+        }
+        // A source may report an unavailable key state by returning nothing
+        // rather than throwing; either way nothing has been contradicted yet.
+        if (!ks) ksUnresolvable = true
         keyStateDigests[aaNode.issuee] = keyStateDigest(ks)
         const di = ks?.di
         const entityAid = entityLineage?.le?.issuee
-        const ok = !!di && !!entityAid && di === entityAid
+        const ok = !ksUnresolvable && !!di && !!entityAid && di === entityAid
         delegation = { agentAid: aaNode.issuee, delegator: di, expectedDelegator: entityAid ?? "", ok }
-        if (!ok) {
-            reasons.push(
-                `agent AID ${aaNode.issuee} is not delegated by the legal entity ${entityAid ?? "(unresolved)"} (di=${di ?? "none"})`,
-            )
+        if (ksUnresolvable) {
+            const r = `unresolvable key state for agent AID ${aaNode.issuee}`
+            unresolved.push(r)
+            reasons.push(r)
+        } else if (!ok) {
+            const r = `agent AID ${aaNode.issuee} is not delegated by the legal entity ${entityAid ?? "(unresolved)"} (di=${di ?? "none"})`
+            if (!entityAid && unresolvedSaids.size) pushConsequential(r)
+            else reasons.push(r)
         }
     }
 
@@ -388,7 +425,8 @@ export async function verifyChain(
             ? evaluateScope(aaNode.attributes?.authorityScope, opts.proposedTx)
             : ["no agent-authority credential in chain to evaluate scope against"]
         scope = { tx: opts.proposedTx, ok: scopeReasons.length === 0, reasons: scopeReasons }
-        reasons.push(...scopeReasons)
+        if (!aaNode && unresolvedSaids.size) scopeReasons.forEach(pushConsequential)
+        else reasons.push(...scopeReasons)
     }
 
     // Step 0 (replay protection) — live control of the agent's key over a fresh
@@ -412,7 +450,14 @@ export async function verifyChain(
     const reachedRoot = chain.some(
         n => n.schemaName && CHAIN_RULES[n.schemaName].isRoot && n.issuer === trustedRootAid,
     )
-    if (!reachedRoot) reasons.push("chain does not terminate at the trusted GLEIF root")
+    if (!reachedRoot) {
+        const r = "chain does not terminate at the trusted GLEIF root"
+        if (unresolvedSaids.size) pushConsequential(r)
+        else reasons.push(r)
+    }
+    const chainOk = chainReasonCount === 0 && reachedRoot
+    const unresolvedSet = new Set(unresolved)
+    const contradictions = reasons.filter(r => !unresolvedSet.has(r) && !consequential.has(r))
 
     const timestamp = opts.timestamp ?? new Date().toISOString()
     const record = stripUndefinedDeep({
@@ -441,6 +486,9 @@ export async function verifyChain(
         keyControl,
         timestamp,
         recordDigest,
+        chainOk,
+        unresolved,
+        contradictions,
     }
 }
 

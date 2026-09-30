@@ -607,7 +607,7 @@ describe("resolveAttestation (mocked substrate)", () => {
         const ownerHex = await demos.getEd25519Address()
         jest.spyOn(StorageProgram, "searchByName").mockResolvedValue([spItem("stor-valid")] as any)
         jest.spyOn(StorageProgram, "getByAddress").mockResolvedValue(spRecord(ownerHex, att as unknown as Record<string, unknown>) as any)
-        const resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, RPC)
+        const resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, RPC, { trustedAttesters: [attesterClaim] })
         expect(resolved?.subjectClaim).toBe(att.subjectClaim)
     })
 
@@ -615,7 +615,7 @@ describe("resolveAttestation (mocked substrate)", () => {
         const other = await newConnectedDemos()
         jest.spyOn(StorageProgram, "searchByName").mockResolvedValue([spItem("stor-impostor")] as any)
         jest.spyOn(StorageProgram, "getByAddress").mockResolvedValue(spRecord(await other.getEd25519Address(), att as unknown as Record<string, unknown>) as any)
-        const resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, RPC)
+        const resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, RPC, { trustedAttesters: [attesterClaim] })
         expect(resolved).toBeNull()
     })
 
@@ -626,13 +626,51 @@ describe("resolveAttestation (mocked substrate)", () => {
             if (addr === "stor-bad") return spRecord("not-a-hex-address", att as unknown as Record<string, unknown>) as any
             return spRecord(ownerHex, att as unknown as Record<string, unknown>) as any
         })
-        const resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, RPC)
+        const resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, RPC, { trustedAttesters: [attesterClaim] })
         expect(resolved?.subjectClaim).toBe(att.subjectClaim)
+    })
+
+    it("never returns a validly anchored attestation from an untrusted attester", async () => {
+        // A self-consistent squatter: own key signs, own wallet owns the SP.
+        const squatter = await newConnectedDemos()
+        const squatterClaim = demosClaimRefForAddress(await squatter.getEd25519Address())
+        const verdict = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
+        const forged = await signAttestation(buildAttestation(verdict, squatterClaim, { boundAt: 1700000000000 }), squatter)
+        expect(verifyAttestation(forged)).toBe(true)
+        const ownerHex = await demos.getEd25519Address()
+        const squatterHex = await squatter.getEd25519Address()
+        jest.spyOn(StorageProgram, "searchByName").mockResolvedValue([spItem("stor-squat"), spItem("stor-real")] as any)
+        jest.spyOn(StorageProgram, "getByAddress").mockImplementation(async (_rpc: string, addr: string) => {
+            if (addr === "stor-squat") return spRecord(squatterHex, forged as unknown as Record<string, unknown>) as any
+            return spRecord(ownerHex, att as unknown as Record<string, unknown>) as any
+        })
+        const resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, RPC, { trustedAttesters: [attesterClaim] })
+        expect(resolved?.attesterClaim).toBe(attesterClaim)
+
+        jest.spyOn(StorageProgram, "searchByName").mockResolvedValue([spItem("stor-squat")] as any)
+        await expect(
+            resolveAttestation(att.subjectClaim, att.recordDigest, RPC, { trustedAttesters: [attesterClaim] }),
+        ).resolves.toBeNull()
+    })
+
+    it("accepts a trusted attester given as a bare (0x-prefixed, mixed-case) address", async () => {
+        const ownerHex = await demos.getEd25519Address()
+        jest.spyOn(StorageProgram, "searchByName").mockResolvedValue([spItem("stor-valid")] as any)
+        jest.spyOn(StorageProgram, "getByAddress").mockResolvedValue(spRecord(ownerHex, att as unknown as Record<string, unknown>) as any)
+        const bare = "0x" + ownerHex.replace(/^0x/i, "").toUpperCase()
+        const resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, RPC, { trustedAttesters: [bare] })
+        expect(resolved?.subjectClaim).toBe(att.subjectClaim)
+    })
+
+    it("refuses to resolve without a trusted attester set", async () => {
+        await expect(
+            resolveAttestation(att.subjectClaim, att.recordDigest, RPC, { trustedAttesters: [] }),
+        ).rejects.toThrow(/trustedAttesters/)
     })
 
     it("returns null when no candidate exists", async () => {
         jest.spyOn(StorageProgram, "searchByName").mockResolvedValue([] as any)
-        await expect(resolveAttestation(att.subjectClaim, att.recordDigest, RPC)).resolves.toBeNull()
+        await expect(resolveAttestation(att.subjectClaim, att.recordDigest, RPC, { trustedAttesters: [attesterClaim] })).resolves.toBeNull()
     })
 })
 
@@ -668,6 +706,14 @@ describe("DACS-2 VerifyResult mapping (vet recipe output)", () => {
     it("maps a wrong-root verdict to decision 'fail'", async () => {
         const v = await verifyChain(mockSource(baseCreds()), AA_SAID, aid("Z"), { timestamp: FIXED_TS })
         expect(toVerifyResult(v, ref, { verifiedAt: 1700000000000 }).decision).toBe("fail")
+    })
+
+    it("treats a key state the source returns as missing like one it failed to fetch", async () => {
+        // No key states at all: the agent's delegation cannot be judged yet.
+        const v = await verifyChain(mockSource(baseCreds(), {}), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("unresolvable key state"))).toBe(true)
+        expect(toVerifyResult(v, ref, { verifiedAt: 1700000000000 }).decision).toBe("error")
     })
 
     it("maps an unresolvable-leaf verdict to decision 'error'", async () => {
@@ -811,4 +857,127 @@ describe("DACS conformance (§7.5.2 AttestationRef / §7.5 VerifyResult)", () =>
             expect(FOUR.has(toVerifyResult(vd, ref, { verifiedAt: 1, subjectLei: LE_LEI }).decision)).toBe(true)
         }
     })
+})
+
+// A chain that reaches the trusted root with every credential issued, but whose
+// agent-authority credential was minted by an AID that is not the legal entity.
+function forgedAgentAuthorityCreds(): Record<string, VleiCredential> {
+    const creds = baseCreds()
+    creds[AA_SAID].sad.i = aid("X")
+    return creds
+}
+
+describe("VerifyResult positive fields never outrun the verdict", () => {
+    const ref: AttestationRef = { anchor: { kind: "storage-program", locator: "0xSTORAGE" }, contentHash: "a".repeat(64) }
+
+    it("a forged agent-authority chain claims neither entity nor agent authority", async () => {
+        const v = await verifyChain(mockSource(forgedAgentAuthorityCreds()), AA_SAID, GLEIF_ROOT, { proposedTx: IN_SCOPE_TX, timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reachedRoot).toBe(true)
+        expect(v.chain.every(n => n.status === "0")).toBe(true)
+        const vr = toVerifyResult(v, ref, { verifiedAt: 1, subjectLei: LE_LEI })
+        expect(vr.data?.legalEntityVerified).toBe(false)
+        expect(vr.data?.agentAuthorityValid).toBe(false)
+        expect(vr.data?.scopeOk).toBe(false)
+    })
+
+    it("a broken I2I edge (LE not issued by the QVI's issuee) is not a verified legal entity", async () => {
+        const creds = baseCreds()
+        creds[LE_SAID].sad.i = aid("Y")
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reachedRoot).toBe(true)
+        expect(toVerifyResult(v, ref, { verifiedAt: 1, subjectLei: LE_LEI }).data?.legalEntityVerified).toBe(false)
+    })
+
+    it("an out-of-scope tx on a genuine chain keeps the entity + authority facts", async () => {
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, {
+            proposedTx: { ...IN_SCOPE_TX, corridor: "EUR-JPY" },
+            timestamp: FIXED_TS,
+        })
+        expect(v.ok).toBe(false)
+        const vr = toVerifyResult(v, ref, { verifiedAt: 1 })
+        expect(vr.decision).toBe("fail")
+        expect(vr.data?.legalEntityVerified).toBe(true)
+        expect(vr.data?.agentAuthorityValid).toBe(true)
+        expect(vr.data?.scopeOk).toBe(false)
+    })
+
+    it("a verdict without the chain-level flag claims success only when ok", async () => {
+        const v = await verifyChain(mockSource(forgedAgentAuthorityCreds()), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        const { chainOk: _chainOk, ...legacy } = v
+        const vr = toVerifyResult(legacy as VleiVerdict, ref, { verifiedAt: 1, subjectLei: LE_LEI })
+        expect(vr.data?.legalEntityVerified).toBe(false)
+        expect(vr.data?.agentAuthorityValid).toBe(false)
+    })
+})
+
+describe("DACS-2 decision: contradictions fail, only missing data errors", () => {
+    const ref: AttestationRef = { anchor: { kind: "storage-program", locator: "0xSTORAGE" }, contentHash: "a".repeat(64) }
+    const decide = (v: VleiVerdict) => toVerifyResult(v, ref, { verifiedAt: 1, subjectLei: LE_LEI })
+
+    it("entity-binding impersonation is a definite 'fail', not a retryable 'error'", async () => {
+        const v = await verifyChain(mockSource(forgedAgentAuthorityCreds()), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.reasons.join(" ")).toMatch(/fail-closed/)
+        const vr = decide(v)
+        expect(vr.decision).toBe("fail")
+        expect(vr.reason).toMatch(/not the legal entity|issuer-to-issuee/)
+    })
+
+    it("SAID substitution by the source is a definite 'fail'", async () => {
+        const creds = baseCreds()
+        creds[LE_SAID] = { ...creds[LE_SAID], sad: { ...creds[LE_SAID].sad, d: "EotherSaid" } }
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(decide(v).decision).toBe("fail")
+        expect(decide(v).reason).toMatch(/SAID mismatch/)
+    })
+
+    it("a scope restriction the tx cannot meet is a definite 'fail'", async () => {
+        const { corridor: _corridor, ...noCorridor } = IN_SCOPE_TX
+        const v = await verifyChain(mockSource(baseCreds()), AA_SAID, GLEIF_ROOT, { proposedTx: noCorridor, timestamp: FIXED_TS })
+        expect(v.reasons.join(" ")).toMatch(/fail-closed/)
+        expect(decide(v).decision).toBe("fail")
+    })
+
+    it("an unresolvable parent credential is 'error' (the chain was never seen)", async () => {
+        const creds = baseCreds()
+        delete creds[LE_SAID]
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        const vr = decide(v)
+        expect(vr.decision).toBe("error")
+        expect(vr.reason).toMatch(/unresolvable/)
+    })
+
+    it("an unresolvable agent key state is 'error', not a delegation failure", async () => {
+        const src = mockSource(baseCreds())
+        src.getKeyState = async (a: string) => {
+            if (a === AGENT_AID) throw new Error("KERIA down")
+            return KEY_STATES[a]
+        }
+        const v = await verifyChain(src, AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(decide(v).decision).toBe("error")
+    })
+
+    it("a contradiction alongside missing data is still a definite 'fail'", async () => {
+        const creds = forgedAgentAuthorityCreds()
+        delete creds[QVI_SAID]
+        const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        const vr = decide(v)
+        expect(vr.decision).toBe("fail")
+        expect(vr.reason).not.toMatch(/unresolvable/)
+    })
+})
+
+describe("verifyChain: prototype-named schema SAIDs", () => {
+    it.each(["constructor", "__proto__", "toString", "hasOwnProperty"])(
+        "sad.s = %s yields a failing verdict, not a throw",
+        async (s) => {
+            const creds = baseCreds()
+            creds[AA_SAID].sad.s = s
+            const v = await verifyChain(mockSource(creds), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+            expect(v.ok).toBe(false)
+            expect(v.reasons.join(" ")).toMatch(new RegExp(`unpinned/unknown schema ${s}`))
+        },
+    )
 })

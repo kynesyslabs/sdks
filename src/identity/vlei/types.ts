@@ -61,6 +61,21 @@ export interface VleiVerdict {
     timestamp: string
     /** sha256 over the canonical record — the digest an attestation anchors. */
     recordDigest: string
+    /**
+     * True when the credential chain itself held: every credential resolved, was
+     * issued, pinned and correctly edged back to the trusted root, and the
+     * agent-authority lineage binds to its legal entity. Scope, delegation and
+     * key-control outcomes are reported separately.
+     */
+    chainOk?: boolean
+    /** Reasons caused by data the verifier could not fetch — retrying may change them. */
+    unresolved?: string[]
+    /**
+     * Reasons that contradict the presented chain regardless of any missing data
+     * (wrong root, revoked, broken lineage, SAID substitution, out-of-scope, …).
+     * Excludes reasons that only follow from `unresolved` ones.
+     */
+    contradictions?: string[]
 }
 
 // ── Injected KERI transport ─────────────────────────────────────────────────

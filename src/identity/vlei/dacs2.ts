@@ -82,27 +82,37 @@ export function attestationRefFor(
     }
 }
 
-/** Map a verdict's outcome to a DACS-2 decision (§7.5.1 semantics). */
+/**
+ * Map a verdict's outcome to a DACS-2 decision (§7.5.1 semantics). `error` means
+ * the verifier never reached a decision because data could not be fetched, so a
+ * retry may change it. Any contradiction in what WAS presented — wrong root,
+ * revoked, broken lineage, SAID substitution, out-of-scope — is a definite
+ * `fail`, even when other data was also missing. A verdict that does not
+ * classify its reasons is never reported as retryable.
+ */
 function decisionOf(v: VleiVerdict): { decision: VerifyResult["decision"]; reason: string } {
     if (v.ok) return { decision: "pass", reason: "vLEI chain verified to the trusted GLEIF root" }
-    // A transport/resolution failure is `error` (verifier never reached a decision);
-    // a clean contradiction (wrong root, revoked, out-of-scope) is `fail`.
-    const transport = v.reasons.find(r => r.includes("unresolvable") || r.includes("fail-closed"))
-    if (transport) return { decision: "error", reason: transport }
+    if (v.contradictions?.length) return { decision: "fail", reason: v.contradictions[0] }
+    if (v.contradictions && v.unresolved?.length) return { decision: "error", reason: v.unresolved[0] }
     return { decision: "fail", reason: v.reasons[0] ?? "verification failed" }
 }
 
-/** Public (GLEIF) identifiers + predicate outcomes only — §7.5 public-anchor minimisation. */
+/**
+ * Public (GLEIF) identifiers + predicate outcomes only — §7.5 public-anchor
+ * minimisation. Every positive predicate is gated on the chain itself having
+ * verified: a signed result must not say `legalEntityVerified` or
+ * `agentAuthorityValid` for a chain whose lineage or entity binding failed.
+ */
 function publicData(v: VleiVerdict): Record<string, unknown> {
     const lei = v.chain.find(n => n.schemaName === "LE")?.attributes?.LEI
-    const data: Record<string, unknown> = {
-        legalEntityVerified: v.reachedRoot && v.chain.every(n => n.status === "0"),
-    }
+    const chainOk = v.ok || v.chainOk === true
+    const legalEntityVerified = chainOk && v.reachedRoot && v.chain.every(n => n.status === "0")
+    const data: Record<string, unknown> = { legalEntityVerified }
     if (lei) data.lei = lei
-    if (v.delegation) data.agentAuthorityValid = v.delegation.ok
+    if (v.delegation) data.agentAuthorityValid = legalEntityVerified && v.delegation.ok
     if (v.delegation) data.agentAid = v.delegation.agentAid
     if (v.accountableOfficer) data.accountableOfficer = v.accountableOfficer
-    if (v.scope) data.scopeOk = v.scope.ok
+    if (v.scope) data.scopeOk = legalEntityVerified && v.scope.ok
     data.recordDigest = v.recordDigest
     return data
 }
