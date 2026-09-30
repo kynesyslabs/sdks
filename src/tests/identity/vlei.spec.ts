@@ -708,6 +708,14 @@ describe("DACS-2 VerifyResult mapping (vet recipe output)", () => {
         expect(toVerifyResult(v, ref, { verifiedAt: 1700000000000 }).decision).toBe("fail")
     })
 
+    it("treats a key state the source returns as missing like one it failed to fetch", async () => {
+        // No key states at all: the agent's delegation cannot be judged yet.
+        const v = await verifyChain(mockSource(baseCreds(), {}), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
+        expect(v.ok).toBe(false)
+        expect(v.reasons.some(r => r.includes("unresolvable key state"))).toBe(true)
+        expect(toVerifyResult(v, ref, { verifiedAt: 1700000000000 }).decision).toBe("error")
+    })
+
     it("maps an unresolvable-leaf verdict to decision 'error'", async () => {
         const v = await verifyChain(mockSource({}), AA_SAID, GLEIF_ROOT, { timestamp: FIXED_TS })
         // chain is empty on a transport error → the caller supplies the vetted LEI

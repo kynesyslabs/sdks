@@ -399,6 +399,9 @@ export async function verifyChain(
         } catch {
             ksUnresolvable = true
         }
+        // A source may report an unavailable key state by returning nothing
+        // rather than throwing; either way nothing has been contradicted yet.
+        if (!ks) ksUnresolvable = true
         keyStateDigests[aaNode.issuee] = keyStateDigest(ks)
         const di = ks?.di
         const entityAid = entityLineage?.le?.issuee
