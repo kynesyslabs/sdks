@@ -144,6 +144,17 @@ describe("D402Server.validatePayment", () => {
         ).toBe(false)
     })
 
+    it("refuses a credit to an upper-case spelling of the recipient", () => {
+        // The node keys balances by the exact string, so a credit to the
+        // upper-case spelling went to a different account.
+        expect(
+            server().validatePayment(
+                verification({ verified_to: "0x" + RECIPIENT.slice(2).toUpperCase() }),
+                requirement(),
+            ),
+        ).toBe(false)
+    })
+
     it("matches the recipient whatever case or 0x prefix the requirement uses", () => {
         for (const recipient of [RECIPIENT.slice(2), "0x" + RECIPIENT.slice(2).toUpperCase()]) {
             expect(

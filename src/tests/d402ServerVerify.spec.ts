@@ -105,6 +105,14 @@ describe("D402Server.verify", () => {
         expect((await new D402Server({ rpcUrl: RPC }).verify(HASH)).valid).toBe(false)
     })
 
+    it("refuses a stored payment that carries no balance credit", async () => {
+        const noCredit = storedPayment()
+        noCredit.content.gcr_edits = noCredit.content.gcr_edits.filter((e: any) => e.operation !== "add")
+        nodeAnswers(noCredit)
+        const v = await new D402Server({ rpcUrl: RPC }).verify(HASH)
+        expect(v.valid).toBe(false)
+    })
+
     it("refuses when the RPC itself fails", async () => {
         nodeAnswers(storedPayment(), 200, 502)
         expect((await new D402Server({ rpcUrl: RPC }).verify(HASH)).valid).toBe(false)

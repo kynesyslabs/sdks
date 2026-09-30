@@ -196,14 +196,15 @@ export class D402Server {
             return false
         }
 
-        // Check recipient matches. Both sides are spelled canonically first:
-        // a requirement written without `0x` or in upper case names the same
-        // account the node reports.
+        // Check recipient matches. Only the requirement is spelled
+        // canonically (a merchant may write it without `0x` or in upper
+        // case); the credited account must equal that spelling exactly,
+        // because the node keys balances by the exact string and an
+        // upper-case credit lands in a different account.
         if (
             !verification.verified_to ||
             typeof requirement.recipient !== 'string' ||
-            normalizeHexAddress(verification.verified_to) !==
-                normalizeHexAddress(requirement.recipient)
+            verification.verified_to !== normalizeHexAddress(requirement.recipient)
         ) {
             return false
         }
@@ -328,9 +329,12 @@ function paymentFromStoredTx(
               (e: any) => e?.type === 'balance' && e?.operation === 'add',
           )
         : undefined
-    const to = typeof credit?.account === 'string' ? credit.account : payload.to
-    const amount = credit?.amount ?? payload.amount
-    if (typeof to !== 'string' || (typeof amount !== 'number' && typeof amount !== 'string')) {
+    // No credit, no payment: a stored transaction is not proof that the
+    // payee was paid unless the node's balance credit is on it.
+    if (!credit || typeof credit.account !== 'string') return null
+    const to = credit.account
+    const amount = credit.amount
+    if (typeof amount !== 'number' && typeof amount !== 'string') {
         return null
     }
 
