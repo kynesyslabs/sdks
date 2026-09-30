@@ -48,8 +48,20 @@ describe("memoNamesResource", () => {
 
     it("accepts the memo with a description", () => {
         expect(
-            memoNamesResource("resourceId:user-1 - Premium", "user-1"),
+            memoNamesResource("resourceId:user-1 - Premium", "user-1", "Premium"),
         ).toBe(true)
+    })
+
+    it("does not read an id containing ' - ' as a shorter id plus a description", () => {
+        // A payment for "a - b" must not unlock "a", with or without a description.
+        expect(memoNamesResource("resourceId:a - b", "a")).toBe(false)
+        expect(memoNamesResource("resourceId:a - b", "a", "Premium")).toBe(false)
+        expect(memoNamesResource("resourceId:a - b", "a - b")).toBe(true)
+        expect(memoNamesResource("resourceId:a - b - Premium", "a - b", "Premium")).toBe(true)
+    })
+
+    it("rejects a description the requirement does not carry", () => {
+        expect(memoNamesResource("resourceId:user-1 - Other", "user-1", "Premium")).toBe(false)
     })
 
     it("rejects a longer id that merely starts the same", () => {
@@ -128,6 +140,31 @@ describe("D402Server.validatePayment", () => {
             server().validatePayment(
                 verification({ verified_from: undefined }),
                 requirement({ payer: PAYER }),
+            ),
+        ).toBe(false)
+    })
+
+    it("refuses a credit to an upper-case spelling of the recipient", () => {
+        // The node keys balances by the exact string, so a credit to the
+        // upper-case spelling went to a different account.
+        expect(
+            server().validatePayment(
+                verification({ verified_to: "0x" + RECIPIENT.slice(2).toUpperCase() }),
+                requirement(),
+            ),
+        ).toBe(false)
+    })
+
+    it("matches the recipient whatever case or 0x prefix the requirement uses", () => {
+        for (const recipient of [RECIPIENT.slice(2), "0x" + RECIPIENT.slice(2).toUpperCase()]) {
+            expect(
+                server().validatePayment(verification(), requirement({ recipient })),
+            ).toBe(true)
+        }
+        expect(
+            server().validatePayment(
+                verification(),
+                requirement({ recipient: "0x" + "ef".repeat(32) }),
             ),
         ).toBe(false)
     })

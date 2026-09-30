@@ -131,6 +131,27 @@ describe("DemosTransactions.atomicWork", () => {
         expect(credit).toMatchObject({ account: TO, amount: "1500000001" })
     })
 
+    it("signs and credits an upper-case recipient as the lowercase account", async () => {
+        const upper = "0x" + TO.slice(2).toUpperCase()
+        const tx = await DemosTransactions.atomicWork(
+            { ...payload, transfers: [{ to: upper, amount: "7" }] },
+            await demosOn(true),
+        )
+
+        const signed = (tx.content.data as any)[1]
+        expect(signed.transfers[0].to).toBe(TO)
+        const credit = tx.content.gcr_edits.find(
+            (e: any) => e.type === "balance" && e.operation === "add",
+        ) as any
+        expect(credit.account).toBe(TO)
+        // The node regenerates the credit from the signed payload; it must
+        // name the same account the shipped edit does.
+        const regenerated = (await GCRGeneration.generate({ ...tx, hash: "" } as any)).find(
+            (e: any) => e.type === "balance" && e.operation === "add",
+        ) as any
+        expect(regenerated).toMatchObject({ account: TO, amount: "7" })
+    })
+
     it("refuses to sign against a node before the osDenomination fork", async () => {
         await expect(DemosTransactions.atomicWork(payload, await demosOn(false))).rejects.toThrow(
             "past the osDenomination fork",

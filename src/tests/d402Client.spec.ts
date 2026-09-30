@@ -86,6 +86,22 @@ describe("D402Client", () => {
         )
     })
 
+    it("credits an upper-case or 0x-less payee to the lowercase account wallets use", async () => {
+        const { client, demos } = await clientWithNode()
+
+        for (const recipient of ["0x" + PAYEE.slice(2).toUpperCase(), "0X" + PAYEE.slice(2), PAYEE.slice(2)]) {
+            const payment = await client.createPayment({ ...REQUIREMENT, recipient })
+            expect(payment.content.to).toBe(PAYEE)
+            expect((payment.content.data as any)[1].to).toBe(PAYEE)
+
+            const signed = await demos.sign(payment)
+            const credit = signed.content.gcr_edits.find(
+                (e: any) => e.type === "balance" && e.operation === "add",
+            ) as any
+            expect(credit.account).toBe(PAYEE)
+        }
+    })
+
     it("leaves no nonce gap under auto-nonce when a payment is refused", async () => {
         const { client, demos } = await clientWithNode()
         demos.enableAutoNonce()

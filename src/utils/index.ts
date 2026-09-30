@@ -12,6 +12,17 @@ export function validateEd25519Address(address: string) {
     return /^0x[0-9a-f]{64}$/i.test(address)
 }
 
+/**
+ * Canonical spelling of a hex account address: `0x` plus lowercase hex.
+ *
+ * The node keys accounts by the exact string, and wallets derive lowercase
+ * hex, so an address written in another case names a different account.
+ */
+export function normalizeHexAddress(address: string): string {
+    const hex = /^0x/i.test(address) ? address.slice(2) : address
+    return "0x" + hex.toLowerCase()
+}
+
 export function assertValidNonce(nonce: number): number {
     if (typeof nonce !== "number" || !Number.isInteger(nonce) || nonce < 0) {
         throw new Error(

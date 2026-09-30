@@ -9,7 +9,8 @@ import type { Transaction } from '@/types'
 import type { D402PaymentRequirement, D402SettlementResult } from './types'
 import { uint8ArrayToHex } from '@/encryption/unifiedCrypto'
 import * as skeletons from '../../websdk/utils/skeletons'
-import { resolveNonce, sleep, validateEd25519Address } from '@/utils'
+import { d402Memo } from '../memo'
+import { normalizeHexAddress, resolveNonce, sleep, validateEd25519Address } from '@/utils'
 
 export class D402Client {
     private demos: Demos
@@ -35,9 +36,10 @@ export class D402Client {
         // transaction without one, so leaving it only inside `data` made
         // every payment built here unsignable. Checked before a nonce is
         // reserved, so a refused payment leaves no gap under auto-nonce.
-        const recipient = requirement.recipient?.startsWith("0x")
-            ? requirement.recipient
-            : `0x${requirement.recipient ?? ""}`
+        // Lowercased as well: the node keys accounts by the exact string, so
+        // a payee written in upper case would be credited to an account no
+        // wallet owns.
+        const recipient = normalizeHexAddress(requirement.recipient ?? "")
         if (!validateEd25519Address(recipient)) {
             throw new Error(
                 `d402 payment recipient must be a 32-byte hex address, got "${requirement.recipient}"`,
@@ -57,9 +59,7 @@ export class D402Client {
         const tx = structuredClone(skeletons.transaction)
 
         // Build memo with resource ID
-        const memo = requirement.description
-            ? `resourceId:${requirement.resourceId} - ${requirement.description}`
-            : `resourceId:${requirement.resourceId}`
+        const memo = d402Memo(requirement.resourceId, requirement.description)
 
         // Fill in transaction details
         tx.content.type = 'd402_payment'
@@ -69,7 +69,7 @@ export class D402Client {
         tx.content.data = [
             'd402_payment',
             {
-                to: requirement.recipient,
+                to: recipient,
                 amount: requirement.amount,
                 memo: memo
             }
