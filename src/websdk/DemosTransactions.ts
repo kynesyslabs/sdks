@@ -20,7 +20,7 @@ import { BroadcastFailedError } from "./BroadcastFailedError"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
 import { txSignaturePreimage } from "./utils/txSignaturePreimage"
 import { OS_PER_DEM } from "@/denomination"
-import { resolveNonce } from "@/utils"
+import { normalizeHexAddress, resolveNonce } from "@/utils"
 
 // Connection-error codes indicating the request never reached the node.
 // HTTP 5xx is intentionally NOT in this set: a 5xx means the server did
@@ -176,7 +176,22 @@ export const DemosTransactions = {
         tx.content.amount = 0
         tx.content.type = "atomicWork"
         tx.content.timestamp = Date.now()
-        tx.content.data = ["atomicWork", payload]
+        // Recipients are signed lowercase: the node keys accounts by the
+        // exact string and regenerates the credits from this payload, so a
+        // recipient in upper case would be paid into an account no wallet
+        // owns. Anything that is not a string is left for GCRGeneration to
+        // refuse.
+        const signed: AtomicWorkPayload = Array.isArray(payload.transfers)
+            ? {
+                  ...payload,
+                  transfers: payload.transfers.map(t =>
+                      typeof t?.to === "string"
+                          ? { ...t, to: normalizeHexAddress(t.to) }
+                          : t,
+                  ),
+              }
+            : payload
+        tx.content.data = ["atomicWork", signed]
 
         return await demos.sign(tx)
     },
