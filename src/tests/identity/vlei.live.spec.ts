@@ -81,7 +81,9 @@ maybe("vLEI live anchor/resolve round-trip (opt-in)", () => {
         let resolved: Awaited<ReturnType<typeof resolveAttestation>> = null
         const deadline = Date.now() + 120_000
         while (Date.now() < deadline) {
-            resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, LIVE_RPC!)
+            resolved = await resolveAttestation(att.subjectClaim, att.recordDigest, LIVE_RPC!, {
+                trustedAttesters: [attesterClaim],
+            })
             if (resolved) break
             await sleep(2000)
         }

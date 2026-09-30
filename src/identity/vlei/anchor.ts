@@ -29,8 +29,8 @@ export interface AnchorAttestationResult {
 /**
  * Anchor a signed attestation to chain via SR-2 (Storage Program). The deployer
  * (= connected Demos wallet, which must control `attesterClaim`) becomes the SP
- * owner; that owner check is what makes `resolveAttestation` safe against an
- * impostor SP published under the same deterministic name.
+ * owner; that owner check is what stops an impostor SP published under the same
+ * deterministic name from speaking for this attester in `resolveAttestation`.
  */
 export async function anchorAttestation(
     att: VleiAttestation,
@@ -74,22 +74,46 @@ export async function anchorAttestation(
     return { storageAddress: payload.storageAddress, txHash: signed.hash }
 }
 
+export interface ResolveAttestationOpts {
+    /**
+     * Attesters whose word the caller accepts, as `demos:` claims or bare Demos
+     * addresses. Required and non-empty: signature + owner checks only prove a
+     * candidate is self-consistent, and anyone can anchor a self-consistent
+     * attestation under the same deterministic name.
+     */
+    trustedAttesters: string[]
+}
+
+function attesterAddressOf(ref: string): string {
+    return ref.includes(":") ? demosAddressFromClaim(ref as ClaimReference) : normalizeDemosAddress(ref)
+}
+
 /**
- * Find the anchored, verified attestation for `(subjectClaim, recordDigest)`.
+ * Find the anchored, verified attestation for `(subjectClaim, recordDigest)`
+ * issued by one of `opts.trustedAttesters`.
  *
- * Two-stage check on every candidate Storage Program:
+ * Three checks on every candidate Storage Program:
  *   1. Embedded attester signature verifies under the embedded claim's key.
  *   2. SP owner's Demos address matches that claim's address — so only the actual
  *      key-holder could have deployed this SP under this name.
+ *   3. That address is one of the caller's trusted attesters.
  *
- * Both must pass. Returns `null` when no candidate qualifies. A single malformed
+ * All must pass. Returns `null` when no candidate qualifies. A single malformed
  * candidate is skipped (not thrown) so a squatter cannot DoS the resolver.
+ *
+ * @throws If `trustedAttesters` is empty or holds an unparseable entry.
  */
 export async function resolveAttestation(
     subjectClaim: ClaimReference,
     recordDigest: string,
     rpcUrl: string,
+    opts: ResolveAttestationOpts,
 ): Promise<VleiAttestation | null> {
+    if (!opts?.trustedAttesters?.length) {
+        throw new Error("resolveAttestation: trustedAttesters must name at least one attester")
+    }
+    const trusted = new Set(opts.trustedAttesters.map(attesterAddressOf))
+
     const name = attestationProgramName(subjectClaim, recordDigest)
     const list = await StorageProgram.searchByName(rpcUrl, name, { exactMatch: true })
 
@@ -105,6 +129,7 @@ export async function resolveAttestation(
 
         try {
             const attesterAddress = demosAddressFromClaim(att.attesterClaim)
+            if (!trusted.has(attesterAddress)) continue
             if (normalizeDemosAddress(sp.owner) !== attesterAddress) continue
         } catch {
             continue
