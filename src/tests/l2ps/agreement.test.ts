@@ -212,6 +212,37 @@ describe("WI-D AgreementDocument — a hostile body cannot break the verifier", 
     })
 })
 
+describe("WI-D AgreementDocument — unsafe integers", () => {
+    it("refuses to sign an integer beyond Number.MAX_SAFE_INTEGER", async () => {
+        const { parties } = await committed()
+        // 9007199254740993 is already 9007199254740992 once parsed — the party
+        // would sign a different amount than the one written.
+        const body = JSON.parse('{"amount":9007199254740993}')
+        expect(() => agreementHashHex(buildUnsignedAgreement({ channelId: CHANNEL, parties, body })))
+            .toThrow(/safe integer/)
+        expect(() => agreementHashHex(buildUnsignedAgreement({ channelId: CHANNEL, parties, body: { amount: 2 ** 53 } })))
+            .toThrow(/safe integer/)
+        expect(() => agreementHashHex(buildUnsignedAgreement({ channelId: CHANNEL, parties, body: { amount: -(2 ** 53) } })))
+            .toThrow(/safe integer/)
+    })
+
+    it("fails verification of a wire document carrying an unsafe integer", async () => {
+        const { doc, parties } = await committed()
+        const wire = JSON.parse(JSON.stringify({ ...doc, body: { price: 0 } }).replace('"price":0', '"price":9007199254740993'))
+        const r = verifyAgreement(wire as AgreementDocument, { members: parties })
+        expect(r.ok).toBe(false)
+        expect(r.errors.join(" ")).toMatch(/safe integer/)
+    })
+
+    it("still accepts safe integers and finite fractions", async () => {
+        const { parties } = await committed()
+        for (const amount of [Number.MAX_SAFE_INTEGER, -Number.MAX_SAFE_INTEGER, 0.5, 1e-7]) {
+            expect(agreementHashHex(buildUnsignedAgreement({ channelId: CHANNEL, parties, body: { amount } })))
+                .toMatch(/^[0-9a-f]{64}$/)
+        }
+    })
+})
+
 describe("WI-D AgreementDocument — the §0 invariant", () => {
     it("the committing parties must be exactly the channel's members", async () => {
         const { doc, parties } = await committed()
