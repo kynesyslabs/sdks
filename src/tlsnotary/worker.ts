@@ -5,7 +5,7 @@
  * Uses Comlink for seamless RPC between main thread and worker.
  */
 import * as Comlink from "comlink"
-import init, { Prover, Presentation } from "tlsn-js"
+import init, { Prover, Presentation } from "./tlsn-runtime"
 
 /**
  * Worker API exposed via Comlink

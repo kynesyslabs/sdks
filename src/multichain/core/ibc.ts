@@ -8,7 +8,7 @@ import {
     calculateFee,
 } from '@cosmjs/stargate'
 import { fromBase64, toBase64 } from '@cosmjs/encoding';
-import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx'
+import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx.js'
 
 import { DefaultChain, IBCDefaultChain } from './types/defaultChain'
 import {

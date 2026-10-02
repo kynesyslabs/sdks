@@ -9,6 +9,11 @@
 
 A JavaScript/TypeScript SDK providing a unified interface for interacting with the Demos network and cross-chain operations.
 
+Services that need only native DEM, Storage Programs, identity reads and DAHR
+should use the separately packaged `@kynesyslabs/demos-native` client under
+[`packages/demos-native`](./packages/demos-native). Its independent manifest
+does not install the multichain, PQC, bridge or TLSNotary dependency graph.
+
 ***IMPORTANT*** This SDK is built with bun and performs the best with bun
 
 ## Requirements
@@ -219,16 +224,21 @@ For debugging or temporary commits, you can skip the build check:
 The SDK is automatically published to NPM when:
 
 1. The version in `package.json` is incremented
-2. Changes are committed with a message starting with "release"
-3. The commit is pushed to GitHub
+2. Changes are committed on `main` with a message starting with "release"
+3. The commit is pushed to `main` on GitHub
+
+Release commits pushed to any other branch start no workflow and publish nothing.
 
 Example:
 ```sh
+git checkout main
 git commit -m "release v2.3.25"
-git push
+git push origin main
 ```
 
-For simplicity, a `publish.sh` script is included. By default it will ask to forward the version, but you can re-publish the same version number with `./publish.sh -r`.
+For simplicity, a `publish` script is included (and `publish-cli.sh` for non-interactive use). Both refuse to run off `main`. By default it will ask to forward the version, but you can re-publish the same version number with `./publish -r`.
+
+Releases publish one at a time, in push order. Both scripts also refuse to release while a previous publish is running or queued (they check with the GitHub CLI, `gh`), since a release pushed then could replace the queued one before it publishes.
 
 ## Documentation
 

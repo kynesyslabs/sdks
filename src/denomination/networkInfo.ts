@@ -45,7 +45,20 @@ export interface ForkStatus {
 export interface NetworkInfo {
     forks: {
         osDenomination: ForkStatus
+        /**
+         * Transaction signatures cover `demos-tx:v1:<chainId>:<hash>` once
+         * active, instead of the bare hash. Optional: a node older than the
+         * fork does not report it, and the SDK then keeps signing the legacy
+         * preimage.
+         */
+        signatureDomain?: ForkStatus
     }
+    /**
+     * Network identity from the node's genesis. Bound into the signature
+     * preimage once `signatureDomain` is active, which is what stops a
+     * transaction signed for one network from replaying on another.
+     */
+    chainId?: number | null
 }
 
 /**

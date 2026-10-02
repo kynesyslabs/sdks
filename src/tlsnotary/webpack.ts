@@ -38,6 +38,11 @@
  */
 
 import * as path from "path"
+import { createRequire } from "module"
+import { fileURLToPath } from "url"
+
+const require = createRequire(import.meta.url)
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
 
 /**
  * Get the absolute path to the bundled WASM files directory.
@@ -60,9 +65,9 @@ import * as path from "path"
  * ```
  */
 export function getTlsnWasmPath(): string {
-    // __dirname will be build/tlsnotary after compilation
+    // This module is emitted as ESM, so derive its directory from import.meta.
     // WASM files are in build/tlsnotary/wasm
-    return path.resolve(__dirname, "wasm")
+    return path.resolve(moduleDirectory, "wasm")
 }
 
 /**

@@ -1,0 +1,68 @@
+name: Publish Demos native
+
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected-version:
+        description: Exact version already committed in packages/demos-native/package.json
+        required: true
+        type: string
+      dist-tag:
+        description: npm distribution tag
+        required: true
+        default: next
+        type: choice
+        options:
+          - next
+          - latest
+
+concurrency:
+  group: publish-demos-native
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify and publish exact package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.2'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+          cache-dependency-path: packages/demos-native/package-lock.json
+      - name: Use trusted-publishing capable npm
+        run: npm install --global --ignore-scripts npm@11.19.0
+      - name: Verify requested version and distribution tag
+        working-directory: packages/demos-native
+        env:
+          EXPECTED_VERSION: ${{ inputs['expected-version'] }}
+          DIST_TAG: ${{ inputs['dist-tag'] }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import manifest from './package.json' with { type: 'json' };
+          assert.equal(manifest.version, process.env.EXPECTED_VERSION);
+          if (process.env.DIST_TAG === 'latest') {
+            assert.doesNotMatch(manifest.version, /-/,
+              'prerelease versions must use the next dist-tag');
+          }
+          NODE
+      - name: Install exact dependencies
+        working-directory: packages/demos-native
+        run: npm ci --ignore-scripts
+      - name: Verify release contract
+        working-directory: packages/demos-native
+        run: npm run verify:release
+      - name: Publish with provenance
+        working-directory: packages/demos-native
+        env:
+          DIST_TAG: ${{ inputs['dist-tag'] }}
+        run: npm publish --provenance --access public --tag "$DIST_TAG"

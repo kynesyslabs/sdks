@@ -1,0 +1,332 @@
+/**
+ * Runtime boundary for tlsn-js.
+ *
+ * tlsn-js 0.1.0-alpha.12 is a browser-targeted CommonJS/UMD bundle. Eagerly
+ * importing it from an ES module makes every Demos SDK entry point that
+ * reaches TLSNotary fail in plain Node: the bundle reads `self` during module
+ * evaluation, and Node cannot reliably synthesize its named exports.
+ *
+ * Keep the dependency behind an operation-time import and normalize both the
+ * CommonJS and bundler namespace shapes. The small facades below retain the
+ * public tlsn-js constructor types while delaying browser-only evaluation
+ * until a TLSNotary operation actually needs it.
+ */
+
+import { Buffer } from "buffer"
+
+type TlsnModule = typeof import("tlsn-js")
+
+type UnknownModule = Record<string, unknown> & { default?: unknown }
+
+let runtimePromise: Promise<TlsnModule> | undefined
+
+function hasTlsnRuntime(value: unknown): value is TlsnModule {
+    if ((typeof value !== "object" && typeof value !== "function") || !value) {
+        return false
+    }
+
+    const candidate = value as UnknownModule
+    return (
+        typeof candidate.default === "function" &&
+        typeof candidate.Prover === "function" &&
+        typeof candidate.Presentation === "function" &&
+        typeof candidate.NotaryServer === "function" &&
+        typeof candidate.Transcript === "function"
+    )
+}
+
+function isBrowserRuntime(): boolean {
+    return (
+        typeof globalThis !== "undefined" &&
+        typeof (globalThis as typeof globalThis & { self?: unknown }).self !==
+            "undefined" &&
+        typeof globalThis.addEventListener === "function"
+    )
+}
+
+/** Load the browser-only tlsn-js bundle when an operation first needs it. */
+export async function loadTlsnRuntime(): Promise<TlsnModule> {
+    if (!isBrowserRuntime()) {
+        throw new Error(
+            "TLSNotary operations require a browser or Web Worker runtime with WASM support.",
+        )
+    }
+
+    runtimePromise ??= import("tlsn-js")
+        .then((namespace: UnknownModule) => {
+            if (hasTlsnRuntime(namespace)) return namespace
+            if (hasTlsnRuntime(namespace.default)) return namespace.default
+
+            throw new Error(
+                "The installed tlsn-js package has an unsupported runtime export shape.",
+            )
+        })
+        .catch((error: unknown) => {
+            runtimePromise = undefined
+            throw error
+        })
+
+    return runtimePromise
+}
+
+/** Construct a tlsn-js object on first use, retrying if the runtime failed to load. */
+function lazyRuntimeInstance<T>(create: (runtime: TlsnModule) => T): () => Promise<T> {
+    let instance: Promise<T> | undefined
+    return () =>
+        (instance ??= loadTlsnRuntime()
+            .then(create)
+            .catch((error: unknown) => {
+                instance = undefined
+                throw error
+            }))
+}
+
+/**
+ * Decode transcript bytes as UTF-8, with one redaction symbol per redacted
+ * (zero) byte. tlsn-js decodes byte by byte, which corrupts multibyte text.
+ */
+function transcriptText(bytes: number[], redactedSymbol: string): string {
+    let output = ""
+    let start = 0
+    for (let index = 0; index <= bytes.length; index++) {
+        if (index < bytes.length && bytes[index] !== 0) continue
+        if (index > start) output += Buffer.from(bytes.slice(start, index)).toString("utf8")
+        if (index < bytes.length) output += redactedSymbol
+        start = index + 1
+    }
+    return output
+}
+
+/**
+ * Default request headers for an attested request. tlsn-js uses the hostname
+ * (dropping a non-default port) and counts Content-Length in UTF-16 units;
+ * Host keeps the port here and Content-Length counts UTF-8 bytes.
+ */
+function defaultRequestHeaders(url: string, body?: unknown): Record<string, string> {
+    const headers: Record<string, string> = {
+        Host: new URL(url).host,
+        Connection: "close",
+    }
+    if (typeof body === "string") {
+        headers["Content-Length"] = Buffer.byteLength(body).toString()
+    } else if (typeof body === "object") {
+        headers["Content-Length"] = Buffer.byteLength(JSON.stringify(body)).toString()
+    } else if (typeof body === "number") {
+        headers["Content-Length"] = Buffer.byteLength(body.toString()).toString()
+    }
+    return headers
+}
+
+const init: TlsnModule["default"] = async (config) => {
+    const runtime = await loadTlsnRuntime()
+    await runtime.default(config)
+}
+
+class LazyProver {
+    readonly #instance: () => Promise<InstanceType<TlsnModule["Prover"]>>
+
+    constructor(config: ConstructorParameters<TlsnModule["Prover"]>[0]) {
+        this.#instance = lazyRuntimeInstance((runtime) => new runtime.Prover(config))
+    }
+
+    static async notarize(
+        options: Parameters<TlsnModule["Prover"]["notarize"]>[0],
+    ): ReturnType<TlsnModule["Prover"]["notarize"]> {
+        const runtime = await loadTlsnRuntime()
+        return runtime.Prover.notarize(options)
+    }
+
+    static getHeaderMap(
+        url: string,
+        body?: unknown,
+        headers: Record<string, string> = {},
+    ): Map<string, number[]> {
+        return new Map(
+            Object.entries({ ...defaultRequestHeaders(url, body), ...headers }).map(([name, value]) => [
+                name,
+                Buffer.from(value).toJSON().data,
+            ]),
+        )
+    }
+
+    async free(): Promise<void> {
+        return (await this.#instance()).free()
+    }
+
+    async setup(verifierUrl: string): Promise<void> {
+        return (await this.#instance()).setup(verifierUrl)
+    }
+
+    async transcript(): ReturnType<
+        InstanceType<TlsnModule["Prover"]>["transcript"]
+    > {
+        return (await this.#instance()).transcript()
+    }
+
+    async sendRequest(
+        wsProxyUrl: string,
+        request: Parameters<
+            InstanceType<TlsnModule["Prover"]>["sendRequest"]
+        >[1],
+    ): ReturnType<InstanceType<TlsnModule["Prover"]>["sendRequest"]> {
+        // tlsn-js spreads caller headers over its own defaults, so passing the
+        // corrected defaults here fixes the bytes actually sent. Explicit
+        // caller headers still win.
+        return (await this.#instance()).sendRequest(wsProxyUrl, {
+            ...request,
+            headers: { ...defaultRequestHeaders(request.url, request.body), ...request.headers },
+        })
+    }
+
+    async notarize(
+        commit?: Parameters<
+            InstanceType<TlsnModule["Prover"]>["notarize"]
+        >[0],
+    ): ReturnType<InstanceType<TlsnModule["Prover"]>["notarize"]> {
+        return (await this.#instance()).notarize(commit)
+    }
+
+    async reveal(
+        reveal: Parameters<InstanceType<TlsnModule["Prover"]>["reveal"]>[0],
+    ): Promise<void> {
+        return (await this.#instance()).reveal(reveal)
+    }
+}
+
+class LazyPresentation {
+    readonly #instance: () => Promise<InstanceType<TlsnModule["Presentation"]>>
+
+    constructor(params: ConstructorParameters<TlsnModule["Presentation"]>[0]) {
+        this.#instance = lazyRuntimeInstance((runtime) => new runtime.Presentation(params))
+    }
+
+    async free(): Promise<void> {
+        return (await this.#instance()).free()
+    }
+
+    async serialize(): Promise<string> {
+        return (await this.#instance()).serialize()
+    }
+
+    async verifyingKey(): ReturnType<
+        InstanceType<TlsnModule["Presentation"]>["verifyingKey"]
+    > {
+        return (await this.#instance()).verifyingKey()
+    }
+
+    async json(): ReturnType<
+        InstanceType<TlsnModule["Presentation"]>["json"]
+    > {
+        return (await this.#instance()).json()
+    }
+
+    async verify(): ReturnType<
+        InstanceType<TlsnModule["Presentation"]>["verify"]
+    > {
+        return (await this.#instance()).verify()
+    }
+}
+
+class CompatibleNotaryServer {
+    readonly #url: string
+
+    static from(url: string): CompatibleNotaryServer {
+        return new CompatibleNotaryServer(url)
+    }
+
+    constructor(url: string) {
+        this.#url = url
+    }
+
+    get url(): string {
+        return this.#url
+    }
+
+    async publicKey(encoding: "pem" | "hex" = "hex"): Promise<string> {
+        const response = await fetch(`${this.#url}/info`)
+        const { publicKey } = (await response.json()) as { publicKey?: unknown }
+        if (typeof publicKey !== "string" || publicKey.length === 0) {
+            throw new Error("invalid public key")
+        }
+        if (encoding === "pem") return publicKey
+
+        return Buffer.from(
+            publicKey
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replace(/\n/gu, ""),
+            "base64",
+        )
+            .subarray(23)
+            .toString("hex")
+    }
+
+    normalizeUrl(): string {
+        const parsed = new URL(this.#url)
+        const protocol =
+            parsed.protocol === "https:" || parsed.protocol === "http:"
+                ? parsed.protocol
+                : parsed.protocol === "wss:"
+                  ? "https:"
+                  : "http:"
+        return `${protocol}//${parsed.host}`
+    }
+
+    async sessionUrl(maxSentData?: number, maxRecvData?: number): Promise<string> {
+        const response = await fetch(`${this.#url}/session`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                clientType: "Websocket",
+                maxRecvData,
+                maxSentData,
+            }),
+        })
+        const { sessionId } = (await response.json()) as { sessionId?: unknown }
+        if (typeof sessionId !== "string" || sessionId.length === 0) {
+            throw new Error("invalid session id")
+        }
+
+        const parsed = new URL(this.#url)
+        const protocol = parsed.protocol === "https:" ? "wss" : "ws"
+        const pathname = parsed.pathname
+        return `${protocol}://${parsed.host}${pathname === "/" ? "" : pathname}/notarize?sessionId=${sessionId}`
+    }
+}
+
+class CompatibleTranscript {
+    readonly #sent: number[]
+    readonly #recv: number[]
+
+    constructor(params: { sent: number[]; recv: number[] }) {
+        this.#sent = params.sent
+        this.#recv = params.recv
+    }
+
+    get raw(): { recv: number[]; sent: number[] } {
+        return { recv: this.#recv, sent: this.#sent }
+    }
+
+    recv(redactedSymbol = "*"): string {
+        return transcriptText(this.#recv, redactedSymbol)
+    }
+
+    sent(redactedSymbol = "*"): string {
+        return transcriptText(this.#sent, redactedSymbol)
+    }
+
+    text = (redactedSymbol = "*"): { sent: string; recv: string } => ({
+        sent: this.sent(redactedSymbol),
+        recv: this.recv(redactedSymbol),
+    })
+}
+
+export const Prover = LazyProver as unknown as TlsnModule["Prover"]
+export const Presentation =
+    LazyPresentation as unknown as TlsnModule["Presentation"]
+export const NotaryServer =
+    CompatibleNotaryServer as unknown as TlsnModule["NotaryServer"]
+export const Transcript =
+    CompatibleTranscript as unknown as TlsnModule["Transcript"]
+
+export default init

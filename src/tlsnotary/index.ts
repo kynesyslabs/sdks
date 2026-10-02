@@ -54,6 +54,8 @@
  * ```
  */
 
+import "./tlsn-wasm-compat.js"
+
 // Core TLSNotary class for attestation
 export { TLSNotary } from "./TLSNotary"
 
@@ -93,6 +95,16 @@ export { default } from "./TLSNotary"
 // Helper function exports
 export { calculateStorageFee } from "./helpers"
 
+// Comparing a presentation's signer against the notary you pinned.
+// `NotaryKeyMismatchError` is thrown by `verify()`, so consumers need it here
+// to tell "signed by someone else" apart from a malformed proof with an
+// `instanceof` check rather than by matching on a message.
+export {
+    NotaryKeyMismatchError,
+    normaliseNotaryKey,
+    notaryKeyMatches,
+} from "./notaryKey"
+
 // Auto-init helper for simplified WASM setup
 export {
     initTlsn,
@@ -119,16 +131,19 @@ export {
     Presentation,
     NotaryServer,
     Transcript,
-    // Types re-exported from tlsn-js
-    type Commit,
-    type Reveal,
-    type Method,
-    type ProverConfig,
-    type LoggingLevel,
-    type LoggingConfig,
+} from "./tlsn-runtime"
+
+// Types remain the exact upstream declarations; type-only exports are erased.
+export type {
+    Commit,
+    Reveal,
+    Method,
+    ProverConfig,
+    LoggingLevel,
+    LoggingConfig,
 } from "tlsn-js"
 
 // Re-export types from tlsn-js/build/types for advanced usage
 export type {
     PresentationJSON as TlsnPresentationJSON,
-} from "tlsn-js/build/types"
+} from "tlsn-js/build/types.js"

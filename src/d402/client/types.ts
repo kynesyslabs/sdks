@@ -32,4 +32,10 @@ export interface D402SettlementResult {
     blockNumber?: number
     /** Error message (if failed) */
     message?: string
+    /**
+     * True when the payment was broadcast but not seen in a block before the
+     * wait ran out. It may still land: resume with `waitForSettlement(hash)`
+     * rather than paying again.
+     */
+    pending?: boolean
 }

@@ -1,4 +1,5 @@
 import forge from "node-forge"
+import { AtomicWorkPayload } from "@/types/blockchain/TransactionSubtypes/AtomicWorkTransaction"
 
 import { Demos } from "./demosclass"
 import { sha256 } from "./utils/sha256"
@@ -17,8 +18,9 @@ import { Enigma } from "@/encryption/PQC/enigma"
 import { BroadcastTimeoutError } from "./BroadcastTimeoutError"
 import { BroadcastFailedError } from "./BroadcastFailedError"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
+import { txSignaturePreimage } from "./utils/txSignaturePreimage"
 import { OS_PER_DEM } from "@/denomination"
-import { resolveNonce } from "@/utils"
+import { normalizeHexAddress, resolveNonce } from "@/utils"
 
 // Connection-error codes indicating the request never reached the node.
 // HTTP 5xx is intentionally NOT in this set: a 5xx means the server did
@@ -133,6 +135,67 @@ export const DemosTransactions = {
         return await demos.sign(tx)
     },
     /**
+     * Create a signed `atomicWork` transaction: one Work whose edits and
+     * transfers the node applies all together or not at all.
+     *
+     * The payload is signed as given; the node regenerates the edits from it
+     * and refuses the transaction if they differ from what was shipped.
+     * Transfer amounts are OS, as decimal strings.
+     *
+     * ⚠️ Only signs — broadcast with `demos.confirm` + `demos.broadcast`.
+     */
+    async atomicWork(
+        payload: AtomicWorkPayload,
+        demos: Demos,
+        options?: { nonce?: number },
+    ) {
+        required(demos.keypair, "Wallet not connected")
+
+        // The pre-fork wire format rewrites every edit amount as a DEM number,
+        // while the node regenerates the transfer edits with the OS strings
+        // in the payload, so the edits would never match (and sub-DEM
+        // amounts would be truncated). A Work is post-fork only.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (!(await (demos as any)._isPostForkCached())) {
+            throw new Error(
+                "[DemosTransactions] atomicWork needs a node past the osDenomination fork",
+            )
+        }
+
+        const tx = DemosTransactions.empty()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
+        )
+
+        tx.content.to = publicKeyHex.startsWith("0x") ? publicKeyHex : "0x" + publicKeyHex
+        tx.content.nonce = nonce
+        tx.content.amount = 0
+        tx.content.type = "atomicWork"
+        tx.content.timestamp = Date.now()
+        // Recipients are signed lowercase: the node keys accounts by the
+        // exact string and regenerates the credits from this payload, so a
+        // recipient in upper case would be paid into an account no wallet
+        // owns. Anything that is not a string is left for GCRGeneration to
+        // refuse.
+        const signed: AtomicWorkPayload = Array.isArray(payload.transfers)
+            ? {
+                  ...payload,
+                  transfers: payload.transfers.map(t =>
+                      typeof t?.to === "string"
+                          ? { ...t, to: normalizeHexAddress(t.to) }
+                          : t,
+                  ),
+              }
+            : payload
+        tx.content.data = ["atomicWork", signed]
+
+        return await demos.sign(tx)
+    },
+    /**
      * Convert a legacy DEM `number` input to an OS `bigint` for internal
      * carrying. Only whole-DEM `number` inputs are accepted on this
      * legacy path — fractional DEM is rejected with a clear error
@@ -184,9 +247,20 @@ export const DemosTransactions = {
      * Signs a transaction after hashing its content.
      *
      * @deprecated Use demos.sign(tx) instead
-     * 
+     *
+     * This path has no `Demos` instance and so cannot ask the node anything:
+     * it assumes the pre-fork wire shape, and unless `chainId` is passed it
+     * signs the legacy bare-hash preimage. A node that has activated
+     * `signatureDomain` verifies `demos-tx:v1:<chainId>:<hash>` instead and
+     * rejects what this produces. Callers who cannot move to `demos.sign(tx)`
+     * yet should read the chain id from `getNetworkInfo` and pass it here
+     * once the fork is active on their target network.
+     *
      * @param raw_tx - The transaction to be signed.
      * @param keypair - The keypair to use for signing.
+     * @param options.algorithm - The algorithm related to the keypair.
+     * @param options.chainId - The network id to bind the signature to. Omit
+     *   for the legacy preimage, which only pre-fork nodes accept.
      * @returns A Promise that resolves to the signed transaction.
      */
     sign: async function (
@@ -194,6 +268,7 @@ export const DemosTransactions = {
         keypair: IKeyPair,
         options: {
             algorithm: SigningAlgorithm
+            chainId?: number
         },
     ): Promise<Transaction> {
         required(keypair, "Private key not provided")
@@ -231,8 +306,17 @@ export const DemosTransactions = {
         // the bytes we just signed. See the equivalent block in
         // `Demos.sign` for the full rationale (myc#13).
         raw_tx.content = JSON.parse(serialized) as Transaction["content"]
+        // Built through the shared helper so these bytes cannot drift from
+        // the ones `Demos.sign` and the node produce.
+        const signedBytes = new TextDecoder().decode(
+            txSignaturePreimage(
+                raw_tx.hash,
+                options.chainId ?? 0,
+                typeof options.chainId === "number",
+            ),
+        )
         raw_tx.signature = await DemosTransactions.signWithAlgorithm(
-            raw_tx.hash,
+            signedBytes,
             keypair,
             { algorithm: options.algorithm },
         )
@@ -382,7 +466,10 @@ export const DemosTransactions = {
      * @param opts.failFastOnBroadcastError - If true, throw `BroadcastFailedError`
      *   immediately when the broadcast can't contact the node. Defaults to false.
      *
-     * @returns The original broadcast response and the terminal status.
+     * @returns The transaction hash, the original broadcast response, and the
+     *   terminal status. The hash is the node-recalculated one the status polls
+     *   ran against, so it is the identifier an explorer or a later
+     *   `getTransactionStatus` call will resolve.
      */
     broadcastAndWait: async function (
         validationData: RPCResponseWithValidityData,
@@ -393,6 +480,7 @@ export const DemosTransactions = {
             failFastOnBroadcastError?: boolean
         },
     ): Promise<{
+        hash: string
         broadcast: RPCResponse
         status: { state: "included" | "failed"; blockNumber?: number }
     }> {
@@ -497,6 +585,7 @@ export const DemosTransactions = {
                     const blockNumber: number | undefined =
                         (statusRes as any).blockNumber
                     return {
+                        hash: txHash,
                         broadcast: broadcastRes,
                         status: { state, blockNumber },
                     }

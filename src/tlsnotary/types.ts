@@ -104,7 +104,7 @@ export interface CommitRanges {
 }
 
 // Import and re-export PresentationJSON from tlsn-js types
-import type { PresentationJSON } from "tlsn-js/build/types"
+import type { PresentationJSON } from "tlsn-js/build/types.js"
 export type { PresentationJSON }
 
 /**
