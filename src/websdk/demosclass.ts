@@ -685,8 +685,8 @@ export class Demos {
                     `${identityStr}:${timestamp}`,
                 )
                 // raw: the node verifies this header against the unprefixed
-                // sha256 (`verifySignature.ts`), so the personal-message
-                // prefix would fail auth until the node follows.
+                // sha256 (`verifySignature.ts`). Explicit so it stays that way
+                // if the default ever moves to the prefixed preimage.
                 const { data } = await this.signMessage(authMessage, {
                     algorithm: "ed25519",
                     raw: true,
@@ -923,26 +923,34 @@ export class Demos {
     /**
      * Signs a message.
      *
-     * The signature covers the domain-separated preimage
-     * `\x19Demos Signed Message:\n<byte length><message>`, not the bare
-     * message bytes. A transaction signature covers `TextEncoder(tx.hash)`, so
-     * unprefixed a caller-chosen message of 64 hex characters produced a
-     * signature equally valid as a transaction signature: a site asking for a
-     * "login challenge" could hand over the hash of a transaction it had
-     * built and keep what the user believed was a login. The two preimages can
-     * no longer collide.
+     * By default the signature covers the bare message bytes, which is what
+     * the node and every deployed verifier check. With `personal: true` it
+     * covers the domain-separated preimage
+     * `\x19Demos Signed Message:\n<byte length><message>` instead.
+     *
+     * Prefer `personal: true` for any message a third party chooses. A
+     * transaction signature on a chain without the signatureDomain fork covers
+     * `TextEncoder(tx.hash)`, so a bare signature over a caller-chosen 64-hex
+     * "challenge" is equally valid as a signature over that transaction. The
+     * prefixed preimage cannot collide with it. The default stays unprefixed
+     * until verifiers accept the prefix, since switching it would break every
+     * existing signature check.
      *
      * @param message - The message to sign
      * @param options - The options for the message signing
      * @param options.algorithm - The algorithm to use for the message signing. Defaults to the connected wallet's algorithm.
-     * @param options.raw - Sign the unprefixed bytes, for verifiers that still
-     *   expect the legacy preimage (the node's auth headers). Never route a
-     *   caller-supplied message through it.
+     * @param options.personal - Sign the domain-separated preimage.
+     * @param options.raw - Sign the bare bytes. Kept for callers that already
+     *   pass it; it is the default and overrides `personal`.
      * @returns The signature of the message
      */
     async signMessage(
         message: string | Buffer,
-        options?: { algorithm?: SigningAlgorithm; raw?: boolean },
+        options?: {
+            algorithm?: SigningAlgorithm
+            personal?: boolean
+            raw?: boolean
+        },
     ): Promise<{ type: SigningAlgorithm; data: string }> {
         const algorithm = options?.algorithm || this.algorithm
 
@@ -961,9 +969,9 @@ export class Demos {
 
         const signature = await this.crypto.sign(
             algorithm,
-            options?.raw
-                ? messageBuffer
-                : personalMessagePreimage(messageBuffer),
+            Demos._isPersonal(options)
+                ? personalMessagePreimage(messageBuffer)
+                : messageBuffer,
         )
 
         return { type: algorithm, data: uint8ArrayToHex(signature.signature) }
@@ -977,10 +985,11 @@ export class Demos {
      * @param publicKey - The public key of the message
      * @param options - The options for the message verification
      * @param options.algorithm - The algorithm to use for the message verification. Defaults to the connected wallet's algorithm or ed25519 if no wallet is connected.
-     * @param options.raw - Verify against the unprefixed bytes, for signatures
-     *   produced by `signMessage(..., { raw: true })` or by an SDK older than
-     *   the domain-separated preimage. Off by default: accepting the legacy
-     *   form lets a transaction signature stand in for a message signature.
+     * @param options.personal - Verify against the domain-separated preimage,
+     *   for signatures produced by `signMessage(..., { personal: true })`.
+     *   Verifiers that accept a caller-chosen challenge should require it.
+     * @param options.raw - Verify against the bare bytes. It is the default
+     *   and overrides `personal`.
      *
      * @returns Whether the message is verified
      */
@@ -988,7 +997,11 @@ export class Demos {
         message: string | Buffer,
         signature: string,
         publicKey: string,
-        options?: { algorithm?: SigningAlgorithm; raw?: boolean },
+        options?: {
+            algorithm?: SigningAlgorithm
+            personal?: boolean
+            raw?: boolean
+        },
     ): Promise<boolean> {
         const algorithm = options?.algorithm || this.algorithm
 
@@ -1003,12 +1016,19 @@ export class Demos {
             algorithm: algorithm,
             signature: hexToUint8Array(signature),
             publicKey: hexToUint8Array(publicKey),
-            message: options?.raw
-                ? messageBuffer
-                : personalMessagePreimage(messageBuffer),
+            message: Demos._isPersonal(options)
+                ? personalMessagePreimage(messageBuffer)
+                : messageBuffer,
         })
 
         return verified
+    }
+
+    private static _isPersonal(options?: {
+        personal?: boolean
+        raw?: boolean
+    }): boolean {
+        return options?.personal === true && options?.raw !== true
     }
 
     /**
@@ -2021,7 +2041,7 @@ export class Demos {
             Date.now() - this._cachedNetworkInfoFailedAt <
                 Demos._NETWORK_INFO_FAILURE_TTL_MS
         ) {
-            return null
+            return this._cachedNetworkInfo
         }
 
         let fresh: unknown = null
@@ -2056,6 +2076,14 @@ export class Demos {
         this._cachedNetworkInfoFailed = true
         this._cachedNetworkInfoFailedAt = Date.now()
         this._cachedNetworkInfoRpcUrl = this.rpc_url
+
+        // A re-ask that fails says nothing new about the forks: the last
+        // answer from this node is still the best one there is. Dropping it
+        // would flip a post-fork instance back to the legacy wire format for
+        // the failure TTL, and the node would reject what it signs meanwhile.
+        if (this._cachedNetworkInfo) {
+            return this._cachedNetworkInfo
+        }
         if (!this._cachedNetworkInfoWarned) {
             this._cachedNetworkInfoWarned = true
             console.warn(

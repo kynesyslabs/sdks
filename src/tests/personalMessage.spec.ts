@@ -51,6 +51,7 @@ describe("signMessage domain separation", () => {
 
         const { data } = await demos.signMessage(TX_HASH, {
             algorithm: "ed25519",
+            personal: true,
         })
 
         // What a node does with a transaction: verify over the bare hash bytes.
@@ -64,37 +65,73 @@ describe("signMessage domain separation", () => {
         expect(asTransactionSignature).toBe(false)
     })
 
-    it("round-trips through verifyMessage", async () => {
+    it("round-trips a personal signature through verifyMessage", async () => {
         const demos = await connectedDemos()
 
         const { data } = await demos.signMessage(TX_HASH, {
             algorithm: "ed25519",
+            personal: true,
         })
 
         await expect(
             demos.verifyMessage(TX_HASH, data, demos.getAddress(), {
                 algorithm: "ed25519",
+                personal: true,
             }),
         ).resolves.toBe(true)
-    })
-
-    it("rejects a legacy raw signature by default", async () => {
-        const demos = await connectedDemos()
-
-        const { data } = await demos.signMessage(TX_HASH, {
-            raw: true,
-            algorithm: "ed25519",
-        })
-
+        // A verifier on the bare bytes does not accept it.
         await expect(
             demos.verifyMessage(TX_HASH, data, demos.getAddress(), {
                 algorithm: "ed25519",
             }),
         ).resolves.toBe(false)
+    })
+
+    it("signs and verifies the bare bytes by default, as deployed verifiers expect", async () => {
+        const demos = await connectedDemos()
+        const message = "getL2PSHistory:subnet:0xabc:1700000000000"
+
+        const { data } = await demos.signMessage(message, {
+            algorithm: "ed25519",
+        })
+        const direct = await demos.crypto.sign(
+            "ed25519",
+            new TextEncoder().encode(message),
+        )
+
+        expect(data).toBe(uint8ArrayToHex(direct.signature))
         await expect(
-            demos.verifyMessage(TX_HASH, data, demos.getAddress(), {
+            demos.verifyMessage(message, data, demos.getAddress(), {
                 algorithm: "ed25519",
-                raw: true,
+            }),
+        ).resolves.toBe(true)
+    })
+
+    it("lets raw override personal", async () => {
+        const demos = await connectedDemos()
+
+        const { data } = await demos.signMessage(TX_HASH, {
+            algorithm: "ed25519",
+            personal: true,
+            raw: true,
+        })
+        const direct = await demos.crypto.sign(
+            "ed25519",
+            new TextEncoder().encode(TX_HASH),
+        )
+
+        expect(data).toBe(uint8ArrayToHex(direct.signature))
+    })
+
+    it("signs binary that is not valid UTF-8 by default, as 4.0.16 did", async () => {
+        const demos = await connectedDemos()
+        const bytes = Buffer.from([0x68, 0xff, 0x69])
+
+        const { data } = await demos.signMessage(bytes, { algorithm: "ed25519" })
+
+        await expect(
+            demos.verifyMessage(bytes, data, demos.getAddress(), {
+                algorithm: "ed25519",
             }),
         ).resolves.toBe(true)
     })
