@@ -28,9 +28,13 @@ export interface AnchorAttestationResult {
 
 /**
  * Why an anchor was not confirmed as accepted. `refused` is the node saying no
- * (a 4xx): the transaction is not pending and may be resent. `unknown` means
- * the outcome is not known (a 5xx, or no usable response): the transaction may
- * still land, so check `txHash` before sending another anchor.
+ * (a 4xx) to this transaction, which therefore will not land; read the reason
+ * before sending another, since a nonce conflict can mean an earlier anchor is
+ * still pending. `unknown` means the outcome is not known (a 5xx, or no usable
+ * response): this transaction may still land, so check `txHash` first.
+ *
+ * Each call signs a fresh transaction, so a refusal never stands for "this
+ * same transaction is already pending".
  */
 export class AnchorBroadcastError extends Error {
     constructor(
