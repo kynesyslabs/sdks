@@ -180,6 +180,36 @@ describe("a cached answer that says 'not yet' expires", () => {
         expect(calls.length).toBe(2)
     })
 
+    test("keeps the last answer when a re-ask fails, instead of falling back to pre-fork", async () => {
+        const pending = mkInfo(true)
+        ;(pending.forks as any).signatureDomain = {
+            activated: false,
+            activationHeight: null,
+        }
+        const map = new Map<string, NetworkInfo | null>([
+            ["http://node-a", pending],
+        ])
+        const { demos, calls } = buildDemosWithRpcMap(map)
+        ;(demos as any).rpc_url = "http://node-a"
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {})
+
+        await demos.getNetworkInfo()
+        // The pending-fork answer expires and the node blips on the re-ask.
+        map.set("http://node-a", null)
+        ;(demos as any)._cachedNetworkInfoAt = Date.now() - 60_000
+
+        const afterBlip = await demos.getNetworkInfo()
+        expect(afterBlip?.forks.osDenomination.activated).toBe(true)
+        expect(await (demos as any)._isPostForkCached()).toBe(true)
+        // Within the failure TTL it does not hammer the node either.
+        await demos.getNetworkInfo()
+        expect(calls.length).toBe(2)
+        // Serving the old answer is reported, once.
+        expect(warn).toHaveBeenCalledTimes(1)
+        expect(String(warn.mock.calls[0][0])).toContain("refresh failed")
+        warn.mockRestore()
+    })
+
     test("keeps an answer where every fork is already active", async () => {
         const map = new Map<string, NetworkInfo | null>([
             ["http://node-a", mkInfo(true)],
