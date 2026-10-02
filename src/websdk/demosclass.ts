@@ -44,6 +44,7 @@ import {
 //import { l2psCalls } from "@/l2ps"
 import {
     l2psHistoryAuthMessage,
+    legacyL2psHistoryAuthMessage,
     type L2PSHistoryOptions,
     type L2PSHistoryPage,
 } from "@/l2ps/history"
@@ -1729,21 +1730,37 @@ export class Demos {
         // Signed as raw bytes, not as a personal message: this is a protocol
         // message the node verifies verbatim, and a display prefix would make
         // the signature fail to verify there.
-        const message = l2psHistoryAuthMessage(l2psUid, address, timestamp)
-        const signature = await this.crypto.sign(
-            "ed25519",
-            new TextEncoder().encode(message),
-        )
+        const request = async (message: string) => {
+            const signature = await this.crypto.sign(
+                "ed25519",
+                new TextEncoder().encode(message),
+            )
+            return this.nodeCall("getL2PSAccountTransactions", {
+                l2psUid,
+                address,
+                signature: uint8ArrayToHex(signature.signature),
+                timestamp: timestamp.toString(),
+                limit: options.limit,
+                offset: options.offset,
+                since: options.since,
+            })
+        }
 
-        const page = (await this.nodeCall("getL2PSAccountTransactions", {
-            l2psUid,
-            address,
-            signature: uint8ArrayToHex(signature.signature),
-            timestamp: timestamp.toString(),
-            limit: options.limit,
-            offset: options.offset,
-            since: options.since,
-        })) as L2PSHistoryPage
+        // The legacy form is never a fallback chosen on the node's say-so: a
+        // node that answers "invalid signature" would otherwise be handed a
+        // signature that is not bound to this subnet.
+        const page = (await request(
+            options.legacyAuth
+                ? legacyL2psHistoryAuthMessage(address, timestamp)
+                : l2psHistoryAuthMessage(l2psUid, address, timestamp),
+        )) as L2PSHistoryPage | string
+        if (typeof page === "string") {
+            const hint =
+                !options.legacyAuth && /invalid signature/i.test(page)
+                    ? " (a node built before the subnet id was bound into the signature refuses it; pass { legacyAuth: true } only for a node you trust)"
+                    : ""
+            throw new Error(`getL2PSHistory: ${page}${hint}`)
+        }
 
         // `since` is applied again here. A node older than the paired change
         // ignores the field, and silently returning history from before the
@@ -1751,11 +1768,20 @@ export class Demos {
         // filter worked.
         if (options.since && Array.isArray(page?.transactions)) {
             const since = options.since
+            const newer = page.transactions.filter(
+                tx => Number(tx.timestamp) > since,
+            )
+            if (newer.length === page.transactions.length) {
+                return page
+            }
+            // The node pages newest first, so dropping a row means this page
+            // already reached the cursor: nothing newer lies beyond it, and
+            // the node's count and hasMore describe the unfiltered page.
             return {
                 ...page,
-                transactions: page.transactions.filter(
-                    tx => Number(tx.timestamp) > since,
-                ),
+                transactions: newer,
+                count: newer.length,
+                hasMore: false,
             }
         }
         return page

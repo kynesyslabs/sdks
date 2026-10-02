@@ -5,6 +5,7 @@ import {
     AGENT_AUTHORITY_SCHEMA,
     VLEI_SCHEMAS,
     ATTESTATION_DOMAIN_PREFIX,
+    anchorAttestation,
     attestationProgramName,
     attestationSigningBytes,
     buildAttestation,
@@ -549,6 +550,62 @@ describe("vLEI attestation (build / sign / verify)", () => {
 
     it("rejects a demos-scheme mismatch on attesterClaim", () => {
         expect(() => buildAttestation(verdict, "eip155:0x1234" as ClaimReference)).toThrow(/demos:/)
+    })
+
+    describe("anchorAttestation", () => {
+        function stubChain(broadcastResult: unknown) {
+            const d = demos as any
+            const saved = {
+                sign: d.sign,
+                confirm: d.confirm,
+                broadcast: d.broadcast,
+                getAddressNonce: d.getAddressNonce,
+                _nonceReserver: d._nonceReserver,
+            }
+            const seen: { nonce?: number } = {}
+            d.getAddressNonce = async () => 4
+            d.sign = async (tx: any) => {
+                seen.nonce = tx.content.nonce
+                return { ...tx, hash: "0xanchor" }
+            }
+            d.confirm = async () => ({ result: 200, response: { data: { valid: true } } })
+            d.broadcast = async () => broadcastResult
+            return { seen, restore: () => Object.assign(d, saved) }
+        }
+
+        it("throws when the node refuses the anchor, instead of reporting it anchored", async () => {
+            const att = await signAttestation(buildAttestation(verdict, attesterClaim, { boundAt: 1700000000000 }), demos)
+            const chain = stubChain({ result: 400, response: "Nonce already used" })
+            try {
+                await expect(anchorAttestation(att, demos)).rejects.toThrow("did not accept the anchor transaction (400): Nonce already used")
+            } finally {
+                chain.restore()
+            }
+        })
+
+        it("returns the anchor once the node accepts it", async () => {
+            const att = await signAttestation(buildAttestation(verdict, attesterClaim, { boundAt: 1700000000000 }), demos)
+            const chain = stubChain({ result: 200, response: { message: "ok" } })
+            try {
+                const res = await anchorAttestation(att, demos)
+                expect(res.txHash).toBe("0xanchor")
+                expect(chain.seen.nonce).toBe(5)
+            } finally {
+                chain.restore()
+            }
+        })
+
+        it("draws the nonce from the auto-nonce reserver when it is on", async () => {
+            const att = await signAttestation(buildAttestation(verdict, attesterClaim, { boundAt: 1700000000000 }), demos)
+            const chain = stubChain({ result: 200, response: {} })
+            ;(demos as any)._nonceReserver = () => async () => 42
+            try {
+                await anchorAttestation(att, demos)
+                expect(chain.seen.nonce).toBe(42)
+            } finally {
+                chain.restore()
+            }
+        })
     })
 
     describe("tamper detection", () => {

@@ -8,6 +8,7 @@ export {
     L2PSHistoryOptions,
     L2PSHistoryPage,
     l2psHistoryAuthMessage,
+    legacyL2psHistoryAuthMessage,
     L2PS_HISTORY_AUTH_WINDOW_MS,
 } from "./history"
 

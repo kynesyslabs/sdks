@@ -58,6 +58,14 @@ export interface L2PSHistoryOptions {
      * to catch up when you already hold history.
      */
     since?: number
+    /**
+     * Sign the old auth message, without the subnet id, for a node that
+     * predates binding it. That signature verifies for a read of any subnet
+     * the node serves, so whoever relays it can reuse it against another one
+     * for the five-minute window. Only set this for a node you trust and know
+     * to be on the old build; it is never chosen for you.
+     */
+    legacyAuth?: boolean
 }
 
 /**
@@ -74,6 +82,18 @@ export function l2psHistoryAuthMessage(
     timestamp: number,
 ): string {
     return `getL2PSHistory:${l2psUid}:${address}:${timestamp}`
+}
+
+/**
+ * The message nodes built before the subnet id was bound into the signature
+ * verify. Signed only when the caller opts in with `legacyAuth`, since a
+ * signature over it is not tied to one subnet.
+ */
+export function legacyL2psHistoryAuthMessage(
+    address: string,
+    timestamp: number,
+): string {
+    return `getL2PSHistory:${address}:${timestamp}`
 }
 
 /**

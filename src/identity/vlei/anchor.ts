@@ -31,6 +31,9 @@ export interface AnchorAttestationResult {
  * (= connected Demos wallet, which must control `attesterClaim`) becomes the SP
  * owner; that owner check is what stops an impostor SP published under the same
  * deterministic name from speaking for this attester in `resolveAttestation`.
+ *
+ * Resolves once the node has accepted the transaction for inclusion; it does
+ * not wait for the block. Throws when the node refuses it.
  */
 export async function anchorAttestation(
     att: VleiAttestation,
@@ -49,7 +52,11 @@ export async function anchorAttestation(
         )
     }
 
-    const nonce = await resolveNonce(options?.nonce, () => demos.getAddressNonce(connected))
+    const nonce = await resolveNonce(
+        options?.nonce,
+        () => demos.getAddressNonce(connected),
+        demos._nonceReserver(connected),
+    )
     const payload = StorageProgram.createStorageProgram(
         connected,
         attestationProgramName(att.subjectClaim, att.recordDigest),
@@ -69,7 +76,17 @@ export async function anchorAttestation(
 
     const signed = await demos.sign(tx)
     const validity = await demos.confirm(signed)
-    await demos.broadcast(validity)
+    const broadcast = await demos.broadcast(validity)
+    // broadcast reports a node refusal in its result rather than throwing.
+    if (broadcast?.result !== 200) {
+        const reason =
+            typeof broadcast?.response === "string"
+                ? broadcast.response
+                : JSON.stringify(broadcast?.response ?? null)
+        throw new Error(
+            `anchorAttestation: the node did not accept the anchor transaction (${broadcast?.result}): ${reason}`,
+        )
+    }
 
     return { storageAddress: payload.storageAddress, txHash: signed.hash }
 }
