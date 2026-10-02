@@ -231,6 +231,21 @@ describe("a node that predates the subnet-bound signature", () => {
         expect(page.transactions).toEqual([])
     })
 
+    it("throws on a transport failure instead of returning the envelope as a page", async () => {
+        const demos = new Demos()
+        ;(demos as any).nodeCall = async () => ({
+            result: 500,
+            response: new Error("connect ECONNREFUSED"),
+            require_reply: false,
+            extra: null,
+        })
+        await demos.connectWallet(demos.newMnemonic())
+
+        await expect(demos.getL2PSHistory(SUBNET)).rejects.toThrow(
+            "no history page from the node (500): connect ECONNREFUSED",
+        )
+    })
+
     it("surfaces any other refusal instead of returning it as a page", async () => {
         const demos = new Demos()
         let calls = 0

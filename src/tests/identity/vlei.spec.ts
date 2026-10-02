@@ -6,6 +6,7 @@ import {
     VLEI_SCHEMAS,
     ATTESTATION_DOMAIN_PREFIX,
     anchorAttestation,
+    AnchorBroadcastError,
     attestationProgramName,
     attestationSigningBytes,
     buildAttestation,
@@ -573,13 +574,37 @@ describe("vLEI attestation (build / sign / verify)", () => {
             return { seen, restore: () => Object.assign(d, saved) }
         }
 
-        it("throws when the node refuses the anchor, instead of reporting it anchored", async () => {
+        it("throws a refusal when the node says no, instead of reporting it anchored", async () => {
             const att = await signAttestation(buildAttestation(verdict, attesterClaim, { boundAt: 1700000000000 }), demos)
             const chain = stubChain({ result: 400, response: "Nonce already used" })
             try {
-                await expect(anchorAttestation(att, demos)).rejects.toThrow("did not accept the anchor transaction (400): Nonce already used")
+                const err = await anchorAttestation(att, demos).catch(e => e)
+                expect(err).toBeInstanceOf(AnchorBroadcastError)
+                expect(err.outcome).toBe("refused")
+                expect(err.txHash).toBe("0xanchor")
+                expect(err.message).toContain("Nonce already used")
             } finally {
                 chain.restore()
+            }
+        })
+
+        it("reports an unknown outcome, with the hash, when the broadcast may still have landed", async () => {
+            const att = await signAttestation(buildAttestation(verdict, attesterClaim, { boundAt: 1700000000000 }), demos)
+            for (const reply of [
+                { result: 500, response: new Error("socket hang up") },
+                { result: 502, response: "Bad Gateway" },
+                undefined,
+            ]) {
+                const chain = stubChain(reply)
+                try {
+                    const err = await anchorAttestation(att, demos).catch(e => e)
+                    expect(err).toBeInstanceOf(AnchorBroadcastError)
+                    expect(err.outcome).toBe("unknown")
+                    expect(err.txHash).toBe("0xanchor")
+                    expect(err.storageAddress).toBeTruthy()
+                } finally {
+                    chain.restore()
+                }
             }
         })
 

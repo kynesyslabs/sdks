@@ -43,6 +43,7 @@ export {
 } from "./attestation"
 export {
     anchorAttestation,
+    AnchorBroadcastError,
     resolveAttestation,
     attestationProgramName,
     type AnchorAttestationResult,

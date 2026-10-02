@@ -27,13 +27,37 @@ export interface AnchorAttestationResult {
 }
 
 /**
+ * Why an anchor was not confirmed as accepted. `refused` is the node saying no
+ * (a 4xx): the transaction is not pending and may be resent. `unknown` means
+ * the outcome is not known (a 5xx, or no usable response): the transaction may
+ * still land, so check `txHash` before sending another anchor.
+ */
+export class AnchorBroadcastError extends Error {
+    constructor(
+        readonly outcome: "refused" | "unknown",
+        readonly txHash: string,
+        readonly storageAddress: string,
+        readonly result: unknown,
+        reason: string,
+    ) {
+        super(
+            outcome === "refused"
+                ? `anchorAttestation: the node refused the anchor transaction ${txHash} (${String(result)}): ${reason}`
+                : `anchorAttestation: the outcome of anchor transaction ${txHash} is unknown (${String(result)}): ${reason}; check the hash before resending`,
+        )
+        this.name = "AnchorBroadcastError"
+    }
+}
+
+/**
  * Anchor a signed attestation to chain via SR-2 (Storage Program). The deployer
  * (= connected Demos wallet, which must control `attesterClaim`) becomes the SP
  * owner; that owner check is what stops an impostor SP published under the same
  * deterministic name from speaking for this attester in `resolveAttestation`.
  *
  * Resolves once the node has accepted the transaction for inclusion; it does
- * not wait for the block. Throws when the node refuses it.
+ * not wait for the block. Throws {@link AnchorBroadcastError} otherwise, saying
+ * whether the node refused it or the outcome is unknown.
  */
 export async function anchorAttestation(
     att: VleiAttestation,
@@ -77,14 +101,23 @@ export async function anchorAttestation(
     const signed = await demos.sign(tx)
     const validity = await demos.confirm(signed)
     const broadcast = await demos.broadcast(validity)
-    // broadcast reports a node refusal in its result rather than throwing.
+    // broadcast reports a node refusal, and a transport failure, in its result
+    // rather than throwing.
     if (broadcast?.result !== 200) {
+        const result = broadcast?.result
+        const response = broadcast?.response
         const reason =
-            typeof broadcast?.response === "string"
-                ? broadcast.response
-                : JSON.stringify(broadcast?.response ?? null)
-        throw new Error(
-            `anchorAttestation: the node did not accept the anchor transaction (${broadcast?.result}): ${reason}`,
+            typeof response === "string"
+                ? response
+                : ((response as Error)?.message ?? JSON.stringify(response ?? null))
+        const refused =
+            typeof result === "number" && result >= 400 && result < 500
+        throw new AnchorBroadcastError(
+            refused ? "refused" : "unknown",
+            signed.hash,
+            payload.storageAddress,
+            result,
+            reason,
         )
     }
 

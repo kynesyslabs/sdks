@@ -1754,6 +1754,22 @@ export class Demos {
                 ? legacyL2psHistoryAuthMessage(address, timestamp)
                 : l2psHistoryAuthMessage(l2psUid, address, timestamp),
         )) as L2PSHistoryPage | string
+        if (
+            page &&
+            typeof page === "object" &&
+            !Array.isArray((page as L2PSHistoryPage).transactions)
+        ) {
+            // A transport failure comes back from nodeCall as an RPC envelope,
+            // not a page; returning it would read as an empty history.
+            const failure = page as unknown as { result?: unknown; response?: unknown }
+            throw new Error(
+                `getL2PSHistory: no history page from the node (${String(failure.result ?? "no result")}): ` +
+                    String(
+                        (failure.response as Error)?.message ??
+                            JSON.stringify(failure.response ?? null),
+                    ),
+            )
+        }
         if (typeof page === "string") {
             const hint =
                 !options.legacyAuth && /invalid signature/i.test(page)
