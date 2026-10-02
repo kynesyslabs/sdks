@@ -1746,18 +1746,20 @@ export class Demos {
             })
         }
 
-        let page = (await request(
-            l2psHistoryAuthMessage(l2psUid, address, timestamp),
+        // The legacy form is never a fallback chosen on the node's say-so: a
+        // node that answers "invalid signature" would otherwise be handed a
+        // signature that is not bound to this subnet.
+        const page = (await request(
+            options.legacyAuth
+                ? legacyL2psHistoryAuthMessage(address, timestamp)
+                : l2psHistoryAuthMessage(l2psUid, address, timestamp),
         )) as L2PSHistoryPage | string
-        // A node that predates binding the subnet id into the signature
-        // refuses the current form; it still accepts the old one.
-        if (typeof page === "string" && /invalid signature/i.test(page)) {
-            page = (await request(
-                legacyL2psHistoryAuthMessage(address, timestamp),
-            )) as L2PSHistoryPage | string
-        }
         if (typeof page === "string") {
-            throw new Error(`getL2PSHistory: ${page}`)
+            const hint =
+                !options.legacyAuth && /invalid signature/i.test(page)
+                    ? " (a node built before the subnet id was bound into the signature refuses it; pass { legacyAuth: true } only for a node you trust)"
+                    : ""
+            throw new Error(`getL2PSHistory: ${page}${hint}`)
         }
 
         // `since` is applied again here. A node older than the paired change

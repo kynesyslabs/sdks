@@ -194,8 +194,7 @@ describe("the since cursor's page metadata", () => {
 })
 
 describe("a node that predates the subnet-bound signature", () => {
-    it("retries with the message that node verifies", async () => {
-        const demos = new Demos()
+    function legacyNode(demos: Demos) {
         const signed: string[] = []
         ;(demos as any).nodeCall = async (_message: string, args: any) => {
             const legacy = legacyL2psHistoryAuthMessage(args.address, Number(args.timestamp))
@@ -209,11 +208,26 @@ describe("a node that predates the subnet-bound signature", () => {
                 ? { l2psUid: SUBNET, address: args.address, transactions: [], count: 0, hasMore: false }
                 : "Invalid signature. Unable to verify address ownership."
         }
+        return signed
+    }
+
+    it("is never sent the unbound signature on its own say-so", async () => {
+        const demos = new Demos()
+        const signed = legacyNode(demos)
         await demos.connectWallet(demos.newMnemonic())
 
-        const page = await demos.getL2PSHistory(SUBNET)
+        await expect(demos.getL2PSHistory(SUBNET)).rejects.toThrow("legacyAuth")
+        expect(signed).toEqual(["current"])
+    })
 
-        expect(signed).toEqual(["current", "legacy"])
+    it("is read with the legacy message when the caller opts in", async () => {
+        const demos = new Demos()
+        const signed = legacyNode(demos)
+        await demos.connectWallet(demos.newMnemonic())
+
+        const page = await demos.getL2PSHistory(SUBNET, { legacyAuth: true })
+
+        expect(signed).toEqual(["legacy"])
         expect(page.transactions).toEqual([])
     })
 
