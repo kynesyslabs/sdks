@@ -77,6 +77,18 @@ export function l2psHistoryAuthMessage(
 }
 
 /**
+ * The message nodes built before the subnet id was bound into the signature
+ * verify. Only sent to a node that refused the current form, so a client on
+ * this release can still read history from a node that has not updated.
+ */
+export function legacyL2psHistoryAuthMessage(
+    address: string,
+    timestamp: number,
+): string {
+    return `getL2PSHistory:${address}:${timestamp}`
+}
+
+/**
  * How long the node gives a signed request to arrive. Kept here so callers
  * can see that a clock far out of step is what a 401 means.
  */

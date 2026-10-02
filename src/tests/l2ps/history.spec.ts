@@ -1,5 +1,5 @@
 import { Demos } from "@/websdk"
-import { l2psHistoryAuthMessage } from "@/l2ps"
+import { l2psHistoryAuthMessage, legacyL2psHistoryAuthMessage } from "@/l2ps"
 import { Cryptography } from "@/encryption/Cryptography"
 import { hexToUint8Array } from "@/encryption/unifiedCrypto"
 
@@ -9,7 +9,7 @@ import { hexToUint8Array } from "@/encryption/unifiedCrypto"
  * A node will not serve an account's L2PS history to anyone but its owner, so
  * the whole value of this call is that the request it builds actually verifies
  * on the other side — which is a signature over the raw bytes of
- * `getL2PSHistory:<address>:<timestamp>`, with no display prefix.
+ * `getL2PSHistory:<l2psUid>:<address>:<timestamp>`, with no display prefix.
  */
 
 const SUBNET = "subnet-under-test"
@@ -153,5 +153,80 @@ describe("the since cursor", () => {
         const page = await demos.getL2PSHistory(SUBNET, { since: 200 })
 
         expect(page.transactions.map(t => t.hash)).toEqual(["new"])
+    })
+})
+
+describe("the since cursor's page metadata", () => {
+    it("reports the filtered count, and no more pages once the cursor is reached", async () => {
+        const demos = new Demos()
+        ;(demos as any).nodeCall = async () => ({
+            transactions: [
+                { hash: "newest", timestamp: "400" },
+                { hash: "newer", timestamp: "300" },
+                { hash: "older", timestamp: "100" },
+            ],
+            count: 3,
+            hasMore: true,
+        })
+        await demos.connectWallet(demos.newMnemonic())
+
+        const page = await demos.getL2PSHistory(SUBNET, { since: 200 })
+
+        expect(page.transactions.map(t => t.hash)).toEqual(["newest", "newer"])
+        expect(page.count).toBe(2)
+        expect(page.hasMore).toBe(false)
+    })
+
+    it("keeps the node's metadata when the cursor filtered nothing", async () => {
+        const demos = new Demos()
+        ;(demos as any).nodeCall = async () => ({
+            transactions: [{ hash: "newest", timestamp: "400" }],
+            count: 1,
+            hasMore: true,
+        })
+        await demos.connectWallet(demos.newMnemonic())
+
+        const page = await demos.getL2PSHistory(SUBNET, { since: 200 })
+
+        expect(page.count).toBe(1)
+        expect(page.hasMore).toBe(true)
+    })
+})
+
+describe("a node that predates the subnet-bound signature", () => {
+    it("retries with the message that node verifies", async () => {
+        const demos = new Demos()
+        const signed: string[] = []
+        ;(demos as any).nodeCall = async (_message: string, args: any) => {
+            const legacy = legacyL2psHistoryAuthMessage(args.address, Number(args.timestamp))
+            const ok = Cryptography.verify(
+                legacy,
+                Buffer.from(hexToUint8Array(args.signature)),
+                Buffer.from(hexToUint8Array(args.address)),
+            )
+            signed.push(ok ? "legacy" : "current")
+            return ok
+                ? { l2psUid: SUBNET, address: args.address, transactions: [], count: 0, hasMore: false }
+                : "Invalid signature. Unable to verify address ownership."
+        }
+        await demos.connectWallet(demos.newMnemonic())
+
+        const page = await demos.getL2PSHistory(SUBNET)
+
+        expect(signed).toEqual(["current", "legacy"])
+        expect(page.transactions).toEqual([])
+    })
+
+    it("surfaces any other refusal instead of returning it as a page", async () => {
+        const demos = new Demos()
+        let calls = 0
+        ;(demos as any).nodeCall = async () => {
+            calls += 1
+            return "Request expired or invalid timestamp."
+        }
+        await demos.connectWallet(demos.newMnemonic())
+
+        await expect(demos.getL2PSHistory(SUBNET)).rejects.toThrow("Request expired")
+        expect(calls).toBe(1)
     })
 })
