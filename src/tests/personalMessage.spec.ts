@@ -123,6 +123,29 @@ describe("signMessage domain separation", () => {
         expect(data).toBe(uint8ArrayToHex(direct.signature))
     })
 
+    it("refuses to sign a transaction's preimage unprefixed unless asked for raw", async () => {
+        const demos = await connectedDemos()
+        const domainForm = `demos-tx:v1:7:${TX_HASH}`
+
+        for (const message of [TX_HASH, TX_HASH.toUpperCase(), domainForm]) {
+            await expect(
+                demos.signMessage(message, { algorithm: "ed25519" }),
+            ).rejects.toThrow("transaction's signing preimage")
+            await expect(
+                demos.signMessage(Buffer.from(message), { algorithm: "ed25519" }),
+            ).rejects.toThrow("transaction's signing preimage")
+        }
+
+        // Prefixed, it cannot stand in for the transaction, so it is fine.
+        await expect(
+            demos.signMessage(TX_HASH, { algorithm: "ed25519", personal: true }),
+        ).resolves.toBeDefined()
+        // A message that merely contains a transaction hash is not its preimage.
+        await expect(
+            demos.signMessage(`login:${TX_HASH}`, { algorithm: "ed25519" }),
+        ).resolves.toBeDefined()
+    })
+
     it("signs binary that is not valid UTF-8 by default, as 4.0.16 did", async () => {
         const demos = await connectedDemos()
         const bytes = Buffer.from([0x68, 0xff, 0x69])

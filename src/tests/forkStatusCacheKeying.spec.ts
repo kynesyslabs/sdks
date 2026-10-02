@@ -204,6 +204,9 @@ describe("a cached answer that says 'not yet' expires", () => {
         // Within the failure TTL it does not hammer the node either.
         await demos.getNetworkInfo()
         expect(calls.length).toBe(2)
+        // Serving the old answer is reported, once.
+        expect(warn).toHaveBeenCalledTimes(1)
+        expect(String(warn.mock.calls[0][0])).toContain("refresh failed")
         warn.mockRestore()
     })
 

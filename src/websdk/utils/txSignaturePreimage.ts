@@ -40,3 +40,24 @@ export function txSignaturePreimage(
     }
     return new TextEncoder().encode(`${TX_SIGNATURE_DOMAIN}${chainId}:${hash}`)
 }
+
+const TX_PREIMAGE_FORMS = [
+    /^[0-9a-fA-F]{64}$/,
+    new RegExp(`^${TX_SIGNATURE_DOMAIN}\\d+:[0-9a-fA-F]{64}$`),
+]
+
+/**
+ * Whether these bytes are what a transaction signature covers, before or
+ * after the signatureDomain fork. A signature over them is a valid
+ * transaction signature, so a message signer must not produce one for a
+ * message it did not build itself.
+ */
+export function isTransactionSignaturePreimage(bytes: Uint8Array): boolean {
+    let text: string
+    try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+    } catch {
+        return false
+    }
+    return TX_PREIMAGE_FORMS.some(form => form.test(text))
+}

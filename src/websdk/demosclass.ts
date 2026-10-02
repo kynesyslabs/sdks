@@ -7,7 +7,10 @@ This library contains all the functions that are used to interact with the demos
 import axios from "axios"
 import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
-import { txSignaturePreimage } from "./utils/txSignaturePreimage"
+import {
+    isTransactionSignaturePreimage,
+    txSignaturePreimage,
+} from "./utils/txSignaturePreimage"
 import { personalMessagePreimage } from "./utils/personalMessage"
 import { TransportError } from "./TransportError"
 
@@ -126,6 +129,7 @@ export class Demos {
     private _cachedNetworkInfoFailed: boolean = false
     private _cachedNetworkInfoFailedAt: number = 0
     private _cachedNetworkInfoWarned: boolean = false
+    private _staleNetworkInfoWarned: boolean = false
     /**
      * When the successful answer was cached. Only consulted while some fork
      * the node reported is still pending — see `_cachedAnswerStillHolds`.
@@ -928,21 +932,26 @@ export class Demos {
      * covers the domain-separated preimage
      * `\x19Demos Signed Message:\n<byte length><message>` instead.
      *
-     * Prefer `personal: true` for any message a third party chooses. A
-     * transaction signature on a chain without the signatureDomain fork covers
-     * `TextEncoder(tx.hash)`, so a bare signature over a caller-chosen 64-hex
-     * "challenge" is equally valid as a signature over that transaction. The
-     * prefixed preimage cannot collide with it. The default stays unprefixed
-     * until verifiers accept the prefix, since switching it would break every
-     * existing signature check.
+     * A bare signature over exactly what a transaction signature covers (a
+     * 64-hex hash, or its `demos-tx:v1:<chainId>:` form) would be a valid
+     * signature for that transaction, so a site could pass a transaction off
+     * as a "login challenge". Unprefixed signing refuses such a message
+     * unless the caller asks for `raw: true` explicitly. Prefer
+     * `personal: true` for any message a third party chooses: the prefixed
+     * preimage cannot collide with a transaction at all. The default stays
+     * unprefixed until verifiers accept the prefix, since switching it would
+     * break every existing signature check.
      *
      * @param message - The message to sign
      * @param options - The options for the message signing
      * @param options.algorithm - The algorithm to use for the message signing. Defaults to the connected wallet's algorithm.
      * @param options.personal - Sign the domain-separated preimage.
-     * @param options.raw - Sign the bare bytes. Kept for callers that already
-     *   pass it; it is the default and overrides `personal`.
+     * @param options.raw - Sign the bare bytes even when they are a
+     *   transaction's signing preimage. Overrides `personal`. Never route a
+     *   caller-supplied message through it.
      * @returns The signature of the message
+     * @throws When signing unprefixed bytes that a transaction signature
+     *   covers, without `raw: true`.
      */
     async signMessage(
         message: string | Buffer,
@@ -967,11 +976,22 @@ export class Demos {
             messageBuffer = message
         }
 
+        const personal = Demos._isPersonal(options)
+        if (
+            !personal &&
+            options?.raw !== true &&
+            isTransactionSignaturePreimage(messageBuffer)
+        ) {
+            throw new Error(
+                "Refusing to sign a message that is a transaction's signing preimage: " +
+                    "the signature would authorize that transaction. " +
+                    "Use { personal: true }, or { raw: true } for a protocol message you built.",
+            )
+        }
+
         const signature = await this.crypto.sign(
             algorithm,
-            Demos._isPersonal(options)
-                ? personalMessagePreimage(messageBuffer)
-                : messageBuffer,
+            personal ? personalMessagePreimage(messageBuffer) : messageBuffer,
         )
 
         return { type: algorithm, data: uint8ArrayToHex(signature.signature) }
@@ -1997,16 +2017,19 @@ export class Demos {
      * activation height, current chain head, and the `activated` boolean
      * for every known fork.
      *
-     * Caches the result on this `Demos` instance for the instance's
-     * lifetime (no TTL). To re-fetch after a node upgrade, construct a
-     * fresh `Demos` instance.
+     * Caches the result per RPC URL. An answer in which every fork is
+     * already active is kept for the instance's lifetime; one that reports a
+     * pending fork is re-fetched after 30 seconds, so a long-lived instance
+     * sees the activation.
      *
-     * On RPC failure (404, malformed response, network error), this
-     * method returns `null` and the SDK assumes pre-fork wire format.
-     * A `console.warn` is emitted exactly once per `Demos` instance
-     * recommending the operator upgrade the target node.
+     * On RPC failure (404, malformed response, network error), this method
+     * returns the last answer it got from the same node, if any, and retries
+     * after the failure TTL. Only a node that never answered yields `null`,
+     * in which case the SDK assumes the pre-fork wire format. Each case
+     * emits a `console.warn` once per `Demos` instance.
      *
-     * @returns The fork-status payload, or `null` if the RPC failed.
+     * @returns The fork-status payload, the last one from this node when a
+     * refresh failed, or `null` if the node never answered.
      */
     async getNetworkInfo(): Promise<NetworkInfo | null> {
         // PR-86 myc#18: cache is keyed by rpc_url. A stale entry from a
@@ -2082,6 +2105,12 @@ export class Demos {
         // would flip a post-fork instance back to the legacy wire format for
         // the failure TTL, and the node would reject what it signs meanwhile.
         if (this._cachedNetworkInfo) {
+            if (!this._staleNetworkInfoWarned) {
+                this._staleNetworkInfoWarned = true
+                console.warn(
+                    "getNetworkInfo refresh failed — using the last fork status this node reported until a refresh succeeds.",
+                )
+            }
             return this._cachedNetworkInfo
         }
         if (!this._cachedNetworkInfoWarned) {
