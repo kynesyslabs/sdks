@@ -30,6 +30,7 @@
     ],
     "files": [
         "build/",
+        "documentation/l2ps/experimental-sealed-bid.md",
         "!build/tests"
     ],
     "exports": {
