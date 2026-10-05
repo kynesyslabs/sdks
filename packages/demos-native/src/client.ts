@@ -1,8 +1,11 @@
 import {
   createHash,
+  createPrivateKey,
+  createPublicKey,
   hkdfSync,
+  type KeyObject,
+  sign as cryptoSign,
 } from "node:crypto";
-import forge from "node-forge";
 import { mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import {
@@ -27,8 +30,32 @@ const RETRYABLE_STATUS = new Set([502, 503, 504]);
 
 class NonRetryableRpcError extends Error {}
 
-type NativeBuffer = forge.pki.ed25519.NativeBuffer;
+type NativeBuffer = Buffer;
+// privateKey is the 64-byte seed || publicKey form.
 type KeyPair = { publicKey: NativeBuffer; privateKey: NativeBuffer };
+
+// DER prefix of a PKCS#8 Ed25519 private key; the 32-byte seed follows it.
+const ED25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
+
+function ed25519PrivateKey(seed: Uint8Array): KeyObject {
+  return createPrivateKey({
+    key: Buffer.concat([ED25519_PKCS8_PREFIX, seed]),
+    format: "der",
+    type: "pkcs8",
+  });
+}
+
+function ed25519KeyPair(seed: Uint8Array): KeyPair {
+  const spki = createPublicKey(ed25519PrivateKey(seed)).export({
+    format: "der",
+    type: "spki",
+  });
+  const publicKey = Buffer.from(spki.subarray(spki.length - 32));
+  return {
+    publicKey,
+    privateKey: Buffer.concat([Buffer.from(seed), publicKey]),
+  };
+}
 
 function sha256Hex(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
@@ -270,7 +297,7 @@ function deriveKeyPair(secret: string | Uint8Array): KeyPair {
   const ed25519Seed = createHash("sha256")
     .update(legacySeedString)
     .digest();
-  return forge.pki.ed25519.generateKeyPair({ seed: ed25519Seed });
+  return ed25519KeyPair(ed25519Seed);
 }
 
 class Ed25519Authority {
@@ -310,11 +337,12 @@ class Ed25519Authority {
       throw new Error("@kynesyslabs/demos-native supports only ed25519");
     }
     if (!this.keyPair) throw new Error("Wallet not connected");
-    const signature = forge.pki.ed25519.sign({
-      message: new TextDecoder().decode(data),
-      encoding: "utf8",
-      privateKey: this.keyPair.privateKey,
-    });
+    // Signs the bytes' UTF-8 decoding, re-encoded, exactly as earlier releases
+    // did, so signatures over non-UTF-8 input stay the same.
+    const message = Buffer.from(new TextDecoder().decode(data), "utf8");
+    const signature = new Uint8Array(
+      cryptoSign(null, message, ed25519PrivateKey(this.keyPair.privateKey.subarray(0, 32))),
+    );
     return {
       algorithm: "ed25519",
       signature,

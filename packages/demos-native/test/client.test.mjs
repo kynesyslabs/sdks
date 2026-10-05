@@ -146,6 +146,33 @@ test("derives the existing Demos Ed25519 wallet identity", async () => {
   );
 });
 
+// Keys and signatures recorded from the node-forge implementation this
+// package used through 0.1.0-alpha.1; switching crypto must not change them.
+test("keeps the Ed25519 keys and signatures of earlier releases", async () => {
+  const demos = new Demos();
+  await demos.connectWallet(MNEMONIC);
+  const identity = await demos.crypto.getIdentity("ed25519");
+  assert.equal(Buffer.from(identity.publicKey).toString("hex"), "263af3be8487729727d99b35dcfdc61bf920a9164249ad117b292e6d3c7194f8");
+  assert.equal(
+    Buffer.from(identity.privateKey).toString("hex"),
+    "9c059a934eed1a4244dc564888d780e60a3b55bc20b67603ddf8633d9ac72959263af3be8487729727d99b35dcfdc61bf920a9164249ad117b292e6d3c7194f8",
+  );
+  const cases = {
+    ascii: new TextEncoder().encode("register:test:1"),
+    utf8: new TextEncoder().encode("héllo ✓ мир"),
+    nonUtf8: new Uint8Array([0xff, 0x00, 0xc3, 0x28, 0x41]),
+  };
+  const expected = {
+    ascii: "bcca9aaadc7124e565ea76566699198fb8120d559c5e00c58d4b3ad548f94a9052ef689240d010b1b9d5c579cfe6dadffc96f7aaff8cbbe59ab7bc3858a1c80a",
+    utf8: "7eab43a1b92870dc83bc9c36e04524239b3e0c45c45ef47a7573f71157969bd2e8eecce91c7cf890c56c283ca8c096d4c227ea6f620233b0c7ad18842ea67708",
+    nonUtf8: "ddaf3a4bd9eda2dea64b51f08b5369f5e70351958b86b8e20eb081208dad26127ea72ec275e06115d230a0456d0e7d35d5978d28175c3925dab8d543d189870f",
+  };
+  for (const [name, message] of Object.entries(cases)) {
+    const signed = await demos.crypto.sign("ed25519", message);
+    assert.equal(Buffer.from(signed.signature).toString("hex"), expected[name], name);
+  }
+});
+
 test("prepares post-fork native and Storage Program transactions", async () => {
   const demos = new Demos();
   await demos.connect(rpc);
