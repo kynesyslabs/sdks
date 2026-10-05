@@ -1639,11 +1639,13 @@ export class Demos {
      * The **confirmed** nonce of an address: the highest nonce the chain has
      * included for it, not the value to sign the next transaction with.
      *
-     * The node requires the exact next nonce — `confirmed + 1 + pending`, where
-     * `pending` is how many of this address's own transactions are already
-     * waiting in the node's mempool — and rejects any other value, so a caller
-     * passing an explicit nonce wants {@link getNextNonce}, or no `nonce` option
-     * at all — the builders resolve it themselves. This holds for every
+     * A node running the `nonceEnforcement` network upgrade requires the exact
+     * next nonce — `confirmed + 1 + pending`, where `pending` is how many of
+     * this address's own transactions are already waiting in its mempool — and
+     * rejects any other value. Nodes without it accept any nonce above the
+     * confirmed one. Either way a caller passing an explicit nonce wants
+     * {@link getNextNonce}, or no `nonce` option at all — the builders resolve
+     * it themselves. This holds for every
      * transaction type: a web2/DAHR request consumes a nonce exactly like a
      * transfer does.
      *
@@ -1807,9 +1809,10 @@ export class Demos {
 
     /**
      * The nonce to sign the next transaction from `address` with: the confirmed
-     * nonce plus one. The node requires the exact `confirmed + 1 + pending`, so
-     * this is the accepted value only when the client has no transactions of its
-     * own still waiting in the node's mempool.
+     * nonce plus one. A node running the `nonceEnforcement` network upgrade
+     * requires the exact `confirmed + 1 + pending`, so there this is the
+     * accepted value only when the client has no transactions of its own still
+     * waiting in the node's mempool.
      *
      * Use it whenever a nonce is derived by hand — deriving a storage address,
      * anchoring after a web2/DAHR request, or any flow that pre-computes what

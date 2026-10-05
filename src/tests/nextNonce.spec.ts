@@ -1,8 +1,10 @@
 import { Demos } from "@/websdk"
+import { Web2Proxy } from "@/websdk/Web2Calls"
 
 /**
- * The node returns the CONFIRMED nonce but requires the exact next one —
- * `confirmed + 1 + pending` (node `validateTransaction.ts`). `getNextNonce`
+ * The node returns the CONFIRMED nonce. Once its `nonceEnforcement` upgrade is
+ * active it requires the exact next one — `confirmed + 1 + pending` (node
+ * mempool admission). `getNextNonce`
  * expresses the no-pending case (`confirmed + 1`) once, so hand-derived nonces
  * stop landing on the off-by-one.
  */
@@ -53,15 +55,60 @@ describe("getNextNonce", () => {
  * with the still-pending DAHR tx. The documented fix is to wait for the nonce
  * to advance ({@link waitForNonce}) before deriving the next one.
  */
-describe("nonce lag after a web2/DAHR request (#118)", () => {
-    it("getNextNonce cannot see a pending DAHR tx, so it repeats the same value", async () => {
-        // The DAHR tx took nonce 6 but is not yet included: the confirmed nonce
-        // still reads 5, so getNextNonce keeps handing back 6 and a second
-        // hand-derived send would reuse the in-flight nonce.
-        const demos = demosReporting(5)
+/**
+ * A Demos wired to a node whose confirmed nonce for ADDRESS is `confirmed`
+ * and which answers a DAHR request; records every transaction it signs.
+ */
+function demosRunningDahr(confirmed: number) {
+    const demos = new Demos()
+    const signed: any[] = []
+    jest.spyOn(demos, "nodeCall").mockResolvedValue(confirmed as any)
+    jest.spyOn(demos, "getEd25519Address").mockResolvedValue(ADDRESS)
+    jest.spyOn(demos, "call").mockResolvedValue({
+        result: 200,
+        response: {
+            status: 200,
+            statusText: "OK",
+            headers: {},
+            responseHash: "0x01",
+            responseHeadersHash: "0x02",
+        },
+    } as any)
+    jest.spyOn(demos, "sign").mockImplementation(async (tx: any) => {
+        signed.push(tx)
+        return tx
+    })
+    jest.spyOn(demos, "confirm").mockResolvedValue({
+        response: { data: { transaction: { hash: "0xdahr" } } },
+    } as any)
+    jest.spyOn(demos, "broadcast").mockResolvedValue({} as any)
+    return { demos, signed }
+}
 
+describe("nonce lag after a web2/DAHR request (#118)", () => {
+    const request = { method: "GET", url: "https://example.com" } as any
+
+    it("a DAHR request signs confirmed + 1, and getNextNonce repeats it until inclusion", async () => {
+        const { demos, signed } = demosRunningDahr(5)
+
+        await new Web2Proxy("session", demos).startProxy(request)
+
+        expect(signed).toHaveLength(1)
+        expect(signed[0].content.type).toBe("web2Request")
+        expect(signed[0].content.nonce).toBe(6)
+        // The DAHR tx holds nonce 6 but the chain still reports 5, so a
+        // hand-derived next send would reuse the in-flight nonce.
         await expect(demos.getNextNonce(ADDRESS)).resolves.toBe(6)
-        await expect(demos.getNextNonce(ADDRESS)).resolves.toBe(6)
+    })
+
+    it("with auto-nonce, a send after a DAHR request takes the next nonce", async () => {
+        const { demos, signed } = demosRunningDahr(5)
+        demos.enableAutoNonce()
+
+        await new Web2Proxy("session", demos).startProxy(request)
+        await new Web2Proxy("session", demos).startProxy(request)
+
+        expect(signed.map(tx => tx.content.nonce)).toEqual([6, 7])
     })
 
     it("waitForNonce rides out the lag until the DAHR tx is included", async () => {

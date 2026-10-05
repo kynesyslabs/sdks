@@ -3,9 +3,10 @@
 ## Unreleased
 
 ### Fixed
-- `getNextNonce` / `getAddressNonce` docs state the exact nonce the node
-  requires (confirmed + 1 + pending) and quote the node's real error
-  strings; a test covers the lag of a DAHR send that is not yet included.
+- `getNextNonce` / `getAddressNonce` docs state the exact nonce a node
+  running the `nonceEnforcement` upgrade requires (confirmed + 1 + pending)
+  and no longer quote error strings; tests drive a DAHR request and cover the
+  nonce lag until it is included.
 
 ## 4.0.17
 
