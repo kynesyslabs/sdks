@@ -6,7 +6,7 @@ import { DemosTokens } from "@/websdk/DemosTokens"
 /**
  * Contract and token transactions have to carry the next nonce, like
  * every other builder. They used to take the confirmed nonce as is, which
- * the node rejects ("Expected >= confirmed + 1").
+ * the node rejects — it requires the exact `confirmed + 1 + pending`.
  *
  * Each case runs the real builder with a connected wallet. Contract and
  * token-creation transactions are read before `sign()`, which does not
