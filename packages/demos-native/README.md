@@ -1,4 +1,4 @@
-# `@kynesyslabs/demos-native`
+# `@demosnetwork/demos-native`
 
 A dependency-minimal, Node ESM Demos client for native DEM transfers, L2PS
 messaging, Storage Programs, public identity reads and DAHR requests. It exists
@@ -6,10 +6,10 @@ for services that must not install the full multichain
 `@kynesyslabs/demosdk` dependency graph.
 
 ```ts
-import { Demos } from "@kynesyslabs/demos-native";
-import { StorageProgram } from "@kynesyslabs/demos-native/storage";
-import { Identities } from "@kynesyslabs/demos-native/identity-read";
-import { L2PSMessagingPeer } from "@kynesyslabs/demos-native/messaging";
+import { Demos } from "@demosnetwork/demos-native";
+import { StorageProgram } from "@demosnetwork/demos-native/storage";
+import { Identities } from "@demosnetwork/demos-native/identity-read";
+import { L2PSMessagingPeer } from "@demosnetwork/demos-native/messaging";
 
 const demos = new Demos();
 await demos.connect(process.env.DEMOS_RPC!);

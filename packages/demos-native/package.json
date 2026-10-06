@@ -1,5 +1,5 @@
 {
-  "name": "@kynesyslabs/demos-native",
+  "name": "@demosnetwork/demos-native",
   "version": "0.1.0-alpha.1",
   "description": "Dependency-minimal Demos native, messaging, Storage Program, identity-read and DAHR client",
   "type": "module",

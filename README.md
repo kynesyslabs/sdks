@@ -10,7 +10,7 @@
 A JavaScript/TypeScript SDK providing a unified interface for interacting with the Demos network and cross-chain operations.
 
 Services that need only native DEM, Storage Programs, identity reads and DAHR
-should use the separately packaged `@kynesyslabs/demos-native` client under
+should use the separately packaged `@demosnetwork/demos-native` client under
 [`packages/demos-native`](./packages/demos-native). Its independent manifest
 does not install the multichain, PQC, bridge or TLSNotary dependency graph.
 

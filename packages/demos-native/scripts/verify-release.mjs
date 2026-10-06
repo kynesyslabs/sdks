@@ -91,8 +91,8 @@ const consumerAudit = JSON.parse(npm(["audit", "--omit=dev", "--json"], consumer
 assert.equal(consumerAudit.metadata.vulnerabilities.total, 0);
 const smokeModule = join(consumer, "smoke.mjs");
 writeFileSync(smokeModule, [
-  'import { Demos, StorageProgram } from "@kynesyslabs/demos-native";',
-  'import { L2PSMessagingPeer } from "@kynesyslabs/demos-native/messaging";',
+  'import { Demos, StorageProgram } from "@demosnetwork/demos-native";',
+  'import { L2PSMessagingPeer } from "@demosnetwork/demos-native/messaging";',
   "export { Demos, StorageProgram, L2PSMessagingPeer };",
 ].join("\n"));
 const installed = await import(smokeModule);
