@@ -318,7 +318,7 @@ class Ed25519Authority {
 
   async getIdentity(algorithm: string): Promise<KeyPair> {
     if (algorithm !== "ed25519") {
-      throw new Error("@kynesyslabs/demos-native supports only ed25519");
+      throw new Error("@demosnetwork/demos-native supports only ed25519");
     }
     if (!this.keyPair) throw new Error("Wallet not connected");
     return this.keyPair;
@@ -334,7 +334,7 @@ class Ed25519Authority {
     publicKey: NativeBuffer;
   }> {
     if (algorithm !== "ed25519") {
-      throw new Error("@kynesyslabs/demos-native supports only ed25519");
+      throw new Error("@demosnetwork/demos-native supports only ed25519");
     }
     if (!this.keyPair) throw new Error("Wallet not connected");
     // Signs the bytes' UTF-8 decoding, re-encoded, exactly as earlier releases
