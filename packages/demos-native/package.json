@@ -55,5 +55,10 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kynesyslabs/sdks.git",
+    "directory": "packages/demos-native"
   }
 }
