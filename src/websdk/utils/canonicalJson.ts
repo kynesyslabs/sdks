@@ -53,7 +53,13 @@ export function looksLikeJsonString(str: string): boolean {
 
 function stableStringify(value: unknown): string {
     const t = typeof value
-    if (value === null || t === "number" || t === "boolean" || t === "string") {
+    if (t === "string") {
+        // DACS CF-1: NFC-normalise string VALUES so two canonically-equal
+        // strings hash identically. Object member names are left unchanged
+        // (handled in the object branch below), per RFC 8785.
+        return JSON.stringify((value as string).normalize("NFC"))
+    }
+    if (value === null || t === "number" || t === "boolean") {
         return JSON.stringify(value)
     }
     if (Array.isArray(value)) {
