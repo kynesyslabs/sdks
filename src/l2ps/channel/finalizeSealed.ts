@@ -15,6 +15,22 @@
  * these members committed and failed to open, which is exactly what a
  * reputation layer needs. Only `aborted` and the non-terminal phases are
  * refused.
+ *
+ * The session and the channel transcript are separate inputs, so finalisation
+ * trusts neither the outcome nor the messages: it re-derives the auction from
+ * the signed transcript and refuses on any disagreement (see
+ * `finalizeSealedEnvelope`). Scope and tolerance rules:
+ *   - One sealed auction per channel; the channel is the auction's scope.
+ *   - The first reveal on the wire closes the commit window. A sender's first
+ *     commit before it is binding; a later commit from the same sender, or any
+ *     commit after the first reveal, is a straggler and is ignored (it neither
+ *     backs a reveal nor has to be accounted for).
+ *   - Stray reveals (no binding commit) and repeat reveals are refused, as is
+ *     any abort message.
+ *   - Every valid opening in the transcript must appear in `outcome.reveals`.
+ *     Disqualifying a reveal that arrived after the deadline close would need
+ *     an on-wire close marker, which the protocol does not carry yet — until it
+ *     does there is no verifiable notion of "late" and the rule is strict.
  */
 
 import type { Demos } from "../../websdk"
@@ -95,6 +111,32 @@ function sameValue(a: unknown, b: unknown): boolean {
     }
 }
 
+/**
+ * Finalise a closed sealed-bid auction. Throws, before anything is signed or
+ * anchored, unless the transcript independently backs the session's outcome:
+ *
+ *  1. the session is `closed` and its outcome reports the same state;
+ *  2. the signer is a channel member;
+ *  3. every message has the transcript's channel id, a member sender, a valid
+ *     signature, and a strictly increasing sequence;
+ *  4. no `abort` is present;
+ *  5. every reveal has a binding commit and each sender reveals at most once
+ *     (late and duplicate commits are ignored, see the module header);
+ *  6. each reported reveal is a real reveal message that opens its sender's
+ *     binding commit, with the reported bid equal to the opened bid, and no
+ *     participant is listed twice;
+ *  7. every valid opening in the transcript is reported, and no participant is
+ *     both revealed and disqualified;
+ *  8. the reported winner and winning bid equal the winner recomputed from the
+ *     opened bids with `compareBids` (ties go to the lower sequence). An outcome
+ *     that names a winner is refused without `compareBids`, and a session built
+ *     without a comparator but finalised with one fails because the expected
+ *     winner exists while the outcome names none;
+ *  9. every binding committer is revealed or disqualified, each disqualified
+ *     participant has a binding commit, and the outcome is not empty.
+ *
+ * Then it signs the transcript and anchors it per `policy` (DACS-3 §8.7).
+ */
 export async function finalizeSealedEnvelope(
     opts: FinalizeSealedEnvelopeOpts,
 ): Promise<SealedEnvelopeFinalizeResult> {
@@ -150,37 +192,75 @@ export async function finalizeSealedEnvelope(
         lastSeq = m.sequence
     }
 
-    // One sealed auction per channel: the session carries no auction id or
-    // sequence range, so the channel IS the auction's scope. A second commit
-    // from the same sender would be a second auction (or a replaced bid) whose
-    // reveal could be paired with whichever commit suits the outcome — reject it
-    // rather than guess which one counts.
-    const commits = new Map<ClaimReference, ChannelMessage>()
-    let lastCommitSeq = 0
-    let firstRevealSeq = Infinity
-    for (const m of messages) {
-        if (m.type === "sealed-envelope-commit") {
-            if (commits.has(m.sender))
-                throw new Error(
-                    `finalizeSealedEnvelope: ${m.sender} committed more than once — ` +
-                        "a channel carries a single sealed auction",
-                )
-            commits.set(m.sender, m)
-            lastCommitSeq = Math.max(lastCommitSeq, m.sequence)
-        } else if (m.type === "sealed-envelope-reveal") {
-            firstRevealSeq = Math.min(firstRevealSeq, m.sequence)
-        }
-    }
-    // The fairness rule: no bid may be opened while another is still unsealed.
-    if (firstRevealSeq <= lastCommitSeq)
+    // A terminal abort anywhere in the record means the auction did not resolve,
+    // whatever the session object says; a closed outcome must not be anchored
+    // over it.
+    if (messages.some(m => m.type === "abort"))
         throw new Error(
-            `finalizeSealedEnvelope: a reveal (seq ${firstRevealSeq}) does not come after every ` +
-                `commit (last at seq ${lastCommitSeq}) — bids were opened before all were sealed`,
+            "finalizeSealedEnvelope: the transcript contains an abort — the auction did not resolve",
         )
-    const commitOf = (participant: ClaimReference): ChannelMessage | undefined =>
-        commits.get(participant)
 
+    // Scope. The session carries no auction id or sequence range, so the channel
+    // IS the auction: one sealed auction per channel. Within it, the first reveal
+    // on the wire closes the commit window — a commit sequenced after it, or a
+    // repeat commit from the same sender, is a straggler or a replacement. It is
+    // ignored rather than fatal: one late message must not let a participant
+    // block finalisation of an otherwise-valid auction, and it can never back a
+    // reveal (the first commit is the binding one).
+    let firstRevealSeq = Infinity
+    for (const m of messages)
+        if (m.type === "sealed-envelope-reveal")
+            firstRevealSeq = Math.min(firstRevealSeq, m.sequence)
+    const binding = new Map<ClaimReference, ChannelMessage>()
+    for (const m of messages)
+        if (
+            m.type === "sealed-envelope-commit" &&
+            m.sequence < firstRevealSeq &&
+            !binding.has(m.sender)
+        )
+            binding.set(m.sender, m)
+
+    // Reveals, by contrast, are not tolerated when stray: a reveal with no
+    // binding commit opens nothing, and a second reveal from one sender would
+    // let the outcome pick whichever opening suits it.
+    const revealMsgs = new Map<ClaimReference, ChannelMessage>()
+    for (const m of messages) {
+        if (m.type !== "sealed-envelope-reveal") continue
+        if (!binding.has(m.sender))
+            throw new Error(
+                `finalizeSealedEnvelope: reveal (seq ${m.sequence}) from ${m.sender}, who has no ` +
+                    "binding commit in the transcript",
+            )
+        if (revealMsgs.has(m.sender))
+            throw new Error(
+                `finalizeSealedEnvelope: ${m.sender} revealed more than once (seq ${m.sequence})`,
+            )
+        revealMsgs.set(m.sender, m)
+    }
+
+    // The openings the transcript itself proves: a reveal that reproduces the
+    // sender's binding commitment. Derived here, never taken from the outcome.
+    const opened = new Map<ClaimReference, RevealedBid>()
+    for (const [participant, revealMsg] of revealMsgs) {
+        const { bid, salt } = (revealMsg.body as SealedRevealBody) ?? {}
+        const { commitment } = (binding.get(participant)!.body as SealedCommitBody) ?? {}
+        let opens = false
+        try {
+            opens = typeof salt === "string" && commitmentHex(bid, salt) === commitment
+        } catch {
+            opens = false
+        }
+        if (opens) opened.set(participant, { participant, bid, sequence: revealMsg.sequence })
+    }
+
+    // State, not just reachability: the outcome object must describe the same
+    // terminal state the session reports (finalizeRfq does the same).
     const outcome = opts.sealed.outcome()
+    if (outcome.state !== opts.sealed.state)
+        throw new Error(
+            `finalizeSealedEnvelope: outcome state "${outcome.state}" does not match session ` +
+                `state "${opts.sealed.state}" — session mismatch`,
+        )
 
     // Bids as the transcript proves them, not as the outcome reports them.
     const verified: RevealedBid[] = []
@@ -192,40 +272,47 @@ export async function finalizeSealedEnvelope(
                 `finalizeSealedEnvelope: ${reveal.participant} appears twice in the reported reveals`,
             )
         seenRevealers.add(reveal.participant)
-        const revealMsg = messages.find(
-            m =>
-                m.sequence === reveal.sequence &&
-                m.type === "sealed-envelope-reveal" &&
-                m.sender === reveal.participant,
+        const revealMsg = revealMsgs.get(reveal.participant)
+        if (
+            !revealMsg ||
+            !binding.has(reveal.participant) ||
+            revealMsg.sequence !== reveal.sequence
         )
-        const commitMsg = commitOf(reveal.participant)
-        if (!revealMsg || !commitMsg)
             throw new Error(
                 `finalizeSealedEnvelope: transcript does not contain ${reveal.participant}'s ` +
                     `commit and its reveal (seq ${reveal.sequence}) — session mismatch`,
             )
-        const { bid, salt } = (revealMsg.body as SealedRevealBody) ?? {}
-        const { commitment } = (commitMsg.body as SealedCommitBody) ?? {}
-        let opens = false
-        try {
-            opens = typeof salt === "string" && commitmentHex(bid, salt) === commitment
-        } catch {
-            opens = false
-        }
-        if (!opens)
+        const proven = opened.get(reveal.participant)
+        if (!proven)
             throw new Error(
                 `finalizeSealedEnvelope: ${reveal.participant}'s reveal (seq ${reveal.sequence}) ` +
                     "does not open the commit it is bound to — session mismatch",
             )
         // The opening is proven against the commit, so the reported bid must be
         // the opened one — otherwise the outcome could rank a bid nobody sealed.
-        if (!sameValue(reveal.bid, bid))
+        if (!sameValue(reveal.bid, proven.bid))
             throw new Error(
                 `finalizeSealedEnvelope: ${reveal.participant}'s reported bid differs from the bid ` +
                     `revealed at seq ${reveal.sequence} — session mismatch`,
             )
-        verified.push({ participant: reveal.participant, bid, sequence: reveal.sequence })
+        verified.push(proven)
     }
+
+    // The converse: a valid opening must not be dropped. Listing a genuine
+    // revealer as disqualified, or omitting them, would crown a winner from
+    // whoever is left. (Disqualifying a reveal that arrived after the close
+    // needs an on-wire close marker; none exists yet, so the rule is strict.)
+    for (const participant of outcome.disqualified ?? [])
+        if (seenRevealers.has(participant))
+            throw new Error(
+                `finalizeSealedEnvelope: ${participant} is both revealed and disqualified in the outcome`,
+            )
+    for (const participant of opened.keys())
+        if (!seenRevealers.has(participant))
+            throw new Error(
+                `finalizeSealedEnvelope: ${participant} has a valid reveal in the transcript that ` +
+                    "the outcome omits or disqualifies — session mismatch",
+            )
 
     if (outcome.winner !== undefined || outcome.winningBid !== undefined) {
         if (!opts.compareBids)
@@ -235,7 +322,15 @@ export async function finalizeSealedEnvelope(
             )
     }
     if (opts.compareBids) {
-        const expected = selectWinner(verified, opts.compareBids)
+        let expected: RevealedBid | undefined
+        try {
+            expected = selectWinner(verified, opts.compareBids)
+        } catch {
+            throw new Error(
+                "finalizeSealedEnvelope: compareBids threw on the transcript's revealed bids — " +
+                    "session mismatch",
+            )
+        }
         const matches = expected
             ? expected.participant === outcome.winner &&
               sameValue(expected.bid, outcome.winningBid)
@@ -254,7 +349,7 @@ export async function finalizeSealedEnvelope(
         ...outcome.reveals.map(r => r.participant),
         ...(outcome.disqualified ?? []),
     ])
-    for (const committer of commits.keys())
+    for (const committer of binding.keys())
         if (!accounted.has(committer))
             throw new Error(
                 `finalizeSealedEnvelope: ${committer} committed but is neither revealed nor ` +
@@ -266,7 +361,7 @@ export async function finalizeSealedEnvelope(
     // the record, a fabricated `{state:"closed", reveals:[]}` would export a
     // transcript that proves nothing — so require the commits that back them.
     for (const participant of outcome.disqualified ?? []) {
-        if (!commitOf(participant))
+        if (!binding.has(participant))
             throw new Error(
                 `finalizeSealedEnvelope: disqualified participant ${participant} has no commit ` +
                     "in the transcript — nothing backs the default",

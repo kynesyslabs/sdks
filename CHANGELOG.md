@@ -2,7 +2,16 @@
 
 ## Unreleased
 
+### Added
+- L2PS: `finalizeSealedEnvelope` finalises a closed sealed-bid auction and
+  anchors its signed transcript. It re-derives the bids and winner from the
+  transcript (pass `compareBids` to verify a winner), verifies every message,
+  and refuses an outcome the transcript does not back. `selectWinner` exposes
+  the shared winner rule.
+
 ### Fixed
+- `SealedEnvelopeSession` refuses a second reveal from a sender whose first
+  reveal already failed to open their commitment.
 - `getNextNonce` / `getAddressNonce` docs state the exact nonce a node
   running the `nonceEnforcement` upgrade requires (confirmed + 1 + pending)
   and no longer quote error strings; tests drive a DAHR request and cover the

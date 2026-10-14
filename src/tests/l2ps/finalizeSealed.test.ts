@@ -41,7 +41,12 @@ async function newConnectedDemos(): Promise<{
  * mid-reveal for the "not closed" guard. Only the anchor is mocked (real
  * ChannelSession, real CCI signing).
  */
-async function resolvedAuction(stopAfter?: "reveal-a") {
+async function resolvedAuction(
+    stopAfter?: "reveal-a",
+    cfg: { prices?: [number, number]; compare?: boolean } = {},
+) {
+    const [aPrice, bPrice] = cfg.prices ?? [90, 100]
+    const compareBids = cfg.compare === false ? undefined : byPrice
     const alice = await newConnectedDemos()
     const bob = await newConnectedDemos()
     const members = [alice.claim, bob.claim]
@@ -55,7 +60,7 @@ async function resolvedAuction(stopAfter?: "reveal-a") {
     aSeal = new SealedEnvelopeSession({
         me: alice.claim,
         participants: members,
-        compareBids: byPrice,
+        compareBids,
         send: async opts => {
             const m = await aSes.sendOutgoing(opts)
             await bSes.receiveIncoming(m)
@@ -66,7 +71,7 @@ async function resolvedAuction(stopAfter?: "reveal-a") {
     bSeal = new SealedEnvelopeSession({
         me: bob.claim,
         participants: members,
-        compareBids: byPrice,
+        compareBids,
         send: async opts => {
             const m = await bSes.sendOutgoing(opts)
             await aSes.receiveIncoming(m)
@@ -75,8 +80,8 @@ async function resolvedAuction(stopAfter?: "reveal-a") {
         },
     })
 
-    await aSeal.commit({ price: 90 })
-    await bSeal.commit({ price: 100 })
+    await aSeal.commit({ price: aPrice })
+    await bSeal.commit({ price: bPrice })
     await aSeal.reveal()
     if (stopAfter === "reveal-a") return { alice, bob, aSes, aSeal, members }
     await bSeal.reveal()
@@ -411,7 +416,7 @@ describe("finalizeSealedEnvelope — the outcome must match the revealed bids", 
         ).rejects.toThrow(/no compareBids/)
     })
 
-    it("refuses an outcome that leaves a committer out of reveals and disqualified", async () => {
+    it("refuses an outcome that drops a valid revealer", async () => {
         const { alice, aSes, aSeal } = await resolvedAuction()
         // Bob (the real winner) is dropped; alice would "win" among who is left.
         const real = aSeal.outcome()
@@ -425,7 +430,105 @@ describe("finalizeSealedEnvelope — the outcome must match the revealed bids", 
                 sealed, session: aSes, signer: alice.claim, demos: alice.demos,
                 policy: "none", compareBids: byPrice,
             }),
-        ).rejects.toThrow(/neither revealed nor disqualified/)
+        ).rejects.toThrow(/valid reveal in the transcript that the outcome omits/)
+    })
+
+    it("refuses a valid revealer listed as disqualified", async () => {
+        const { alice, bob, aSes, aSeal } = await resolvedAuction()
+        const real = aSeal.outcome()
+        const sealed = tamper(aSeal, {
+            reveals: real.reveals.filter(r => r.participant === alice.claim),
+            disqualified: [bob.claim],
+            winner: alice.claim,
+            winningBid: { price: 90 },
+        })
+        await expect(
+            finalizeSealedEnvelope({
+                sealed, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/valid reveal in the transcript that the outcome omits/)
+    })
+
+    it("refuses an outcome that disqualifies every genuine revealer", async () => {
+        const { alice, bob, aSes, aSeal } = await resolvedAuction()
+        const sealed = tamper(aSeal, {
+            reveals: [], disqualified: [alice.claim, bob.claim],
+            winner: undefined, winningBid: undefined,
+        })
+        await expect(
+            finalizeSealedEnvelope({
+                sealed, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/valid reveal in the transcript that the outcome omits/)
+    })
+
+    it("refuses a participant that is both revealed and disqualified", async () => {
+        const { alice, aSes, aSeal } = await resolvedAuction()
+        const sealed = tamper(aSeal, { disqualified: [alice.claim] })
+        await expect(
+            finalizeSealedEnvelope({
+                sealed, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/both revealed and disqualified/)
+    })
+
+    it("refuses an outcome whose state differs from the session's", async () => {
+        const { alice, aSes, aSeal } = await resolvedAuction()
+        const sealed: SealedEnvelopeLike = {
+            state: "closed",
+            outcome: () => ({ ...aSeal.outcome(), state: "reveal" }),
+        }
+        await expect(
+            finalizeSealedEnvelope({
+                sealed, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/does not match session state/)
+    })
+
+    it("finalises a tie, and the winner is the bid revealed first on the wire", async () => {
+        const { alice, bob, aSes, aSeal } = await resolvedAuction(undefined, { prices: [100, 100] })
+        expect(aSeal.outcome().winner).toBe(alice.claim) // alice revealed first
+        const ok = await finalizeSealedEnvelope({
+            sealed: aSeal, session: aSes, signer: alice.claim, demos: alice.demos,
+            policy: "none", compareBids: byPrice,
+        })
+        expect(ok.transcript.messages).toHaveLength(4)
+
+        const flipped = tamper(aSeal, { winner: bob.claim })
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: flipped, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/winner \/ winning bid does not match/)
+    })
+
+    it("refuses a session built without compareBids when finalised with one", async () => {
+        const { alice, aSes, aSeal } = await resolvedAuction(undefined, { compare: false })
+        expect(aSeal.outcome().winner).toBeUndefined()
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: aSeal, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/winner \/ winning bid does not match/)
+    })
+
+    it("reports a throwing comparator as a session mismatch", async () => {
+        const { alice, aSes, aSeal } = await resolvedAuction()
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: aSeal, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none",
+                compareBids: () => {
+                    throw new TypeError("boom")
+                },
+            }),
+        ).rejects.toThrow(/compareBids threw .* session mismatch/)
     })
 
     it("refuses the same participant reported as revealing twice", async () => {
@@ -441,63 +544,148 @@ describe("finalizeSealedEnvelope — the outcome must match the revealed bids", 
     })
 })
 
-describe("finalizeSealedEnvelope — commits are scoped and ordered", () => {
+describe("finalizeSealedEnvelope — commit scoping, stray messages and completeness", () => {
     const view = (members: ClaimReference[], messages: ChannelMessage[]): ChannelSessionView => ({
         channelId: CHANNEL, members, messages: () => messages,
     })
     const salt = "42".repeat(16)
     const bid = { price: 90 }
 
-    it("refuses two commits from one sender in the channel", async () => {
-        const alice = await newConnectedDemos()
-        const session = view([alice.claim], [
-            await signedMsg(alice, "sealed-envelope-commit", 1, { commitment: commitmentHex(bid, salt) }),
-            await signedMsg(alice, "sealed-envelope-commit", 2, { commitment: "de".repeat(32) }),
-            await signedMsg(alice, "sealed-envelope-reveal", 3, { bid, salt }),
-        ])
-        const sealed: SealedEnvelopeLike = {
+    const commitMsg = (who: { demos: Demos; claim: ClaimReference }, seq: number, commitment = commitmentHex(bid, salt)) =>
+        signedMsg(who, "sealed-envelope-commit", seq, { commitment })
+    const revealMsg = (who: { demos: Demos; claim: ClaimReference }, seq: number) =>
+        signedMsg(who, "sealed-envelope-reveal", seq, { bid, salt })
+    const closed = (
+        reveals: Array<{ participant: ClaimReference; sequence: number }>,
+        disqualified: ClaimReference[] = [],
+    ): SealedEnvelopeLike => ({
+        state: "closed",
+        outcome: () => ({
             state: "closed",
-            outcome: () => ({ state: "closed", reveals: [{ participant: alice.claim, bid, sequence: 3 }], disqualified: [] }),
-        }
-        await expect(
-            finalizeSealedEnvelope({ sealed, session, signer: alice.claim, demos: alice.demos, policy: "none" }),
-        ).rejects.toThrow(/committed more than once/)
+            reveals: reveals.map(r => ({ ...r, bid })),
+            disqualified,
+        }),
     })
 
-    it("refuses a reveal that precedes its own commit", async () => {
+    it("ignores a repeat commit from one sender: the first is binding", async () => {
         const alice = await newConnectedDemos()
         const session = view([alice.claim], [
-            await signedMsg(alice, "sealed-envelope-reveal", 1, { bid, salt }),
-            await signedMsg(alice, "sealed-envelope-commit", 2, { commitment: commitmentHex(bid, salt) }),
+            await commitMsg(alice, 1),
+            await commitMsg(alice, 2, "de".repeat(32)),
+            await revealMsg(alice, 3),
         ])
-        const sealed: SealedEnvelopeLike = {
-            state: "closed",
-            outcome: () => ({ state: "closed", reveals: [{ participant: alice.claim, bid, sequence: 1 }], disqualified: [] }),
-        }
-        await expect(
-            finalizeSealedEnvelope({ sealed, session, signer: alice.claim, demos: alice.demos, policy: "none" }),
-        ).rejects.toThrow(/does not come after every commit/)
+        const res = await finalizeSealedEnvelope({
+            sealed: closed([{ participant: alice.claim, sequence: 3 }]),
+            session, signer: alice.claim, demos: alice.demos, policy: "none",
+        })
+        expect(res.transcript.messages).toHaveLength(3)
     })
 
-    it("refuses a reveal that precedes another participant's commit", async () => {
+    it("a repeat commit never backs a reveal the first commit does not open", async () => {
+        const alice = await newConnectedDemos()
+        const session = view([alice.claim], [
+            await commitMsg(alice, 1, "de".repeat(32)),
+            await commitMsg(alice, 2), // would open, but is not the binding commit
+            await revealMsg(alice, 3),
+        ])
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: closed([{ participant: alice.claim, sequence: 3 }]),
+                session, signer: alice.claim, demos: alice.demos, policy: "none",
+            }),
+        ).rejects.toThrow(/does not open the commit/)
+    })
+
+    it("ignores a commit sequenced after the first reveal", async () => {
         const alice = await newConnectedDemos()
         const bob = await newConnectedDemos()
         const session = view([alice.claim, bob.claim], [
-            await signedMsg(alice, "sealed-envelope-commit", 1, { commitment: commitmentHex(bid, salt) }),
-            await signedMsg(alice, "sealed-envelope-reveal", 2, { bid, salt }),
-            await signedMsg(bob, "sealed-envelope-commit", 3, { commitment: "de".repeat(32) }),
+            await commitMsg(alice, 1),
+            await revealMsg(alice, 2),
+            await commitMsg(bob, 3), // straggler: not a binding commitment
         ])
-        const sealed: SealedEnvelopeLike = {
-            state: "closed",
-            outcome: () => ({
-                state: "closed",
-                reveals: [{ participant: alice.claim, bid, sequence: 2 }],
-                disqualified: [bob.claim],
-            }),
-        }
+        const res = await finalizeSealedEnvelope({
+            sealed: closed([{ participant: alice.claim, sequence: 2 }]),
+            session, signer: alice.claim, demos: alice.demos, policy: "none",
+        })
+        expect(res.transcript.messages).toHaveLength(3)
+    })
+
+    it("a straggler commit cannot back a disqualification", async () => {
+        const alice = await newConnectedDemos()
+        const bob = await newConnectedDemos()
+        const session = view([alice.claim, bob.claim], [
+            await commitMsg(alice, 1),
+            await revealMsg(alice, 2),
+            await commitMsg(bob, 3),
+        ])
         await expect(
-            finalizeSealedEnvelope({ sealed, session, signer: alice.claim, demos: alice.demos, policy: "none" }),
-        ).rejects.toThrow(/does not come after every commit/)
+            finalizeSealedEnvelope({
+                sealed: closed([{ participant: alice.claim, sequence: 2 }], [bob.claim]),
+                session, signer: alice.claim, demos: alice.demos, policy: "none",
+            }),
+        ).rejects.toThrow(/has no commit/)
+    })
+
+    it("refuses a reveal whose commit only comes after it", async () => {
+        const alice = await newConnectedDemos()
+        const session = view([alice.claim], [
+            await revealMsg(alice, 1),
+            await commitMsg(alice, 2),
+        ])
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: closed([{ participant: alice.claim, sequence: 1 }]),
+                session, signer: alice.claim, demos: alice.demos, policy: "none",
+            }),
+        ).rejects.toThrow(/no binding commit/)
+    })
+
+    it("refuses a reveal from a member who never committed", async () => {
+        const alice = await newConnectedDemos()
+        const bob = await newConnectedDemos()
+        const session = view([alice.claim, bob.claim], [
+            await commitMsg(alice, 1),
+            await revealMsg(bob, 2),
+            await revealMsg(alice, 3),
+        ])
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: closed([{ participant: alice.claim, sequence: 3 }]),
+                session, signer: alice.claim, demos: alice.demos, policy: "none",
+            }),
+        ).rejects.toThrow(/who has no binding commit/)
+    })
+
+    it("refuses a second reveal from one sender", async () => {
+        const alice = await newConnectedDemos()
+        const session = view([alice.claim], [
+            await commitMsg(alice, 1),
+            await revealMsg(alice, 2),
+            await revealMsg(alice, 3),
+        ])
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: closed([{ participant: alice.claim, sequence: 2 }]),
+                session, signer: alice.claim, demos: alice.demos, policy: "none",
+            }),
+        ).rejects.toThrow(/revealed more than once/)
+    })
+
+    it("refuses a binding committer that the outcome does not account for", async () => {
+        const alice = await newConnectedDemos()
+        const bob = await newConnectedDemos()
+        const session = view([alice.claim, bob.claim], [
+            await commitMsg(alice, 1),
+            await commitMsg(bob, 2, "de".repeat(32)),
+            await revealMsg(alice, 3),
+        ])
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: closed([{ participant: alice.claim, sequence: 3 }]),
+                session, signer: alice.claim, demos: alice.demos, policy: "none",
+            }),
+        ).rejects.toThrow(/neither revealed nor disqualified/)
     })
 })
 
@@ -559,8 +747,35 @@ describe("finalizeSealedEnvelope — only verified messages are co-signed and an
         await expect(call).rejects.toThrow(/non-member/)
     })
 
+    it("refuses a validly signed message from another channel", async () => {
+        const { call } = await run(async (msgs, { alice }) => {
+            const last = msgs[msgs.length - 1]
+            msgs.push(
+                await signChannelMessage(
+                    {
+                        channelId: "some-other-channel", sequence: last.sequence + 1,
+                        sender: alice.claim, sentAt: 1, type: "offer", body: {},
+                    },
+                    alice.demos,
+                ),
+            )
+            return msgs
+        })
+        await expect(call).rejects.toThrow(/belongs to channel "some-other-channel"/)
+    })
+
+    it("refuses a transcript that contains an abort", async () => {
+        const { call, captured } = await run(async (msgs, { alice }) => {
+            const last = msgs[msgs.length - 1]
+            msgs.push(await signedMsg(alice, "abort", last.sequence + 1, {}))
+            return msgs
+        })
+        await expect(call).rejects.toThrow(/contains an abort/)
+        expect(captured).toHaveLength(0)
+    })
+
     it("refuses messages that are not strictly ordered", async () => {
         const { call } = await run(msgs => [msgs[1], msgs[0], ...msgs.slice(2)])
-        await expect(call).rejects.toThrow(/not strictly ordered|not after seq/)
+        await expect(call).rejects.toThrow(/message seq 1 is not after seq 2/)
     })
 })
