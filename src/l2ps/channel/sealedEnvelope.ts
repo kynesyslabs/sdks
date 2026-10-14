@@ -100,7 +100,10 @@ export function selectWinner(
 
 export interface SealedEnvelopeOutcome {
     state: SealedEnvelopeState
-    /** Valid reveals (commitment matched), in the order revealed. */
+    /**
+     * Valid reveals (commitment matched), in the order this session recorded
+     * them — which can differ from channel order; rank by `sequence`.
+     */
     reveals: RevealedBid[]
     /**
      * Participants who committed but, by the time the session closed, either
@@ -135,7 +138,7 @@ export interface SealedEnvelopeSessionOpts {
     /**
      * Optional winner rule over valid reveals. Positive → `a` beats `b`
      * (highest wins); the session picks the maximum. Ties resolve to the
-     * earlier-revealed bid. Absent → no winner is chosen; the caller ranks
+     * lower channel sequence (the bid revealed first on the wire). Absent → no winner is chosen; the caller ranks
      * `outcome.reveals` itself.
      */
     compareBids?: (a: RevealedBid, b: RevealedBid) => number
@@ -318,7 +321,9 @@ export class SealedEnvelopeSession {
                     throw new Error(
                         `SealedEnvelopeSession: reveal from ${msg.sender} who never committed`,
                     )
-                if (this.reveals.has(msg.sender))
+                // A sender whose reveal already failed stays disqualified: a second
+                // try would double-count them against the close condition.
+                if (this.reveals.has(msg.sender) || this._badReveals.has(msg.sender))
                     throw new Error(
                         `SealedEnvelopeSession: duplicate reveal from ${msg.sender}`,
                     )

@@ -180,6 +180,26 @@ describe("SealedEnvelopeSession — cheating is contained, not fatal", () => {
         expect(o.winner).toBe(A) // the only valid bid wins by default
     })
 
+    it("keeps a bad revealer disqualified: a second reveal from them is refused", async () => {
+        const h = harness([A, B, C], { compareBids: byPrice })
+        const a = h.get(A)
+        await a.commit({ price: 90 })
+        a.onIncoming(h.raw(B, "sealed-envelope-commit", { commitment: commitmentHex({ price: 5 }, "aa") }))
+        a.onIncoming(h.raw(C, "sealed-envelope-commit", { commitment: commitmentHex({ price: 7 }, "bb") }))
+        await tick()
+        expect(a.state).toBe("reveal")
+
+        a.onIncoming(h.raw(B, "sealed-envelope-reveal", { bid: { price: 999 }, salt: "00" }))
+        // A valid opening after a failed one must not undo the disqualification.
+        expect(() =>
+            a.onIncoming(h.raw(B, "sealed-envelope-reveal", { bid: { price: 5 }, salt: "aa" })),
+        ).toThrow(/duplicate reveal/)
+        // …and must not be counted toward closing while C has still not revealed.
+        expect(a.state).toBe("reveal")
+        expect(a.outcome().disqualified).toContain(B)
+        expect(a.outcome().reveals.map(r => r.participant)).not.toContain(B)
+    })
+
     it("disqualifies a committer who never reveals, at the deadline", async () => {
         const h = harness([A, B], { compareBids: byPrice })
         await h.get(A).commit({ price: 90 })
