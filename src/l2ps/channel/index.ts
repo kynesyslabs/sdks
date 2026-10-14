@@ -100,6 +100,7 @@ export {
     type SealedAbortBody,
     type SealedCommitment,
     type RevealedBid,
+    selectWinner,
 } from "./sealedEnvelope"
 
 export {

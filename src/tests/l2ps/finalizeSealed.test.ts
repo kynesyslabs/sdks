@@ -104,6 +104,7 @@ describe("finalizeSealedEnvelope — transcript anchor on a resolved auction", (
             demos: alice.demos,
             l2ps: {} as never, // only forwarded to the (mocked) anchor
             policy: "encrypted-anchored-required",
+            compareBids: byPrice,
             anchor: okAnchor(captured),
         })
 
@@ -124,6 +125,7 @@ describe("finalizeSealedEnvelope — transcript anchor on a resolved auction", (
             signer: alice.claim,
             demos: alice.demos,
             policy: "none",
+            compareBids: byPrice,
             anchor: okAnchor(captured),
         })
         expect(res.channelTranscriptRef).toBeNull()
@@ -142,6 +144,7 @@ describe("finalizeSealedEnvelope — transcript anchor on a resolved auction", (
             l2ps: {} as never,
             policy: "encrypted-anchored-recommended",
             consent: true,
+            compareBids: byPrice,
             anchor: okAnchor(cap1),
         })
         expect(a.channelTranscriptRef).not.toBeNull()
@@ -155,6 +158,7 @@ describe("finalizeSealedEnvelope — transcript anchor on a resolved auction", (
             signer: without.alice.claim,
             demos: without.alice.demos,
             policy: "encrypted-anchored-recommended",
+            compareBids: byPrice,
             anchor: okAnchor(cap2),
         })
         expect(b.channelTranscriptRef).toBeNull()
@@ -199,6 +203,7 @@ describe("finalizeSealedEnvelope — transcript anchor on a resolved auction", (
                 demos: alice.demos,
                 l2ps: {} as never,
                 policy: "encrypted-anchored-required",
+                compareBids: byPrice,
                 anchor: async () => null,
             }),
         ).rejects.toThrow(/produced no attestation/)
@@ -336,5 +341,87 @@ describe("finalizeSealedEnvelope — the transcript must cryptographically back 
         await expect(
             finalizeSealedEnvelope({ sealed, session, signer: alice.claim, demos: alice.demos, policy: "none" }),
         ).rejects.toThrow(/nothing to anchor/)
+    })
+})
+
+describe("finalizeSealedEnvelope — the outcome must match the revealed bids", () => {
+    const tamper = (
+        aSeal: SealedEnvelopeSession,
+        patch: Partial<ReturnType<SealedEnvelopeSession["outcome"]>>,
+    ): SealedEnvelopeLike => ({
+        state: aSeal.state,
+        outcome: () => ({ ...aSeal.outcome(), ...patch }),
+    })
+
+    it("refuses a reported reveal bid that differs from the revealed body", async () => {
+        const { alice, aSes, aSeal } = await resolvedAuction()
+        const real = aSeal.outcome()
+        const sealed = tamper(aSeal, {
+            reveals: real.reveals.map(r =>
+                r.participant === alice.claim ? { ...r, bid: { price: 1 } } : r,
+            ),
+        })
+        await expect(
+            finalizeSealedEnvelope({
+                sealed, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/reported bid differs/)
+    })
+
+    it("refuses an outcome that names the wrong winner", async () => {
+        const { alice, aSes, aSeal } = await resolvedAuction()
+        // alice bid 90, bob 100 — the byPrice comparator picks bob.
+        const sealed = tamper(aSeal, { winner: alice.claim, winningBid: { price: 90 } })
+        await expect(
+            finalizeSealedEnvelope({
+                sealed, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/winner \/ winning bid does not match/)
+    })
+
+    it("refuses a right winner with a wrong winning bid", async () => {
+        const { alice, bob, aSes, aSeal } = await resolvedAuction()
+        const sealed = tamper(aSeal, { winner: bob.claim, winningBid: { price: 101 } })
+        await expect(
+            finalizeSealedEnvelope({
+                sealed, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/winner \/ winning bid does not match/)
+    })
+
+    it("refuses an outcome with no winner when the rule picks one", async () => {
+        const { alice, aSes, aSeal } = await resolvedAuction()
+        const sealed = tamper(aSeal, { winner: undefined, winningBid: undefined })
+        await expect(
+            finalizeSealedEnvelope({
+                sealed, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/winner \/ winning bid does not match/)
+    })
+
+    it("refuses to take a reported winner on trust when no comparator is given", async () => {
+        const { alice, aSes, aSeal } = await resolvedAuction()
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: aSeal, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none",
+            }),
+        ).rejects.toThrow(/no compareBids/)
+    })
+
+    it("refuses the same participant reported as revealing twice", async () => {
+        const { alice, aSes, aSeal } = await resolvedAuction()
+        const real = aSeal.outcome()
+        const sealed = tamper(aSeal, { reveals: [...real.reveals, real.reveals[0]] })
+        await expect(
+            finalizeSealedEnvelope({
+                sealed, session: aSes, signer: alice.claim, demos: alice.demos,
+                policy: "none", compareBids: byPrice,
+            }),
+        ).rejects.toThrow(/appears twice/)
     })
 })

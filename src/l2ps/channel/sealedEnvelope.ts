@@ -81,6 +81,23 @@ export interface RevealedBid {
     sequence: number
 }
 
+/**
+ * The winner rule, shared by the session and by finalisation so a verifier
+ * recomputes exactly what the session reported. Reveals are ranked in channel
+ * sequence order, so a tie resolves to the bid revealed first on the wire —
+ * independent of the order in which any one participant happened to receive
+ * the messages.
+ */
+export function selectWinner(
+    reveals: ReadonlyArray<RevealedBid>,
+    compareBids: (a: RevealedBid, b: RevealedBid) => number,
+): RevealedBid | undefined {
+    const ordered = [...reveals].sort((a, b) => a.sequence - b.sequence)
+    return ordered.length
+        ? ordered.reduce((best, r) => (compareBids(r, best) > 0 ? r : best))
+        : undefined
+}
+
 export interface SealedEnvelopeOutcome {
     state: SealedEnvelopeState
     /** Valid reveals (commitment matched), in the order revealed. */
@@ -398,12 +415,12 @@ export class SealedEnvelopeSession {
             disqualified,
             reason: this._reason,
         }
-        if (this._state === "closed" && this.compareBids && reveals.length) {
-            const winner = reveals.reduce((best, r) =>
-                this.compareBids!(r, best) > 0 ? r : best,
-            )
-            outcome.winner = winner.participant
-            outcome.winningBid = winner.bid
+        if (this._state === "closed" && this.compareBids) {
+            const winner = selectWinner(reveals, this.compareBids)
+            if (winner) {
+                outcome.winner = winner.participant
+                outcome.winningBid = winner.bid
+            }
         }
         return outcome
     }

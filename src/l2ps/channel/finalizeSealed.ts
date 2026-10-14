@@ -29,8 +29,11 @@ import { anchorEncryptedTranscript } from "../anchor"
 import { exportTranscript } from "./transcript"
 import type { ChannelTranscript } from "./types"
 import type { ChannelSessionView } from "./finalize"
+import { canonicalJSONStringify } from "@/websdk/utils/canonicalJson"
 import {
     commitmentHex,
+    selectWinner,
+    type RevealedBid,
     type SealedCommitBody,
     type SealedEnvelopeOutcome,
     type SealedEnvelopeState,
@@ -56,6 +59,13 @@ export interface FinalizeSealedEnvelopeOpts {
     /** Needed to anchor under `encrypted-anchored-recommended`. */
     consent?: boolean
     /**
+     * The winner rule the session was built with. The outcome's winner is
+     * recomputed from the transcript's reveals with it and must match; an
+     * outcome that names a winner cannot be finalised without it, because the
+     * ranking would otherwise be taken on trust.
+     */
+    compareBids?: (a: RevealedBid, b: RevealedBid) => number
+    /**
      * Injectable anchor implementation; defaults to the real
      * `anchorEncryptedTranscript`. Tests pass a fake to avoid deploying a
      * storage program.
@@ -73,6 +83,15 @@ export interface SealedEnvelopeFinalizeResult {
      * anchor (`none`, or `recommended` without consent).
      */
     channelTranscriptRef: AttestationRef | null
+}
+
+/** Structural equality of two JSON bids; a non-JSON value is never equal. */
+function sameValue(a: unknown, b: unknown): boolean {
+    try {
+        return canonicalJSONStringify(a) === canonicalJSONStringify(b)
+    } catch {
+        return false
+    }
 }
 
 export async function finalizeSealedEnvelope(
@@ -108,7 +127,16 @@ export async function finalizeSealedEnvelope(
 
     const outcome = opts.sealed.outcome()
 
+    // Bids as the transcript proves them, not as the outcome reports them.
+    const verified: RevealedBid[] = []
+    const seenRevealers = new Set<ClaimReference>()
+
     for (const reveal of outcome.reveals) {
+        if (seenRevealers.has(reveal.participant))
+            throw new Error(
+                `finalizeSealedEnvelope: ${reveal.participant} appears twice in the reported reveals`,
+            )
+        seenRevealers.add(reveal.participant)
         const revealMsg = messages.find(
             m =>
                 m.sequence === reveal.sequence &&
@@ -133,6 +161,34 @@ export async function finalizeSealedEnvelope(
             throw new Error(
                 `finalizeSealedEnvelope: ${reveal.participant}'s reveal (seq ${reveal.sequence}) ` +
                     "does not open the commit it is bound to — session mismatch",
+            )
+        // The opening is proven against the commit, so the reported bid must be
+        // the opened one — otherwise the outcome could rank a bid nobody sealed.
+        if (!sameValue(reveal.bid, bid))
+            throw new Error(
+                `finalizeSealedEnvelope: ${reveal.participant}'s reported bid differs from the bid ` +
+                    `revealed at seq ${reveal.sequence} — session mismatch`,
+            )
+        verified.push({ participant: reveal.participant, bid, sequence: reveal.sequence })
+    }
+
+    if (outcome.winner !== undefined || outcome.winningBid !== undefined) {
+        if (!opts.compareBids)
+            throw new Error(
+                "finalizeSealedEnvelope: outcome names a winner but no compareBids was given — " +
+                    "the ranking cannot be verified against the transcript",
+            )
+    }
+    if (opts.compareBids) {
+        const expected = selectWinner(verified, opts.compareBids)
+        const matches = expected
+            ? expected.participant === outcome.winner &&
+              sameValue(expected.bid, outcome.winningBid)
+            : outcome.winner === undefined && outcome.winningBid === undefined
+        if (!matches)
+            throw new Error(
+                "finalizeSealedEnvelope: reported winner / winning bid does not match the " +
+                    "transcript's revealed bids — session mismatch",
             )
     }
 

@@ -1,6 +1,7 @@
 import {
     SealedEnvelopeSession,
     commitmentHex,
+    selectWinner,
     type RevealedBid,
     type SealedCommitBody,
 } from "@/l2ps/channel/sealedEnvelope"
@@ -286,5 +287,18 @@ describe("SealedEnvelopeSession — abort", () => {
                     send: async () => ({}) as ChannelMessage,
                 }),
         ).toThrow(/not a participant/)
+    })
+})
+
+describe("selectWinner", () => {
+    it("breaks a tie toward the lower channel sequence, whatever the input order", () => {
+        const first: RevealedBid = { participant: A, bid: { price: 7 }, sequence: 3 }
+        const second: RevealedBid = { participant: B, bid: { price: 7 }, sequence: 4 }
+        expect(selectWinner([second, first], byPrice)?.participant).toBe(A)
+        expect(selectWinner([first, second], byPrice)?.participant).toBe(A)
+    })
+
+    it("returns undefined when nothing was revealed", () => {
+        expect(selectWinner([], byPrice)).toBeUndefined()
     })
 })
