@@ -69,6 +69,33 @@ confirm() {
     fi
 }
 
+# Checked before anything is built or changed, dry runs included.
+# Releases publish from main only (see .github/workflows/publish.yml): a release
+# commit pushed from any other branch starts no workflow. And they publish one
+# at a time: a release pushed while another is publishing or queued can replace
+# that queued one, which would then never publish.
+release_preflight() {
+    local branch in_flight
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$branch" != "main" ]; then
+        echo -e "${RED}Releases are published from main only; you are on '$branch'.${NC}"
+        exit 1
+    fi
+    if ! command -v gh >/dev/null 2>&1; then
+        echo -e "${RED}The GitHub CLI (gh) is needed to check that no release is already publishing.${NC}"
+        exit 1
+    fi
+    if ! in_flight=$(gh run list --repo kynesyslabs/sdks --workflow publish.yml --branch main --limit 20 \
+        --json status -q '[.[] | select(.status != "completed")] | length'); then
+        echo -e "${RED}Could not check for a release already publishing; not releasing.${NC}"
+        exit 1
+    fi
+    if [ "$in_flight" != "0" ]; then
+        echo -e "${RED}A release is still publishing or queued; wait for it to finish.${NC}"
+        exit 1
+    fi
+}
+
 # Main script
 case "$1" in
     -r|--redo)
@@ -76,18 +103,20 @@ case "$1" in
         CURRENT_VERSION=$(get_current_version)
         echo -e "Current version: ${GREEN}v$CURRENT_VERSION${NC}"
 
+        release_preflight
         confirm "This will create a new commit for the same version and trigger the release workflow."
 
         git commit --allow-empty -m "release v$CURRENT_VERSION"
         echo -e "${GREEN}✓ Created empty commit for release v$CURRENT_VERSION${NC}"
 
-        git push
+        git push origin main
         echo -e "${GREEN}✓ Pushed to remote${NC}"
         echo -e "${BLUE}🚀 Release workflow should start shortly for v$CURRENT_VERSION${NC}"
         ;;
 
     "")
         echo -e "${BLUE}=== NEW RELEASE ===${NC}"
+        release_preflight
 
         # Run build first and only proceed if successful
         echo -e "${BLUE}Building project...${NC}"
@@ -151,7 +180,7 @@ case "$1" in
         git commit -m "release v$NEW_VERSION"
         echo -e "${GREEN}✓ Committed version bump${NC}"
 
-        git push
+        git push origin main
         echo -e "${GREEN}✓ Pushed to remote${NC}"
         echo -e "${BLUE}🚀 Release workflow should start shortly for v$NEW_VERSION${NC}"
         ;;

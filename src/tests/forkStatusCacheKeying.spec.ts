@@ -1,4 +1,4 @@
-import { Demos } from "@/websdk/demosclass"
+import { Demos } from "@/websdk"
 import type { NetworkInfo } from "@/denomination/networkInfo"
 
 // REVIEW: PR-86 review fix (myc#18) — fork-status cache must be keyed
@@ -147,5 +147,82 @@ describe("fork-status cache keyed by rpc_url (myc#18)", () => {
         } finally {
             warnSpy.mockRestore()
         }
+    })
+})
+
+describe("a cached answer that says 'not yet' expires", () => {
+    /**
+     * A successful answer used to be kept for the life of the instance. An
+     * instance that cached the pre-fork answer and stayed up across the
+     * activation would keep signing the legacy preimage, and every
+     * transaction it produced from then on would be rejected until the
+     * process restarted.
+     */
+    test("re-fetches after the pending-fork TTL, and sees the activation", async () => {
+        const map = new Map<string, NetworkInfo | null>([
+            ["http://node-a", mkInfo(false)],
+        ])
+        const { demos, calls } = buildDemosWithRpcMap(map)
+        ;(demos as any).rpc_url = "http://node-a"
+
+        expect((await demos.getNetworkInfo())?.forks.osDenomination.activated).toBe(
+            false,
+        )
+        expect(calls.length).toBe(1)
+
+        // The chain crosses the activation height while this instance is up.
+        map.set("http://node-a", mkInfo(true))
+        ;(demos as any)._cachedNetworkInfoAt = Date.now() - 60_000
+
+        expect((await demos.getNetworkInfo())?.forks.osDenomination.activated).toBe(
+            true,
+        )
+        expect(calls.length).toBe(2)
+    })
+
+    test("keeps the last answer when a re-ask fails, instead of falling back to pre-fork", async () => {
+        const pending = mkInfo(true)
+        ;(pending.forks as any).signatureDomain = {
+            activated: false,
+            activationHeight: null,
+        }
+        const map = new Map<string, NetworkInfo | null>([
+            ["http://node-a", pending],
+        ])
+        const { demos, calls } = buildDemosWithRpcMap(map)
+        ;(demos as any).rpc_url = "http://node-a"
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {})
+
+        await demos.getNetworkInfo()
+        // The pending-fork answer expires and the node blips on the re-ask.
+        map.set("http://node-a", null)
+        ;(demos as any)._cachedNetworkInfoAt = Date.now() - 60_000
+
+        const afterBlip = await demos.getNetworkInfo()
+        expect(afterBlip?.forks.osDenomination.activated).toBe(true)
+        expect(await (demos as any)._isPostForkCached()).toBe(true)
+        // Within the failure TTL it does not hammer the node either.
+        await demos.getNetworkInfo()
+        expect(calls.length).toBe(2)
+        // Serving the old answer is reported, once.
+        expect(warn).toHaveBeenCalledTimes(1)
+        expect(String(warn.mock.calls[0][0])).toContain("refresh failed")
+        warn.mockRestore()
+    })
+
+    test("keeps an answer where every fork is already active", async () => {
+        const map = new Map<string, NetworkInfo | null>([
+            ["http://node-a", mkInfo(true)],
+        ])
+        const { demos, calls } = buildDemosWithRpcMap(map)
+        ;(demos as any).rpc_url = "http://node-a"
+
+        await demos.getNetworkInfo()
+        // An activated fork never deactivates, so age does not make this
+        // answer wrong and re-asking would be pure overhead on every sign.
+        ;(demos as any)._cachedNetworkInfoAt = Date.now() - 60 * 60_000
+        await demos.getNetworkInfo()
+
+        expect(calls.length).toBe(1)
     })
 })

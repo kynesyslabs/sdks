@@ -19,6 +19,14 @@ export interface D402PaymentRequirement {
     resourceId: string
     /** Optional payment description */
     description?: string
+    /**
+     * Optional payer address. When set, the payment must come from it.
+     *
+     * A payment proof is a transaction hash, and transactions are public, so
+     * without this anyone who learns the hash can present it as their own
+     * proof and take the paid-for access.
+     */
+    payer?: string
 }
 
 /**

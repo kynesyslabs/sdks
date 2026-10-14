@@ -1,5 +1,3 @@
-import { Demos, DemosWebAuth } from "@/websdk"
-import { demosClaimRefForAddress, type ClaimReference } from "@/identity/cci"
 import {
     ChannelSession,
     RfqSession,
@@ -10,36 +8,23 @@ import type {
     AnchorEncryptedTranscriptOpts,
     AttestationRef,
 } from "@/l2ps/anchor"
+import { newConnectedDemos } from "./helpers"
 
 const CHANNEL = "ch-finalize-1"
 
-async function newConnectedDemos(): Promise<{
-    demos: Demos
-    claim: ClaimReference
-}> {
-    const auth = new DemosWebAuth()
-    await auth.create()
-    const demos = new Demos()
-    await demos.connectWallet(auth.keypair.privateKey as Uint8Array)
-    return {
-        demos,
-        claim: demosClaimRefForAddress(await demos.getEd25519Address()),
-    }
-}
-
 /** Run a real signed offer→accept so the session holds a verifiable transcript. */
-async function agreedSession() {
+async function agreedSession(channelId = CHANNEL, bindOutcome = true) {
     const alice = await newConnectedDemos()
     const bob = await newConnectedDemos()
     const members = [alice.claim, bob.claim]
     const aSes = new ChannelSession({
-        channelId: CHANNEL,
+        channelId,
         members,
         me: alice.claim,
         demos: alice.demos,
     })
     const bSes = new ChannelSession({
-        channelId: CHANNEL,
+        channelId,
         members,
         me: bob.claim,
         demos: bob.demos,
@@ -48,6 +33,7 @@ async function agreedSession() {
     await bSes.open()
 
     const aRfq = new RfqSession({
+        ...(bindOutcome && { channelId, members }),
         me: alice.claim,
         send: async opts => {
             const m = await aSes.sendOutgoing(opts)
@@ -57,6 +43,7 @@ async function agreedSession() {
         },
     })
     const bRfq = new RfqSession({
+        ...(bindOutcome && { channelId, members }),
         me: bob.claim,
         send: async opts => {
             const m = await bSes.sendOutgoing(opts)
@@ -80,6 +67,21 @@ const okAnchor =
     }
 
 describe("finalizeRfq — WI-C transcript anchor on terminal", () => {
+    it("finalizes a safely verified legacy RfqSession outcome", async () => {
+        const { alice, aSes, aRfq } = await agreedSession(
+            "ch-finalize-legacy",
+            false,
+        )
+        const res = await finalizeRfq({
+            rfq: aRfq,
+            session: aSes,
+            signer: alice.claim,
+            demos: alice.demos,
+            policy: "none",
+        })
+        expect(res.transcript.messages).toHaveLength(3)
+    })
+
     it("exports a signed transcript and anchors under `required`", async () => {
         const { alice, aSes, aRfq } = await agreedSession()
         const captured: AnchorEncryptedTranscriptOpts[] = []
@@ -241,5 +243,63 @@ describe("finalizeRfq — WI-C transcript anchor on terminal", () => {
                 policy: "none",
             }),
         ).rejects.toThrow(/session mismatch/)
+    })
+
+    it("rejects a populated different channel with the same accepted sequence and terms", async () => {
+        const fromA = await agreedSession("ch-finalize-a")
+        const fromB = await agreedSession("ch-finalize-b")
+        expect(fromA.aRfq.outcome().acceptedSequence).toBe(fromB.aRfq.outcome().acceptedSequence)
+        await expect(finalizeRfq({
+            rfq: fromA.aRfq,
+            session: fromB.aSes,
+            signer: fromB.alice.claim,
+            demos: fromB.alice.demos,
+            policy: "none",
+        })).rejects.toThrow(/session mismatch/)
+    })
+
+    it("rejects a different signed exchange even if a channel ID was reused", async () => {
+        const fromA = await agreedSession("ch-finalize-reused")
+        const fromB = await agreedSession("ch-finalize-reused")
+        await expect(finalizeRfq({
+            rfq: fromA.aRfq,
+            session: fromB.aSes,
+            signer: fromB.alice.claim,
+            demos: fromB.alice.demos,
+            policy: "none",
+        })).rejects.toThrow(/session mismatch/)
+    })
+
+    it("rejects cross-pairing an exact signed exchange with different members under a reused channel ID", async () => {
+        const fromA = await agreedSession("ch-finalize-reused-splice")
+        const fromB = await agreedSession("ch-finalize-reused-splice")
+        const crossPairedSession = {
+            channelId: "ch-finalize-reused-splice",
+            members: fromB.aSes.members,
+            messages: () => fromA.aSes.messages(),
+        }
+
+        await expect(finalizeRfq({
+            rfq: fromA.aRfq,
+            session: crossPairedSession,
+            signer: fromB.alice.claim,
+            demos: fromB.alice.demos,
+            policy: "none",
+        })).rejects.toThrow(/session mismatch/)
+    })
+
+    it("rejects an outcome that disagrees with the reported accepted state", async () => {
+        const { alice, aSes, aRfq } = await agreedSession()
+        const inconsistent = {
+            state: "accepted" as const,
+            outcome: () => ({ ...aRfq.outcome(), state: "rejected" as const }),
+        }
+        await expect(finalizeRfq({
+            rfq: inconsistent,
+            session: aSes,
+            signer: alice.claim,
+            demos: alice.demos,
+            policy: "none",
+        })).rejects.toThrow(/outcome is "rejected"/)
     })
 })

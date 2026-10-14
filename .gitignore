@@ -7,6 +7,8 @@ TODO.md
 .yarn
 # yarn.lock
 package-lock.json
+!packages/demos-native/package-lock.json
+packages/demos-native/dist/
 yarn.lock
 docs
 *.pkl

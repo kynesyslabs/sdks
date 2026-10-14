@@ -29,6 +29,7 @@ import { anchorEncryptedTranscript } from "../anchor"
 import { exportTranscript } from "./transcript"
 import type { ChannelMessage, ChannelTranscript } from "./types"
 import type { RfqOutcome, RfqState } from "./negotiate"
+import { matchesAcceptedRfq } from "./acceptedRfq"
 
 /** Minimal RfqSession surface — structural for testability. */
 export interface RfqLike {
@@ -100,32 +101,29 @@ export async function finalizeRfq(
     // points at. A stale or mismatched session would otherwise let us
     // export/anchor a transcript that does not back the agreement.
     const outcome = opts.rfq.outcome()
+    if (outcome.state !== "accepted") {
+        throw new Error(
+            `finalizeRfq: negotiation outcome is "${outcome.state}", not "accepted"`,
+        )
+    }
     const acceptedSequence = outcome.acceptedSequence
     if (acceptedSequence === undefined) {
         throw new Error(
             "finalizeRfq: accepted outcome has no acceptedSequence — cannot match transcript",
         )
     }
-    const messages = opts.session.messages()
-    const hasAcceptedProposal = messages.some(
-        m => m.sequence === acceptedSequence,
-    )
-    const hasAccept = messages.some(
-        m =>
-            m.type === "accept" &&
-            (m.body as { acceptedSequence?: number } | undefined)
-                ?.acceptedSequence === acceptedSequence,
-    )
-    if (!hasAcceptedProposal || !hasAccept) {
+    const channelId = opts.session.channelId
+    const members = [...opts.session.members]
+    const messages = [...opts.session.messages()]
+    if (!matchesAcceptedRfq(outcome, channelId, members, messages)) {
         throw new Error(
             `finalizeRfq: session transcript does not contain the accepted proposal ` +
                 `(seq ${acceptedSequence}) and its matching accept — session mismatch`,
         )
     }
-
     const transcript = await exportTranscript({
-        channelId: opts.session.channelId,
-        members: [...opts.session.members],
+        channelId,
+        members,
         messages,
         signers: [{ claim: opts.signer, demos: opts.demos }],
     })

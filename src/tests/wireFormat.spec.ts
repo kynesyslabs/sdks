@@ -1,4 +1,4 @@
-import { Demos } from "@/websdk/demosclass"
+import { Demos } from "@/websdk"
 import { SubDemPrecisionError } from "@/denomination/networkInfo"
 import { OS_PER_DEM } from "@/denomination"
 

@@ -110,7 +110,7 @@ bump_version() {
         echo -e "${CYAN}[dry-run]${NC} Would bump ${YELLOW}v${current_version}${NC} → ${GREEN}v${new_version}${NC}"
         echo -e "${CYAN}[dry-run]${NC} Would run: bun run build"
         echo -e "${CYAN}[dry-run]${NC} Would commit: ${BOLD}release v${new_version}${NC}"
-        echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+        echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
         echo -e "${GREEN}✓ Dry run complete — no changes made${NC}"
         exit 0
     fi
@@ -152,13 +152,45 @@ run_build() {
     echo -e "${GREEN}✓ Build successful${NC}"
 }
 
+# Checked before anything is built or changed, dry runs included.
+# Releases publish from main only (see .github/workflows/publish.yml): a release
+# commit pushed from any other branch starts no workflow. And they publish one
+# at a time: a release pushed while another is publishing or queued can replace
+# that queued one, which would then never publish.
+release_preflight() {
+    local branch in_flight problem=""
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$branch" != "main" ]; then
+        echo -e "${RED}Releases are published from main only; you are on '$branch'.${NC}"
+        exit 1
+    fi
+    if ! command -v gh >/dev/null 2>&1; then
+        problem="The GitHub CLI (gh) is needed to check that no release is already publishing."
+    elif ! in_flight=$(gh run list --repo kynesyslabs/sdks --workflow publish.yml --branch main --limit 20 \
+        --json status -q '[.[] | select(.status != "completed")] | length'); then
+        problem="Could not check for a release already publishing."
+    elif [ "$in_flight" != "0" ]; then
+        problem="A release is still publishing or queued; wait for it to finish."
+    fi
+    if [ -n "$problem" ]; then
+        # A dry run changes nothing, so it previews anyway and says what a
+        # real release would stop on.
+        if [ "$DRY_RUN" = true ]; then
+            echo -e "${YELLOW}[dry-run] A real release would stop here: $problem${NC}"
+            return 0
+        fi
+        echo -e "${RED}$problem Not releasing.${NC}"
+        exit 1
+    fi
+}
+
 commit_and_push() {
     local version=$1
     local commit_msg="release v$version"
 
     if [ "$DRY_RUN" = true ]; then
         echo -e "${CYAN}[dry-run]${NC} Would commit: ${BOLD}$commit_msg${NC}"
-        echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+        echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
         return 0
     fi
 
@@ -166,7 +198,7 @@ commit_and_push() {
     git commit -m "$commit_msg"
     echo -e "${GREEN}✓ Committed version bump${NC}"
 
-    git push
+    git push origin main
     echo -e "${GREEN}✓ Pushed to remote${NC}"
     echo -e "${BLUE}🚀 Release workflow should start shortly for v${version}${NC}"
 }
@@ -177,7 +209,7 @@ redo_release() {
 
     if [ "$DRY_RUN" = true ]; then
         echo -e "${CYAN}[dry-run]${NC} Would create empty commit: ${BOLD}$commit_msg${NC}"
-        echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+        echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
         return 0
     fi
 
@@ -186,7 +218,7 @@ redo_release() {
     git commit --allow-empty -m "$commit_msg"
     echo -e "${GREEN}✓ Created empty commit for release v${current_version}${NC}"
 
-    git push
+    git push origin main
     echo -e "${GREEN}✓ Pushed to remote${NC}"
     echo -e "${BLUE}🚀 Release workflow should start shortly for v${current_version}${NC}"
 }
@@ -229,6 +261,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+release_preflight
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 # ─── Explicit version mode ───────────────────────────────────────────────────
 if [ -n "$EXPLICIT_VERSION" ]; then
@@ -244,7 +278,7 @@ if [ -n "$EXPLICIT_VERSION" ]; then
         echo -e "${CYAN}[dry-run]${NC} Would run: bun run build"
         echo -e "${CYAN}[dry-run]${NC} Would set version to ${GREEN}v${EXPLICIT_VERSION}${NC}"
         echo -e "${CYAN}[dry-run]${NC} Would commit: ${BOLD}release v${EXPLICIT_VERSION}${NC}"
-        echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+        echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
         echo -e "${GREEN}✓ Dry run complete — no changes made${NC}"
         exit 0
     fi
@@ -328,7 +362,7 @@ else console.log((m+1)+'.0.0');
     echo -e "${CYAN}[dry-run]${NC} Would run: bun run build"
     echo -e "${CYAN}[dry-run]${NC} Would bump ${YELLOW}v${current_version}${NC} → ${GREEN}v${next}${NC}"
     echo -e "${CYAN}[dry-run]${NC} Would commit: ${BOLD}release v${next}${NC}"
-    echo -e "${CYAN}[dry-run]${NC} Would push to remote"
+    echo -e "${CYAN}[dry-run]${NC} Would push to origin main"
     echo -e "${GREEN}✓ Dry run complete — no changes made${NC}"
     exit 0
 fi

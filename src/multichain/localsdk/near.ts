@@ -1,6 +1,6 @@
 import { KeyPair, transactions } from "near-api-js";
 import { IDefaultChainLocal, NEAR as NearCore, required, TransactionResponse } from "../core";
-import { SignedTransaction } from "near-api-js/lib/transaction";
+import { SignedTransaction } from "near-api-js/lib/transaction.js";
 import { XmTransactionResult } from "../core/types/interfaces";
 
 export class NEAR extends NearCore implements IDefaultChainLocal {

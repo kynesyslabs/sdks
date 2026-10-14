@@ -1,4 +1,4 @@
-import { Demos } from "@/websdk/demosclass"
+import { Demos } from "@/websdk"
 
 const ADDR = "0x" + "aa".repeat(32)
 

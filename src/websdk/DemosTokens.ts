@@ -6,7 +6,7 @@
  */
 
 import type { Demos } from "./demosclass"
-import { assertValidNonce } from "@/utils"
+import { resolveNonce } from "@/utils"
 import type { Transaction } from "@/types"
 import type {
     TokenCreationParams,
@@ -75,9 +75,11 @@ export class DemosTokens {
 
         // Get deployer info for address derivation preview
         const deployerAddress = this.demos.getAddress()
-        const nonce = options?.nonce !== undefined
-            ? assertValidNonce(options.nonce)
-            : await this.demos.getAddressNonce(deployerAddress)
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => this.demos.getAddressNonce(deployerAddress),
+            this.demos._nonceReserver(deployerAddress),
+        )
 
         // Derive the token address (preview - actual derivation happens on-chain)
         const tokenAddress = deriveTokenAddress(deployerAddress, nonce, params)
@@ -439,9 +441,11 @@ export class DemosTokens {
         }
 
         const senderAddress = this.demos.getAddress()
-        const nonce = options?.nonce !== undefined
-            ? assertValidNonce(options.nonce)
-            : await this.demos.getAddressNonce(senderAddress)
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => this.demos.getAddressNonce(senderAddress),
+            this.demos._nonceReserver(senderAddress),
+        )
 
         const tx: Transaction = {
             content: {

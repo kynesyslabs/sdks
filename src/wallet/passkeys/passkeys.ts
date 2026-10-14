@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 const execAsync = promisify(exec);
 
@@ -10,7 +11,10 @@ export class PasskeyGenerator {
 
     constructor() {
         // Assuming the generate.sh script is in the same directory as this file
-        this.scriptPath = path.join(__dirname, 'hmywallet/generate.sh');
+        // Resolved here, not at import: the root entry pulls this module into
+        // browser bundles, where `url` is a polyfill without fileURLToPath.
+        const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+        this.scriptPath = path.join(moduleDirectory, 'hmywallet/generate.sh');
     }
 
     /**
@@ -44,20 +48,4 @@ export class PasskeyGenerator {
             throw error;
         }
     }
-}
-
-// Test the passkey generator if this file is run directly
-if (require.main === module) {
-    const main = async () => {
-        try {
-            const passkeyGenerator = new PasskeyGenerator();
-            await passkeyGenerator.generate();
-            console.log('Test completed successfully');
-        } catch (error) {
-            console.error('Test failed:', error);
-            process.exit(1);
-        }
-    };
-
-    main();
 }

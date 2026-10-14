@@ -31,7 +31,9 @@
  * ```
  */
 
-import init, { type LoggingLevel } from "tlsn-js"
+import "./tlsn-wasm-compat.js"
+import init from "./tlsn-runtime"
+import type { LoggingLevel } from "tlsn-js"
 
 /**
  * Configuration options for auto-initialization
@@ -190,9 +192,22 @@ export async function initTlsn(options: AutoInitOptions = {}): Promise<void> {
  * ```
  */
 export function getWasmSourcePath(): string {
-    // This returns the path relative to where this file is in the build output
-    // In build/tlsnotary/auto-init.js, WASM files are in build/tlsnotary/wasm/
-    return require("path").resolve(__dirname, "wasm")
+    // This module is ESM in the published package, so neither require nor
+    // __dirname is available. Keep the helper synchronous and bundler-safe by
+    // deriving the package-owned directory directly from import.meta.url.
+    const wasmUrl = new URL("./wasm/", import.meta.url)
+    if (wasmUrl.protocol !== "file:") {
+        throw new Error(
+            `TLSNotary WASM source is not a filesystem URL: ${wasmUrl.href}`,
+        )
+    }
+
+    let pathname = decodeURIComponent(wasmUrl.pathname)
+    if (wasmUrl.hostname) pathname = `//${wasmUrl.hostname}${pathname}`
+    // Node accepts forward slashes on Windows, but file URLs prefix drive
+    // letters with a slash that filesystem APIs do not accept.
+    if (/^\/[A-Za-z]:\//u.test(pathname)) pathname = pathname.slice(1)
+    return pathname.replace(/\/$/u, "")
 }
 
 /**

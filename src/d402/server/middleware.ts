@@ -23,6 +23,15 @@ export interface D402MiddlewareOptions {
     recipient?: string
     /** Optional payment description */
     description?: string
+    /**
+     * Optional payer address the payment must come from. Can also be set per
+     * request via `req.d402Payer`, the way `recipient` can.
+     *
+     * Without it a proof is a bearer token: the proof is a transaction hash,
+     * transactions are public, and anyone who reads one can replay it as
+     * their own proof and take the access it paid for.
+     */
+    payer?: string
     /** Payment cache TTL in seconds (default: 300) */
     cacheTTL?: number
 }
@@ -33,6 +42,11 @@ export interface D402MiddlewareOptions {
 export interface D402Request {
     /** Merchant address (can be set dynamically per request) */
     d402Recipient?: string
+    /**
+     * Payer the payment must come from, per request — for example the
+     * address of the already-authenticated caller.
+     */
+    d402Payer?: string
     /** Verified payment details (available after middleware passes) */
     d402Payment?: {
         from: string
@@ -73,6 +87,8 @@ export function d402Required(options: D402MiddlewareOptions) {
 
             // Determine recipient address
             const recipient = options.recipient || req.d402Recipient
+            // And the payer, if this route pins one.
+            const payer = options.payer || req.d402Payer
 
             if (!recipient) {
                 return res.status(500).json({
@@ -86,7 +102,8 @@ export function d402Required(options: D402MiddlewareOptions) {
                     amount: options.amount,
                     recipient: recipient,
                     resourceId: options.resourceId,
-                    description: options.description
+                    description: options.description,
+                    payer: payer
                 }
 
                 const response = server.require(requirement)
@@ -107,7 +124,8 @@ export function d402Required(options: D402MiddlewareOptions) {
                 amount: options.amount,
                 recipient: recipient,
                 resourceId: options.resourceId,
-                description: options.description
+                description: options.description,
+                payer: payer
             }
 
             const isValid = server.validatePayment(verification, requirement)

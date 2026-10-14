@@ -9,7 +9,7 @@ import {
     prepareWeb2Step,
     prepareXMStep,
 } from "@/demoswork"
-import createTestScript from "@/demoswork/utils/createTestWorkScript"
+import createTestScript from "@/tests/utils/createTestWorkScript"
 import { EVM } from "@/multichain/websdk"
 import pprint from "@/utils/pprint"
 import { Demos, DemosWebAuth } from "@/websdk"

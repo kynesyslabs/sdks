@@ -66,6 +66,12 @@ export {
     NetworkUpgradePayload,
     NetworkUpgradeVoteTransaction,
     NetworkUpgradeVotePayload,
+    // Atomic DemosWork
+    AtomicWorkTransaction,
+    type AtomicWorkTransactionContent,
+    type AtomicWorkPayload,
+    type AtomicWorkEdit,
+    type AtomicWorkTransfer,
 } from "./blockchain/TransactionSubtypes/index.js"
 
 // L2PSEncryptedPayload removed to avoid circular dependency - import directly from @/l2ps
@@ -191,6 +197,9 @@ export {
     GCREditValidatorStake,
     GCREditNetworkUpgrade,
     GCREditNetworkUpgradeVote,
+    GCREditResourceSlot,
+    GCREditWorkAttempt,
+    GCREditStoragePut,
     Web2GCRData,
     XmGCRData,
     XmGCRIdentityData,
