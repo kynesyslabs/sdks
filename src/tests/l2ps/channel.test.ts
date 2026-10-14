@@ -557,3 +557,112 @@ describe("ChannelSession.sendOutgoing — concurrency (P1 regression)", () => {
         expect(seqs).toEqual([1, 2, 3, 4, 5])
     })
 })
+
+describe("ChannelSession — restart recovery (checkpoint/restore/close)", () => {
+    let alice: { demos: Demos; claim: ClaimReference }
+    let bob: { demos: Demos; claim: ClaimReference }
+
+    beforeEach(async () => {
+        alice = await newConnectedDemos()
+        bob = await newConnectedDemos()
+    })
+
+    it("resumes the sequence floor and transcript after a restart", async () => {
+        const reg = new InMemoryChannelIdRegistry()
+        const a1 = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+            channelIdRegistry: reg,
+        })
+        await a1.open()
+        await a1.sendOutgoing({ type: "offer", body: { x: 1 } })
+
+        const snap = a1.checkpoint()
+        expect(snap.highestSeen).toBe(1)
+        expect(snap.transcript).toHaveLength(1)
+        // The snapshot must survive a persist/reload round-trip unchanged.
+        expect(JSON.parse(JSON.stringify(snap))).toEqual(snap)
+
+        // Restart: same registry — restore must NOT re-register the channelId.
+        const a2 = ChannelSession.restore(snap, {
+            demos: alice.demos,
+            channelIdRegistry: reg,
+        })
+        expect(a2.messages()).toHaveLength(1)
+        const next = await a2.sendOutgoing({ type: "counter", body: { x: 2 } })
+        // Resumes at the floor: the next sequence is 2, no gap and no reuse.
+        expect(next.sequence).toBe(2)
+    })
+
+    it("a restored session still rejects a replay of an already-seen sequence", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        const b1 = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: bob.claim,
+            demos: bob.demos,
+        })
+        await a.open()
+        await b1.open()
+
+        const m1 = await a.sendOutgoing({ type: "offer", body: 1 })
+        const m2 = await a.sendOutgoing({ type: "offer", body: 2 })
+        await b1.receiveIncoming(m1)
+        await b1.receiveIncoming(m2)
+
+        const b2 = ChannelSession.restore(b1.checkpoint(), { demos: bob.demos })
+        await expect(b2.receiveIncoming(m1)).rejects.toThrow(/non-monotonic/)
+    })
+
+    it("restore does not re-register the channelId (a re-register would throw CH-6)", async () => {
+        const reg = new InMemoryChannelIdRegistry()
+        const a1 = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+            channelIdRegistry: reg,
+        })
+        await a1.open()
+        const snap = a1.checkpoint()
+        expect(() =>
+            ChannelSession.restore(snap, {
+                demos: alice.demos,
+                channelIdRegistry: reg,
+            }),
+        ).not.toThrow()
+    })
+
+    it("close() blocks further sends/receives but still checkpoints the final state", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        a.close()
+        await expect(
+            a.sendOutgoing({ type: "offer", body: 2 }),
+        ).rejects.toThrow(/closed/)
+        expect(a.checkpoint().highestSeen).toBe(1)
+    })
+
+    it("refuses to checkpoint a session that was never opened", () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        expect(() => a.checkpoint()).toThrow(/before open/)
+    })
+})

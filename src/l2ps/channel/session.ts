@@ -42,6 +42,27 @@ export interface ChannelSessionOpts {
 }
 
 /**
+ * A serializable snapshot of a `ChannelSession`'s runtime state, for
+ * restart recovery. It carries only plain-JSON data — the live `demos`
+ * client, the CH-6 registry, and the clock are NOT captured and must be
+ * re-supplied to `ChannelSession.restore()`. Persist one with
+ * `checkpoint()` as the session progresses; after a crash or restart,
+ * rebuild the session from the last persisted snapshot.
+ */
+export interface ChannelSessionSnapshot {
+    channelId: string
+    members: ClaimReference[]
+    me: ClaimReference
+    /** Highest sequence signed or accepted so far (anti-replay floor). */
+    highestSeen: number
+    /** Every message this session has signed or accepted, in order. */
+    transcript: ChannelMessage[]
+    /** Local CH-4 timestamps, in the clock units of the session that took it. */
+    openedAt: number
+    lastActivityAt: number
+}
+
+/**
  * Per-channel session — owns the monotonic sequence counter and applies
  * the four invariants from §8.3.3 / §8.12 on every message:
  *
@@ -62,6 +83,7 @@ export class ChannelSession {
     private readonly demos: Demos
     private readonly registry: ChannelIdRegistry | undefined
     private opened = false
+    private closed = false
     private highestSeen = 0
     private readonly transcript: ChannelMessage[] = []
     private readonly clock: () => number
@@ -98,6 +120,76 @@ export class ChannelSession {
         this.opened = true
         this.openedAt = this.clock()
         this.lastActivityAt = this.openedAt
+    }
+
+    /**
+     * Capture the session's runtime state for restart recovery. Persist the
+     * result (it is plain JSON) and rebuild from it with `restore()` after a
+     * crash. The transcript array is copied so later messages don't mutate an
+     * already-persisted snapshot. Allowed after `close()` so a final state can
+     * still be recorded.
+     */
+    checkpoint(): ChannelSessionSnapshot {
+        if (!this.opened)
+            throw new Error("ChannelSession: cannot checkpoint before open()")
+        return {
+            channelId: this.channelId,
+            members: [...this.members],
+            me: this.me,
+            highestSeen: this.highestSeen,
+            transcript: [...this.transcript],
+            openedAt: this.openedAt,
+            lastActivityAt: this.lastActivityAt,
+        }
+    }
+
+    /**
+     * Rebuild a session from a `checkpoint()` snapshot. The live `demos`
+     * client (and optionally the registry/clock) are re-injected — they are
+     * not part of the snapshot.
+     *
+     * Unlike `open()`, this does NOT register the channelId with the CH-6
+     * registry: the id was registered before the restart, and re-registering
+     * it would (correctly) throw as reuse. The restored session resumes at the
+     * exact sequence floor it had, so a replayed older message is still
+     * rejected.
+     */
+    static restore(
+        snapshot: ChannelSessionSnapshot,
+        opts: Omit<ChannelSessionOpts, "channelId" | "members" | "me">,
+    ): ChannelSession {
+        if (!snapshot || typeof snapshot !== "object")
+            throw new Error("ChannelSession.restore: snapshot required")
+        if (!Number.isInteger(snapshot.highestSeen) || snapshot.highestSeen < 0)
+            throw new Error(
+                `ChannelSession.restore: invalid highestSeen ${snapshot.highestSeen}`,
+            )
+        if (!Array.isArray(snapshot.transcript))
+            throw new Error("ChannelSession.restore: transcript must be an array")
+
+        const session = new ChannelSession({
+            channelId: snapshot.channelId,
+            members: snapshot.members,
+            me: snapshot.me,
+            demos: opts.demos,
+            channelIdRegistry: opts.channelIdRegistry,
+            now: opts.now,
+        })
+        session.opened = true
+        session.highestSeen = snapshot.highestSeen
+        session.transcript.push(...snapshot.transcript)
+        session.openedAt = snapshot.openedAt
+        session.lastActivityAt = snapshot.lastActivityAt
+        return session
+    }
+
+    /**
+     * Release the session. After `close()` no further `sendOutgoing()` or
+     * `receiveIncoming()` is allowed; `messages()` and `checkpoint()` still
+     * read the final record. Idempotent.
+     */
+    close(): void {
+        this.closed = true
     }
 
     /**
@@ -189,6 +281,8 @@ export class ChannelSession {
     }
 
     private assertOpened(): void {
+        if (this.closed)
+            throw new Error("ChannelSession: session is closed")
         if (!this.opened)
             throw new Error(
                 "ChannelSession: call open() before sending or receiving",
