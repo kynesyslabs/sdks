@@ -5,6 +5,7 @@ import {
     SealedEnvelopeSession,
     commitmentHex,
     finalizeSealedEnvelope,
+    signChannelMessage,
     type ChannelMessage,
     type ChannelSessionView,
     type RevealedBid,
@@ -80,6 +81,19 @@ async function resolvedAuction(stopAfter?: "reveal-a") {
     if (stopAfter === "reveal-a") return { alice, bob, aSes, aSeal, members }
     await bSeal.reveal()
     return { alice, bob, aSes, aSeal, members }
+}
+
+/** A properly signed envelope, so finalisation's signature check is exercised for real. */
+async function signedMsg(
+    from: { demos: Demos; claim: ClaimReference },
+    type: ChannelMessage["type"],
+    sequence: number,
+    body: unknown,
+): Promise<ChannelMessage> {
+    return signChannelMessage(
+        { channelId: CHANNEL, sequence, sender: from.claim, sentAt: 1000 + sequence, type, body },
+        from.demos,
+    )
 }
 
 const okAnchor =
@@ -234,22 +248,6 @@ describe("finalizeSealedEnvelope — transcript anchor on a resolved auction", (
 })
 
 describe("finalizeSealedEnvelope — the transcript must cryptographically back the outcome", () => {
-    const fakeMsg = (
-        type: ChannelMessage["type"],
-        sender: ClaimReference,
-        sequence: number,
-        body: unknown,
-    ): ChannelMessage =>
-        ({
-            channelId: CHANNEL,
-            sequence,
-            sender,
-            sentAt: 1000 + sequence,
-            type,
-            body,
-            signature: { sigVersion: "1", signature: "0x00" },
-        }) as ChannelMessage
-
     const fakeSession = (
         members: ClaimReference[],
         messages: ChannelMessage[],
@@ -263,8 +261,8 @@ describe("finalizeSealedEnvelope — the transcript must cryptographically back 
         const session = fakeSession(
             [alice.claim],
             [
-                fakeMsg("sealed-envelope-commit", alice.claim, 1, { commitment: "de".repeat(32) }),
-                fakeMsg("sealed-envelope-reveal", alice.claim, 2, { bid: { price: 90 }, salt: "aa" }),
+                await signedMsg(alice, "sealed-envelope-commit", 1, { commitment: "de".repeat(32) }),
+                await signedMsg(alice, "sealed-envelope-reveal", 2, { bid: { price: 90 }, salt: "aa" }),
             ],
         )
         const sealed: SealedEnvelopeLike = {
@@ -287,8 +285,8 @@ describe("finalizeSealedEnvelope — the transcript must cryptographically back 
         const session = fakeSession(
             [alice.claim],
             [
-                fakeMsg("sealed-envelope-commit", alice.claim, 1, { commitment: commitmentHex(bid, salt) }),
-                fakeMsg("sealed-envelope-reveal", alice.claim, 2, { bid, salt }),
+                await signedMsg(alice, "sealed-envelope-commit", 1, { commitment: commitmentHex(bid, salt) }),
+                await signedMsg(alice, "sealed-envelope-reveal", 2, { bid, salt }),
             ],
         )
         const sealed: SealedEnvelopeLike = {
@@ -306,7 +304,7 @@ describe("finalizeSealedEnvelope — the transcript must cryptographically back 
         const bob = await newConnectedDemos()
         const session = fakeSession(
             [alice.claim, bob.claim],
-            [fakeMsg("sealed-envelope-commit", alice.claim, 1, { commitment: "de".repeat(32) })],
+            [await signedMsg(alice, "sealed-envelope-commit", 1, { commitment: "de".repeat(32) })],
         )
         const sealed: SealedEnvelopeLike = {
             state: "closed",
@@ -321,7 +319,7 @@ describe("finalizeSealedEnvelope — the transcript must cryptographically back 
         const alice = await newConnectedDemos()
         const session = fakeSession(
             [alice.claim],
-            [fakeMsg("sealed-envelope-commit", alice.claim, 1, { commitment: "de".repeat(32) })],
+            [await signedMsg(alice, "sealed-envelope-commit", 1, { commitment: "de".repeat(32) })],
         )
         const sealed: SealedEnvelopeLike = {
             state: "closed",
@@ -444,16 +442,6 @@ describe("finalizeSealedEnvelope — the outcome must match the revealed bids", 
 })
 
 describe("finalizeSealedEnvelope — commits are scoped and ordered", () => {
-    const fakeMsg = (
-        type: ChannelMessage["type"],
-        sender: ClaimReference,
-        sequence: number,
-        body: unknown,
-    ): ChannelMessage =>
-        ({
-            channelId: CHANNEL, sequence, sender, sentAt: 1000 + sequence, type, body,
-            signature: { sigVersion: "1", signature: "0x00" },
-        }) as ChannelMessage
     const view = (members: ClaimReference[], messages: ChannelMessage[]): ChannelSessionView => ({
         channelId: CHANNEL, members, messages: () => messages,
     })
@@ -463,9 +451,9 @@ describe("finalizeSealedEnvelope — commits are scoped and ordered", () => {
     it("refuses two commits from one sender in the channel", async () => {
         const alice = await newConnectedDemos()
         const session = view([alice.claim], [
-            fakeMsg("sealed-envelope-commit", alice.claim, 1, { commitment: commitmentHex(bid, salt) }),
-            fakeMsg("sealed-envelope-commit", alice.claim, 2, { commitment: "de".repeat(32) }),
-            fakeMsg("sealed-envelope-reveal", alice.claim, 3, { bid, salt }),
+            await signedMsg(alice, "sealed-envelope-commit", 1, { commitment: commitmentHex(bid, salt) }),
+            await signedMsg(alice, "sealed-envelope-commit", 2, { commitment: "de".repeat(32) }),
+            await signedMsg(alice, "sealed-envelope-reveal", 3, { bid, salt }),
         ])
         const sealed: SealedEnvelopeLike = {
             state: "closed",
@@ -479,8 +467,8 @@ describe("finalizeSealedEnvelope — commits are scoped and ordered", () => {
     it("refuses a reveal that precedes its own commit", async () => {
         const alice = await newConnectedDemos()
         const session = view([alice.claim], [
-            fakeMsg("sealed-envelope-reveal", alice.claim, 1, { bid, salt }),
-            fakeMsg("sealed-envelope-commit", alice.claim, 2, { commitment: commitmentHex(bid, salt) }),
+            await signedMsg(alice, "sealed-envelope-reveal", 1, { bid, salt }),
+            await signedMsg(alice, "sealed-envelope-commit", 2, { commitment: commitmentHex(bid, salt) }),
         ])
         const sealed: SealedEnvelopeLike = {
             state: "closed",
@@ -495,9 +483,9 @@ describe("finalizeSealedEnvelope — commits are scoped and ordered", () => {
         const alice = await newConnectedDemos()
         const bob = await newConnectedDemos()
         const session = view([alice.claim, bob.claim], [
-            fakeMsg("sealed-envelope-commit", alice.claim, 1, { commitment: commitmentHex(bid, salt) }),
-            fakeMsg("sealed-envelope-reveal", alice.claim, 2, { bid, salt }),
-            fakeMsg("sealed-envelope-commit", bob.claim, 3, { commitment: "de".repeat(32) }),
+            await signedMsg(alice, "sealed-envelope-commit", 1, { commitment: commitmentHex(bid, salt) }),
+            await signedMsg(alice, "sealed-envelope-reveal", 2, { bid, salt }),
+            await signedMsg(bob, "sealed-envelope-commit", 3, { commitment: "de".repeat(32) }),
         ])
         const sealed: SealedEnvelopeLike = {
             state: "closed",
@@ -510,5 +498,69 @@ describe("finalizeSealedEnvelope — commits are scoped and ordered", () => {
         await expect(
             finalizeSealedEnvelope({ sealed, session, signer: alice.claim, demos: alice.demos, policy: "none" }),
         ).rejects.toThrow(/does not come after every commit/)
+    })
+})
+
+describe("finalizeSealedEnvelope — only verified messages are co-signed and anchored", () => {
+    const run = async (
+        mutate: (
+            msgs: ChannelMessage[],
+            ctx: { alice: { demos: Demos; claim: ClaimReference } },
+        ) => Promise<ChannelMessage[]> | ChannelMessage[],
+    ) => {
+        const { alice, aSes, aSeal } = await resolvedAuction()
+        const messages = await mutate([...aSes.messages()], { alice })
+        const session: ChannelSessionView = {
+            channelId: CHANNEL,
+            members: aSes.members,
+            messages: () => messages,
+        }
+        const captured: AnchorEncryptedTranscriptOpts[] = []
+        const call = finalizeSealedEnvelope({
+            sealed: aSeal, session, signer: alice.claim, demos: alice.demos,
+            l2ps: {} as never, policy: "encrypted-anchored-required",
+            compareBids: byPrice, anchor: okAnchor(captured),
+        })
+        return { call, captured }
+    }
+
+    it("refuses a message whose signed fields were altered", async () => {
+        // sentAt is covered by the signature but read by no other check, so only
+        // signature verification can notice it changed.
+        const { call, captured } = await run(msgs => {
+            msgs[0] = { ...msgs[0], sentAt: msgs[0].sentAt + 1 }
+            return msgs
+        })
+        await expect(call).rejects.toThrow(/invalid signature/)
+        expect(captured).toHaveLength(0)
+    })
+
+    it("refuses an unrelated message carrying a placeholder signature", async () => {
+        const { call, captured } = await run(msgs => {
+            const last = msgs[msgs.length - 1]
+            msgs.push({
+                channelId: CHANNEL, sequence: last.sequence + 1, sender: last.sender,
+                sentAt: 1, type: "abort", body: {},
+                signature: { sigVersion: "1", signature: "0x00" },
+            } as ChannelMessage)
+            return msgs
+        })
+        await expect(call).rejects.toThrow(/invalid signature/)
+        expect(captured).toHaveLength(0)
+    })
+
+    it("refuses a validly signed message from a non-member", async () => {
+        const outsider = await newConnectedDemos()
+        const { call } = await run(async msgs => {
+            const last = msgs[msgs.length - 1]
+            msgs.push(await signedMsg(outsider, "abort", last.sequence + 1, {}))
+            return msgs
+        })
+        await expect(call).rejects.toThrow(/non-member/)
+    })
+
+    it("refuses messages that are not strictly ordered", async () => {
+        const { call } = await run(msgs => [msgs[1], msgs[0], ...msgs.slice(2)])
+        await expect(call).rejects.toThrow(/not strictly ordered|not after seq/)
     })
 })

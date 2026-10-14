@@ -27,6 +27,7 @@ import type {
 } from "../anchor"
 import { anchorEncryptedTranscript } from "../anchor"
 import { exportTranscript } from "./transcript"
+import { verifyChannelMessage } from "./envelope"
 import type { ChannelTranscript } from "./types"
 import type { ChannelSessionView } from "./finalize"
 import { canonicalJSONStringify } from "@/websdk/utils/canonicalJson"
@@ -120,6 +121,34 @@ export async function finalizeSealedEnvelope(
     // real reveal sequence with an unrelated commit and still produce a
     // transcript that verifies while proving nothing about the sealed bid.
     const messages = opts.session.messages()
+
+    // The transcript is co-signed and anchored as evidence, and every check
+    // below reads message bodies — so a forged or foreign message must be
+    // refused before any of them is believed. `session` is a structural input
+    // and carries no guarantee that its messages were ever verified.
+    let lastSeq = 0
+    for (const m of messages) {
+        if (m.channelId !== opts.session.channelId)
+            throw new Error(
+                `finalizeSealedEnvelope: message seq ${m.sequence} belongs to channel "${m.channelId}", ` +
+                    `not "${opts.session.channelId}"`,
+            )
+        if (!opts.session.members.includes(m.sender))
+            throw new Error(
+                `finalizeSealedEnvelope: message seq ${m.sequence} is from non-member ${m.sender}`,
+            )
+        if (!verifyChannelMessage(m))
+            throw new Error(
+                `finalizeSealedEnvelope: message seq ${m.sequence} from ${m.sender} has an ` +
+                    "invalid signature — refusing to sign or anchor it",
+            )
+        if (m.sequence <= lastSeq)
+            throw new Error(
+                `finalizeSealedEnvelope: message seq ${m.sequence} is not after seq ${lastSeq} — ` +
+                    "the transcript is not strictly ordered",
+            )
+        lastSeq = m.sequence
+    }
 
     // One sealed auction per channel: the session carries no auction id or
     // sequence range, so the channel IS the auction's scope. A second commit
