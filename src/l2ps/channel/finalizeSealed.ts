@@ -120,10 +120,36 @@ export async function finalizeSealedEnvelope(
     // real reveal sequence with an unrelated commit and still produce a
     // transcript that verifies while proving nothing about the sealed bid.
     const messages = opts.session.messages()
-    const commitOf = (participant: ClaimReference): ChannelMessage | undefined =>
-        messages.find(
-            m => m.type === "sealed-envelope-commit" && m.sender === participant,
+
+    // One sealed auction per channel: the session carries no auction id or
+    // sequence range, so the channel IS the auction's scope. A second commit
+    // from the same sender would be a second auction (or a replaced bid) whose
+    // reveal could be paired with whichever commit suits the outcome — reject it
+    // rather than guess which one counts.
+    const commits = new Map<ClaimReference, ChannelMessage>()
+    let lastCommitSeq = 0
+    let firstRevealSeq = Infinity
+    for (const m of messages) {
+        if (m.type === "sealed-envelope-commit") {
+            if (commits.has(m.sender))
+                throw new Error(
+                    `finalizeSealedEnvelope: ${m.sender} committed more than once — ` +
+                        "a channel carries a single sealed auction",
+                )
+            commits.set(m.sender, m)
+            lastCommitSeq = Math.max(lastCommitSeq, m.sequence)
+        } else if (m.type === "sealed-envelope-reveal") {
+            firstRevealSeq = Math.min(firstRevealSeq, m.sequence)
+        }
+    }
+    // The fairness rule: no bid may be opened while another is still unsealed.
+    if (firstRevealSeq <= lastCommitSeq)
+        throw new Error(
+            `finalizeSealedEnvelope: a reveal (seq ${firstRevealSeq}) does not come after every ` +
+                `commit (last at seq ${lastCommitSeq}) — bids were opened before all were sealed`,
         )
+    const commitOf = (participant: ClaimReference): ChannelMessage | undefined =>
+        commits.get(participant)
 
     const outcome = opts.sealed.outcome()
 
@@ -191,6 +217,20 @@ export async function finalizeSealedEnvelope(
                     "transcript's revealed bids — session mismatch",
             )
     }
+
+    // Every sealed bid in the record must be accounted for. Without this, an
+    // outcome could simply leave a committer out and crown a winner from the
+    // bidders that remain.
+    const accounted = new Set<ClaimReference>([
+        ...outcome.reveals.map(r => r.participant),
+        ...(outcome.disqualified ?? []),
+    ])
+    for (const committer of commits.keys())
+        if (!accounted.has(committer))
+            throw new Error(
+                `finalizeSealedEnvelope: ${committer} committed but is neither revealed nor ` +
+                    "disqualified in the outcome — session mismatch",
+            )
 
     // An all-defaulted auction's evidence IS the commits: every disqualified
     // participant committed and then failed to open. Without their commits in
