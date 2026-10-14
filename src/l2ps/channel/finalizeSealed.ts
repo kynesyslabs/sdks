@@ -150,11 +150,7 @@ export async function finalizeSealedEnvelope(
 
     // A closed auction with neither a valid reveal nor a disqualified committer
     // has no bids to anchor; refuse rather than sign an empty record.
-    if (
-        opts.sealed.state === "closed" &&
-        outcome.reveals.length === 0 &&
-        (outcome.disqualified?.length ?? 0) === 0
-    )
+    if (outcome.reveals.length === 0 && (outcome.disqualified?.length ?? 0) === 0)
         throw new Error(
             "finalizeSealedEnvelope: closed auction has no reveals and no disqualified " +
                 "committers — there is nothing to anchor",
