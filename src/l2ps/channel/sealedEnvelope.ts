@@ -93,9 +93,11 @@ export function selectWinner(
     compareBids: (a: RevealedBid, b: RevealedBid) => number,
 ): RevealedBid | undefined {
     const ordered = [...reveals].sort((a, b) => a.sequence - b.sequence)
-    return ordered.length
-        ? ordered.reduce((best, r) => (compareBids(r, best) > 0 ? r : best))
-        : undefined
+    let best: RevealedBid | undefined
+    for (const reveal of ordered) {
+        if (best === undefined || compareBids(reveal, best) > 0) best = reveal
+    }
+    return best
 }
 
 export interface SealedEnvelopeOutcome {
