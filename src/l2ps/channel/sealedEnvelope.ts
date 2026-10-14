@@ -138,8 +138,8 @@ export interface SealedEnvelopeSessionOpts {
     /**
      * Optional winner rule over valid reveals. Positive → `a` beats `b`
      * (highest wins); the session picks the maximum. Ties resolve to the
-     * lower channel sequence (the bid revealed first on the wire). Absent → no winner is chosen; the caller ranks
-     * `outcome.reveals` itself.
+     * lower channel sequence (the bid revealed first on the wire). Absent → no
+     * winner is chosen; the caller ranks `outcome.reveals` itself.
      */
     compareBids?: (a: RevealedBid, b: RevealedBid) => number
     /** Fired on every phase/state transition. */

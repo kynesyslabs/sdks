@@ -544,7 +544,7 @@ describe("finalizeSealedEnvelope — the outcome must match the revealed bids", 
     })
 })
 
-describe("finalizeSealedEnvelope — commit scoping, stray messages and completeness", () => {
+describe("finalizeSealedEnvelope — commit window, stray messages and completeness", () => {
     const view = (members: ClaimReference[], messages: ChannelMessage[]): ChannelSessionView => ({
         channelId: CHANNEL, members, messages: () => messages,
     })
@@ -567,25 +567,11 @@ describe("finalizeSealedEnvelope — commit scoping, stray messages and complete
         }),
     })
 
-    it("ignores a repeat commit from one sender: the first is binding", async () => {
+    it("refuses a second commit from one sender", async () => {
         const alice = await newConnectedDemos()
         const session = view([alice.claim], [
             await commitMsg(alice, 1),
             await commitMsg(alice, 2, "de".repeat(32)),
-            await revealMsg(alice, 3),
-        ])
-        const res = await finalizeSealedEnvelope({
-            sealed: closed([{ participant: alice.claim, sequence: 3 }]),
-            session, signer: alice.claim, demos: alice.demos, policy: "none",
-        })
-        expect(res.transcript.messages).toHaveLength(3)
-    })
-
-    it("a repeat commit never backs a reveal the first commit does not open", async () => {
-        const alice = await newConnectedDemos()
-        const session = view([alice.claim], [
-            await commitMsg(alice, 1, "de".repeat(32)),
-            await commitMsg(alice, 2), // would open, but is not the binding commit
             await revealMsg(alice, 3),
         ])
         await expect(
@@ -593,38 +579,51 @@ describe("finalizeSealedEnvelope — commit scoping, stray messages and complete
                 sealed: closed([{ participant: alice.claim, sequence: 3 }]),
                 session, signer: alice.claim, demos: alice.demos, policy: "none",
             }),
-        ).rejects.toThrow(/does not open the commit/)
+        ).rejects.toThrow(/committed more than once/)
     })
 
-    it("ignores a commit sequenced after the first reveal", async () => {
+    it("refuses commits that follow an early reveal, even if they never reveal", async () => {
+        // The shape that would crown an uncontested winner if stragglers were
+        // exempted: alice seals and opens first, bob and carol commit after and
+        // then stay silent.
         const alice = await newConnectedDemos()
         const bob = await newConnectedDemos()
-        const session = view([alice.claim, bob.claim], [
+        const carol = await newConnectedDemos()
+        const session = view([alice.claim, bob.claim, carol.claim], [
             await commitMsg(alice, 1),
             await revealMsg(alice, 2),
-            await commitMsg(bob, 3), // straggler: not a binding commitment
-        ])
-        const res = await finalizeSealedEnvelope({
-            sealed: closed([{ participant: alice.claim, sequence: 2 }]),
-            session, signer: alice.claim, demos: alice.demos, policy: "none",
-        })
-        expect(res.transcript.messages).toHaveLength(3)
-    })
-
-    it("a straggler commit cannot back a disqualification", async () => {
-        const alice = await newConnectedDemos()
-        const bob = await newConnectedDemos()
-        const session = view([alice.claim, bob.claim], [
-            await commitMsg(alice, 1),
-            await revealMsg(alice, 2),
-            await commitMsg(bob, 3),
+            await commitMsg(bob, 3, "de".repeat(32)),
+            await commitMsg(carol, 4, "ad".repeat(32)),
         ])
         await expect(
             finalizeSealedEnvelope({
-                sealed: closed([{ participant: alice.claim, sequence: 2 }], [bob.claim]),
+                sealed: closed([{ participant: alice.claim, sequence: 2 }]),
                 session, signer: alice.claim, demos: alice.demos, policy: "none",
             }),
-        ).rejects.toThrow(/has no commit/)
+        ).rejects.toThrow(/comes after the first reveal/)
+        // Listing them as disqualified does not make the record acceptable.
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: closed([{ participant: alice.claim, sequence: 2 }], [bob.claim, carol.claim]),
+                session, signer: alice.claim, demos: alice.demos, policy: "none",
+            }),
+        ).rejects.toThrow(/comes after the first reveal/)
+    })
+
+    it("refuses commits that follow a garbage early reveal", async () => {
+        const alice = await newConnectedDemos()
+        const bob = await newConnectedDemos()
+        const session = view([alice.claim, bob.claim], [
+            await commitMsg(alice, 1),
+            await signedMsg(alice, "sealed-envelope-reveal", 2, { bid, salt: "00" }), // opens nothing
+            await commitMsg(bob, 3, "de".repeat(32)),
+        ])
+        await expect(
+            finalizeSealedEnvelope({
+                sealed: closed([], [alice.claim, bob.claim]),
+                session, signer: alice.claim, demos: alice.demos, policy: "none",
+            }),
+        ).rejects.toThrow(/comes after the first reveal/)
     })
 
     it("refuses a reveal whose commit only comes after it", async () => {
@@ -638,7 +637,7 @@ describe("finalizeSealedEnvelope — commit scoping, stray messages and complete
                 sealed: closed([{ participant: alice.claim, sequence: 1 }]),
                 session, signer: alice.claim, demos: alice.demos, policy: "none",
             }),
-        ).rejects.toThrow(/no binding commit/)
+        ).rejects.toThrow(/comes after the first reveal/)
     })
 
     it("refuses a reveal from a member who never committed", async () => {
@@ -654,7 +653,7 @@ describe("finalizeSealedEnvelope — commit scoping, stray messages and complete
                 sealed: closed([{ participant: alice.claim, sequence: 3 }]),
                 session, signer: alice.claim, demos: alice.demos, policy: "none",
             }),
-        ).rejects.toThrow(/who has no binding commit/)
+        ).rejects.toThrow(/who has no commit/)
     })
 
     it("refuses a second reveal from one sender", async () => {
@@ -672,7 +671,7 @@ describe("finalizeSealedEnvelope — commit scoping, stray messages and complete
         ).rejects.toThrow(/revealed more than once/)
     })
 
-    it("refuses a binding committer that the outcome does not account for", async () => {
+    it("refuses a committer that the outcome does not account for", async () => {
         const alice = await newConnectedDemos()
         const bob = await newConnectedDemos()
         const session = view([alice.claim, bob.claim], [

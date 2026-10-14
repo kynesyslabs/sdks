@@ -8,6 +8,10 @@
   transcript (pass `compareBids` to verify a winner), verifies every message,
   and refuses an outcome the transcript does not back. `selectWinner` exposes
   the shared winner rule.
+  Follow-up: finalisation fails closed on a commit after the first reveal, a
+  repeat commit, a stray or repeat reveal, and any abort, so one member can
+  block anchoring; honest deadline-close auctions with a straggler cannot be
+  anchored until the protocol carries a signed close marker.
 
 ### Fixed
 - `SealedEnvelopeSession` refuses a second reveal from a sender whose first
