@@ -27,12 +27,11 @@
 
 ### Cryptography
 - @noble/curves, @noble/hashes, @noble/post-quantum
-- libsodium-wrappers-sumo, node-forge, node-seal
-- falcon-js, mlkem, ntru, sphincs, superdilithium
+- node-forge, node-seal
+- falcon-sign (Falcon), @noble/post-quantum (ML-DSA, ML-KEM), superdilithium
 
 ### Bridge & Integration
-- rubic-sdk for bridge operations
-- @simplewebauthn for authentication
+- rubic-sdk for bridge operations (optional, bridge/rubic subpath only)
 - axios for HTTP requests
 - socket.io-client for real-time communication
 
