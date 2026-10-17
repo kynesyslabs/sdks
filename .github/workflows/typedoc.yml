@@ -35,9 +35,20 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
+      - name: Configure deploy key
+        env:
+          DEPLOY_KEY: ${{ secrets.API_DOCS_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          git config --global core.sshCommand "ssh -F /dev/null -i $HOME/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o GlobalKnownHostsFile=/dev/null -o HostName=github.com -o Port=22"
+
       - name: Clone target repository
         run: |
-          git clone https://${{ secrets.API_DOCS_PAT }}@github.com/${{ github.repository_owner }}/demosdk-api-ref.git target_repo
+          git clone git@github.com:${{ github.repository_owner }}/demosdk-api-ref.git target_repo
 
       - name: Copy docs to target repository
         run: |
