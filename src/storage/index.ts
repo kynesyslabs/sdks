@@ -1,4 +1,6 @@
 export { StorageProgram } from "./StorageProgram"
+export { StorageProgramProvider } from "./StorageProgramProvider"
+export type { DemosWalletProvider } from "./StorageProgramProvider"
 export type { StorageProgramData, StorageProgramListItem } from "./StorageProgram"
 export type {
     // Operations and encoding
