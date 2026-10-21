@@ -80,11 +80,24 @@ export class ChannelSession {
     readonly channelId: string
     readonly members: ReadonlyArray<ClaimReference>
     readonly me: ClaimReference
+    /**
+     * Highest sequence this session has signed or accepted — the anti-replay
+     * floor. Exposed so a transport can resume from a RESTORED session's
+     * position: `L2PSChannelTransport` seeds its contiguous-apply counter from
+     * this, otherwise a restored session would wait forever for sequence 1.
+     */
+    get highestSequence(): number {
+        return this.highestSeen
+    }
     private readonly demos: Demos
     private readonly registry: ChannelIdRegistry | undefined
     private opened = false
     private closed = false
     private highestSeen = 0
+    /** In-flight `sendOutgoing()` calls — a checkpoint during one would be
+     * non-final (the sequence is reserved but the signed message not yet
+     * recorded), so `checkpoint()` refuses while this is non-zero. */
+    private pendingSends = 0
     private readonly transcript: ChannelMessage[] = []
     private readonly clock: () => number
     /** Local times — CH-4 is measured on what THIS member observed, never on
@@ -132,6 +145,14 @@ export class ChannelSession {
     checkpoint(): ChannelSessionSnapshot {
         if (!this.opened)
             throw new Error("ChannelSession: cannot checkpoint before open()")
+        // A send in flight has already reserved its sequence (`++highestSeen`)
+        // but not yet appended the signed message. Snapshotting here would
+        // persist the advanced floor without the message, or — if restored —
+        // let that sequence be reused. Refuse until the send settles.
+        if (this.pendingSends > 0)
+            throw new Error(
+                "ChannelSession: cannot checkpoint while a send is in flight",
+            )
         return {
             channelId: this.channelId,
             members: [...this.members],
@@ -237,10 +258,17 @@ export class ChannelSession {
                 refs: { repliesTo: opts.repliesTo },
             }),
         }
-        const signed = await signChannelMessage(unsigned, this.demos)
-        this.transcript.push(signed)
-        this.lastActivityAt = this.clock()
-        return signed
+        // Mark the send in flight across the signing await so a concurrent
+        // checkpoint() refuses rather than persisting a non-final state.
+        this.pendingSends++
+        try {
+            const signed = await signChannelMessage(unsigned, this.demos)
+            this.transcript.push(signed)
+            this.lastActivityAt = this.clock()
+            return signed
+        } finally {
+            this.pendingSends--
+        }
     }
 
     /**

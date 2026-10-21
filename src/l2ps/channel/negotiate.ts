@@ -127,6 +127,10 @@ export class RfqSession {
 
     private _state: RfqState = "open"
     private _closed = false
+    /** In-flight `sendFn` calls. A checkpoint while one is pending would be
+     * non-final: the message was emitted to the peer but the local state not
+     * yet settled, so a restore from it could re-drive and reuse a sequence. */
+    private _pending = 0
     private _standing: StandingProposal | null = null
     /** Every proposal seen, by sequence — so `accept` can resolve its terms. */
     private readonly proposals = new Map<number, StandingProposal>()
@@ -167,6 +171,14 @@ export class RfqSession {
      * Allowed after `close()` so a final state can still be recorded.
      */
     checkpoint(): RfqSessionSnapshot {
+        // A send in flight has already reached the peer but not yet settled
+        // locally. Snapshotting here would persist an "open" negotiation the
+        // peer already sees as accepted/ended; a restore would re-drive it and
+        // mint a duplicate message at a reused sequence. Refuse until it settles.
+        if (this._pending > 0)
+            throw new Error(
+                "RfqSession: cannot checkpoint while a send is in flight",
+            )
         return {
             ...(this.channelId !== undefined && { channelId: this.channelId }),
             ...(this.members !== undefined && { members: [...this.members] }),
@@ -254,7 +266,7 @@ export class RfqSession {
             )
         const accepted = this._standing
         const body: RfqAcceptBody = { acceptedSequence: accepted.sequence }
-        const msg = await this.sendFn({
+        const msg = await this.trackSend({
             type: "accept",
             body,
             repliesTo: accepted.sequence,
@@ -267,7 +279,7 @@ export class RfqSession {
     async reject(reason?: string): Promise<ChannelMessage> {
         this.assertOpen("reject")
         const body: RfqEndBody = reason ? { reason } : {}
-        const msg = await this.sendFn({ type: "reject", body })
+        const msg = await this.trackSend({ type: "reject", body })
         this.settle({ state: "rejected", reason })
         return msg
     }
@@ -276,7 +288,7 @@ export class RfqSession {
     async abort(reason?: string): Promise<ChannelMessage> {
         this.assertOpen("abort")
         const body: RfqEndBody = reason ? { reason } : {}
-        const msg = await this.sendFn({ type: "abort", body })
+        const msg = await this.trackSend({ type: "abort", body })
         this.settle({ state: "aborted", reason })
         return msg
     }
@@ -383,7 +395,7 @@ export class RfqSession {
         repliesTo?: number,
     ): Promise<ChannelMessage> {
         const body: RfqProposalBody = { terms }
-        const msg = await this.sendFn({ type, body, repliesTo })
+        const msg = await this.trackSend({ type, body, repliesTo })
         if (this.channelId && msg.channelId !== this.channelId)
             throw new Error("RfqSession: proposal changed channel")
         if (!sameRfqMembers([msg.sender], [this.me]))
@@ -442,6 +454,26 @@ export class RfqSession {
         this._state = outcome.state
         this._outcome = outcome
         this.onStateChange?.(outcome)
+    }
+
+    /**
+     * Deliver through `sendFn` while counting the call as in-flight, so a
+     * `checkpoint()` taken across the await refuses rather than persisting a
+     * state the peer has already moved past. The state mutation that follows
+     * each send runs synchronously after the await, so it is atomic with the
+     * counter dropping back to zero.
+     */
+    private async trackSend(opts: {
+        type: ChannelMessageType
+        body: unknown
+        repliesTo?: number
+    }): Promise<ChannelMessage> {
+        this._pending++
+        try {
+            return await this.sendFn(opts)
+        } finally {
+            this._pending--
+        }
     }
 
     private assertOpen(action: string): void {

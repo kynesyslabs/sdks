@@ -325,6 +325,45 @@ describe("RfqSession — restart recovery (checkpoint/restore/close)", () => {
         )
     })
 
+    it("refuses a checkpoint while a send is in flight (no reused sequence on restore)", async () => {
+        let release!: () => void
+        const gate = new Promise<void>(resolve => {
+            release = resolve
+        })
+        const out: ChannelMessage[] = []
+        let seq = 100
+        const a = new RfqSession({
+            channelId: "ch",
+            members: [A, B],
+            me: A,
+            send: async opts => {
+                await gate // stay pending until released
+                const msg = {
+                    channelId: "ch",
+                    sequence: ++seq,
+                    sender: A,
+                    sentAt: seq,
+                    type: opts.type,
+                    body: opts.body,
+                    signature: { sigVersion: "1", signature: "0xout" + seq },
+                } as ChannelMessage
+                out.push(msg)
+                return msg
+            },
+        })
+
+        const pending = a.offer({ x: 1 }) // send is awaiting the gate
+        // The negotiation hasn't settled locally but the message is on its way,
+        // so a checkpoint now would be non-final — it must refuse.
+        expect(() => a.checkpoint()).toThrow(/send is in flight/)
+
+        release()
+        await pending
+        // Once the send settles, a checkpoint is allowed and is final.
+        expect(() => a.checkpoint()).not.toThrow()
+        expect(a.standingProposal?.sequence).toBe(101)
+    })
+
     it("close() blocks further actions and ignores inbound traffic", async () => {
         const b = new RfqSession({
             channelId: "ch",

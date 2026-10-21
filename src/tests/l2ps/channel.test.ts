@@ -656,6 +656,25 @@ describe("ChannelSession — restart recovery (checkpoint/restore/close)", () =>
         expect(a.checkpoint().highestSeen).toBe(1)
     })
 
+    it("refuses a checkpoint while a send is in flight", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        // sendOutgoing reserves the sequence synchronously, then awaits signing.
+        // A checkpoint across that window would persist the advanced floor
+        // without the signed message (or let the sequence be reused on
+        // restore), so it must refuse until the send settles.
+        const pending = a.sendOutgoing({ type: "offer", body: 1 })
+        expect(() => a.checkpoint()).toThrow(/send is in flight/)
+        await pending
+        expect(a.checkpoint().highestSeen).toBe(1)
+        expect(a.checkpoint().transcript).toHaveLength(1)
+    })
+
     it("refuses to checkpoint a session that was never opened", () => {
         const a = new ChannelSession({
             channelId: CHANNEL,
