@@ -42,6 +42,34 @@ export interface ChannelSessionOpts {
 }
 
 /**
+ * A serializable snapshot of a `ChannelSession`'s runtime state, for
+ * restart recovery. It carries only plain-JSON data — the live `demos`
+ * client, the CH-6 registry, and the clock are NOT captured and must be
+ * re-supplied to `ChannelSession.restore()`. Persist one with
+ * `checkpoint()` as the session progresses; after a crash or restart,
+ * rebuild the session from the last persisted snapshot.
+ */
+export interface ChannelSessionSnapshot {
+    channelId: string
+    members: ClaimReference[]
+    me: ClaimReference
+    /** Highest sequence signed or accepted so far (anti-replay floor). */
+    highestSeen: number
+    /** Every message this session has signed or accepted, in order. */
+    transcript: ChannelMessage[]
+    /** Local CH-4 timestamps, in the clock units of the session that took it. */
+    openedAt: number
+    lastActivityAt: number
+    /**
+     * Whether the session was closed when the snapshot was taken. A closed
+     * session must restore as closed — otherwise a crash right after `close()`
+     * would re-open a finished negotiation. Optional for backward compatibility
+     * with snapshots taken before this field existed (treated as not closed).
+     */
+    closed?: boolean
+}
+
+/**
  * Per-channel session — owns the monotonic sequence counter and applies
  * the four invariants from §8.3.3 / §8.12 on every message:
  *
@@ -59,10 +87,24 @@ export class ChannelSession {
     readonly channelId: string
     readonly members: ReadonlyArray<ClaimReference>
     readonly me: ClaimReference
+    /**
+     * Highest sequence this session has signed or accepted — the anti-replay
+     * floor. Exposed so a transport can resume from a RESTORED session's
+     * position: `L2PSChannelTransport` seeds its contiguous-apply counter from
+     * this, otherwise a restored session would wait forever for sequence 1.
+     */
+    get highestSequence(): number {
+        return this.highestSeen
+    }
     private readonly demos: Demos
     private readonly registry: ChannelIdRegistry | undefined
     private opened = false
+    private closed = false
     private highestSeen = 0
+    /** In-flight `sendOutgoing()` calls — a checkpoint during one would be
+     * non-final (the sequence is reserved but the signed message not yet
+     * recorded), so `checkpoint()` refuses while this is non-zero. */
+    private pendingSends = 0
     private readonly transcript: ChannelMessage[] = []
     private readonly clock: () => number
     /** Local times — CH-4 is measured on what THIS member observed, never on
@@ -98,6 +140,130 @@ export class ChannelSession {
         this.opened = true
         this.openedAt = this.clock()
         this.lastActivityAt = this.openedAt
+    }
+
+    /**
+     * Capture the session's runtime state for restart recovery. Persist the
+     * result (it is plain JSON) and rebuild from it with `restore()` after a
+     * crash. The transcript array is copied so later messages don't mutate an
+     * already-persisted snapshot. Allowed after `close()` so a final state can
+     * still be recorded.
+     */
+    checkpoint(): ChannelSessionSnapshot {
+        if (!this.opened)
+            throw new Error("ChannelSession: cannot checkpoint before open()")
+        // A send in flight has already reserved its sequence (`++highestSeen`)
+        // but not yet appended the signed message. Snapshotting here would
+        // persist the advanced floor without the message, or — if restored —
+        // let that sequence be reused. Refuse until the send settles.
+        if (this.pendingSends > 0)
+            throw new Error(
+                "ChannelSession: cannot checkpoint while a send is in flight",
+            )
+        return {
+            channelId: this.channelId,
+            members: [...this.members],
+            me: this.me,
+            highestSeen: this.highestSeen,
+            transcript: [...this.transcript],
+            openedAt: this.openedAt,
+            lastActivityAt: this.lastActivityAt,
+            closed: this.closed,
+        }
+    }
+
+    /**
+     * Rebuild a session from a `checkpoint()` snapshot. The live `demos`
+     * client (and optionally the registry/clock) are re-injected — they are
+     * not part of the snapshot.
+     *
+     * Unlike `open()`, this does NOT register the channelId with the CH-6
+     * registry: the id was registered before the restart, and re-registering
+     * it would (correctly) throw as reuse. The restored session resumes at the
+     * exact sequence floor it had, so a replayed older message is still
+     * rejected.
+     *
+     * The persisted snapshot is UNTRUSTED: a tampered store could inject
+     * messages the session would then co-sign on (e.g. via `finalizeRfq`).
+     * Every transcript entry is therefore re-validated here exactly as
+     * `receiveIncoming` validates a live message — channelId, membership,
+     * monotonic sequence, and signature — and the recorded `highestSeen` must
+     * cover the highest transcript sequence. Any mismatch refuses the restore.
+     */
+    static restore(
+        snapshot: ChannelSessionSnapshot,
+        opts: Omit<ChannelSessionOpts, "channelId" | "members" | "me">,
+    ): ChannelSession {
+        if (!snapshot || typeof snapshot !== "object")
+            throw new Error("ChannelSession.restore: snapshot required")
+        if (!Number.isInteger(snapshot.highestSeen) || snapshot.highestSeen < 0)
+            throw new Error(
+                `ChannelSession.restore: invalid highestSeen ${snapshot.highestSeen}`,
+            )
+        if (!Array.isArray(snapshot.transcript))
+            throw new Error("ChannelSession.restore: transcript must be an array")
+
+        const session = new ChannelSession({
+            channelId: snapshot.channelId,
+            members: snapshot.members,
+            me: snapshot.me,
+            demos: opts.demos,
+            channelIdRegistry: opts.channelIdRegistry,
+            now: opts.now,
+        })
+
+        // Re-validate the persisted transcript before trusting it. Same checks
+        // as receiveIncoming, applied in order so the sequence floor rises the
+        // same way it did live — a tampered entry is rejected, not replayed.
+        let maxSeq = 0
+        for (const msg of snapshot.transcript) {
+            if (!msg || typeof msg !== "object")
+                throw new Error(
+                    "ChannelSession.restore: transcript entry is not a message",
+                )
+            if (msg.channelId !== session.channelId)
+                throw new Error(
+                    `ChannelSession.restore: transcript channelId mismatch (expected ${session.channelId}, got ${msg.channelId})`,
+                )
+            if (!isSenderInMembers(msg, session.members))
+                throw new Error(
+                    `ChannelSession.restore: transcript sender "${msg.sender}" not in members (CH-1)`,
+                )
+            if (!Number.isInteger(msg.sequence) || msg.sequence < 1)
+                throw new Error(
+                    `ChannelSession.restore: invalid transcript sequence ${msg.sequence}`,
+                )
+            if (msg.sequence <= maxSeq)
+                throw new Error(
+                    `ChannelSession.restore: non-monotonic transcript sequence ${msg.sequence} (prior ${maxSeq})`,
+                )
+            if (!verifyChannelMessage(msg))
+                throw new Error(
+                    `ChannelSession.restore: transcript signature verification failed at sequence ${msg.sequence}`,
+                )
+            maxSeq = msg.sequence
+        }
+        if (snapshot.highestSeen < maxSeq)
+            throw new Error(
+                `ChannelSession.restore: highestSeen ${snapshot.highestSeen} below highest transcript sequence ${maxSeq}`,
+            )
+
+        session.opened = true
+        session.closed = snapshot.closed === true
+        session.highestSeen = snapshot.highestSeen
+        session.transcript.push(...snapshot.transcript)
+        session.openedAt = snapshot.openedAt
+        session.lastActivityAt = snapshot.lastActivityAt
+        return session
+    }
+
+    /**
+     * Release the session. After `close()` no further `sendOutgoing()` or
+     * `receiveIncoming()` is allowed; `messages()` and `checkpoint()` still
+     * read the final record. Idempotent.
+     */
+    close(): void {
+        this.closed = true
     }
 
     /**
@@ -145,10 +311,17 @@ export class ChannelSession {
                 refs: { repliesTo: opts.repliesTo },
             }),
         }
-        const signed = await signChannelMessage(unsigned, this.demos)
-        this.transcript.push(signed)
-        this.lastActivityAt = this.clock()
-        return signed
+        // Mark the send in flight across the signing await so a concurrent
+        // checkpoint() refuses rather than persisting a non-final state.
+        this.pendingSends++
+        try {
+            const signed = await signChannelMessage(unsigned, this.demos)
+            this.transcript.push(signed)
+            this.lastActivityAt = this.clock()
+            return signed
+        } finally {
+            this.pendingSends--
+        }
     }
 
     /**
@@ -189,6 +362,8 @@ export class ChannelSession {
     }
 
     private assertOpened(): void {
+        if (this.closed)
+            throw new Error("ChannelSession: session is closed")
         if (!this.opened)
             throw new Error(
                 "ChannelSession: call open() before sending or receiving",

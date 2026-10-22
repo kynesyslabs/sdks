@@ -239,3 +239,162 @@ describe("RfqSession — negotiate-rfq state machine", () => {
         expect(bSes.standingProposal?.terms).toEqual(terms)
     })
 })
+
+describe("RfqSession — restart recovery (checkpoint/restore/close)", () => {
+    const offerFromA = (
+        seq = 1,
+        terms: unknown = { sku: "X", qty: 2 },
+    ): ChannelMessage =>
+        ({
+            channelId: "ch",
+            sequence: seq,
+            sender: A,
+            sentAt: 1000 + seq,
+            type: "offer",
+            body: { terms },
+            signature: { sigVersion: "1", signature: "0xsig" + seq },
+        }) as ChannelMessage
+
+    // A `send` that records what it was asked to emit, minting a plausible
+    // outbound envelope on `me`'s behalf (the channel layer is out of scope).
+    const recordingSend =
+        (me: ClaimReference, seqStart = 100, into: ChannelMessage[] = []) =>
+        async (opts: {
+            type: ChannelMessageType
+            body: unknown
+            repliesTo?: number
+        }): Promise<ChannelMessage> => {
+            const msg = {
+                channelId: "ch",
+                sequence: ++seqStart,
+                sender: me,
+                sentAt: seqStart,
+                type: opts.type,
+                body: opts.body,
+                ...(opts.repliesTo !== undefined && {
+                    refs: { repliesTo: opts.repliesTo },
+                }),
+                signature: { sigVersion: "1", signature: "0xout" + seqStart },
+            } as ChannelMessage
+            into.push(msg)
+            return msg
+        }
+
+    it("restores the standing proposal and can still accept after a restart", async () => {
+        const b1 = new RfqSession({
+            channelId: "ch",
+            members: [A, B],
+            me: B,
+            send: async () => {
+                throw new Error("no send expected before restart")
+            },
+        })
+        b1.onIncoming(offerFromA(1))
+        expect(b1.standingProposal?.sequence).toBe(1)
+
+        const snap = b1.checkpoint()
+        // Persist-safe: the snapshot survives a JSON round-trip unchanged.
+        expect(JSON.parse(JSON.stringify(snap))).toEqual(snap)
+
+        const b2 = RfqSession.restore(snap, { send: recordingSend(B) })
+        expect(b2.state).toBe("open")
+        expect(b2.standingProposal?.sequence).toBe(1)
+
+        const accept = await b2.accept()
+        expect(accept.type).toBe("accept")
+        expect((accept.body as RfqAcceptBody).acceptedSequence).toBe(1)
+        expect(b2.state).toBe("accepted")
+        expect(b2.outcome().agreedTerms).toEqual({ sku: "X", qty: 2 })
+    })
+
+    it("a restored terminal negotiation stays terminal and cannot be re-driven", async () => {
+        const a1 = new RfqSession({
+            channelId: "ch",
+            members: [A, B],
+            me: A,
+            send: recordingSend(A),
+        })
+        await a1.offer({ x: 1 })
+        await a1.reject("done")
+        expect(a1.state).toBe("rejected")
+
+        const a2 = RfqSession.restore(a1.checkpoint(), { send: recordingSend(A) })
+        expect(a2.state).toBe("rejected")
+        await expect(a2.offer({ x: 2 })).rejects.toThrow(
+            /negotiation is rejected/,
+        )
+    })
+
+    it("refuses a checkpoint while a send is in flight (no reused sequence on restore)", async () => {
+        let release!: () => void
+        const gate = new Promise<void>(resolve => {
+            release = resolve
+        })
+        const out: ChannelMessage[] = []
+        let seq = 100
+        const a = new RfqSession({
+            channelId: "ch",
+            members: [A, B],
+            me: A,
+            send: async opts => {
+                await gate // stay pending until released
+                const msg = {
+                    channelId: "ch",
+                    sequence: ++seq,
+                    sender: A,
+                    sentAt: seq,
+                    type: opts.type,
+                    body: opts.body,
+                    signature: { sigVersion: "1", signature: "0xout" + seq },
+                } as ChannelMessage
+                out.push(msg)
+                return msg
+            },
+        })
+
+        const pending = a.offer({ x: 1 }) // send is awaiting the gate
+        // The negotiation hasn't settled locally but the message is on its way,
+        // so a checkpoint now would be non-final — it must refuse.
+        expect(() => a.checkpoint()).toThrow(/send is in flight/)
+
+        release()
+        await pending
+        // Once the send settles, a checkpoint is allowed and is final.
+        expect(() => a.checkpoint()).not.toThrow()
+        expect(a.standingProposal?.sequence).toBe(101)
+    })
+
+    it("close() blocks further actions and ignores inbound traffic", async () => {
+        const b = new RfqSession({
+            channelId: "ch",
+            members: [A, B],
+            me: B,
+            send: recordingSend(B),
+        })
+        b.close()
+        await expect(b.offer({ x: 1 })).rejects.toThrow(/session is closed/)
+        // Inbound is ignored after close — no throw, no state change.
+        b.onIncoming(offerFromA(1))
+        expect(b.standingProposal).toBeNull()
+        expect(b.state).toBe("open")
+    })
+
+    it("restores a closed negotiation as closed, not re-opened", async () => {
+        const b = new RfqSession({
+            channelId: "ch",
+            members: [A, B],
+            me: B,
+            send: recordingSend(B),
+        })
+        b.close()
+        const snap = b.checkpoint()
+        expect(snap.closed).toBe(true)
+
+        // A crash right after close() must not re-open the negotiation: the
+        // restored session still refuses actions and still ignores traffic.
+        const b2 = RfqSession.restore(snap, { send: recordingSend(B) })
+        await expect(b2.offer({ x: 1 })).rejects.toThrow(/session is closed/)
+        b2.onIncoming(offerFromA(1))
+        expect(b2.standingProposal).toBeNull()
+    })
+})

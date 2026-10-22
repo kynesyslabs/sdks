@@ -46,6 +46,13 @@ const MAX_REORDER_AHEAD = 256
  */
 export interface ChannelSessionLike {
     readonly channelId: string
+    /**
+     * Highest sequence the session has signed or accepted. When present (a
+     * real `ChannelSession` always exposes it), the transport seeds its
+     * contiguous-apply counter from it so a RESTORED session resumes from the
+     * right position instead of waiting for sequence 1.
+     */
+    readonly highestSequence?: number
     sendOutgoing(opts: {
         type: ChannelMessageType
         body: unknown
@@ -97,6 +104,13 @@ export interface L2PSChannelTransportOpts {
     onMessage?: (msg: ChannelMessage) => void
     /** Called on a decrypt / parse / verification failure. */
     onError?: (err: Error) => void
+    /**
+     * Sequence the contiguous-apply counter should resume from. Defaults to
+     * the session's `highestSequence` (so a restored session resumes
+     * correctly); set it explicitly only when the session can't report its
+     * own position (e.g. a structural fake in tests).
+     */
+    resumeFrom?: number
 }
 
 export class L2PSChannelTransport {
@@ -122,6 +136,10 @@ export class L2PSChannelTransport {
         this.recipients = opts.recipients
         this.onMessage = opts.onMessage
         this.onError = opts.onError
+        // Resume from the session's current position so a RESTORED session
+        // keeps receiving: without this the counter starts at 0 and an
+        // incoming seq N waits forever for the already-applied seq 1.
+        this.appliedSeq = opts.resumeFrom ?? opts.session.highestSequence ?? 0
     }
 
     /** Wire the peer's inbound handler. Call once. */
