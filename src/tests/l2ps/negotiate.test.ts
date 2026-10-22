@@ -378,4 +378,23 @@ describe("RfqSession — restart recovery (checkpoint/restore/close)", () => {
         expect(b.standingProposal).toBeNull()
         expect(b.state).toBe("open")
     })
+
+    it("restores a closed negotiation as closed, not re-opened", async () => {
+        const b = new RfqSession({
+            channelId: "ch",
+            members: [A, B],
+            me: B,
+            send: recordingSend(B),
+        })
+        b.close()
+        const snap = b.checkpoint()
+        expect(snap.closed).toBe(true)
+
+        // A crash right after close() must not re-open the negotiation: the
+        // restored session still refuses actions and still ignores traffic.
+        const b2 = RfqSession.restore(snap, { send: recordingSend(B) })
+        await expect(b2.offer({ x: 1 })).rejects.toThrow(/session is closed/)
+        b2.onIncoming(offerFromA(1))
+        expect(b2.standingProposal).toBeNull()
+    })
 })

@@ -60,6 +60,13 @@ export interface ChannelSessionSnapshot {
     /** Local CH-4 timestamps, in the clock units of the session that took it. */
     openedAt: number
     lastActivityAt: number
+    /**
+     * Whether the session was closed when the snapshot was taken. A closed
+     * session must restore as closed — otherwise a crash right after `close()`
+     * would re-open a finished negotiation. Optional for backward compatibility
+     * with snapshots taken before this field existed (treated as not closed).
+     */
+    closed?: boolean
 }
 
 /**
@@ -161,6 +168,7 @@ export class ChannelSession {
             transcript: [...this.transcript],
             openedAt: this.openedAt,
             lastActivityAt: this.lastActivityAt,
+            closed: this.closed,
         }
     }
 
@@ -174,6 +182,13 @@ export class ChannelSession {
      * it would (correctly) throw as reuse. The restored session resumes at the
      * exact sequence floor it had, so a replayed older message is still
      * rejected.
+     *
+     * The persisted snapshot is UNTRUSTED: a tampered store could inject
+     * messages the session would then co-sign on (e.g. via `finalizeRfq`).
+     * Every transcript entry is therefore re-validated here exactly as
+     * `receiveIncoming` validates a live message — channelId, membership,
+     * monotonic sequence, and signature — and the recorded `highestSeen` must
+     * cover the highest transcript sequence. Any mismatch refuses the restore.
      */
     static restore(
         snapshot: ChannelSessionSnapshot,
@@ -196,7 +211,45 @@ export class ChannelSession {
             channelIdRegistry: opts.channelIdRegistry,
             now: opts.now,
         })
+
+        // Re-validate the persisted transcript before trusting it. Same checks
+        // as receiveIncoming, applied in order so the sequence floor rises the
+        // same way it did live — a tampered entry is rejected, not replayed.
+        let maxSeq = 0
+        for (const msg of snapshot.transcript) {
+            if (!msg || typeof msg !== "object")
+                throw new Error(
+                    "ChannelSession.restore: transcript entry is not a message",
+                )
+            if (msg.channelId !== session.channelId)
+                throw new Error(
+                    `ChannelSession.restore: transcript channelId mismatch (expected ${session.channelId}, got ${msg.channelId})`,
+                )
+            if (!isSenderInMembers(msg, session.members))
+                throw new Error(
+                    `ChannelSession.restore: transcript sender "${msg.sender}" not in members (CH-1)`,
+                )
+            if (!Number.isInteger(msg.sequence) || msg.sequence < 1)
+                throw new Error(
+                    `ChannelSession.restore: invalid transcript sequence ${msg.sequence}`,
+                )
+            if (msg.sequence <= maxSeq)
+                throw new Error(
+                    `ChannelSession.restore: non-monotonic transcript sequence ${msg.sequence} (prior ${maxSeq})`,
+                )
+            if (!verifyChannelMessage(msg))
+                throw new Error(
+                    `ChannelSession.restore: transcript signature verification failed at sequence ${msg.sequence}`,
+                )
+            maxSeq = msg.sequence
+        }
+        if (snapshot.highestSeen < maxSeq)
+            throw new Error(
+                `ChannelSession.restore: highestSeen ${snapshot.highestSeen} below highest transcript sequence ${maxSeq}`,
+            )
+
         session.opened = true
+        session.closed = snapshot.closed === true
         session.highestSeen = snapshot.highestSeen
         session.transcript.push(...snapshot.transcript)
         session.openedAt = snapshot.openedAt

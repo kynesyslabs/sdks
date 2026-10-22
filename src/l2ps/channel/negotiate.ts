@@ -107,6 +107,13 @@ export interface RfqSessionSnapshot {
     /** Every proposal seen so far, so a restored `accept` can resolve terms. */
     proposals: StandingProposal[]
     outcome: RfqOutcome
+    /**
+     * Whether the session was released (`close()`) when the snapshot was taken.
+     * A closed session ignores all further traffic and refuses every action, so
+     * it must restore closed rather than re-opening. Optional for backward
+     * compatibility with snapshots taken before this field existed.
+     */
+    closed?: boolean
 }
 
 const RFQ_TYPES: ReadonlySet<ChannelMessageType> = new Set<ChannelMessageType>([
@@ -187,6 +194,7 @@ export class RfqSession {
             standing: this._standing,
             proposals: [...this.proposals.values()],
             outcome: this._outcome,
+            closed: this._closed,
         }
     }
 
@@ -219,6 +227,7 @@ export class RfqSession {
         for (const proposal of snapshot.proposals)
             session.proposals.set(proposal.sequence, proposal)
         session._outcome = snapshot.outcome
+        session._closed = snapshot.closed === true
         return session
     }
 

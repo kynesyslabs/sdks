@@ -684,4 +684,85 @@ describe("ChannelSession — restart recovery (checkpoint/restore/close)", () =>
         })
         expect(() => a.checkpoint()).toThrow(/before open/)
     })
+
+    it("restores a closed session as closed, not re-opened", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        a.close()
+        const snap = a.checkpoint()
+        expect(snap.closed).toBe(true)
+
+        // A crash right after close() must not re-open a finished session.
+        const a2 = ChannelSession.restore(snap, { demos: alice.demos })
+        await expect(
+            a2.sendOutgoing({ type: "offer", body: 2 }),
+        ).rejects.toThrow(/closed/)
+    })
+
+    it("refuses a restore whose transcript was tampered after persistence", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: { price: 1 } })
+        const snap = a.checkpoint()
+
+        // A store that rewrote a signed message's body would let a restored
+        // session co-sign on terms it never agreed to. The signature no longer
+        // verifies, so restore must refuse.
+        const tampered = {
+            ...snap,
+            transcript: [{ ...snap.transcript[0], body: { price: 999 } }],
+        }
+        expect(() =>
+            ChannelSession.restore(tampered, { demos: alice.demos }),
+        ).toThrow(/signature verification failed/)
+    })
+
+    it("refuses a restore whose transcript carries a foreign channelId", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        const snap = a.checkpoint()
+        const tampered = {
+            ...snap,
+            transcript: [{ ...snap.transcript[0], channelId: "ch-other" }],
+        }
+        expect(() =>
+            ChannelSession.restore(tampered, { demos: alice.demos }),
+        ).toThrow(/channelId mismatch/)
+    })
+
+    it("refuses a restore whose highestSeen floor was lowered below the transcript", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        await a.sendOutgoing({ type: "counter", body: 2 })
+        const snap = a.checkpoint()
+        expect(snap.highestSeen).toBe(2)
+        // Rolling the floor back under a recorded message would re-admit it.
+        const tampered = { ...snap, highestSeen: 1 }
+        expect(() =>
+            ChannelSession.restore(tampered, { demos: alice.demos }),
+        ).toThrow(/below highest transcript sequence/)
+    })
 })
