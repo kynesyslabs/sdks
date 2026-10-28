@@ -557,3 +557,292 @@ describe("ChannelSession.sendOutgoing — concurrency (P1 regression)", () => {
         expect(seqs).toEqual([1, 2, 3, 4, 5])
     })
 })
+
+describe("ChannelSession — restart recovery (checkpoint/restore/close)", () => {
+    let alice: { demos: Demos; claim: ClaimReference }
+    let bob: { demos: Demos; claim: ClaimReference }
+
+    beforeEach(async () => {
+        alice = await newConnectedDemos()
+        bob = await newConnectedDemos()
+    })
+
+    it("resumes the sequence floor and transcript after a restart", async () => {
+        const reg = new InMemoryChannelIdRegistry()
+        const a1 = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+            channelIdRegistry: reg,
+        })
+        await a1.open()
+        await a1.sendOutgoing({ type: "offer", body: { x: 1 } })
+
+        const snap = a1.checkpoint()
+        expect(snap.highestSeen).toBe(1)
+        expect(snap.transcript).toHaveLength(1)
+        // The snapshot must survive a persist/reload round-trip unchanged.
+        expect(JSON.parse(JSON.stringify(snap))).toEqual(snap)
+
+        // Restart: same registry — restore must NOT re-register the channelId.
+        const a2 = ChannelSession.restore(snap, {
+            demos: alice.demos,
+            channelIdRegistry: reg,
+        })
+        expect(a2.messages()).toHaveLength(1)
+        const next = await a2.sendOutgoing({ type: "counter", body: { x: 2 } })
+        // Resumes at the floor: the next sequence is 2, no gap and no reuse.
+        expect(next.sequence).toBe(2)
+    })
+
+    it("a restored session still rejects a replay of an already-seen sequence", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        const b1 = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: bob.claim,
+            demos: bob.demos,
+        })
+        await a.open()
+        await b1.open()
+
+        const m1 = await a.sendOutgoing({ type: "offer", body: 1 })
+        const m2 = await a.sendOutgoing({ type: "offer", body: 2 })
+        await b1.receiveIncoming(m1)
+        await b1.receiveIncoming(m2)
+
+        const b2 = ChannelSession.restore(b1.checkpoint(), { demos: bob.demos })
+        await expect(b2.receiveIncoming(m1)).rejects.toThrow(/non-monotonic/)
+    })
+
+    it("restore does not re-register the channelId (a re-register would throw CH-6)", async () => {
+        const reg = new InMemoryChannelIdRegistry()
+        const a1 = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+            channelIdRegistry: reg,
+        })
+        await a1.open()
+        const snap = a1.checkpoint()
+        expect(() =>
+            ChannelSession.restore(snap, {
+                demos: alice.demos,
+                channelIdRegistry: reg,
+            }),
+        ).not.toThrow()
+    })
+
+    it("close() blocks further sends/receives but still checkpoints the final state", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        a.close()
+        await expect(
+            a.sendOutgoing({ type: "offer", body: 2 }),
+        ).rejects.toThrow(/closed/)
+        expect(a.checkpoint().highestSeen).toBe(1)
+    })
+
+    it("refuses a checkpoint while a send is in flight", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        // sendOutgoing reserves the sequence synchronously, then awaits signing.
+        // A checkpoint across that window would persist the advanced floor
+        // without the signed message (or let the sequence be reused on
+        // restore), so it must refuse until the send settles.
+        const pending = a.sendOutgoing({ type: "offer", body: 1 })
+        expect(() => a.checkpoint()).toThrow(/send is in flight/)
+        await pending
+        expect(a.checkpoint().highestSeen).toBe(1)
+        expect(a.checkpoint().transcript).toHaveLength(1)
+    })
+
+    it("refuses to checkpoint a session that was never opened", () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        expect(() => a.checkpoint()).toThrow(/before open/)
+    })
+
+    it("restores a closed session as closed, not re-opened", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        a.close()
+        const snap = a.checkpoint()
+        expect(snap.closed).toBe(true)
+
+        // A crash right after close() must not re-open a finished session.
+        const a2 = ChannelSession.restore(snap, { demos: alice.demos })
+        await expect(
+            a2.sendOutgoing({ type: "offer", body: 2 }),
+        ).rejects.toThrow(/closed/)
+    })
+
+    it("refuses a restore whose transcript was tampered after persistence", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: { price: 1 } })
+        const snap = a.checkpoint()
+
+        // A store that rewrote a signed message's body would let a restored
+        // session co-sign on terms it never agreed to. The signature no longer
+        // verifies, so restore must refuse.
+        const tampered = {
+            ...snap,
+            transcript: [{ ...snap.transcript[0], body: { price: 999 } }],
+        }
+        expect(() =>
+            ChannelSession.restore(tampered, { demos: alice.demos }),
+        ).toThrow(/signature verification failed/)
+    })
+
+    it("refuses a restore whose transcript carries a foreign channelId", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        const snap = a.checkpoint()
+        const tampered = {
+            ...snap,
+            transcript: [{ ...snap.transcript[0], channelId: "ch-other" }],
+        }
+        expect(() =>
+            ChannelSession.restore(tampered, { demos: alice.demos }),
+        ).toThrow(/channelId mismatch/)
+    })
+
+    it("refuses a restore whose highestSeen floor was lowered below the transcript", async () => {
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        await a.sendOutgoing({ type: "counter", body: 2 })
+        const snap = a.checkpoint()
+        expect(snap.highestSeen).toBe(2)
+        // Rolling the floor back under a recorded message would re-admit it.
+        const tampered = { ...snap, highestSeen: 1 }
+        expect(() =>
+            ChannelSession.restore(tampered, { demos: alice.demos }),
+        ).toThrow(/below highest transcript sequence/)
+    })
+
+    it("persists each send write-ahead, so a crash after delivery cannot reuse the sequence", async () => {
+        const snapshots: ReturnType<ChannelSession["checkpoint"]>[] = []
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+            persist: s => {
+                snapshots.push(s)
+            },
+        })
+        await a.open()
+        const m1 = await a.sendOutgoing({ type: "offer", body: 1 })
+        expect(m1.sequence).toBe(1)
+        // The write-ahead snapshot already carries seq 1 and the message, with
+        // no checkpoint() call — it was persisted before the send returned.
+        const persisted = snapshots[snapshots.length - 1]!
+        expect(persisted.highestSeen).toBe(1)
+        expect(persisted.transcript).toHaveLength(1)
+
+        // Restore from that write-ahead snapshot (a crash right after delivery,
+        // before any checkpoint): the next send is seq 2, never a reuse of 1.
+        const a2 = ChannelSession.restore(persisted, { demos: alice.demos })
+        const next = await a2.sendOutgoing({ type: "counter", body: 2 })
+        expect(next.sequence).toBe(2)
+    })
+
+    it("releases the reserved sequence when the write-ahead persist fails", async () => {
+        let shouldFail = true
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+            persist: () => {
+                if (shouldFail) throw new Error("disk full")
+            },
+        })
+        await a.open()
+        await expect(
+            a.sendOutgoing({ type: "offer", body: 1 }),
+        ).rejects.toThrow(/disk full/)
+        // The reserved sequence was released: the next (successful) send is
+        // seq 1, not seq 2 — no gap, no reuse.
+        shouldFail = false
+        const m = await a.sendOutgoing({ type: "offer", body: 1 })
+        expect(m.sequence).toBe(1)
+    })
+
+    it("accepts a restore whose transcript is not sorted by sequence", async () => {
+        // A concurrent receive can append a higher sequence before an in-flight
+        // send's lower one, so a live transcript is not sorted. Restore must
+        // accept that, rejecting only duplicates.
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        await a.sendOutgoing({ type: "counter", body: 2 })
+        const snap = a.checkpoint()
+        const reordered = {
+            ...snap,
+            transcript: [snap.transcript[1]!, snap.transcript[0]!],
+        }
+        expect(() =>
+            ChannelSession.restore(reordered, { demos: alice.demos }),
+        ).not.toThrow()
+
+        const duplicate = {
+            ...snap,
+            transcript: [snap.transcript[0]!, snap.transcript[0]!],
+        }
+        expect(() =>
+            ChannelSession.restore(duplicate, { demos: alice.demos }),
+        ).toThrow(/duplicate transcript sequence/)
+    })
+})
