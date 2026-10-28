@@ -2,6 +2,7 @@ import {
     RfqSession,
     type RfqAcceptBody,
     type RfqProposalBody,
+    type RfqSessionSnapshot,
 } from "@/l2ps/channel/negotiate"
 import type { ChannelMessage, ChannelMessageType } from "@/l2ps/channel"
 import type { ClaimReference } from "@/identity/cci"
@@ -396,5 +397,57 @@ describe("RfqSession — restart recovery (checkpoint/restore/close)", () => {
         await expect(b2.offer({ x: 1 })).rejects.toThrow(/session is closed/)
         b2.onIncoming(offerFromA(1))
         expect(b2.standingProposal).toBeNull()
+    })
+
+    it("persists a write-ahead pending marker before a send and restores closed from it", async () => {
+        const snapshots: RfqSessionSnapshot[] = []
+        const b = new RfqSession({
+            channelId: "ch",
+            members: [A, B],
+            me: B,
+            send: recordingSend(B),
+            persist: s => {
+                snapshots.push(JSON.parse(JSON.stringify(s)))
+            },
+        })
+        await b.offer({ x: 1 })
+
+        // The write-ahead persist fired a snapshot with a `pending` marker
+        // BEFORE the message left, then a settled snapshot after.
+        const pendingSnap = snapshots.find(s => s.pending !== undefined)
+        expect(pendingSnap?.pending?.type).toBe("offer")
+        expect(snapshots[snapshots.length - 1]!.pending).toBeUndefined()
+
+        // Restoring from the pending snapshot (a crash mid-send) yields a closed
+        // session that cannot be re-driven.
+        const b2 = RfqSession.restore(pendingSnap!, { send: recordingSend(B) })
+        await expect(b2.counter({ x: 2 })).rejects.toThrow(/session is closed/)
+        b2.onIncoming(offerFromA(9))
+        expect(b2.standingProposal).toBeNull()
+    })
+
+    it("refuses a restore with an invalid state or a mismatched outcome", () => {
+        expect(() =>
+            RfqSession.restore(
+                { me: B, state: "bogus", standing: null, proposals: [], outcome: { state: "bogus" } } as unknown as RfqSessionSnapshot,
+                { send: recordingSend(B) },
+            ),
+        ).toThrow(/invalid state/)
+        expect(() =>
+            RfqSession.restore(
+                { me: B, state: "accepted", standing: null, proposals: [], outcome: { state: "open" } } as RfqSessionSnapshot,
+                { send: recordingSend(B) },
+            ),
+        ).toThrow(/does not match/)
+    })
+
+    it("refuses a restore whose standing proposal is not in the proposal list", () => {
+        const standing = { channelId: "ch", messageHash: "h", sequence: 5, sender: A, terms: {} }
+        expect(() =>
+            RfqSession.restore(
+                { me: B, state: "open", standing, proposals: [], outcome: { state: "open" } } as unknown as RfqSessionSnapshot,
+                { send: recordingSend(B) },
+            ),
+        ).toThrow(/not in the proposal list/)
     })
 })

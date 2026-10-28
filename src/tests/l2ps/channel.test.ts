@@ -765,4 +765,84 @@ describe("ChannelSession — restart recovery (checkpoint/restore/close)", () =>
             ChannelSession.restore(tampered, { demos: alice.demos }),
         ).toThrow(/below highest transcript sequence/)
     })
+
+    it("persists each send write-ahead, so a crash after delivery cannot reuse the sequence", async () => {
+        const snapshots: ReturnType<ChannelSession["checkpoint"]>[] = []
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+            persist: s => {
+                snapshots.push(s)
+            },
+        })
+        await a.open()
+        const m1 = await a.sendOutgoing({ type: "offer", body: 1 })
+        expect(m1.sequence).toBe(1)
+        // The write-ahead snapshot already carries seq 1 and the message, with
+        // no checkpoint() call — it was persisted before the send returned.
+        const persisted = snapshots[snapshots.length - 1]!
+        expect(persisted.highestSeen).toBe(1)
+        expect(persisted.transcript).toHaveLength(1)
+
+        // Restore from that write-ahead snapshot (a crash right after delivery,
+        // before any checkpoint): the next send is seq 2, never a reuse of 1.
+        const a2 = ChannelSession.restore(persisted, { demos: alice.demos })
+        const next = await a2.sendOutgoing({ type: "counter", body: 2 })
+        expect(next.sequence).toBe(2)
+    })
+
+    it("releases the reserved sequence when the write-ahead persist fails", async () => {
+        let shouldFail = true
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+            persist: () => {
+                if (shouldFail) throw new Error("disk full")
+            },
+        })
+        await a.open()
+        await expect(
+            a.sendOutgoing({ type: "offer", body: 1 }),
+        ).rejects.toThrow(/disk full/)
+        // The reserved sequence was released: the next (successful) send is
+        // seq 1, not seq 2 — no gap, no reuse.
+        shouldFail = false
+        const m = await a.sendOutgoing({ type: "offer", body: 1 })
+        expect(m.sequence).toBe(1)
+    })
+
+    it("accepts a restore whose transcript is not sorted by sequence", async () => {
+        // A concurrent receive can append a higher sequence before an in-flight
+        // send's lower one, so a live transcript is not sorted. Restore must
+        // accept that, rejecting only duplicates.
+        const a = new ChannelSession({
+            channelId: CHANNEL,
+            members: [alice.claim, bob.claim],
+            me: alice.claim,
+            demos: alice.demos,
+        })
+        await a.open()
+        await a.sendOutgoing({ type: "offer", body: 1 })
+        await a.sendOutgoing({ type: "counter", body: 2 })
+        const snap = a.checkpoint()
+        const reordered = {
+            ...snap,
+            transcript: [snap.transcript[1]!, snap.transcript[0]!],
+        }
+        expect(() =>
+            ChannelSession.restore(reordered, { demos: alice.demos }),
+        ).not.toThrow()
+
+        const duplicate = {
+            ...snap,
+            transcript: [snap.transcript[0]!, snap.transcript[0]!],
+        }
+        expect(() =>
+            ChannelSession.restore(duplicate, { demos: alice.demos }),
+        ).toThrow(/duplicate transcript sequence/)
+    })
 })
