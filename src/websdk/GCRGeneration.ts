@@ -795,6 +795,9 @@ export class HandleD402Operations {
  * - WRITE_STORAGE: Updates storage + burns additional fee based on size delta
  * - UPDATE_ACCESS_CONTROL: Updates ACL (no fee)
  * - DELETE_STORAGE_PROGRAM: Soft deletes (no fee)
+ * - SET_FIELD / SET_ITEM / APPEND_ITEM: Updates one field + burns a fee priced
+ *   from the written field and value
+ * - DELETE_FIELD / DELETE_ITEM: Removes one field or array item (no fee)
  */
 export class HandleStorageProgramOperations {
     /**
@@ -838,6 +841,41 @@ export class HandleStorageProgramOperations {
         // OS_PER_DEM (P4) and `chunks` is a finite positive integer.
         const feeDem = Number(feeOs / OS_PER_DEM)
         return { feeOs, feeDem }
+    }
+
+    /**
+     * The object whose JSON size prices a granular write: the field with the
+     * written value, as an array element for the array operations.
+     * The node prices the same write with the same object.
+     */
+    static granularWriteFootprint(
+        payload: StorageProgramPayload,
+    ): Record<string, unknown> {
+        const field = String(payload.field ?? "")
+        const value =
+            payload.operation === "SET_FIELD" ? payload.value : [payload.value]
+        return { [field]: value }
+    }
+
+    private static granularEdit(
+        tx: Transaction,
+        payload: StorageProgramPayload,
+        isRollback: boolean,
+    ): GCREditStorageProgram {
+        return {
+            type: "storageProgram",
+            target: payload.storageAddress,
+            isRollback: isRollback,
+            txhash: tx.hash,
+            context: {
+                operation: payload.operation,
+                sender: tx.content.from_ed25519_address,
+                data: {
+                    variables: payload,
+                    metadata: null,
+                },
+            },
+        }
     }
 
     static async handle(
@@ -961,6 +999,39 @@ export class HandleStorageProgramOperations {
                     },
                 }
                 edits.push(deleteEdit)
+                break
+            }
+
+            case "SET_FIELD":
+            case "SET_ITEM":
+            case "APPEND_ITEM": {
+                // Priced from the signed payload, not the stored data: the
+                // node regenerates these edits from the transaction alone, so
+                // the fee cannot depend on state. The sized object is an upper
+                // bound of the growth the write can cause, so a granular write
+                // never costs less than the bytes it adds.
+                const { feeDem } = this.calculateStorageFee(
+                    this.granularWriteFootprint(payload),
+                    "json",
+                )
+
+                const burnFeeEdit: GCREdit = {
+                    type: "balance",
+                    operation: "remove",
+                    isRollback: isRollback,
+                    account: tx.content.from_ed25519_address,
+                    txhash: tx.hash,
+                    amount: feeDem,
+                }
+                edits.push(burnFeeEdit)
+                edits.push(this.granularEdit(tx, payload, isRollback))
+                break
+            }
+
+            case "DELETE_FIELD":
+            case "DELETE_ITEM": {
+                // No fee: removals only shrink the stored data
+                edits.push(this.granularEdit(tx, payload, isRollback))
                 break
             }
 
