@@ -282,3 +282,116 @@ describe("L2PSChannelTransport — reorder buffer", () => {
         expect(errors.some(e => /ahead of applied/.test(e.message))).toBe(true)
     })
 })
+
+/** Fake peer whose send fails for any recipient in `failTargets`. */
+class FailablePeer implements L2PSMessagingPeerLike {
+    sent: { to: string; messageHash: string }[] = []
+    failTargets = new Set<string>()
+    private handler: ((p: IncomingMessagePayload) => void) | null = null
+
+    async send(to: string, _e: SerializedEncryptedMessage, messageHash: string) {
+        if (this.failTargets.has(to)) {
+            throw new Error(`peer send to ${to} failed`)
+        }
+        this.sent.push({ to, messageHash })
+        return { messageHash, l2psStatus: "submitted" as const }
+    }
+    onMessage(handler: (p: IncomingMessagePayload) => void): void {
+        this.handler = handler
+    }
+}
+
+describe("L2PSChannelTransport — idempotent resend", () => {
+    it("retains a failed send and resends the exact same envelope", async () => {
+        const session = new FakeSession()
+        const peer = new FailablePeer()
+        peer.failTargets.add("0xpeer")
+        const transport = new L2PSChannelTransport({
+            session,
+            peer,
+            sharedKey: KEY,
+            recipients: ["0xpeer"],
+        })
+        transport.start()
+
+        await expect(
+            transport.send({ type: "offer", body: {} }),
+        ).rejects.toThrow(/failed/)
+        expect(transport.hasPendingSend).toBe(true)
+        expect(peer.sent.length).toBe(0)
+
+        peer.failTargets.clear()
+        const msg = await transport.resendPending()
+        expect(msg?.sequence).toBe(1)
+        expect(transport.hasPendingSend).toBe(false)
+        // Same sequence and messageHash as the original mint — no new envelope.
+        expect(peer.sent).toEqual([{ to: "0xpeer", messageHash: "0xsig1" }])
+    })
+
+    it("refuses a new send while one is pending, then keeps the sequence gapless", async () => {
+        const session = new FakeSession()
+        const peer = new FailablePeer()
+        peer.failTargets.add("0xpeer")
+        const transport = new L2PSChannelTransport({
+            session,
+            peer,
+            sharedKey: KEY,
+            recipients: ["0xpeer"],
+        })
+        transport.start()
+
+        await expect(
+            transport.send({ type: "offer", body: {} }),
+        ).rejects.toThrow(/failed/)
+        // A second send must not mint seq 2 while seq 1 is undelivered.
+        await expect(
+            transport.send({ type: "counter", body: {} }),
+        ).rejects.toThrow(/awaiting delivery/)
+
+        peer.failTargets.clear()
+        await transport.resendPending() // seq 1 lands
+        const next = await transport.send({ type: "counter", body: {} })
+        // Next message is seq 2 — the failed send did not burn the number.
+        expect(next.sequence).toBe(2)
+        expect(peer.sent.map(s => s.messageHash)).toEqual(["0xsig1", "0xsig2"])
+    })
+
+    it("on partial delivery only resends to the recipients still missing it", async () => {
+        const session = new FakeSession()
+        const peer = new FailablePeer()
+        peer.failTargets.add("0xB")
+        const transport = new L2PSChannelTransport({
+            session,
+            peer,
+            sharedKey: KEY,
+            recipients: ["0xA", "0xB"],
+        })
+        transport.start()
+
+        await expect(
+            transport.send({ type: "offer", body: {} }),
+        ).rejects.toThrow(/failed/)
+        // A received it; B did not.
+        expect(peer.sent.map(s => s.to)).toEqual(["0xA"])
+        expect(transport.hasPendingSend).toBe(true)
+
+        peer.failTargets.clear()
+        await transport.resendPending()
+        // Only B is retried; A is not sent to twice.
+        expect(peer.sent.map(s => s.to)).toEqual(["0xA", "0xB"])
+        expect(transport.hasPendingSend).toBe(false)
+    })
+
+    it("resendPending with nothing pending is a no-op", async () => {
+        const session = new FakeSession()
+        const peer = new FailablePeer()
+        const transport = new L2PSChannelTransport({
+            session,
+            peer,
+            sharedKey: KEY,
+            recipients: ["0xpeer"],
+        })
+        transport.start()
+        await expect(transport.resendPending()).resolves.toBeNull()
+    })
+})
