@@ -29,6 +29,7 @@ import {
     InferFromTLSNPayload,
     TLSNProofRanges,
     HumanPassportIdentityData,
+    Web2IdentityRemovePayload,
 } from "@/types/abstraction"
 import {
     SavedHumanPassportIdentity,
@@ -42,6 +43,26 @@ import { _required as required, DemosTransactions } from "@/websdk"
 import { resolveNonce } from "@/utils"
 
 type IdentityContext = "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn"
+
+/**
+ * Adds the platform userId to a remove payload as a string, the form links
+ * are stored in. Without one the payload is left as given, so the signed
+ * transaction is the same as from earlier SDK versions.
+ */
+function withUserId<T extends object>(
+    payload: T,
+    userId: string | number | null | undefined,
+): T | (T & { userId: string }) {
+    if (userId === undefined || userId === null || userId === "") return payload
+    // A number past 2^53 was already rounded before it got here, and the
+    // node picks the link by this id, so it could name another account.
+    if (typeof userId === "number" && !Number.isSafeInteger(userId)) {
+        throw new Error(
+            `userId ${userId} is not a safe integer; pass platform ids as strings`,
+        )
+    }
+    return { ...payload, userId: String(userId) }
+}
 
 export class Identities {
     formats = {
@@ -291,19 +312,25 @@ export class Identities {
     /**
      * Remove a web2 identity from the network.
      *
+     * A username is not unique on its own: one account can hold links of two
+     * platform accounts that share it. Pass the platform `userId` to name the
+     * exact link; nodes that do not read it fall back to the username.
+     *
      * @param demos A Demos instance to communicate with the RPC.
      * @param payload The payload to remove the identity.
      * @returns The response from the RPC call.
      */
     async removeWeb2Identity(
         demos: Demos,
-        payload: {
-            context: string
-            username: string
-        },
+        payload: Web2IdentityRemovePayload["payload"],
         options?: { nonce?: number },
     ) {
-        return await this.removeIdentity(demos, "web2", payload, options)
+        return await this.removeIdentity(
+            demos,
+            "web2",
+            withUserId(payload, payload.userId),
+            options,
+        )
     }
 
     /**
@@ -388,22 +415,26 @@ export class Identities {
      * @param demos A Demos instance to communicate with the RPC.
      * @param context The platform context ("github", "discord", or "telegram").
      * @param username The username to remove.
+     * @param options `userId` names the exact link when two share the username.
      * @returns The response from the RPC call.
      */
     async removeWeb2IdentityViaTLSN(
         demos: Demos,
         context: TLSNIdentityContext,
         username: string,
-        options?: { nonce?: number },
+        options?: { nonce?: number; userId?: string | number },
     ): Promise<RPCResponseWithValidityData> {
         return await this.removeIdentity(
             demos,
             "tlsn",
-            {
-                context: context,
-                username: username,
-            },
-            options,
+            withUserId(
+                {
+                    context: context,
+                    username: username,
+                },
+                options?.userId,
+            ),
+            { nonce: options?.nonce },
         )
     }
 

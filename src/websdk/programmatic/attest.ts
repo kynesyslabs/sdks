@@ -203,11 +203,12 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          * })
          * ```
          *
-         * @param payload - The identity to unlink (`context` + `username`).
+         * @param payload - The identity to unlink (`context` + `username`,
+         *                  and `userId` when two links share the username).
          * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
          */
         removeWeb2: (
-            payload: { context: string; username: string },
+            payload: { context: string; username: string; userId?: string | number },
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
@@ -649,12 +650,13 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          * @param context - The platform context ("github", "discord", or
          *                   "telegram").
          * @param username - The username to remove.
-         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour,
+         *               and `userId` when two links share the username.
          */
         removeTlsn: (
             context: TLSNIdentityContext,
             username: string,
-            opts?: ProgrammaticTxOptions,
+            opts?: ProgrammaticTxOptions & { userId?: string | number },
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
                 () =>
@@ -662,7 +664,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         ctx.demos,
                         context,
                         username,
-                        { nonce: opts?.nonce },
+                        { nonce: opts?.nonce, userId: opts?.userId },
                     ),
                 opts,
             ),

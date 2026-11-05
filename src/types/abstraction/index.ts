@@ -204,6 +204,8 @@ export interface Web2IdentityRemovePayload extends BaseWeb2IdentityPayload {
     payload: {
         context: string
         username: string
+        /** The platform account id; names the exact link when two share a username. */
+        userId?: string | number
     }
 }
 
@@ -476,6 +478,8 @@ export interface TLSNIdentityRemovePayload extends BaseTLSNIdentityPayload {
     payload: {
         context: string
         username: string
+        /** The platform account id; names the exact link when two share a username. */
+        userId?: string
     }
 }
 
