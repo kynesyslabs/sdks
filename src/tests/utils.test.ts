@@ -198,6 +198,27 @@ describe("canonicalJSONStringify", () => {
             "Non-JSON value encountered: symbol",
         )
     })
+
+    test("NFC-normalises string values so canonically-equal strings hash the same", () => {
+        // "é" as a single code point (NFC) vs "e" + combining accent (NFD).
+        const composed = "café" // café, NFC
+        const decomposed = "café" // café, NFD
+        expect(composed).not.toBe(decomposed) // distinct code points
+        expect(canonicalJSONStringify({ name: composed })).toBe(
+            canonicalJSONStringify({ name: decomposed }),
+        )
+        // Both canonicalise to the NFC form.
+        expect(canonicalJSONStringify(decomposed)).toBe(
+            JSON.stringify(composed),
+        )
+    })
+
+    test("does NOT normalise object member names (RFC 8785 keeps keys as-is)", () => {
+        const decomposedKey = "café"
+        const result = canonicalJSONStringify({ [decomposedKey]: 1 })
+        // The key is preserved in its original (NFD) form, not folded to NFC.
+        expect(result).toBe(`{${JSON.stringify(decomposedKey)}:1}`)
+    })
 })
 
 describe("validatePureJson", () => {
