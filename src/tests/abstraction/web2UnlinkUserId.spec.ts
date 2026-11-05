@@ -2,6 +2,7 @@ import { Demos } from "@/websdk"
 import { Identities } from "@/abstraction"
 import { GCRGeneration } from "@/websdk/GCRGeneration"
 import { Hashing } from "@/encryption"
+import { createAttestNamespace } from "@/websdk/programmatic/attest"
 
 /**
  * Web2 and TLSN unlinks may name the platform account by `userId`, since a
@@ -73,5 +74,22 @@ describe("web2 unlink by userId", () => {
 
         expect(payloadOf(signed[1])).toEqual({ context: "github", username: "alice" })
         expect(signed[1].content.nonce).toBe(4)
+    })
+
+    it("lets the programmatic removeTlsn name the userId, and sends the old payload without one", async () => {
+        const { demos, signed } = await signingDemos()
+        // The runner's fee and broadcast handling is not under test here.
+        const attest = createAttestNamespace({
+            demos,
+            run: async (source: () => Promise<any>) => source(),
+        } as any)
+
+        await attest.removeTlsn("discord", "alice", { userId: "9", nonce: 20 })
+        await attest.removeTlsn("discord", "alice")
+
+        expect(payloadOf(signed[0])).toEqual({ context: "discord", username: "alice", userId: "9" })
+        expect(signed[0].content.nonce).toBe(20)
+        expect(payloadOf(signed[1])).toEqual({ context: "discord", username: "alice" })
+        expect(Object.keys(payloadOf(signed[1]))).toEqual(["context", "username"])
     })
 })
