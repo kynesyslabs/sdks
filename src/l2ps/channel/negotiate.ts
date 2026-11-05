@@ -88,6 +88,51 @@ export interface RfqSessionOpts {
     onStateChange?: (outcome: RfqOutcome) => void
     /** Fired when a fresh proposal (offer/counter) lands, ours or theirs. */
     onProposal?: (proposal: StandingProposal) => void
+    /**
+     * Write-ahead persistence hook (see `ChannelSessionOpts.persist`). It is
+     * awaited with a snapshot carrying a `pending` marker BEFORE each outbound
+     * message leaves, and again with the settled snapshot after the local
+     * transition. This closes the crash window between a terminal send (accept/
+     * reject/abort) reaching the peer and the local settle, which would
+     * otherwise let a restore re-open an already accepted deal. The hook must
+     * write the snapshot durably, integrity-protected and atomic with the
+     * matching `ChannelSession` snapshot, before it resolves.
+     */
+    persist?: (snapshot: RfqSessionSnapshot) => void | Promise<void>
+}
+
+/**
+ * A serializable snapshot of an `RfqSession`'s state, for restart recovery.
+ * It carries only plain data — the `send` callback and the lifecycle hooks
+ * are NOT captured and must be re-supplied to `RfqSession.restore()`. The
+ * opaque `terms` on each proposal are passed through as-is, so the caller is
+ * responsible for them being serializable if the snapshot is persisted.
+ */
+export interface RfqSessionSnapshot {
+    channelId?: string
+    members?: ClaimReference[]
+    me: ClaimReference
+    state: RfqState
+    /** The proposal currently on the table, or null. */
+    standing: StandingProposal | null
+    /** Every proposal seen so far, so a restored `accept` can resolve terms. */
+    proposals: StandingProposal[]
+    outcome: RfqOutcome
+    /**
+     * Whether the session was released (`close()`) when the snapshot was taken.
+     * A closed session ignores all further traffic and refuses every action, so
+     * it must restore closed rather than re-opening. Optional for backward
+     * compatibility with snapshots taken before this field existed.
+     */
+    closed?: boolean
+    /**
+     * Set while an outbound message is mid-flight: persisted (write-ahead)
+     * before the message leaves, cleared once the local transition settles. A
+     * snapshot restored with it present means a send may already have reached
+     * the peer, so `restore()` fails closed — it restores the session closed and
+     * refuses to re-drive or re-open the negotiation.
+     */
+    pending?: { type: ChannelMessageType }
 }
 
 const RFQ_TYPES: ReadonlySet<ChannelMessageType> = new Set<ChannelMessageType>([
@@ -98,6 +143,14 @@ const RFQ_TYPES: ReadonlySet<ChannelMessageType> = new Set<ChannelMessageType>([
     "abort",
 ])
 
+/** The valid CH-5 states a restored snapshot may carry. */
+const RFQ_STATES: ReadonlySet<RfqState> = new Set<RfqState>([
+    "open",
+    "accepted",
+    "rejected",
+    "aborted",
+])
+
 export class RfqSession {
     private readonly channelId: string | undefined
     private readonly members: ReadonlyArray<ClaimReference> | undefined
@@ -105,8 +158,16 @@ export class RfqSession {
     private readonly sendFn: RfqSessionOpts["send"]
     private readonly onStateChange?: (o: RfqOutcome) => void
     private readonly onProposal?: (p: StandingProposal) => void
+    private readonly persist:
+        | ((snapshot: RfqSessionSnapshot) => void | Promise<void>)
+        | undefined
 
     private _state: RfqState = "open"
+    private _closed = false
+    /** In-flight `sendFn` calls. A checkpoint while one is pending would be
+     * non-final: the message was emitted to the peer but the local state not
+     * yet settled, so a restore from it could re-drive and reuse a sequence. */
+    private _pending = 0
     private _standing: StandingProposal | null = null
     /** Every proposal seen, by sequence — so `accept` can resolve its terms. */
     private readonly proposals = new Map<number, StandingProposal>()
@@ -127,6 +188,31 @@ export class RfqSession {
         this.sendFn = opts.send
         this.onStateChange = opts.onStateChange
         this.onProposal = opts.onProposal
+        this.persist = opts.persist
+    }
+
+    /** The current state as a plain snapshot object, with an optional
+     * `pending` marker. Shared by `checkpoint()` and the write-ahead persists;
+     * it does NOT enforce the `_pending` guard, so only `checkpoint()` exposes
+     * it publicly. */
+    private snapshotData(pending?: { type: ChannelMessageType }): RfqSessionSnapshot {
+        return {
+            ...(this.channelId !== undefined && { channelId: this.channelId }),
+            ...(this.members !== undefined && { members: [...this.members] }),
+            me: this.me,
+            state: this._state,
+            standing: this._standing,
+            proposals: [...this.proposals.values()],
+            outcome: this._outcome,
+            closed: this._closed,
+            ...(pending !== undefined && { pending }),
+        }
+    }
+
+    /** Persist the settled state after an outbound transition, clearing the
+     * write-ahead `pending` marker. No-op without a `persist` hook. */
+    private async persistSettled(): Promise<void> {
+        if (this.persist) await this.persist(this.snapshotData())
     }
 
     get state(): RfqState {
@@ -138,6 +224,142 @@ export class RfqSession {
     }
     outcome(): RfqOutcome {
         return this._outcome
+    }
+
+    /**
+     * Capture the negotiation's state for restart recovery. Persist the result
+     * and rebuild from it with `restore()` after a crash. The proposal list is
+     * copied so later proposals don't mutate an already-persisted snapshot.
+     * Allowed after `close()` so a final state can still be recorded.
+     *
+     * The snapshot MUST be stored integrity-protected and written atomically
+     * together with the matching `ChannelSession` snapshot, so the two never
+     * disagree after a crash. For live write-ahead durability prefer the
+     * `persist` hook (see `RfqSessionOpts.persist`) over polling `checkpoint()`.
+     */
+    checkpoint(): RfqSessionSnapshot {
+        // A send in flight has already reached the peer but not yet settled
+        // locally. Snapshotting here would persist an "open" negotiation the
+        // peer already sees as accepted/ended; a restore would re-drive it and
+        // mint a duplicate message at a reused sequence. Refuse until it settles.
+        if (this._pending > 0)
+            throw new Error(
+                "RfqSession: cannot checkpoint while a send is in flight",
+            )
+        return this.snapshotData()
+    }
+
+    /**
+     * Rebuild a negotiation from a `checkpoint()` snapshot. The `send`
+     * callback, lifecycle hooks and `persist` hook are re-injected — they are
+     * not part of the snapshot. The restored session resumes in its exact prior
+     * state, so a negotiation that had already settled stays terminal and
+     * cannot be re-driven.
+     *
+     * The snapshot is UNTRUSTED: its state and outcome enums, the standing
+     * proposal's membership in the proposal list, each proposal's shape and
+     * sequence uniqueness, and the outcome matching the recorded state are all
+     * re-validated here; a mismatch refuses the restore. A snapshot with a
+     * write-ahead `pending` marker (a send was mid-flight at the crash) is
+     * restored CLOSED and cannot be re-driven.
+     */
+    static restore(
+        snapshot: RfqSessionSnapshot,
+        opts: Pick<
+            RfqSessionOpts,
+            "send" | "onStateChange" | "onProposal" | "persist"
+        >,
+    ): RfqSession {
+        if (!snapshot || typeof snapshot !== "object")
+            throw new Error("RfqSession.restore: snapshot required")
+        if (!Array.isArray(snapshot.proposals))
+            throw new Error("RfqSession.restore: proposals must be an array")
+        if (!RFQ_STATES.has(snapshot.state))
+            throw new Error(
+                `RfqSession.restore: invalid state ${String(snapshot.state)}`,
+            )
+        if (
+            !snapshot.outcome ||
+            typeof snapshot.outcome !== "object" ||
+            snapshot.outcome.state !== snapshot.state
+        )
+            throw new Error(
+                "RfqSession.restore: outcome missing or does not match the recorded state",
+            )
+
+        // Re-validate the proposal list: each a well-formed proposal with a
+        // unique positive sequence.
+        const seenSequences = new Set<number>()
+        for (const proposal of snapshot.proposals) {
+            if (!proposal || typeof proposal !== "object")
+                throw new Error("RfqSession.restore: malformed proposal entry")
+            if (
+                !Number.isInteger(proposal.sequence) ||
+                proposal.sequence < 1
+            )
+                throw new Error(
+                    `RfqSession.restore: invalid proposal sequence ${proposal.sequence}`,
+                )
+            if (seenSequences.has(proposal.sequence))
+                throw new Error(
+                    `RfqSession.restore: duplicate proposal sequence ${proposal.sequence}`,
+                )
+            seenSequences.add(proposal.sequence)
+        }
+        // The standing proposal, when set, must be one of the recorded
+        // proposals (same sequence and identity) — not an injected one.
+        if (snapshot.standing !== null) {
+            const match = snapshot.proposals.find(
+                p => p.sequence === snapshot.standing!.sequence,
+            )
+            if (
+                !match ||
+                match.messageHash !== snapshot.standing.messageHash ||
+                match.channelId !== snapshot.standing.channelId
+            )
+                throw new Error(
+                    "RfqSession.restore: standing proposal is not in the proposal list",
+                )
+        }
+        // An accepted negotiation must reference a known proposal.
+        if (
+            snapshot.state === "accepted" &&
+            snapshot.outcome.acceptedSequence !== undefined &&
+            !seenSequences.has(snapshot.outcome.acceptedSequence)
+        )
+            throw new Error(
+                "RfqSession.restore: accepted outcome references an unknown proposal",
+            )
+
+        const session = new RfqSession({
+            channelId: snapshot.channelId,
+            members: snapshot.members,
+            me: snapshot.me,
+            send: opts.send,
+            onStateChange: opts.onStateChange,
+            onProposal: opts.onProposal,
+            ...(opts.persist !== undefined && { persist: opts.persist }),
+        })
+        session._state = snapshot.state
+        session._standing = snapshot.standing
+        for (const proposal of snapshot.proposals)
+            session.proposals.set(proposal.sequence, proposal)
+        session._outcome = snapshot.outcome
+        // A send was in flight when the snapshot was taken: fail closed so a
+        // restart never re-drives it or re-opens an accepted deal.
+        session._closed = snapshot.closed === true || snapshot.pending !== undefined
+        return session
+    }
+
+    /**
+     * Release the session. After `close()` no further offer/counter/accept/
+     * reject/abort is allowed and inbound messages are ignored; `outcome()`
+     * and `checkpoint()` still read the final state. Idempotent, and a no-op
+     * distinction from the CH-5 terminal states — this is local shutdown, not
+     * a negotiated end.
+     */
+    close(): void {
+        this._closed = true
     }
 
     /** Open a negotiation with the first proposal. */
@@ -173,12 +395,13 @@ export class RfqSession {
             )
         const accepted = this._standing
         const body: RfqAcceptBody = { acceptedSequence: accepted.sequence }
-        const msg = await this.sendFn({
+        const msg = await this.trackSend({
             type: "accept",
             body,
             repliesTo: accepted.sequence,
         })
         this.settleAccepted(accepted, msg)
+        await this.persistSettled()
         return msg
     }
 
@@ -186,8 +409,9 @@ export class RfqSession {
     async reject(reason?: string): Promise<ChannelMessage> {
         this.assertOpen("reject")
         const body: RfqEndBody = reason ? { reason } : {}
-        const msg = await this.sendFn({ type: "reject", body })
+        const msg = await this.trackSend({ type: "reject", body })
         this.settle({ state: "rejected", reason })
+        await this.persistSettled()
         return msg
     }
 
@@ -195,8 +419,9 @@ export class RfqSession {
     async abort(reason?: string): Promise<ChannelMessage> {
         this.assertOpen("abort")
         const body: RfqEndBody = reason ? { reason } : {}
-        const msg = await this.sendFn({ type: "abort", body })
+        const msg = await this.trackSend({ type: "abort", body })
         this.settle({ state: "aborted", reason })
+        await this.persistSettled()
         return msg
     }
 
@@ -207,6 +432,7 @@ export class RfqSession {
      * layer can't catch (e.g. accept referencing an unknown proposal).
      */
     onIncoming(msg: ChannelMessage): void {
+        if (this._closed) return // released locally — ignore all traffic
         if (!RFQ_TYPES.has(msg.type)) return
         if (sameRfqMembers([msg.sender], [this.me])) return // own echo, already applied
         if (this._state !== "open") return // terminal — ignore trailing traffic
@@ -301,7 +527,7 @@ export class RfqSession {
         repliesTo?: number,
     ): Promise<ChannelMessage> {
         const body: RfqProposalBody = { terms }
-        const msg = await this.sendFn({ type, body, repliesTo })
+        const msg = await this.trackSend({ type, body, repliesTo })
         if (this.channelId && msg.channelId !== this.channelId)
             throw new Error("RfqSession: proposal changed channel")
         if (!sameRfqMembers([msg.sender], [this.me]))
@@ -320,6 +546,7 @@ export class RfqSession {
         this.proposals.set(msg.sequence, proposal)
         this._standing = proposal
         this.onProposal?.(proposal)
+        await this.persistSettled()
         return msg
     }
 
@@ -362,7 +589,33 @@ export class RfqSession {
         this.onStateChange?.(outcome)
     }
 
+    /**
+     * Deliver through `sendFn` while counting the call as in-flight, so a
+     * `checkpoint()` taken across the await refuses rather than persisting a
+     * state the peer has already moved past. The state mutation that follows
+     * each send runs synchronously after the await, so it is atomic with the
+     * counter dropping back to zero.
+     */
+    private async trackSend(opts: {
+        type: ChannelMessageType
+        body: unknown
+        repliesTo?: number
+    }): Promise<ChannelMessage> {
+        // Write-ahead: record that this message is leaving, BEFORE it does, so a
+        // crash before the local transition cannot re-open or re-drive it on
+        // restore (the `pending` marker makes restore() fail closed).
+        if (this.persist) await this.persist(this.snapshotData({ type: opts.type }))
+        this._pending++
+        try {
+            return await this.sendFn(opts)
+        } finally {
+            this._pending--
+        }
+    }
+
     private assertOpen(action: string): void {
+        if (this._closed)
+            throw new Error(`RfqSession: cannot ${action} — session is closed`)
         if (this._state !== "open")
             throw new Error(
                 `RfqSession: cannot ${action} — negotiation is ${this._state}`,
