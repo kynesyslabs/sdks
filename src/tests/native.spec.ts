@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto"
 import pprint from "@/utils/pprint"
 import { Identities } from "@/abstraction"
 import { Demos, DemosWebAuth, hexToUint8Array } from "@/websdk"
@@ -113,7 +114,7 @@ describe("Native transactions", () => {
                 const txIndex = batch * BATCH_SIZE + i
                 if (txIndex >= TXCOUNT) break
                 const randomDemos =
-                    mademos[Math.floor(Math.random() * mademos.length)]
+                    mademos[randomInt(mademos.length)]
                 promises.push(
                     (async () => {
                         try {
