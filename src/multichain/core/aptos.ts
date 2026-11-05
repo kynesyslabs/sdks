@@ -7,6 +7,8 @@ import {
     SimpleTransaction,
     UserTransactionResponse,
     Ed25519PrivateKey,
+    Ed25519PublicKey,
+    Ed25519Signature,
 } from "@aptos-labs/ts-sdk"
 import { generateSignedTransaction } from "@aptos-labs/ts-sdk";
 
@@ -15,7 +17,6 @@ import { IPayParams, XmTransactionResponse } from "./types/interfaces"
 import { required } from "./utils"
 import { XMScript } from "@/types"
 import { hexToUint8Array, uint8ArrayToHex } from "@/encryption";
-import * as forge from "node-forge";
 
 /* LICENSE
 
@@ -430,27 +431,13 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
         publicKey: string
     ): Promise<boolean> {
         try {
-            // Convert hex strings to Uint8Arrays
-            const signatureBytes = hexToUint8Array(signature)
-            const publicKeyBytes = hexToUint8Array(publicKey)
+            const pubKey = new Ed25519PublicKey(publicKey)
+            const sig = new Ed25519Signature(hexToUint8Array(signature))
 
-            // Validate input sizes
-            if (signatureBytes.length !== 64) {
-                throw new Error("Invalid signature length. Ed25519 signatures must be 64 bytes.")
-            }
-            if (publicKeyBytes.length !== 32) {
-                throw new Error("Invalid public key length. Ed25519 public keys must be 32 bytes.")
-            }
-
-            // Use node-forge for Ed25519 signature verification
-            const isValid = forge.pki.ed25519.verify({
-                message: message,
-                encoding: "utf8",
-                signature: signatureBytes,
-                publicKey: publicKeyBytes
+            return pubKey.verifySignature({
+                message,
+                signature: sig,
             })
-
-            return isValid
         } catch (error) {
             console.error("Failed to verify message:", error)
             return false
