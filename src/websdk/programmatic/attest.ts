@@ -203,11 +203,12 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          * })
          * ```
          *
-         * @param payload - The identity to unlink (`context` + `username`).
+         * @param payload - The identity to unlink (`context` + `username`,
+         *                  and `userId` when two links share the username).
          * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
          */
         removeWeb2: (
-            payload: { context: string; username: string },
+            payload: { context: string; username: string; userId?: string | number },
             opts?: ProgrammaticTxOptions,
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
