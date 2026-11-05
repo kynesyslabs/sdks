@@ -92,4 +92,16 @@ describe("web2 unlink by userId", () => {
         expect(payloadOf(signed[1])).toEqual({ context: "discord", username: "alice" })
         expect(Object.keys(payloadOf(signed[1]))).toEqual(["context", "username"])
     })
+
+    it("refuses a numeric userId that is not a safe integer", async () => {
+        const { demos, signed } = await signingDemos()
+        await expect(
+            identities.removeWeb2Identity(demos, {
+                context: "twitter",
+                username: "alice",
+                userId: 2 ** 53 + 2,
+            }),
+        ).rejects.toThrow(/not a safe integer/)
+        expect(signed).toHaveLength(0)
+    })
 })

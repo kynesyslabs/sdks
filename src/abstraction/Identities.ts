@@ -54,6 +54,13 @@ function withUserId<T extends object>(
     userId: string | number | null | undefined,
 ): T | (T & { userId: string }) {
     if (userId === undefined || userId === null || userId === "") return payload
+    // A number past 2^53 was already rounded before it got here, and the
+    // node picks the link by this id, so it could name another account.
+    if (typeof userId === "number" && !Number.isSafeInteger(userId)) {
+        throw new Error(
+            `userId ${userId} is not a safe integer; pass platform ids as strings`,
+        )
+    }
     return { ...payload, userId: String(userId) }
 }
 
