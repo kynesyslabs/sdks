@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Deprecated
+- Mnemonic wallets have one documented path: `Demos.connectWallet(mnemonic)`.
+  Restoring a mnemonic through 64-byte BIP39 seed bytes passed to
+  `connectWallet` / `start`, `DemosWebAuth.create(seed)`, `keyPairFromMnemonic`
+  or `Cryptography.newFromSeed` is deprecated: these derive a different address
+  from the same words. They keep working, return the same addresses as before,
+  and print a one-time `[demosdk] ... is deprecated` warning. 128-byte
+  prehashed seeds and 32-byte private keys are unchanged and do not warn. See
+  [Connecting a wallet](documentation/websdk.md#connecting-a-wallet).
+
 ### Fixed
 - `getNextNonce` / `getAddressNonce` docs state the exact nonce a node
   running the `nonceEnforcement` upgrade requires (confirmed + 1 + pending)

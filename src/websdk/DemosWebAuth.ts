@@ -5,6 +5,7 @@ import { required } from "./utils/required"
 import { RSA } from "./rsa"
 import { IKeyPair, IStringifiedKeyPair } from "./types/KeyPair"
 import { Cryptography } from "@/encryption/Cryptography"
+import { warnLegacySeedPath } from "@/encryption/legacySeedWarning"
 
 // TODO Could this be an universal "Sign in with DEMOS" ? Maybe
 
@@ -36,6 +37,11 @@ export class DemosWebAuth {
         return this._instance
     }
 
+    /**
+     * @deprecated For new wallets use Demos.connectWallet(demos.newMnemonic()).
+     * A supplied phrase uses the legacy derivation, not Demos.connectWallet's.
+     * Existing wallets must retain their original derivation.
+     */
     async create(seed = "") {
         let result: [boolean, IKeyPair] = [true, {} as any]
 
@@ -48,6 +54,7 @@ export class DemosWebAuth {
             if (!seed) {
                 this.keypair = Cryptography.new()
             } else {
+                warnLegacySeedPath("legacy")
                 this.keypair = Cryptography.newFromSeed(seed)
             }
 
@@ -69,10 +76,14 @@ export class DemosWebAuth {
 
     /**
      * Creates a new keypair from a seed
+     * @deprecated Use Demos.connectWallet(mnemonic) for new mnemonic wallets.
+     * This legacy derivation is preserved and returns a different address.
+     * Existing wallets must retain their original derivation and input type.
      * @param mnemonic White-space separated string of words or a bip39 seed buffer
      * @returns A new keypair
      */
     static keyPairFromMnemonic(mnemonic: string | Buffer | Uint8Array) {
+        warnLegacySeedPath("legacy")
         return Cryptography.newFromSeed(mnemonic)
     }
 

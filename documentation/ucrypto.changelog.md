@@ -1,5 +1,8 @@
 # Changelog
-This document outlines the changes that need to be made to existing code for it to work properly with the latest SDK and testnet.
+This document records the historical `v2.2.52` migration. For current wallet
+restoration, use [the mnemonic string path](./websdk.md#connecting-a-wallet).
+The current deprecation update preserves all existing derivations and addresses;
+do not repeat this historical migration on a running wallet.
 
 > [!IMPORTANT]
 > After switching to the new PQC-enabled SDK, the ed25519 keypairs for existing mnemonics will change. Connected wallets, and identities will need to be connected to the new address.
@@ -8,12 +11,14 @@ This document outlines the changes that need to be made to existing code for it 
 
 ## 1. Demos.connectWallet
 
-Instead of an ed25519 private key, `Demos.connectWallet` now accepts a master seed in the following two forms:
+Historically, `Demos.connectWallet` accepted a master seed in the following two forms:
 
 1. A mnemonic string (12 or 24 words)
-2. A 128 byte `Uint8Array` representation of the masterseed
+2. A 128 byte `Uint8Array` representation of the masterseed (now deprecated for mnemonic restoration)
 
-If you pass anything else, it will be hashed using sha3-512 to create a 128 byte master seed.
+Other byte inputs are hashed using sha3-512 to create a 128 byte master seed.
+A 64-byte BIP39 seed is not interchangeable with the phrase string. For new
+mnemonic wallets, pass the phrase directly to `connectWallet(mnemonic)`.
 
 
 The `connectWallet` method also supports these fields in the `option` parameter:

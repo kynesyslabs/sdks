@@ -240,6 +240,10 @@ const res = await demos.broadcast(validityData)
 console.log("res:", res)
 ```
 
+This example uses a fresh identity key. `DemosWebAuth.create()` is deprecated for new wallets.
+`connectWallet(privateKey)` is a deprecated byte input and prints a one-time warning; it is shown here only for a throwaway key.
+For restoring a wallet from a phrase, see [mnemonic wallet restoration](../websdk.md#connecting-a-wallet).
+
 ## Combining conditions
 
 ```ts

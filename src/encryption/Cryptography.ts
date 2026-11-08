@@ -19,6 +19,7 @@ const getFs = async () => (await import("fs")).promises
 import * as bip39 from "@scure/bip39"
 import { HexToForge } from "@/utils/dataManipulation"
 import { Hashing } from "./Hashing"
+import { warnLegacySeedPath } from "./legacySeedWarning"
 
 const algorithm = "aes-256-cbc"
 
@@ -54,10 +55,17 @@ export class Cryptography {
     // INFO Method to generate a new key pair from a seed
     /**
      * Creates a new keypair from a mnemonic
+     * @deprecated For mnemonic restoration, use Demos.connectWallet(mnemonic).
+     * This low-level legacy derivation returns a different address. Raw derived
+     * seeds are still used internally by UnifiedCrypto; do not change their encoding.
      * @param seed White-space separated string of words
      * @returns A new keypair
      */
     static newFromSeed(seed: string | Buffer | Uint8Array) {
+        // UnifiedCrypto supplies a 32-byte HKDF result, not a mnemonic/BIP39 seed.
+        if (typeof seed === "string" || seed.length === 64) {
+            warnLegacySeedPath("legacy")
+        }
         if (typeof seed === "string") {
             seed = bip39.mnemonicToSeedSync(seed)
         }

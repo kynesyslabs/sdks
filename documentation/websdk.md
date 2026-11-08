@@ -1,9 +1,9 @@
 # Using the websdk
 
-The SDK with the HTTP rewrite of the `demos` object is published at [@kynesyslabs/demosdk-http](https://www.npmjs.com/package/@kynesyslabs/demosdk-http) on NPM.
+The web SDK is published as part of `@kynesyslabs/demosdk`.
 
 ```ts
-import { demos } from "@kynesyslabs/demosdk-http/websdk"
+import { demos } from "@kynesyslabs/demosdk/websdk"
 ```
 
 ### Connecting to a node
@@ -25,39 +25,66 @@ const lastBlockHash = await demos.getLastBlockHash()
 
 ### Connecting a wallet
 
-To make authenticated calls to the node (eg. confirming or broadcasting transactions), you need to connect a keypair to the demos object.
+To create or restore a mnemonic wallet, pass the phrase string directly to
+`connectWallet(mnemonic)`. This is the supported mnemonic path for new wallets.
+The singleton `demos`, a `new Demos()` instance, and both forms of `Demos.start(rpc, mnemonic)`
+use the same derivation. The default signing algorithm is `ed25519`.
 
 ```ts
-const identity = demos.DemosWebAuth.getInstance()
-await identity.create()
-
-const pubKey = await demos.connectWallet(identity.keypair.privateKey)
+const mnemonic = demos.newMnemonic() // Save securely; reuse the exact phrase to restore.
+// To restore instead: const mnemonic = "your existing phrase"
+const pubKey = await demos.connectWallet(mnemonic)
 assert(demos.walletConnected === true)
+assert(demos.getAddress() === pubKey)
 ```
 
-You can also connect a wallet using a mnemonic.
+Do not convert the phrase with `mnemonicToSeedSync` or `DemosWebAuth` before
+connecting it. BIP39 seed bytes and the legacy helpers produce different addresses.
+`isSeed` is not a supported option. For PQC signing, pass `algorithm: "falcon"`
+or `algorithm: "ml-dsa"`; `getEd25519Address()` still returns the phrase's ed25519 identity.
 
-```ts
-const mnemonic = "property gym walk decorate laundry grab cabin outer artist nest castle vote"
+`connectWallet(Uint8Array)` (including `Buffer`), the byte forms of `start`,
+`DemosWebAuth.keyPairFromMnemonic`, `DemosWebAuth.create` (deprecated for new wallets;
+only a seeded call warns), and mnemonic use
+of `Cryptography.newFromSeed` are deprecated for restoration. They retain their
+existing derivations. BIP39 seed bytes and the legacy helpers each emit one
+console warning per loaded SDK, shared across instances and wrappers, without
+logging the phrase or seed. A 64-byte ed25519 secret key also triggers the byte-input
+warning; 32-byte keys passed to `connectWalletFromPrivateKey` and 128-byte prehashed
+inputs do not.
 
-const pubKey = await demos.connectWallet(mnemonic, {
-    isSeed: true,
-})
+**Existing wallets must keep their original derivation and input type.** This update
+does not move funds, identities, or keys. Switching a legacy wallet to the phrase
+path changes its address; an empty balance after a switch is not a successful
+recovery. `connectWalletFromPrivateKey` also derives a master-seed identity; it does
+not import a literal ed25519 keypair.
+
+### Mnemonic compatibility vector
+
+Public test phrase (never use for funds):
+
+```text
+abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
 ```
 
-Or if you have a bip39 seed.
+The supported phrase path returns
+`0x263af3be8487729727d99b35dcfdc61bf920a9164249ad117b292e6d3c7194f8`
+from `connectWallet`, `getAddress`, and `getEd25519Address`, including the singleton
+and both `start` wrappers. The regression test is
+[`mnemonicDerivation.spec.ts`](../src/tests/encryption/mnemonicDerivation.spec.ts).
 
-```ts
-const mnemonic = "property gym walk decorate laundry grab cabin outer artist nest castle vote"
-const seed = bip39.mnemonicToSeedSync(mnemonic)
+For compatibility, that same phrase also pins these **deprecated** results:
 
-const pubKey = await demos.connectWallet(seed, {
-    isSeed: true,
-})
-```
+| Historical input / API | Preserved ed25519 address |
+| --- | --- |
+| `connectWallet(mnemonicToSeedSync(phrase))`, as `Uint8Array` or `Buffer` | `0xd354410dfe09779096f679ba68ecbf0e73f45af9b363192edff052667b63bcaa` |
+| `DemosWebAuth.keyPairFromMnemonic(phrase)`, seeded `create(phrase)`, or `Cryptography.newFromSeed(phrase)`; also the helpers with BIP39 `Uint8Array` seed | `0x5004eb74216d55d439dda09f29c7611c59c426dad03d4b99e35a1b839cdff421` |
+| Either legacy helper with a BIP39 `Buffer` seed | `0x90721022644444dd2d3b7bbc0df87fa8ef1838e2c83aa9ec40a64a41d48382d2` |
+| `create(phrase)` then `connectWallet(identity.keypair.privateKey)`, as in the old example | `0x6512ecf5d8ce1b07eb6886f302c2a2d58bc09f5c5c4905b50cde6a8796ce5bae` |
 
-> [!TIP]
-> The process of converting a mnemonic to a keypair is defined at `Cryptography.newFromSeed` (in `@/encryption/Cryptography.ts`).
+The old 128-byte prehashed master-seed input is also preserved. For the UTF-8
+encoding of the unprefixed SHA3-512 hex digest of this phrase, it matches the
+supported phrase address. A BIP39 seed is 64 bytes and is a different input.
 
 > [!TIP]
 > You can get the address of the connected wallet using the `demos.getAddress()` method.
@@ -77,7 +104,7 @@ demos.disconnect()
 ```
 
 > [!IMPORTANT]
-> Calling `demos.disconnect` won't log out the `DemosWebAuth` instance. You need to call `identity.logout()` to reset that.
+> Calling `demos.disconnect` won't log out the deprecated `DemosWebAuth` instance. If you used it, call `DemosWebAuth.getInstance().logout()`.
 
 <br>
 <br>
