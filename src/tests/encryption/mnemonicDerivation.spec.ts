@@ -167,20 +167,7 @@ describe("mnemonic restoration compatibility (#171)", () => {
         }
     })
 
-    test("the public create overload only deprecates seeded calls", () => {
-        const source = ts.createSourceFile("DemosWebAuth.ts", readFileSync(resolve(__dirname, "../../websdk/DemosWebAuth.ts"), "utf8"), ts.ScriptTarget.Latest, true)
-        const authClass = source.statements.find((statement): statement is ts.ClassDeclaration => ts.isClassDeclaration(statement) && statement.name?.text === "DemosWebAuth")
-        const overloads = authClass?.members.filter((member): member is ts.MethodDeclaration => ts.isMethodDeclaration(member) && member.name.getText(source) === "create" && !member.body)
-        expect(overloads).toHaveLength(3)
-        expect(overloads?.[0].parameters).toHaveLength(0)
-        expect(ts.getJSDocDeprecatedTag(overloads![0])).toBeUndefined()
-        expect(overloads?.[1].parameters).toHaveLength(1)
-        expect(ts.getJSDocDeprecatedTag(overloads![1])).toBeDefined()
-        expect(overloads?.[2].parameters[0].questionToken).toBeDefined()
-        expect(ts.getJSDocDeprecatedTag(overloads![2])).toBeUndefined()
-    })
-
-    test("strict consumers can forward an optional seed while literal seeds remain deprecated", () => {
+    test("only the seeded create overload is deprecated; optional references type-check", () => {
         const fixture = resolve(__dirname, "fixtures/createOptionalSeed.ts")
         const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists, "tsconfig.json")!
         const config = ts.readConfigFile(configPath, ts.sys.readFile)
@@ -195,33 +182,35 @@ describe("mnemonic restoration compatibility (#171)", () => {
         const diagnostics = ts.getPreEmitDiagnostics(program).filter(diagnostic => diagnostic.file?.fileName === fixture)
         expect(diagnostics.map(diagnostic => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"))).toEqual([])
 
-        const source = program.getSourceFile(fixture)!
-        const seededCall = (source.statements.find((statement): statement is ts.VariableStatement =>
-            ts.isVariableStatement(statement) && statement.declarationList.declarations[0].name.getText(source) === "seeded"
-        )).declarationList.declarations[0].initializer as ts.CallExpression
-        const signature = program.getTypeChecker().getResolvedSignature(seededCall)
-        expect(ts.getJSDocDeprecatedTag(signature!.declaration!)).toBeDefined()
-    })
+        const source = program.getSourceFile(resolve(__dirname, "../../websdk/DemosWebAuth.ts"))!
+        const authClass = source.statements.find((statement): statement is ts.ClassDeclaration =>
+            ts.isClassDeclaration(statement) && statement.name?.text === "DemosWebAuth"
+        )!
+        const checker = program.getTypeChecker()
+        const create = checker.getTypeAtLocation(authClass).getProperty("create")!
+        const overloads = checker.getTypeOfSymbolAtLocation(create, authClass).getCallSignatures()
+            .map(signature => signature.declaration as ts.MethodDeclaration)
+        expect(overloads).toHaveLength(3)
+        expect(overloads.map(declaration => declaration.getSourceFile().fileName)).toEqual(Array(3).fill(source.fileName))
+        expect(overloads[0].parameters).toHaveLength(0)
+        expect(ts.getJSDocDeprecatedTag(overloads[0])).toBeUndefined()
+        expect(overloads[1].parameters[0].type?.getText(source)).toBe("string")
+        expect(overloads[1].parameters[0].questionToken).toBeUndefined()
+        expect(ts.getJSDocDeprecatedTag(overloads[1])).toBeDefined()
+        expect(overloads[2].parameters[0].questionToken).toBeDefined()
+        expect(ts.getJSDocDeprecatedTag(overloads[2])).toBeUndefined()
 
-    test.each(["maybeSeed", "undefined"])("the optional %s fixture call is not deprecated under package settings", argument => {
-        const fixture = resolve(__dirname, "fixtures/createOptionalSeed.ts")
-        const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists, "tsconfig.json")!
-        const config = ts.readConfigFile(configPath, ts.sys.readFile)
-        const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, process.cwd())
-        const program = ts.createProgram([fixture], { ...parsed.options, noEmit: true, skipLibCheck: true })
-        const source = program.getSourceFile(fixture)!
-        const calls: ts.CallExpression[] = []
+        const fixtureSource = program.getSourceFile(fixture)!
+        const deprecatedCalls: ts.CallExpression[] = []
         const visit = (node: ts.Node) => {
-            if (ts.isCallExpression(node) && node.arguments[0]?.getText(source) === argument) calls.push(node)
+            if (ts.isCallExpression(node) && node.expression.getText(fixtureSource) === "auth.create") deprecatedCalls.push(node)
             ts.forEachChild(node, visit)
         }
-        visit(source)
-        expect(calls).toHaveLength(1)
-        const signature = program.getTypeChecker().getResolvedSignature(calls[0])
-        expect(ts.getJSDocDeprecatedTag(signature!.declaration!)).toBeUndefined()
+        visit(fixtureSource)
+        expect(deprecatedCalls).toEqual([])
     })
 
-    test.each(["maybeSeed", "undefined"])("the optional %s fixture promise is intentionally ignored", argument => {
+    test.each(["maybeSeed", "undefined"])("the optional %s reference has its promise intentionally ignored", argument => {
         const source = ts.createSourceFile("createOptionalSeed.ts", readFileSync(resolve(__dirname, "fixtures/createOptionalSeed.ts"), "utf8"), ts.ScriptTarget.Latest, true)
         const calls: ts.CallExpression[] = []
         const visit = (node: ts.Node) => {

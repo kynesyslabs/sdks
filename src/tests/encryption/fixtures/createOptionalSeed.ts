@@ -7,6 +7,5 @@ const optionalCreate: (seed?: string) => ReturnType<DemosWebAuth["create"]> = au
 void optionalCreate(maybeSeed)
 void optionalCreate(undefined)
 const args: Parameters<DemosWebAuth["create"]> = []
-const seeded = auth.create("phrase")
 
-export { args, seeded }
+export { args }
