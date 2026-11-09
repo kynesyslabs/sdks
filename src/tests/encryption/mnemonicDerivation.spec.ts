@@ -203,6 +203,36 @@ describe("mnemonic restoration compatibility (#171)", () => {
         expect(ts.getJSDocDeprecatedTag(signature!.declaration!)).toBeDefined()
     })
 
+    test.each(["maybeSeed", "undefined"])("the optional %s fixture call is not deprecated under package settings", argument => {
+        const fixture = resolve(__dirname, "fixtures/createOptionalSeed.ts")
+        const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists, "tsconfig.json")!
+        const config = ts.readConfigFile(configPath, ts.sys.readFile)
+        const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, process.cwd())
+        const program = ts.createProgram([fixture], { ...parsed.options, noEmit: true, skipLibCheck: true })
+        const source = program.getSourceFile(fixture)!
+        const calls: ts.CallExpression[] = []
+        const visit = (node: ts.Node) => {
+            if (ts.isCallExpression(node) && node.arguments[0]?.getText(source) === argument) calls.push(node)
+            ts.forEachChild(node, visit)
+        }
+        visit(source)
+        expect(calls).toHaveLength(1)
+        const signature = program.getTypeChecker().getResolvedSignature(calls[0])
+        expect(ts.getJSDocDeprecatedTag(signature!.declaration!)).toBeUndefined()
+    })
+
+    test.each(["maybeSeed", "undefined"])("the optional %s fixture promise is intentionally ignored", argument => {
+        const source = ts.createSourceFile("createOptionalSeed.ts", readFileSync(resolve(__dirname, "fixtures/createOptionalSeed.ts"), "utf8"), ts.ScriptTarget.Latest, true)
+        const calls: ts.CallExpression[] = []
+        const visit = (node: ts.Node) => {
+            if (ts.isCallExpression(node) && node.arguments[0]?.getText(source) === argument) calls.push(node)
+            ts.forEachChild(node, visit)
+        }
+        visit(source)
+        expect(calls).toHaveLength(1)
+        expect(calls[0].parent?.kind).toBe(ts.SyntaxKind.VoidExpression)
+    })
+
     test("the shipped web2 example connects with a mnemonic", () => {
         const source = ts.createSourceFile("tryWeb2.ts", readFileSync(resolve(__dirname, "../../websdk/examples/tryWeb2.ts"), "utf8"), ts.ScriptTarget.Latest, true)
         const calls: ts.CallExpression[] = []
