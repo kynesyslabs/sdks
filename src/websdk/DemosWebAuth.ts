@@ -4,7 +4,7 @@ import forge from "node-forge"
 import { required } from "./utils/required"
 import { RSA } from "./rsa"
 import { IKeyPair, IStringifiedKeyPair } from "./types/KeyPair"
-import { Cryptography } from "@/encryption/Cryptography"
+import { Cryptography, deriveKeyPairFromSeed } from "@/encryption/Cryptography"
 import { warnLegacySeedPath } from "@/encryption/legacySeedWarning"
 
 // TODO Could this be an universal "Sign in with DEMOS" ? Maybe
@@ -37,11 +37,14 @@ export class DemosWebAuth {
         return this._instance
     }
 
+    create(): Promise<[boolean, IKeyPair]>
     /**
      * @deprecated For new wallets use Demos.connectWallet(demos.newMnemonic()).
      * A supplied phrase uses the legacy derivation, not Demos.connectWallet's.
      * Existing wallets must retain their original derivation.
      */
+    create(seed: string): Promise<[boolean, IKeyPair]>
+    create(seed?: string): Promise<[boolean, IKeyPair]>
     async create(seed = "") {
         let result: [boolean, IKeyPair] = [true, {} as any]
 
@@ -55,7 +58,7 @@ export class DemosWebAuth {
                 this.keypair = Cryptography.new()
             } else {
                 warnLegacySeedPath("legacy")
-                this.keypair = Cryptography.newFromSeed(seed)
+                this.keypair = deriveKeyPairFromSeed(seed)
             }
 
             this.loggedIn = true
@@ -84,7 +87,7 @@ export class DemosWebAuth {
      */
     static keyPairFromMnemonic(mnemonic: string | Buffer | Uint8Array) {
         warnLegacySeedPath("legacy")
-        return Cryptography.newFromSeed(mnemonic)
+        return deriveKeyPairFromSeed(mnemonic)
     }
 
     // NOTE We just have to accept valid private keys and derive the public key from them

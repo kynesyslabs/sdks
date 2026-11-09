@@ -3,6 +3,7 @@ import { Demos, demos, DemosWebAuth } from "@/websdk"
 import { mnemonicToSeedSync } from "@scure/bip39"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
+import ts from "typescript"
 
 // Public BIP39 test phrase. Never use this wallet for funds.
 const mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
@@ -13,10 +14,7 @@ const legacyBufferAddress = "0x90721022644444dd2d3b7bbc0df87fa8ef1838e2c83aa9ec4
 const legacyCreateThenConnectAddress = "0x6512ecf5d8ce1b07eb6886f302c2a2d58bc09f5c5c4905b50cde6a8796ce5bae"
 
 describe("mnemonic restoration compatibility (#171)", () => {
-    test("the docs cover unseeded create deprecation while only seeded calls warn", async () => {
-        const docs = readFileSync(resolve(__dirname, "../../../documentation/websdk.md"), "utf8")
-        expect(docs).toMatch(/`DemosWebAuth\.create` \(deprecated for new wallets;\s+only a seeded call warns\)/)
-
+    test("unseeded create does not warn", async () => {
         const originalWarn = console.warn
         const warnings: unknown[][] = []
         console.warn = (...args) => { warnings.push(args) }
@@ -136,10 +134,84 @@ describe("mnemonic restoration compatibility (#171)", () => {
         }
     })
 
-    test("Demoswork's byte-key example points readers to mnemonic restoration guidance", () => {
-        const cookbook = readFileSync(resolve(__dirname, "../../../documentation/demoswork/cookbook.md"), "utf8")
-        expect(cookbook).toMatch(/connectWallet\(identity\.keypair\.privateKey\)[\s\S]*?\[mnemonic wallet restoration\]\(\.\.\/websdk\.md#connecting-a-wallet\)/)
-        expect(cookbook).toMatch(/`DemosWebAuth\.create\(\)` is deprecated for new wallets\./)
-        expect(cookbook).toMatch(/`connectWallet\(privateKey\)` is a deprecated byte input and prints a one-time warning; it is shown here only for a throwaway key\./)
+    test("private key connection calls a subclass wallet override without a legacy warning", async () => {
+        let IsolatedDemos = Demos
+        jest.isolateModules(() => {
+            IsolatedDemos = require("../../websdk").Demos
+        })
+        class TrackedDemos extends IsolatedDemos {
+            seen: (string | Uint8Array)[] = []
+
+            override async connectWallet(seed: string | Uint8Array, options?: Parameters<Demos["connectWallet"]>[1]) {
+                this.seen.push(seed)
+                return super.connectWallet(seed, options)
+            }
+        }
+
+        const wallet = new TrackedDemos()
+        const reference = new IsolatedDemos()
+        const originalWarn = console.warn
+        const warnings: unknown[][] = []
+        console.warn = (...args) => { warnings.push(args) }
+        try {
+            const key = Uint8Array.from({ length: 32 }, () => 0x11)
+            const expected = await reference.connectWallet(key as string | Uint8Array)
+            expect(await wallet.connectWalletFromPrivateKey("11".repeat(32))).toBe(expected)
+            expect(wallet.getAddress()).toBe(expected)
+            expect(wallet.seen).toEqual([key])
+            expect(warnings).toEqual([])
+        } finally {
+            console.warn = originalWarn
+            wallet.disconnect()
+            reference.disconnect()
+        }
+    })
+
+    test("the public create overload only deprecates seeded calls", () => {
+        const source = ts.createSourceFile("DemosWebAuth.ts", readFileSync(resolve(__dirname, "../../websdk/DemosWebAuth.ts"), "utf8"), ts.ScriptTarget.Latest, true)
+        const authClass = source.statements.find((statement): statement is ts.ClassDeclaration => ts.isClassDeclaration(statement) && statement.name?.text === "DemosWebAuth")
+        const overloads = authClass?.members.filter((member): member is ts.MethodDeclaration => ts.isMethodDeclaration(member) && member.name.getText(source) === "create" && !member.body)
+        expect(overloads).toHaveLength(3)
+        expect(overloads?.[0].parameters).toHaveLength(0)
+        expect(ts.getJSDocDeprecatedTag(overloads![0])).toBeUndefined()
+        expect(overloads?.[1].parameters).toHaveLength(1)
+        expect(ts.getJSDocDeprecatedTag(overloads![1])).toBeDefined()
+        expect(overloads?.[2].parameters[0].questionToken).toBeDefined()
+        expect(ts.getJSDocDeprecatedTag(overloads![2])).toBeUndefined()
+    })
+
+    test("strict consumers can forward an optional seed while literal seeds remain deprecated", () => {
+        const fixture = resolve(__dirname, "fixtures/createOptionalSeed.ts")
+        const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists, "tsconfig.json")!
+        const config = ts.readConfigFile(configPath, ts.sys.readFile)
+        expect(config.error).toBeUndefined()
+        const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, process.cwd())
+        const program = ts.createProgram([fixture], {
+            ...parsed.options,
+            strictNullChecks: true,
+            noEmit: true,
+            skipLibCheck: true,
+        })
+        const diagnostics = ts.getPreEmitDiagnostics(program).filter(diagnostic => diagnostic.file?.fileName === fixture)
+        expect(diagnostics.map(diagnostic => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"))).toEqual([])
+
+        const source = program.getSourceFile(fixture)!
+        const seededCall = (source.statements.find((statement): statement is ts.VariableStatement =>
+            ts.isVariableStatement(statement) && statement.declarationList.declarations[0].name.getText(source) === "seeded"
+        )).declarationList.declarations[0].initializer as ts.CallExpression
+        const signature = program.getTypeChecker().getResolvedSignature(seededCall)
+        expect(ts.getJSDocDeprecatedTag(signature!.declaration!)).toBeDefined()
+    })
+
+    test("the shipped web2 example connects with a mnemonic", () => {
+        const source = ts.createSourceFile("tryWeb2.ts", readFileSync(resolve(__dirname, "../../websdk/examples/tryWeb2.ts"), "utf8"), ts.ScriptTarget.Latest, true)
+        const calls: ts.CallExpression[] = []
+        const visit = (node: ts.Node) => {
+            if (ts.isCallExpression(node) && node.expression.getText(source) === "demos.connectWallet") calls.push(node)
+            ts.forEachChild(node, visit)
+        }
+        visit(source)
+        expect(calls).toHaveLength(1)
+        expect(calls[0].arguments[0].getText(source)).toBe("demos.newMnemonic()")
     })
 })

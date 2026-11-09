@@ -14,7 +14,7 @@ do not repeat this historical migration on a running wallet.
 Historically, `Demos.connectWallet` accepted a master seed in the following two forms:
 
 1. A mnemonic string (12 or 24 words)
-2. A 128 byte `Uint8Array` representation of the masterseed (now deprecated for mnemonic restoration)
+2. A 128 byte `Uint8Array` representation of the masterseed
 
 Other byte inputs are hashed using sha3-512 to create a 128 byte master seed.
 A 64-byte BIP39 seed is not interchangeable with the phrase string. For new

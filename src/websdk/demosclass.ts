@@ -444,7 +444,7 @@ export class Demos {
                 "connectWalletFromPrivateKey: expected a 32-byte key as 64 hex chars (optionally 0x-prefixed).",
             )
         }
-        return await this.connectWallet(hexToUint8Array(clean), options)
+        return await this.connectWallet(hexToUint8Array(clean) as string | Uint8Array, options)
     }
 
     /**

@@ -44,12 +44,15 @@ connecting it. BIP39 seed bytes and the legacy helpers produce different address
 or `algorithm: "ml-dsa"`; `getEd25519Address()` still returns the phrase's ed25519 identity.
 
 `connectWallet(Uint8Array)` (including `Buffer`), the byte forms of `start`,
-`DemosWebAuth.keyPairFromMnemonic`, `DemosWebAuth.create` (deprecated for new wallets;
-only a seeded call warns), and mnemonic use
-of `Cryptography.newFromSeed` are deprecated for restoration. They retain their
+`DemosWebAuth.keyPairFromMnemonic`, seeded `DemosWebAuth.create(phrase)`, and
+`Cryptography.newFromSeed` (for phrase and byte inputs) are deprecated for
+new wallets. `create()` without a seed does not warn. They retain their
 existing derivations. BIP39 seed bytes and the legacy helpers each emit one
 console warning per loaded SDK, shared across instances and wrappers, without
-logging the phrase or seed. A 64-byte ed25519 secret key also triggers the byte-input
+logging the phrase or seed. `Cryptography.newFromSeed` warns for phrases and 64-byte inputs only.
+With `strictNullChecks` off, forwarding an optional seed (`create(maybeSeed)`)
+shows as deprecated in editors; call `create()` when there is no seed.
+A 64-byte ed25519 secret key also triggers the byte-input
 warning; 32-byte keys passed to `connectWalletFromPrivateKey` and 128-byte prehashed
 inputs do not.
 
@@ -104,7 +107,7 @@ demos.disconnect()
 ```
 
 > [!IMPORTANT]
-> Calling `demos.disconnect` won't log out the deprecated `DemosWebAuth` instance. If you used it, call `DemosWebAuth.getInstance().logout()`.
+> Calling `demos.disconnect` won't log out a `DemosWebAuth` instance. If you created one with `new DemosWebAuth()`, call `logout()` on that same instance. If you used the singleton, call `DemosWebAuth.getInstance().logout()`.
 
 <br>
 <br>

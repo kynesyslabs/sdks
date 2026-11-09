@@ -3,7 +3,7 @@ import { Enigma } from "./PQC/enigma"
 import { hkdf } from "@noble/hashes/hkdf"
 import { randomBytes } from "@noble/hashes/utils"
 import * as forge from "node-forge"
-import { Cryptography } from "./Cryptography"
+import { Cryptography, deriveKeyPairFromSeed } from "./Cryptography"
 import { PQCAlgorithm, SigningAlgorithm } from '@/types/cryptography';
 
 /* The two interfaces below are used to route the encrypted and signed data through the unified crypto system */
@@ -254,7 +254,7 @@ export class UnifiedCrypto {
 
         // Generating the identity for the given algorithm
         if (algorithm === "ed25519") {
-            this.ed25519KeyPair = Cryptography.newFromSeed(seed)
+            this.ed25519KeyPair = deriveKeyPairFromSeed(seed)
         } else if (algorithm === "falcon") {
             await this.enigma.generate_falcon_signing_keypair(seed)
         } else if (algorithm === "ml-dsa") {
