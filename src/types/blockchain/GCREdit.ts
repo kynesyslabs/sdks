@@ -255,6 +255,7 @@ export interface GCREditValidatorStake {
     connectionUrl?: string           // only meaningful for the initial stake
     nft?: ValidatorNftProof          // present on the stake that creates the validator
     evidenceTx?: string              // evict only: Solana transfer that moved the NFT
+    proofTx?: string                 // evict only: the proof the seat was taken with
     txhash: string
 }
 

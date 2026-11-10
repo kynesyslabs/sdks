@@ -10,6 +10,8 @@ export interface ValidatorChallengePayload {
     validator: string
     /** Base58 signature of the Solana transfer that moved the NFT. */
     evidenceTx: string
+    /** The seat's recorded proof; the eviction applies only while the seat still rests on it. */
+    proofTx: string
 }
 
 export type ValidatorChallengeTransactionContent = Omit<TransactionContent, 'type' | 'data'> & {

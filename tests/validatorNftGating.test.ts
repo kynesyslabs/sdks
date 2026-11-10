@@ -111,7 +111,7 @@ describe("validatorStake edit generation with an NFT proof", () => {
 describe("validatorChallenge edit generation", () => {
     test("produces an evict edit against the challenged validator", async () => {
         const edits = await stakeEdits(
-            makeTx("validatorChallenge", { validator: OTHER, evidenceTx: SIG }),
+            makeTx("validatorChallenge", { validator: OTHER, evidenceTx: SIG, proofTx: SIG }),
         )
         expect(edits).toHaveLength(1)
         expect(edits[0]).toEqual({
@@ -121,6 +121,7 @@ describe("validatorChallenge edit generation", () => {
             operation: "evict",
             amount: "0",
             evidenceTx: SIG,
+            proofTx: SIG,
             txhash: "deadbeef".repeat(8),
         })
     })
@@ -128,16 +129,21 @@ describe("validatorChallenge edit generation", () => {
     test("rejects a validator that is not an ed25519 address", async () => {
         await expect(
             stakeEdits(
-                makeTx("validatorChallenge", { validator: "0x1234", evidenceTx: SIG }),
+                makeTx("validatorChallenge", { validator: "0x1234", evidenceTx: SIG, proofTx: SIG }),
             ),
         ).rejects.toThrow("validator must be an ed25519 address")
     })
 
-    test("rejects an evidenceTx that is not a base58 signature", async () => {
+    test("rejects an evidenceTx or proofTx that is not a base58 signature", async () => {
         await expect(
             stakeEdits(
-                makeTx("validatorChallenge", { validator: OTHER, evidenceTx: "0xabc" }),
+                makeTx("validatorChallenge", { validator: OTHER, evidenceTx: "0xabc", proofTx: SIG }),
             ),
         ).rejects.toThrow("evidenceTx must be a base58 signature")
+        await expect(
+            stakeEdits(
+                makeTx("validatorChallenge", { validator: OTHER, evidenceTx: SIG, proofTx: "0xabc" }),
+            ),
+        ).rejects.toThrow("proofTx must be a base58 signature")
     })
 })

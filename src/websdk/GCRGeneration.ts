@@ -170,6 +170,7 @@ export class GCRGeneration {
                 const p = this.requirePayload<{
                     validator: string
                     evidenceTx: string
+                    proofTx: string
                 }>(content, "validatorChallenge")
                 if (
                     typeof p.validator !== "string" ||
@@ -184,6 +185,11 @@ export class GCRGeneration {
                         "[GCRGeneration] validatorChallenge.evidenceTx must be a base58 signature",
                     )
                 }
+                if (!isBase58(p.proofTx)) {
+                    throw new Error(
+                        "[GCRGeneration] validatorChallenge.proofTx must be a base58 signature",
+                    )
+                }
                 gcrEdits.push({
                     type: "validatorStake",
                     isRollback,
@@ -191,6 +197,7 @@ export class GCRGeneration {
                     operation: "evict",
                     amount: "0",
                     evidenceTx: p.evidenceTx,
+                    proofTx: p.proofTx,
                     txhash: tx.hash,
                 })
                 break

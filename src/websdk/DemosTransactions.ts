@@ -787,17 +787,20 @@ export const DemosTransactions = {
     /**
      * Create a signed `validatorChallenge` transaction. Any account may
      * submit one; the network evicts `validator` when `evidenceTx` is a
-     * finalized Solana transfer that moved its NFT out of the recorded wallet.
+     * finalized Solana transfer that moved its NFT out of the recorded wallet,
+     * and only while the seat still rests on `proofTx`.
      */
     async challengeValidator(
         validator: string,
         evidenceTx: string,
+        proofTx: string,
         demos: Demos,
         options?: { nonce?: number },
     ) {
         required(demos.keypair, "Wallet not connected")
         required(validator, "Validator address is required")
         required(evidenceTx, "Evidence transaction signature is required")
+        required(proofTx, "Recorded proof signature is required")
 
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
@@ -813,7 +816,7 @@ export const DemosTransactions = {
         tx.content.amount = 0
         tx.content.type = "validatorChallenge"
         tx.content.timestamp = Date.now()
-        tx.content.data = ["validatorChallenge", { validator, evidenceTx }]
+        tx.content.data = ["validatorChallenge", { validator, evidenceTx, proofTx }]
 
         return await demos.sign(tx)
     },
