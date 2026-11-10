@@ -51,7 +51,14 @@ describe("identity circuit artifacts", () => {
     })
 })
 
-describe("identity circuit artifacts without WebCrypto", () => {
+describe("identity circuit artifacts without WebCrypto or Node crypto", () => {
+    beforeAll(() => {
+        jest.resetModules()
+        jest.doMock("crypto", () => {
+            throw new Error("crypto is not bundled for browsers")
+        })
+    })
+    afterAll(() => jest.dontMock("crypto"))
     const realFetch = globalThis.fetch
     const realCrypto = Object.getOwnPropertyDescriptor(globalThis, "crypto")
     afterEach(() => {
@@ -61,6 +68,7 @@ describe("identity circuit artifacts without WebCrypto", () => {
 
     it("still checks the digest", async () => {
         Object.defineProperty(globalThis, "crypto", { value: undefined, configurable: true })
+        const { loadArtifact } = await import("@/encryption/zK/identity/artifacts")
         const data = new Uint8Array([7, 8, 9])
         const artifact = artifactFor(data)
         serve([data])

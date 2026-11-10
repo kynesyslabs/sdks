@@ -6,7 +6,7 @@
  * the secret into a public signal.
  */
 
-import { createHash } from "crypto"
+import { sha256 } from "@noble/hashes/sha2"
 
 const CEREMONY_COMMIT = "a03628e63e939c2c05c6659a1b277c9a7b186fc6"
 const BASE_URL = `https://raw.githubusercontent.com/kynesyslabs/zk_ceremony/${CEREMONY_COMMIT}/final`
@@ -33,13 +33,13 @@ export const IDENTITY_ARTIFACTS = {
 
 const cache = new Map<string, Promise<Uint8Array>>()
 
-// WebCrypto is missing on Node 18 and on insecure browser origins.
+// WebCrypto is missing on Node 18 and on plain-HTTP pages, where browser
+// bundles have no Node crypto either.
 async function sha256Hex(data: Uint8Array): Promise<string> {
-    if (!globalThis.crypto?.subtle) {
-        return createHash("sha256").update(data).digest("hex")
-    }
-    const digest = await globalThis.crypto.subtle.digest("SHA-256", data as BufferSource)
-    return Array.from(new Uint8Array(digest))
+    const digest = globalThis.crypto?.subtle
+        ? new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", data as BufferSource))
+        : sha256(data)
+    return Array.from(digest)
         .map(b => b.toString(16).padStart(2, "0"))
         .join("")
 }
