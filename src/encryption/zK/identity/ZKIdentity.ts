@@ -195,7 +195,7 @@ export class ZKIdentity {
         // 6. Create attestation payload
         const payload: IdentityAttestationPayload = {
             nullifier_hash: publicSignals[0],
-            merkle_root: publicSignals[1],
+            merkle_root: publicSignals[2],
             proof,
             public_signals: publicSignals,
             provider: this.getProvider(),

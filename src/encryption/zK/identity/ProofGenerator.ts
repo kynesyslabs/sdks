@@ -80,7 +80,7 @@ export interface MerkleProof {
  *     merkleProof,
  *     merkleRoot
  * )
- * // result: { proof: {...}, publicSignals: [nullifier, merkleRoot, context] }
+ * // result: { proof: {...}, publicSignals: [nullifier, context, merkleRoot] }
  * ```
  */
 export async function generateIdentityProof(
@@ -198,11 +198,15 @@ export async function verifyProof(
 // Helper Functions
 // ============================================================================
 
+const BN254_SCALAR_FIELD = BigInt(
+    '21888242871839275222246405745257275088548364400416034343698204186575808495617',
+)
+
 /**
- * Convert string to BigInt using simple hashing
- *
- * @param str - Input string to convert
- * @returns BigInt representation of the string
+ * Field element for a string input, reduced like poseidon-lite reduces the
+ * commitment inputs. The witness calculator truncates an unreduced input to
+ * 256 bits instead, so a generated secret (64 bytes) would yield a leaf that
+ * is not the registered commitment.
  */
 function stringToBigInt(str: string): bigint {
     const encoder = new TextEncoder()
@@ -210,5 +214,5 @@ function stringToBigInt(str: string): bigint {
     const hex = Array.from(bytes)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
-    return BigInt('0x' + hex)
+    return BigInt('0x' + hex) % BN254_SCALAR_FIELD
 }
