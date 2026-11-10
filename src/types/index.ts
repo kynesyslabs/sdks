@@ -61,6 +61,9 @@ export {
     ValidatorUnstakePayload,
     ValidatorExitTransaction,
     ValidatorExitPayload,
+    ValidatorChallengeTransaction,
+    ValidatorChallengePayload,
+    ValidatorNftProof,
     // Stackable-genesis governance (Phase 1 / upgradable_network)
     NetworkUpgradeTransaction,
     NetworkUpgradePayload,

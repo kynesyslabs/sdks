@@ -23,6 +23,7 @@ import { TokenCreationPayload, TokenExecutionPayload } from "./TransactionSubtyp
 import { ValidatorStakePayload } from "./TransactionSubtypes/ValidatorStakeTransaction"
 import { ValidatorUnstakePayload } from "./TransactionSubtypes/ValidatorUnstakeTransaction"
 import { ValidatorExitPayload } from "./TransactionSubtypes/ValidatorExitTransaction"
+import { ValidatorChallengePayload } from "./TransactionSubtypes/ValidatorChallengeTransaction"
 import { NetworkUpgradePayload } from "./TransactionSubtypes/NetworkUpgradeTransaction"
 import { NetworkUpgradeVotePayload } from "./TransactionSubtypes/NetworkUpgradeVoteTransaction"
 import { AtomicWorkPayload } from "./TransactionSubtypes/AtomicWorkTransaction"
@@ -59,6 +60,7 @@ export type TransactionContentData =
     | ["validatorStake", ValidatorStakePayload]
     | ["validatorUnstake", ValidatorUnstakePayload]
     | ["validatorExit", ValidatorExitPayload]
+    | ["validatorChallenge", ValidatorChallengePayload]
     | ["networkUpgrade", NetworkUpgradePayload]
     | ["networkUpgradeVote", NetworkUpgradeVotePayload]
     | ["atomicWork", AtomicWorkPayload]
@@ -92,6 +94,7 @@ export interface TransactionContent {
     | "validatorStake"
     | "validatorUnstake"
     | "validatorExit"
+    | "validatorChallenge"
     | "networkUpgrade"
     | "networkUpgradeVote"
     | "atomicWork"

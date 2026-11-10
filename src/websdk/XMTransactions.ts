@@ -7,6 +7,7 @@ import { DemosTransactions } from "./DemosTransactions"
 import { IKeyPair } from "./types/KeyPair"
 import { Demos } from "./demosclass"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
+import { resolveNonce } from "@/utils"
 
 // INFO Using the methods below to create, manage and send chainscript-like scripts
 const XMTransactions = {
@@ -199,6 +200,7 @@ export function prepareXMScript({
 async function prepareXMPayload(
     xm_payload: XMScript,
     demos: Demos,
+    options?: { nonce?: number },
 ): Promise<Transaction> {
     const tx: Transaction = DemosTransactions.empty()
 
@@ -206,13 +208,21 @@ async function prepareXMPayload(
     const ed25519_address = uint8ArrayToHex(ed25519.publicKey as Uint8Array)
     tx.content.to = ed25519_address
 
+    // The nonce comes from the connected node like every other builder; an
+    // unset nonce signs as 0 and is refused.
+    const nonce = await resolveNonce(
+        options?.nonce,
+        () => demos.getAddressNonce(ed25519_address),
+        demos._nonceReserver(ed25519_address),
+    )
+
     // Setting the type and data
     tx.content.type = "crosschainOperation"
     tx.content.data = ["crosschainOperation", xm_payload]
     // Producing a timestamp
     tx.content.timestamp = Date.now()
     // Signing the transaction
-    return await demos.sign(tx)
+    return await demos.sign(tx, { nonce })
 }
 
 export { prepareXMPayload, XMTransactions }

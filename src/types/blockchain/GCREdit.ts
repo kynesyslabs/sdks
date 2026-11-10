@@ -1,6 +1,7 @@
 // TODO See handleGCR.ts for the execution of the GCREdit
 // TODO See endpointHandlers.ts for the derivation of the GCREdit from a Transaction (see handleExecuteTransaction)
 
+import { ValidatorNftProof } from "./TransactionSubtypes/ValidatorStakeTransaction"
 import {
     IdentityAttestationPayload,
     IdentityCommitmentPayload,
@@ -249,9 +250,11 @@ export interface GCREditValidatorStake {
     type: "validatorStake"
     isRollback: boolean
     account: string                  // validator ed25519 pubkey hex
-    operation: "stake" | "unstake" | "exit"
-    amount: string                   // bigint-as-string; "0" for unstake/exit
+    operation: "stake" | "unstake" | "exit" | "evict"
+    amount: string                   // bigint-as-string; "0" for unstake/exit/evict
     connectionUrl?: string           // only meaningful for the initial stake
+    nft?: ValidatorNftProof          // present on the stake that creates the validator
+    evidenceTx?: string              // evict only: Solana transfer that moved the NFT
     txhash: string
 }
 

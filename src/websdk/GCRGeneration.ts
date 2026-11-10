@@ -2,6 +2,7 @@ import {
     GCREdit,
     GCREditIdentity,
     GCREditStorageProgram,
+    GCREditValidatorStake,
     Web2TLSNGCRData,
     Web2GCRData,
 } from "@/types/blockchain/GCREdit"
@@ -17,12 +18,20 @@ import {
 import { Hashing } from "@/encryption/Hashing"
 import { INativePayload } from "@/types/native"
 import { Transaction, TransactionContent } from "@/types/blockchain/Transaction"
+import { ValidatorNftProof } from "@/types/blockchain/TransactionSubtypes/ValidatorStakeTransaction"
 import {
     StorageProgramPayload,
     STORAGE_PROGRAM_CONSTANTS,
 } from "@/types/blockchain/TransactionSubtypes/StorageProgramTransaction"
 import { OS_PER_DEM } from "@/denomination"
 import { validateEd25519Address } from "@/utils"
+
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,88}$/
+
+/** Whether `value` is a base58 string of Solana address or signature length. */
+function isBase58(value: unknown): value is string {
+    return typeof value === "string" && BASE58.test(value)
+}
 
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
@@ -33,6 +42,26 @@ export class GCRGeneration {
     // Fail-fast payload extractor — throws explicitly instead of silently
     // defaulting missing/wrong-typed fields, which can flip semantics
     // (e.g. a vote without `approve` would become an implicit reject).
+    /** The three base58 fields of an NFT proof, or a throw naming the bad one. */
+    private static requireNftProof(raw: unknown): ValidatorNftProof {
+        if (raw === null || typeof raw !== "object") {
+            throw new Error("[GCRGeneration] validatorStake.nft must be an object")
+        }
+        const nft = raw as Record<string, unknown>
+        for (const key of ["mint", "owner", "proofTx"] as const) {
+            if (!isBase58(nft[key])) {
+                throw new Error(
+                    `[GCRGeneration] validatorStake.nft.${key} must be a base58 string`,
+                )
+            }
+        }
+        return {
+            mint: nft.mint as string,
+            owner: nft.owner as string,
+            proofTx: nft.proofTx as string,
+        }
+    }
+
     private static requirePayload<T>(
         content: TransactionContent,
         expectedType: TransactionContent["type"],
@@ -110,6 +139,7 @@ export class GCRGeneration {
                 const p = this.requirePayload<{
                     amount: string
                     connectionUrl: string
+                    nft?: ValidatorNftProof
                 }>(content, "validatorStake")
                 if (typeof p.amount !== "string" || !/^\d+$/.test(p.amount)) {
                     throw new Error(
@@ -121,13 +151,46 @@ export class GCRGeneration {
                         "[GCRGeneration] validatorStake.connectionUrl must be a string",
                     )
                 }
-                gcrEdits.push({
+                const edit: GCREditValidatorStake = {
                     type: "validatorStake",
                     isRollback,
                     account: content.from_ed25519_address,
                     operation: "stake",
                     amount: p.amount,
                     connectionUrl: p.connectionUrl,
+                    txhash: tx.hash,
+                }
+                if (p.nft !== undefined) {
+                    edit.nft = this.requireNftProof(p.nft)
+                }
+                gcrEdits.push(edit)
+                break
+            }
+            case "validatorChallenge": {
+                const p = this.requirePayload<{
+                    validator: string
+                    evidenceTx: string
+                }>(content, "validatorChallenge")
+                if (
+                    typeof p.validator !== "string" ||
+                    !validateEd25519Address(p.validator)
+                ) {
+                    throw new Error(
+                        "[GCRGeneration] validatorChallenge.validator must be an ed25519 address",
+                    )
+                }
+                if (!isBase58(p.evidenceTx)) {
+                    throw new Error(
+                        "[GCRGeneration] validatorChallenge.evidenceTx must be a base58 signature",
+                    )
+                }
+                gcrEdits.push({
+                    type: "validatorStake",
+                    isRollback,
+                    account: p.validator,
+                    operation: "evict",
+                    amount: "0",
+                    evidenceTx: p.evidenceTx,
                     txhash: tx.hash,
                 })
                 break

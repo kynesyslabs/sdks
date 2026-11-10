@@ -1995,6 +1995,16 @@ export class Demos {
     }
 
     /**
+     * The validator whose seat a Solana NFT mint currently backs, active or
+     * unstaking. Returns null when the mint is free to back a new seat.
+     */
+    async getValidatorByMint(mint: string): Promise<ValidatorInfo | null> {
+        return (await this.nodeCall("getValidatorByMint", {
+            mint,
+        })) as ValidatorInfo | null
+    }
+
+    /**
      * Convenience: return a single validator's current staked amount as a
      * bigint-encoded string. Returns `"0"` for non-validators.
      */

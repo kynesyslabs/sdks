@@ -1,5 +1,9 @@
 import forge from "node-forge"
 import { AtomicWorkPayload } from "@/types/blockchain/TransactionSubtypes/AtomicWorkTransaction"
+import type {
+    ValidatorNftProof,
+    ValidatorStakePayload,
+} from "@/types/blockchain/TransactionSubtypes/ValidatorStakeTransaction"
 
 import { Demos } from "./demosclass"
 import { sha256 } from "./utils/sha256"
@@ -720,12 +724,14 @@ export const DemosTransactions = {
      * @param connectionUrl - Validator's public endpoint (required on first stake;
      *                        subsequent top-ups may overwrite it).
      * @param demos - The demos instance (for nonce + signing).
+     * @param options.nft - NFT proof, required on the stake that creates the
+     *                      validator and omitted on top-ups.
      */
     async stake(
         amount: string,
         connectionUrl: string,
         demos: Demos,
-        options?: { nonce?: number },
+        options?: { nonce?: number; nft?: ValidatorNftProof },
     ) {
         required(demos.keypair, "Wallet not connected")
         required(amount, "Stake amount is required")
@@ -762,7 +768,52 @@ export const DemosTransactions = {
         tx.content.amount = 0
         tx.content.type = "validatorStake"
         tx.content.timestamp = Date.now()
-        tx.content.data = ["validatorStake", { amount, connectionUrl }]
+        const payload: ValidatorStakePayload = { amount, connectionUrl }
+        if (options?.nft !== undefined) {
+            for (const key of ["mint", "owner", "proofTx"] as const) {
+                required(options.nft[key], `nft.${key} is required`)
+            }
+            payload.nft = {
+                mint: options.nft.mint,
+                owner: options.nft.owner,
+                proofTx: options.nft.proofTx,
+            }
+        }
+        tx.content.data = ["validatorStake", payload]
+
+        return await demos.sign(tx)
+    },
+
+    /**
+     * Create a signed `validatorChallenge` transaction. Any account may
+     * submit one; the network evicts `validator` when `evidenceTx` is a
+     * finalized Solana transfer that moved its NFT out of the recorded wallet.
+     */
+    async challengeValidator(
+        validator: string,
+        evidenceTx: string,
+        demos: Demos,
+        options?: { nonce?: number },
+    ) {
+        required(demos.keypair, "Wallet not connected")
+        required(validator, "Validator address is required")
+        required(evidenceTx, "Evidence transaction signature is required")
+
+        const tx = DemosTransactions.empty()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
+        )
+
+        tx.content.to = validator
+        tx.content.nonce = nonce
+        tx.content.amount = 0
+        tx.content.type = "validatorChallenge"
+        tx.content.timestamp = Date.now()
+        tx.content.data = ["validatorChallenge", { validator, evidenceTx }]
 
         return await demos.sign(tx)
     },
