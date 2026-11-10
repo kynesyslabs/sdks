@@ -119,6 +119,7 @@
         "@coral-xyz/anchor": "^0.32.1",
         "@cosmjs/proto-signing": "^0.32.4",
         "@cosmjs/stargate": "^0.32.4",
+        "@cryptkeeperzk/ffjavascript": "^0.2.59",
         "@cryptkeeperzk/snarkjs": "^0.7.2",
         "@metaplex-foundation/js": "^0.20.1",
         "@multiversx/sdk-core": "^13.17.2",

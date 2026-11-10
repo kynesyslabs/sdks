@@ -3,17 +3,44 @@
  *
  * REVIEW: Phase 9 - SDK Integration
  * REVIEW: Phase 10.1 - Production Implementation (Real snarkjs proof generation)
- * REVIEW: Phase 10.4 - CDN Integration (Production-ready with CDN URLs)
  *
  * Generates Groth16 ZK-SNARK proofs for identity attestations using snarkjs.
- * Circuit artifacts (WASM, proving key, verification key) are loaded from CDN.
+ * Circuit artifacts (WASM, proving key, verification key) are the ceremony's
+ * final keys, pinned by digest (see ./artifacts).
  */
+
+import { IDENTITY_ARTIFACTS, loadArtifact } from './artifacts'
 
 // REVIEW: Phase 10.1 - Production cryptographic implementation
 // snarkjs is loaded lazily (dynamic import inside the proof/verify functions):
 // a static import pulls snarkjs → node `fs` into the eager graph, which breaks
 // browser bundles that merely touch `encryption`/`websdk`. It's only needed when
 // a proof is actually generated/verified.
+
+let singleThreadCurve: Promise<void> | undefined
+
+/**
+ * This snarkjs fork starts its workers from blob: URLs, which Node and Bun
+ * refuse, so outside a browser every proof and verification would fail.
+ * snarkjs reuses the curve cached in `globalThis.curve_bn128`, so a
+ * single-threaded curve placed there keeps the work on the calling thread; the
+ * identity circuit proves in about half a second without workers. Call after
+ * snarkjs is loaded: loading ffjavascript resets the cache.
+ */
+function useSingleThreadCurveOutsideBrowser(): Promise<void> {
+    if (typeof process === 'undefined' || !process.versions?.node) {
+        return Promise.resolve()
+    }
+    singleThreadCurve ??= (async () => {
+        const { buildBn128 } = await import('@cryptkeeperzk/ffjavascript')
+        const cache = globalThis as { curve_bn128?: unknown }
+        cache.curve_bn128 ??= await buildBn128(true)
+    })().catch(error => {
+        singleThreadCurve = undefined
+        throw error
+    })
+    return singleThreadCurve
+}
 
 export interface ZKProof {
     pi_a: string[]
@@ -81,9 +108,11 @@ export async function generateIdentityProof(
         merkle_root: merkleRoot,
     }
 
-    // REVIEW: Phase 10.4 - Production CDN URLs for circuit artifacts
-    const wasmPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle.wasm'
-    const zkeyPath = 'https://files.demos.sh/zk-circuits/v1/identity_with_merkle_final.zkey'
+    // Passed as bytes: snarkjs reads a string as a local path outside the browser.
+    const [wasm, zkey] = await Promise.all([
+        loadArtifact(IDENTITY_ARTIFACTS.wasm),
+        loadArtifact(IDENTITY_ARTIFACTS.zkey),
+    ])
 
     // REVIEW: Phase 10.1 - Production-ready proof generation using snarkjs
     let snarkjs: typeof import('@cryptkeeperzk/snarkjs')
@@ -96,10 +125,11 @@ export async function generateIdentityProof(
                 `${error instanceof Error ? error.message : String(error)}`,
         )
     }
+    await useSingleThreadCurveOutsideBrowser()
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
         circuitInputs,
-        wasmPath,
-        zkeyPath,
+        wasm,
+        zkey,
     )
 
     // Convert proof to our ZKProof format
@@ -142,15 +172,8 @@ export async function verifyProof(
     proof: ZKProof,
     publicSignals: string[],
 ): Promise<boolean> {
-    // REVIEW: Phase 10.4 - Load verification key from CDN
-    const vkeyUrl = 'https://files.demos.sh/zk-circuits/v1/verification_key_merkle.json'
-
     try {
-        const response = await fetch(vkeyUrl)
-        if (!response.ok) {
-            throw new Error(`Failed to load verification key: ${response.status} ${response.statusText}`)
-        }
-        const vkey = await response.json()
+        const vkey = JSON.parse(new TextDecoder().decode(await loadArtifact(IDENTITY_ARTIFACTS.vkey)))
 
         // REVIEW: Phase 10.1 - Production-ready verification using snarkjs
         // Convert our ZKProof format to snarkjs format
@@ -162,6 +185,7 @@ export async function verifyProof(
         }
 
         const snarkjs = await import('@cryptkeeperzk/snarkjs')
+        await useSingleThreadCurveOutsideBrowser()
         return await snarkjs.groth16.verify(vkey, publicSignals, snarkjsProof)
     } catch (error) {
         throw new Error(
