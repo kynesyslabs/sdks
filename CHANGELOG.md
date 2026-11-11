@@ -11,6 +11,9 @@
   keeps the pre-settlement transfer for networks without the fork.
 
 ### Fixed
+- `L2PS.encryptTx` no longer names the inner receiver in the public outer
+  transaction (outer `to` is the sender) and pads the plaintext to 1024-char
+  buckets so the ciphertext length does not reveal the amount's size.
 - `getNextNonce` / `getAddressNonce` docs state the exact nonce a node
   running the `nonceEnforcement` upgrade requires (confirmed + 1 + pending)
   and no longer quote error strings; tests drive a DAHR request and cover the

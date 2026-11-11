@@ -15,6 +15,9 @@ import { Hashing } from "@/encryption/Hashing";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
 import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
 
+/** Plaintexts are padded to a multiple of this many characters before encryption. */
+export const L2PS_PLAINTEXT_BUCKET = 1024;
+
 /**
  * Configuration interface for L2PS instances.
  * Defines the structure for L2PS network configuration and metadata.
@@ -220,7 +223,14 @@ export default class L2PS {
         }
 
         try {
-            const txString = JSON.stringify(tx);
+            // AES-GCM ciphertext is as long as the plaintext, so an unpadded
+            // transfer leaks the digit count of its amount. JSON.parse ignores
+            // trailing whitespace, so decryptors of any version accept this.
+            const json = JSON.stringify(tx);
+            const txString = json.padEnd(
+                Math.ceil((json.length + 1) / L2PS_PLAINTEXT_BUCKET) * L2PS_PLAINTEXT_BUCKET,
+                " ",
+            );
             const txBuffer = forge.util.createBuffer(txString);
             const cipher = forge.cipher.createCipher('AES-GCM', this.privateKey);
 
@@ -255,7 +265,9 @@ export default class L2PS {
             const encryptedTxContent: L2PSTransactionContent = {
                 type: "l2psEncryptedTx",
                 from: senderIdentity || tx.content.from,
-                to: tx.content.to,
+                // The outer transaction is public: naming the inner receiver
+                // here would reveal who is paid. The sender is already public.
+                to: tx.content.from_ed25519_address || tx.content.from,
                 from_ed25519_address: tx.content.from_ed25519_address,
                 amount: 0,
                 data: ["l2psEncryptedTx", encryptedPayload],

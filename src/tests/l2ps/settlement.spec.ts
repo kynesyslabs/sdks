@@ -205,6 +205,30 @@ describe("buildSettledL2PSTransfer", () => {
         expect(payloadOf(decrypted).settlement).toEqual(payloadOf(tx).settlement)
     })
 
+    it("keeps the receiver and the amount out of the public outer transaction", async () => {
+        const demos = await connectedDemos()
+        const l2ps = await L2PS.create()
+        l2ps.setConfig({ uid: UID, config: { created_at_block: 0, known_rpcs: [] } })
+        const amount = 987_654_321_123n
+        const inner = await buildSettledL2PSTransfer(demos, { to: TO, amount, l2psUid: UID })
+        const outer = await l2ps.encryptTx(inner)
+
+        const json = JSON.stringify(outer).toLowerCase()
+        expect(json).not.toContain(TO.slice(2).toLowerCase())
+        expect(json).not.toContain(amount.toString())
+        expect(outer.content.to).toBe(inner.content.from)
+        expect(outer.content.amount).toBe(0)
+
+        // Ciphertext length must not track the amount's digit count.
+        const small = await l2ps.encryptTx(
+            await buildSettledL2PSTransfer(demos, { to: TO, amount: 1n, l2psUid: UID }),
+        )
+        expect(small.content.data[1].encrypted_data.length).toBe(
+            outer.content.data[1].encrypted_data.length,
+        )
+        expect(payloadOf(await l2ps.decryptTx(outer)).args[1]).toBe(amount.toString())
+    })
+
     it("uses a given nonce, fee and chain id", async () => {
         const demos = await connectedDemos()
         const tx = await buildSettledL2PSTransfer(demos, {
