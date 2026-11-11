@@ -9,7 +9,8 @@
  */
 
 // REVIEW: Phase 10.1 - Production cryptographic implementation
-import { poseidon2 } from 'poseidon-lite'
+import { poseidon2, poseidon3 } from 'poseidon-lite'
+import { stringToFieldElement } from './attestationContext'
 
 /**
  * Generate a Poseidon hash commitment from provider ID and secret
@@ -38,7 +39,33 @@ export function generateCommitment(providerId: string, secret: string): string {
 }
 
 /**
+ * The nullifier a proof under `context` emits: Poseidon(provider_id, secret,
+ * context) over the same field elements the prover feeds the circuit. The
+ * node records it per attestation, so this is the value to look up before
+ * proving again.
+ *
+ * @param providerId - Provider identifier (e.g., "github:12345")
+ * @param secret - User's secret value
+ * @param context - Attestation context; nodes accept only `ZK_ATTESTATION_CONTEXT`
+ * @returns Nullifier as a decimal string, as in the proof's public signals
+ */
+export function generateAttestationNullifier(
+    providerId: string,
+    secret: string,
+    context: string,
+): string {
+    return poseidon3([
+        stringToFieldElement(providerId),
+        stringToFieldElement(secret),
+        stringToFieldElement(context),
+    ]).toString()
+}
+
+/**
  * Generate a nullifier from provider ID and context
+ *
+ * @deprecated Not the nullifier the identity circuit emits, which also hashes
+ * the secret; use {@link generateAttestationNullifier}.
  *
  * @param providerId - Provider identifier (e.g., "github:12345")
  * @param context - Context string (e.g., "dao_vote_123")
