@@ -477,13 +477,14 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          *
          * @example
          * ```ts
-         * await demos.run.attest.humanpassport({
-         *     address: "0x...",
-         *     verificationMethod: "api",
-         * })
+         * const identities = new Identities()
+         * const claim = await identities.getHumanPassportClaim(demos, "0x...")
+         * await demos.run.attest.humanpassport(
+         *     identities.createHumanPassportPayload(claim),
+         * )
          * ```
          *
-         * @param payload - The Human Passport identity data to link.
+         * @param payload - The payload built from `getHumanPassportClaim`.
          * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
          */
         humanpassport: (

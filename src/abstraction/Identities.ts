@@ -29,6 +29,7 @@ import {
     InferFromTLSNPayload,
     TLSNProofRanges,
     HumanPassportIdentityData,
+    HumanPassportClaim,
     Web2IdentityRemovePayload,
 } from "@/types/abstraction"
 import {
@@ -62,6 +63,20 @@ function withUserId<T extends object>(
         )
     }
     return { ...payload, userId: String(userId) }
+}
+
+function assertHumanPassportScore(claim: Partial<HumanPassportClaim>): void {
+    const finite = (v: unknown) => typeof v === "number" && Number.isFinite(v)
+    if (!finite(claim.score) || !finite(claim.threshold)) {
+        throw new Error(
+            "Human Passport payload needs score and threshold: build it from getHumanPassportClaim",
+        )
+    }
+    if (claim.score! < claim.threshold!) {
+        throw new Error(
+            `Human Passport score ${claim.score} is below the threshold ${claim.threshold}`,
+        )
+    }
 }
 
 export class Identities {
@@ -1579,14 +1594,15 @@ export class Identities {
     // ==================== Human Passport Identity ====================
 
     /**
-     * Fetch Human Passport score for an address.
+     * Fetch the bare Human Passport score for an address.
      *
-     * Calls the `getHumanPassportScore` GCR routine via the Demos RPC.
-     * This fetches the score from the node's cached data, not directly from Human Passport API.
+     * Calls the `getHumanPassportScore` GCR routine; `response` is the score
+     * as a number. To link the identity use {@link getHumanPassportClaim}:
+     * the assign has to carry the threshold and stamps too.
      *
      * @param demos A Demos instance used to communicate with the RPC.
      * @param address The EVM address to retrieve the Human Passport score for.
-     * @returns The RPC response containing the Human Passport score data.
+     * @returns The RPC response containing the Human Passport score.
      */
     async getHumanPassportScore(
         demos: Demos,
@@ -1603,6 +1619,81 @@ export class Identities {
         }
 
         return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Fetch the Human Passport claim an identity assign has to carry.
+     *
+     * Calls the `getHumanPassportClaim` GCR routine, which asks Human Passport
+     * for the current score. Pass the result to
+     * {@link createHumanPassportPayload} and sign the assign soon after:
+     * admission compares the claim with the provider's score at that time.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param address The EVM address the claim is for.
+     * @returns The claim as the node reports it.
+     * @throws When the node does not answer with a claim.
+     */
+    async getHumanPassportClaim(
+        demos: Demos,
+        address: string,
+    ): Promise<HumanPassportClaim> {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getHumanPassportClaim",
+                    params: [address],
+                },
+            ],
+        }
+
+        const response = await demos.rpcCall(request, true)
+        if (response.result !== 200 || !response.response) {
+            const reason =
+                (response.extra as { error?: string } | undefined)?.error ??
+                (response as RPCResponse & { error?: { message: string } }).error?.message ??
+                `unexpected status ${response.result}`
+            throw new Error(`Failed to get Human Passport claim: ${reason}`)
+        }
+        return response.response as HumanPassportClaim
+    }
+
+    /**
+     * Build the Human Passport identity assign payload from a claim.
+     *
+     * Copies only the fields the node's admission reads, so a claim object
+     * that carries more (a later node version, a UI model) still yields the
+     * payload the node checks field by field against the provider.
+     *
+     * @param claim The claim from {@link getHumanPassportClaim}.
+     * @param options Onchain chain id, referral code, ownership signature.
+     * @returns The payload for {@link addHumanPassportIdentity}.
+     */
+    createHumanPassportPayload(
+        claim: HumanPassportClaim,
+        options: { chainId?: number; referralCode?: string; signature?: string } = {},
+    ): HumanPassportIdentityData {
+        assertHumanPassportScore(claim)
+        const payload: HumanPassportIdentityData = {
+            address: claim.address,
+            verificationMethod: claim.verificationMethod,
+            score: claim.score,
+            threshold: claim.threshold,
+        }
+        if (claim.stamps !== undefined) payload.stamps = [...claim.stamps]
+        if (claim.lastScoreTimestamp !== undefined) {
+            payload.lastScoreTimestamp = claim.lastScoreTimestamp
+        }
+        if (claim.expirationTimestamp !== undefined) {
+            payload.expirationTimestamp = claim.expirationTimestamp
+        }
+        if (options.chainId !== undefined) payload.chainId = options.chainId
+        if (options.signature !== undefined) payload.signature = options.signature
+        if (options.referralCode !== undefined) {
+            payload.referralCode = options.referralCode
+        }
+        return payload
     }
 
     /**
@@ -1642,19 +1733,22 @@ export class Identities {
     /**
      * Link a Human Passport identity to the GCR.
      *
-     * Verifies the Human Passport score via the node and persists
-     * the identity if the score meets the threshold (default: 20).
+     * The node checks the signed score, threshold and stamps against Human
+     * Passport and stores them as signed, so the payload must be built from
+     * a fresh {@link getHumanPassportClaim}. The wallet must already be
+     * linked to the account as an EVM xm identity.
      *
      * @param demos A Demos instance used to communicate with the RPC.
-     * @param payload The Human Passport identity data to be linked.
+     * @param payload The payload from {@link createHumanPassportPayload}.
      * @returns The RPC response for the identity inference operation.
      *
      * @example
      * ```typescript
-     * const result = await identities.addHumanPassportIdentity(demos, {
-     *     address: "0x...",
-     *     verificationMethod: "api"
-     * })
+     * const claim = await identities.getHumanPassportClaim(demos, "0x...")
+     * const result = await identities.addHumanPassportIdentity(
+     *     demos,
+     *     identities.createHumanPassportPayload(claim),
+     * )
      * ```
      */
     async addHumanPassportIdentity(
@@ -1665,6 +1759,8 @@ export class Identities {
         if (payload.verificationMethod === 'onchain' && payload.chainId == null) {
             throw new Error('chainId must be provided for onchain verification')
         }
+        // Fail here rather than pay for a transaction the node refuses.
+        assertHumanPassportScore(payload)
 
         return await this.inferIdentity(demos, "humanpassport", payload, options)
     }
