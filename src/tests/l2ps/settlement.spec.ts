@@ -3,7 +3,7 @@
  *
  * `fixtures/settlementVectors.json` is a verbatim copy of the node's
  * `src/libs/l2ps/settlement/__fixtures__/settlementVectors.json` (node commit
- * 237c9199). Both repos test the same file, so a drift on either side fails
+ * 022f940f, Interface v1.1). Both repos test the same file, so a drift on either side fails
  * here or there; refresh the copy only when the node changes it.
  */
 import { describe, expect, it, jest } from "@jest/globals"
