@@ -10,6 +10,7 @@ import {
     InferFromGithubPayload,
     InferFromXPayload,
     InferFromSignaturePayload,
+    InferFromSignatureTargetIdentityPayload,
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
     DiscordProof,
@@ -42,6 +43,7 @@ import { Account, RPCResponse, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
 import { resolveNonce } from "@/utils"
+import { xmBoundProofMessage } from "./xmProof"
 
 type IdentityContext = "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn"
 
@@ -134,6 +136,69 @@ export class Identities {
         return `demos:dw2p:${demos.algorithm}:${uint8ArrayToHex(
             signature.signature,
         )}`
+    }
+
+    /**
+     * The message a cross-chain identity proof signs:
+     * `demos-xm:v1:<chain>:<targetAddress>:<ed25519Address>:<issuedAt>`,
+     * matching the node's `xmBoundProofMessage`. Use it when the wallet signs
+     * outside this SDK; otherwise {@link createXmIdentityProof} does both.
+     *
+     * @param demos A connected Demos instance; its ed25519 address is the
+     *   account the proof is for.
+     * @param chain The chain id the payload names (`target_identity.chain`).
+     * @param targetAddress The wallet address being linked, as the payload
+     *   sends it.
+     * @param issuedAt Epoch milliseconds; nodes refuse a proof older than ten
+     *   minutes, so sign and submit right away.
+     */
+    async createXmProofMessage(
+        demos: Demos,
+        chain: string,
+        targetAddress: string,
+        issuedAt: number = Date.now(),
+    ): Promise<string> {
+        const sender = await demos.getEd25519Address()
+        return xmBoundProofMessage(chain, targetAddress, sender, issuedAt)
+    }
+
+    /**
+     * Build a signed cross-chain identity proof for {@link inferXmIdentity}.
+     *
+     * `sign` signs the bound message ({@link createXmProofMessage}) with the
+     * wallet being linked, e.g. `(m) => evm.signMessage(m)`. Nodes accept the
+     * bound message before and after the `xmProofBinding` fork; once it is
+     * active, it is the only message they accept.
+     *
+     * `legacy: true` signs the account's ed25519 address instead, the text
+     * older SDK flows signed. Nodes accept it only while `xmProofBinding` is
+     * not active.
+     *
+     * @param demos A connected Demos instance.
+     * @param target The wallet being linked, without signature and signedData.
+     * @param sign Signs a UTF-8 message with the target wallet and returns the
+     *   signature in the form the chain's verifier expects.
+     * @param options `issuedAt` (epoch ms, default now) or `legacy`.
+     */
+    async createXmIdentityProof(
+        demos: Demos,
+        target: Omit<InferFromSignatureTargetIdentityPayload, "signature" | "signedData">,
+        sign: (message: string) => Promise<string>,
+        options: { issuedAt?: number; legacy?: boolean } = {},
+    ): Promise<InferFromSignaturePayload> {
+        const signedData = options.legacy
+            ? await demos.getEd25519Address()
+            : await this.createXmProofMessage(
+                demos,
+                target.chain,
+                target.targetAddress,
+                options.issuedAt,
+            )
+        const signature = await sign(signedData)
+        return {
+            method: "identity_assign_from_signature",
+            target_identity: { ...target, signedData, signature },
+        }
     }
 
     /**

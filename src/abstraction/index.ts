@@ -9,6 +9,12 @@ import { EvmCoinFinder } from "./EvmCoinFinder"
 import { CoinFinder } from "./CoinFinder"
 import { Identities } from "./Identities"
 import {
+    XM_PROOF_DOMAIN,
+    XM_PROOF_MAX_AGE_MS,
+    canonicalXmAddress,
+    xmBoundProofMessage,
+} from "./xmProof"
+import {
     InferFromWritePayload,
     InferFromSignaturePayload,
     XMCoreTargetIdentityPayload,
@@ -45,6 +51,10 @@ export {
     EvmCoinFinder,
     CoinFinder,
     Identities,
+    XM_PROOF_DOMAIN,
+    XM_PROOF_MAX_AGE_MS,
+    canonicalXmAddress,
+    xmBoundProofMessage,
     InferFromWritePayload,
     InferFromSignaturePayload,
     XMCoreTargetIdentityPayload,
