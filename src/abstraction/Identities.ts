@@ -101,31 +101,37 @@ export class Identities {
     /**
      * Create a web2 proof payload to publish on the account being claimed.
      *
-     * Pass the claim (`context` + `username`) and the signature is bound to
-     * it: the signed message is
-     * `demos-web2:v1:<context>:<username>:<ed25519Address>`, matching the
-     * node's `web2BoundProofMessage`. Without the claim the payload signs the
-     * legacy constant `"dw2p"`, which is the shape this replaces — that
-     * signature says only that the key took part, so a proof copied out of a
-     * public post is a valid proof under whatever handle it is republished
-     * on, and its signer can claim that handle.
+     * The signature is bound to the claim (`context` + `username`): the
+     * signed message is `demos-web2:v1:<context>:<username>:<ed25519Address>`,
+     * matching the node's `web2BoundProofMessage`.
      *
-     * Nodes accept both shapes until the `web2ProofBinding` fork activates;
-     * after that, only the bound one.
+     * The claim is required because mainnet runs `web2ProofBinding` from
+     * genesis. The legacy constant `"dw2p"` says only that the key took part,
+     * so a proof copied out of a public post is a valid proof under whatever
+     * handle it is republished on, and its signer can claim that handle.
+     * `legacy: true` still signs it, for networks where the fork is not
+     * active.
      *
      * @param demos A connected Demos instance.
-     * @param claim The identity being claimed. Omit only to talk to a node
-     *   that predates the bound shape.
+     * @param claim The identity being claimed.
+     * @param options `legacy: true` signs `"dw2p"` instead of the claim.
      * @returns The proof payload string (`demos:dw2p:<algorithm>:<signature>`).
+     * @throws When neither a claim nor `legacy: true` is given.
      */
     async createWeb2ProofPayload(
         demos: Demos,
         claim?: { context: "twitter" | "github" | "discord"; username: string },
+        options: { legacy?: boolean } = {},
     ) {
+        if (!options.legacy && !claim) {
+            throw new Error(
+                "createWeb2ProofPayload needs the claim ({ context, username }): nodes with web2ProofBinding active, mainnet among them, refuse the unbound \"dw2p\" proof. Pass { legacy: true } only for a network without that fork.",
+            )
+        }
         const sender = await demos.getEd25519Address()
-        const message = claim
-            ? `demos-web2:v1:${claim.context}:${claim.username.toLowerCase()}:${sender.toLowerCase()}`
-            : "dw2p"
+        const message = options.legacy
+            ? "dw2p"
+            : `demos-web2:v1:${claim.context}:${claim.username.toLowerCase()}:${sender.toLowerCase()}`
         const signature = await demos.crypto.sign(
             demos.algorithm,
             new TextEncoder().encode(message),
@@ -461,7 +467,10 @@ export class Identities {
      * @param username Username from the proven response.
      * @param userId User ID from the proven response.
      * @param referralCode Optional referral code.
+     * @param options Must carry `legacy: true`: networks with
+     *   `tlsnProofEnforcement` active, mainnet among them, refuse TLSN links.
      * @returns The response from the RPC call.
+     * @throws Without `legacy: true`.
      */
     async addWeb2IdentityViaTLSN(
         demos: Demos,
@@ -473,8 +482,18 @@ export class Identities {
         username: string,
         userId: string | number,
         referralCode?: string,
-        options?: { nonce?: number },
+        options?: { nonce?: number; legacy?: boolean },
     ): Promise<RPCResponseWithValidityData> {
+        // The node checks only the presentation's shape, not the notary
+        // signature, so any account could attach any handle by authoring its
+        // own bytes. Mainnet therefore refuses this link from genesis
+        // (tlsnProofEnforcement); failing here saves the fee of a refused
+        // transaction. legacy: true is for networks without that fork.
+        if (!options?.legacy) {
+            throw new Error(
+                "TLSN identity links are refused on networks with tlsnProofEnforcement active, mainnet among them, until nodes verify the notary signature. Pass { legacy: true } only for a network without that fork.",
+            )
+        }
         const payload: InferFromTLSNPayload = {
             context: context,
             proof: proof,

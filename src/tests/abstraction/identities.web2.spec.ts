@@ -18,7 +18,10 @@ describe("Web2 Identities", () => {
 
     test.skip("Create Web2 Proof Payload", async () => {
         const identities = new Identities()
-        const payload = await identities.createWeb2ProofPayload(demos)
+        const payload = await identities.createWeb2ProofPayload(demos, {
+            context: "twitter",
+            username: "cwilvxi",
+        })
         console.log(payload)
     })
 

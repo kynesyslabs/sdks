@@ -604,8 +604,13 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          *     revealedRecv,
          *     "octocat",
          *     583231,
+         *     undefined,
+         *     { legacy: true },
          * )
          * ```
+         *
+         * Networks with `tlsnProofEnforcement` active, mainnet among them,
+         * refuse TLSN links, so the call throws unless `opts.legacy` is set.
          *
          * @param context - The platform context ("github", "discord", or
          *                   "telegram").
@@ -616,7 +621,9 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          * @param username - The username from the proven response.
          * @param userId - The user id from the proven response.
          * @param referralCode - Optional referral code for incentive points.
-         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour,
+         *               and `legacy: true` for a network without
+         *               `tlsnProofEnforcement`.
          */
         tlsn: (
             context: TLSNIdentityContext,
@@ -627,7 +634,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             username: string,
             userId: string | number,
             referralCode?: string,
-            opts?: ProgrammaticTxOptions,
+            opts?: ProgrammaticTxOptions & { legacy?: boolean },
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
                 () =>
@@ -641,7 +648,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         username,
                         userId,
                         referralCode,
-                        { nonce: opts?.nonce },
+                        { nonce: opts?.nonce, legacy: opts?.legacy },
                     ),
                 opts,
             ),
