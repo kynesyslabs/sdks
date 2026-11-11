@@ -124,6 +124,47 @@ const validityData = await demos.confirm(tx)
 const result = await demos.broadcast(validityData)
 ```
 
+### L2PS Settled Transfer
+
+On a network with L2PS settlement (interface v1), every L2PS transfer carries
+a Poseidon commitment to `(from, to, amount, fee, nonce, salt)` and the
+sender's ed25519 signature over
+`l2ps-settlement:v1:<chainId>:<l2psUid>:<commitment>`. Validators outside the
+subnet check the signature and a batch proof against the commitment; only
+subnet members see the receiver and the amount.
+
+```typescript
+import { Demos } from "@kynesyslabs/demosdk/websdk"
+import { L2PS, buildSettledL2PSTransfer } from "@kynesyslabs/demosdk/l2ps"
+
+const l2ps = await L2PS.create(subnetKey, subnetIv)
+l2ps.setConfig({ uid: "my_subnet", config: { created_at_block: 0, known_rpcs: [rpc] } })
+
+// Inner native send: amount in OS; fee, nonce and chain id come from the node
+// unless given. data[1].settlement = { fee, salt, commitment, signature }.
+const inner = await buildSettledL2PSTransfer(demos, {
+  to: "0x6690580a02d2da2fefa86e414e92a1146ad5357fd71d594cc561776576857ac5",
+  amount: 5_000_000_000n,
+  l2psUid: "my_subnet",
+})
+
+const encrypted = await l2ps.encryptTx(inner)
+// Wrap `encrypted.content.data[1]` in an `l2psEncryptedTx`, sign it, then
+// confirm and broadcast as before.
+```
+
+- `fee` defaults to the fee the SDK stamps on a native send for the connected
+  node (`network_fee + rpc_fee + additional_fee`); the sender pays
+  `amount + fee`.
+- `nonce` defaults to the sender's next L1 nonce (or the auto-nonce
+  reservation). Transfers of one signer in a batch need consecutive nonces,
+  and an L1 transaction that takes the nonce first voids the transfer.
+- `settle: false` builds the old transfer, without a commitment, for networks
+  that have not activated settlement.
+- The pure helpers `l2psSettlementCommitment`, `l2psSettlementMessage`,
+  `l2psAccountLimbs` and `l2psSettlementSalt` mirror the node's encoding byte
+  for byte.
+
 ### Cross-chain Transaction Example
 
 ```typescript

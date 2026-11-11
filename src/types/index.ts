@@ -30,6 +30,8 @@ export {
 // Export all specific transaction types
 export {
     L2PSTransaction,
+    type L2PSTransferSettlement,
+    type L2PSInnerSendPayload,
     Web2Transaction,
     CrosschainTransaction,
     NativeTransaction,

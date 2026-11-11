@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+- L2PS settlement v1: `buildSettledL2PSTransfer` builds the inner native
+  send of an L2PS transfer with `data[1].settlement = { fee, salt,
+  commitment, signature }` (Poseidon commitment, ed25519 signature over
+  `l2ps-settlement:v1:<chainId>:<l2psUid>:<commitment>`), plus the pure
+  encoding helpers, pinned to the node's shared vectors. `settle: false`
+  keeps the pre-settlement transfer for networks without the fork.
+
 ### Fixed
 - `getNextNonce` / `getAddressNonce` docs state the exact nonce a node
   running the `nonceEnforcement` upgrade requires (confirmed + 1 + pending)
