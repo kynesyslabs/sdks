@@ -192,18 +192,22 @@ export class Identities {
         sign: (message: string) => Promise<string>,
         options: { issuedAt?: number; legacy?: boolean } = {},
     ): Promise<InferFromSignaturePayload> {
+        // Copied before any await: a caller editing its object while the
+        // wallet prompt is open would otherwise send fields the signature
+        // does not cover.
+        const identity = { ...target }
         const signedData = options.legacy
             ? await demos.getEd25519Address()
             : await this.createXmProofMessage(
                 demos,
-                target.chain,
-                target.targetAddress,
+                identity.chain,
+                identity.targetAddress,
                 options.issuedAt,
             )
         const signature = await sign(signedData)
         return {
             method: "identity_assign_from_signature",
-            target_identity: { ...target, signedData, signature },
+            target_identity: { ...identity, signedData, signature },
         }
     }
 

@@ -95,6 +95,24 @@ describe("xm identity proof", () => {
         ).resolves.toBe(expected)
     })
 
+    it("keeps the signed target when the caller edits its object while signing", async () => {
+        const demos = await connected()
+        const mutable = { ...target }
+        const proof = await identities.createXmIdentityProof(
+            demos,
+            mutable,
+            async m => {
+                mutable.targetAddress = "0x" + "11".repeat(20)
+                mutable.chain = "solana"
+                return wallet.signMessage(m)
+            },
+            { issuedAt: NOW },
+        )
+        expect(proof.target_identity.targetAddress).toBe(wallet.address)
+        expect(proof.target_identity.chain).toBe("evm")
+        expect(proof.target_identity.signedData).toContain(`:evm:${wallet.address.toLowerCase()}:`)
+    })
+
     it("stamps the current time by default", async () => {
         const demos = await connected()
         const before = Date.now()
