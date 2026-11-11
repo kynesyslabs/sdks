@@ -149,13 +149,25 @@ const inner = await buildSettledL2PSTransfer(demos, {
 })
 
 const encrypted = await l2ps.encryptTx(inner)
-// Wrap `encrypted.content.data[1]` in an `l2psEncryptedTx`, sign it, then
-// confirm and broadcast as before.
+
+// The public envelope: a fresh l2psEncryptedTx signed by the sender, carrying
+// the ciphertext. Its `to` is the sender, so the receiver stays private.
+const outer = await demos.tx.prepare()
+outer.content.type = "l2psEncryptedTx"
+outer.content.to = encrypted.content.to
+outer.content.amount = 0
+outer.content.data = encrypted.content.data
+outer.content.nonce = inner.content.nonce
+outer.content.timestamp = Date.now()
+const signed = await demos.sign(outer)
+
+const validity = await demos.confirm(signed)
+await demos.broadcast(validity)
 ```
 
 - `fee` defaults to the fee the SDK stamps on a native send for the connected
   node (`network_fee + rpc_fee + additional_fee`); the sender pays
-  `amount + fee`.
+  `amount + fee`. A given fee below that is refused, as settlement would.
 - `nonce` defaults to the sender's next L1 nonce (or the auto-nonce
   reservation). Transfers of one signer in a batch need consecutive nonces,
   and an L1 transaction that takes the nonce first voids the transfer.
