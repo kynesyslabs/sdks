@@ -128,7 +128,7 @@ export interface SettledL2PSTransferOptions {
     l2psUid: string
     /**
      * OS. Defaults to the fee the SDK stamps on a native send for the
-     * connected node; the node refuses anything below that.
+     * connected node; a lower fee is refused here, as settlement would.
      */
     fee?: bigint
     /** Defaults to the sender's next L1 nonce (or the auto-nonce reservation). */
@@ -207,8 +207,13 @@ export async function buildSettledL2PSTransfer(
     if (typeof chainId !== "number") {
         throw new Error("the node reports no chain id; pass options.chainId")
     }
-    const nativeFee = options.fee === undefined ? await nativeTransferFee(demos, tx) : undefined
-    const fee: bigint = options.fee ?? (nativeFee as bigint)
+    // Settlement refuses a fee below the native transfer fee, so a given fee
+    // is checked against it too, not only the default.
+    const nativeFee = await nativeTransferFee(demos, tx)
+    const fee: bigint = options.fee ?? nativeFee
+    if (fee < nativeFee) {
+        throw new Error(`fee ${fee} is below the native transfer fee ${nativeFee}`)
+    }
     const salt = l2psSettlementSalt()
     const commitment = l2psSettlementCommitment({
         from,
@@ -232,8 +237,10 @@ export async function buildSettledL2PSTransfer(
 
     const signed = await demos.sign(tx)
     // sign() re-reads the node's fee parameters; if they moved since the
-    // probe, the committed fee no longer matches what the send pays.
-    if (nativeFee !== undefined && stampedFee(signed) !== nativeFee) {
+    // probe, a default fee no longer matches what the send pays, and a given
+    // fee may have fallen below the floor.
+    const stamped = stampedFee(signed)
+    if (options.fee === undefined ? stamped !== nativeFee : stamped > fee) {
         throw new Error("the node's fee changed while building the transfer; retry")
     }
     return signed

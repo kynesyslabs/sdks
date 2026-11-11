@@ -253,6 +253,26 @@ describe("buildSettledL2PSTransfer", () => {
         expect(demos.getAddressNonce).not.toHaveBeenCalled()
     })
 
+    it("refuses a given fee below the node's native transfer fee", async () => {
+        const demos = await connectedDemos()
+        const probe = await buildSettledL2PSTransfer(demos, { to: TO, amount: 1n, l2psUid: UID })
+        const nativeFee = BigInt(payloadOf(probe).settlement!.fee)
+        expect(nativeFee).toBeGreaterThan(0n)
+
+        for (const fee of [0n, nativeFee - 1n]) {
+            await expect(
+                buildSettledL2PSTransfer(demos, { to: TO, amount: 1n, l2psUid: UID, fee }),
+            ).rejects.toThrow(/below the native transfer fee/)
+        }
+        const atFloor = await buildSettledL2PSTransfer(demos, {
+            to: TO,
+            amount: 1n,
+            l2psUid: UID,
+            fee: nativeFee,
+        })
+        expect(payloadOf(atFloor).settlement!.fee).toBe(nativeFee.toString())
+    })
+
     it("still builds the pre-settlement transfer with settle: false", async () => {
         const demos = await connectedDemos()
         const tx = await buildSettledL2PSTransfer(demos, {
