@@ -20,9 +20,10 @@ const jestConfig: JestConfigWithTsJest = {
 	modulePaths: ['./'],
 	transform: { '^.+\\.(t|j)s?$': 'ts-jest' },
 
-	// Transform ESM-only packages from node_modules
+	// Transform ESM-only packages from node_modules, including copies nested
+	// under another package (for example xrpl > @xrplf/isomorphic > @noble/hashes)
 	transformIgnorePatterns: [
-		'node_modules/(?!(@scure|@noble)/)'
+		'node_modules/(?!(?:.*/node_modules/)?(?:@scure|@noble)/)'
 	],
 
 	// INFO: Tests involving ledger lookups need this
