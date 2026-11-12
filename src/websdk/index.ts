@@ -19,7 +19,7 @@ export {
     prepareXMScript,
 } from "./XMTransactions"
 
-export { GCRGeneration, HandleNativeOperations } from "./GCRGeneration"
+export { GCRGeneration, GASLESS_TX_TYPES, HandleNativeOperations } from "./GCRGeneration"
 // Utils
 export { sha256 } from "./utils/sha256"
 export { bufferize } from "./utils/bufferizer"

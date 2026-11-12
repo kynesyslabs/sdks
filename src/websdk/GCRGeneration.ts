@@ -33,6 +33,16 @@ function isBase58(value: unknown): value is string {
     return typeof value === "string" && BASE58.test(value)
 }
 
+/** Transaction types that ship no gas edit. The node derives the same set. */
+export const GASLESS_TX_TYPES: ReadonlySet<string> = new Set([
+    "identity",
+    "d402_payment",
+    "validatorStake",
+    "validatorUnstake",
+    "validatorExit",
+    "validatorChallenge",
+])
+
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
  * both in the client and the node.
@@ -313,11 +323,8 @@ export class GCRGeneration {
 
         // Add gas operation edit with check for availability of gas amount in the sender's balance
         nonceEdits: try {
-            // INFO: Skip gas for identity and D402 payments (gasless/sponsored transactions)
-            if (
-                content.type === "identity" ||
-                content.type === "d402_payment"
-            ) {
+            // INFO: Skip gas for identity, D402 payments and validator seat txs (gasless)
+            if (GASLESS_TX_TYPES.has(content.type)) {
                 break nonceEdits
             }
 
