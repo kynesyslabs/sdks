@@ -22,6 +22,12 @@ class FakeSession implements ChannelSessionLike {
     applied: number[] = []
     private outSeq = 0
 
+    /** Mirror the real ChannelSession so the transport can seed its counter
+     * from a restored position. */
+    get highestSequence(): number {
+        return this.highestSeen
+    }
+
     async sendOutgoing(opts: {
         type: ChannelMessageType
         body: unknown
@@ -261,6 +267,60 @@ describe("L2PSChannelTransport — reorder buffer", () => {
             transport.send({ type: "offer", body: { ok: true } }),
         ).resolves.toBeDefined()
         expect(peer.sent.length).toBe(1)
+    })
+
+    it("resumes a restored session from its sequence (seeds appliedSeq)", async () => {
+        // A session restored through sequence 2: it reports highestSequence 2.
+        const session = new FakeSession()
+        session.highestSeen = 2
+        const peer = new FakePeer()
+        const applied: number[] = []
+        const transport = new L2PSChannelTransport({
+            session,
+            peer,
+            sharedKey: KEY,
+            recipients: ["0xpeer"],
+            onMessage: m => applied.push(m.sequence),
+        })
+        transport.start()
+
+        // The next contiguous inbound is seq 3 — it must apply immediately,
+        // not wait forever for the already-applied seq 1.
+        await inject(peer, makeMsg(3, "accept"))
+        await flush()
+        expect(applied).toEqual([3])
+        expect(transport.bufferedCount).toBe(0)
+    })
+
+    it("honours an explicit resumeFrom when the session can't report its position", async () => {
+        // A structural fake with no highestSequence: the caller supplies the
+        // restored position directly.
+        const recvApplied: number[] = []
+        const session: ChannelSessionLike = {
+            channelId: CHANNEL,
+            async sendOutgoing(opts) {
+                return makeMsg(1, opts.type, opts.body)
+            },
+            async receiveIncoming(msg) {
+                recvApplied.push(msg.sequence)
+            },
+        }
+        const peer = new FakePeer()
+        const transport = new L2PSChannelTransport({
+            session,
+            peer,
+            sharedKey: KEY,
+            recipients: ["0xpeer"],
+            resumeFrom: 5,
+        })
+        transport.start()
+        // seq 5 and earlier are already applied → dropped; seq 6 applies.
+        await inject(peer, makeMsg(5, "counter"))
+        await flush()
+        expect(recvApplied).toEqual([])
+        await inject(peer, makeMsg(6, "accept"))
+        await flush()
+        expect(recvApplied).toEqual([6])
     })
 
     it("drops inbound frames more than the reorder window ahead", async () => {
