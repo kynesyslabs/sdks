@@ -26,12 +26,23 @@ export class TON extends DefaultChain {
         this.name = "ton"
     }
 
+    private _apiKey?: string
+
     override setRpc(rpc_url: string): void {
         this.rpc_url = rpc_url
 
         this.provider = new TonClient({
             endpoint: this.rpc_url,
+            ...(this._apiKey && { apiKey: this._apiKey }),
         })
+    }
+
+    setApiKey(apiKey: string): void {
+        this._apiKey = apiKey
+        // Recreate provider with the API key
+        if (this.rpc_url) {
+            this.setRpc(this.rpc_url)
+        }
     }
 
     async connect() {
