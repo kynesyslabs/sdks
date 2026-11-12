@@ -19,8 +19,26 @@ const getFs = async () => (await import("fs")).promises
 import * as bip39 from "@scure/bip39"
 import { HexToForge } from "@/utils/dataManipulation"
 import { Hashing } from "./Hashing"
+import { warnLegacySeedPath } from "./legacySeedWarning"
 
 const algorithm = "aes-256-cbc"
+
+/** @internal Shared legacy derivation, including its existing warning behavior. */
+export function deriveKeyPairFromSeed(seed: string | Buffer | Uint8Array) {
+    // UnifiedCrypto supplies a 32-byte HKDF result, not a mnemonic/BIP39 seed.
+    if (typeof seed === "string" || seed.length === 64) {
+        warnLegacySeedPath("legacy")
+    }
+    if (typeof seed === "string") {
+        seed = bip39.mnemonicToSeedSync(seed)
+    }
+
+    const stringSeed = seed.toString()
+    const hashedSeed = Hashing.sha256(stringSeed)
+    const bufferSeed = Buffer.from(hashedSeed, "hex")
+
+    return forge.pki.ed25519.generateKeyPair({ seed: bufferSeed })
+}
 
 export class Cryptography {
     /**
@@ -53,20 +71,15 @@ export class Cryptography {
 
     // INFO Method to generate a new key pair from a seed
     /**
-     * Creates a new keypair from a mnemonic
-     * @param seed White-space separated string of words
+     * Creates a new keypair from a phrase or seed bytes.
+     * @deprecated For new wallets, use Demos.connectWallet(mnemonic).
+     * Both phrase and byte inputs use this low-level legacy derivation. Raw derived
+     * seeds are still used internally by UnifiedCrypto; do not change their encoding.
+     * @param seed White-space separated words or seed bytes.
      * @returns A new keypair
      */
     static newFromSeed(seed: string | Buffer | Uint8Array) {
-        if (typeof seed === "string") {
-            seed = bip39.mnemonicToSeedSync(seed)
-        }
-
-        const stringSeed = seed.toString()
-        const hashedSeed = Hashing.sha256(stringSeed)
-        const bufferSeed = Buffer.from(hashedSeed, "hex")
-
-        return forge.pki.ed25519.generateKeyPair({ seed: bufferSeed })
+        return deriveKeyPairFromSeed(seed)
     }
 
     // TODO Eliminate the old legacy compatibility

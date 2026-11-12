@@ -110,6 +110,11 @@ const address = demos.getAddress()
 console.log("Wallet address:", address)
 ```
 
+For new mnemonic wallets, use `connectWallet(mnemonic)` with the phrase string.
+Converting the phrase to BIP39 seed bytes or a `DemosWebAuth` keypair derives a
+different address. Existing wallets must keep their original derivation and input
+type. See [mnemonic restoration and compatibility vectors](documentation/websdk.md#connecting-a-wallet).
+
 ### Native Transaction Example
 
 ```typescript

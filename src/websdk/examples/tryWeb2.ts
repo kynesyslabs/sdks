@@ -1,13 +1,10 @@
-import { DemosWebAuth } from "../DemosWebAuth"
 import { Demos } from "../demosclass"
 
 async function tryWeb2Proxy() {
     try {
         const demos = new Demos()
         await demos.connect("https://node2.demos.sh")
-        const identity = DemosWebAuth.getInstance()
-        await identity.create()
-        await demos.connectWallet(identity.keypair.privateKey as Buffer)
+        await demos.connectWallet(demos.newMnemonic())
 
         const dahr = await demos.web2.createDahr()
 

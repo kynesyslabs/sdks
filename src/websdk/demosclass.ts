@@ -63,6 +63,7 @@ import {
 } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
+import { warnLegacySeedPath } from "@/encryption/legacySeedWarning"
 import { OS_PER_DEM, demToOs, parseOsString } from "@/denomination"
 import { assertValidNonce, resolveNonce } from "@/utils"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
@@ -91,6 +92,12 @@ import { StorageProgramResponse } from "@/storage/StorageProgram"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+type WalletConnectionOptions = {
+    algorithm?: SigningAlgorithm
+    /** Include the ed25519 signature when signing with an unlinked PQC keypair. */
+    dual_sign?: boolean
 }
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
@@ -260,18 +267,20 @@ export class Demos {
      * ```
      *
      * @param rpc_url - The URL of the demos node.
-     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     * @param wallet - Mnemonic string. Raw seed bytes are deprecated for mnemonic
+     *                 restoration and produce a different address.
      *                 Omit to connect without a wallet.
      * @param walletOptions - Forwarded to {@link connectWallet}.
      * @returns This connected Demos instance.
      */
+    async start(rpc_url: string, wallet?: string, walletOptions?: WalletConnectionOptions): Promise<this>
+    /** @deprecated Seed bytes derive a different address; pass the mnemonic string for new wallets. */
+    async start(rpc_url: string, wallet: Uint8Array, walletOptions?: WalletConnectionOptions): Promise<this>
+    async start(rpc_url: string, wallet?: string | Uint8Array, walletOptions?: WalletConnectionOptions): Promise<this>
     async start(
         rpc_url: string,
         wallet?: string | Uint8Array,
-        walletOptions?: {
-            algorithm?: SigningAlgorithm
-            dual_sign?: boolean
-        },
+        walletOptions?: WalletConnectionOptions,
     ): Promise<this> {
         await this.connect(rpc_url)
         if (wallet !== undefined) {
@@ -291,26 +300,31 @@ export class Demos {
      * ```
      *
      * @param rpc_url - The URL of the demos node.
-     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     * @param wallet - Mnemonic string. Raw seed bytes are deprecated for mnemonic
+     *                 restoration and produce a different address.
      * @param walletOptions - Forwarded to {@link connectWallet}.
      * @returns The started shared Demos instance.
      */
+    static async start(rpc_url: string, wallet?: string, walletOptions?: WalletConnectionOptions): Promise<Demos>
+    /** @deprecated Seed bytes derive a different address; pass the mnemonic string for new wallets. */
+    static async start(rpc_url: string, wallet: Uint8Array, walletOptions?: WalletConnectionOptions): Promise<Demos>
+    static async start(rpc_url: string, wallet?: string | Uint8Array, walletOptions?: WalletConnectionOptions): Promise<Demos>
     static async start(
         rpc_url: string,
         wallet?: string | Uint8Array,
-        walletOptions?: {
-            algorithm?: SigningAlgorithm
-            dual_sign?: boolean
-        },
+        walletOptions?: WalletConnectionOptions,
     ): Promise<Demos> {
         return Demos.instance.start(rpc_url, wallet, walletOptions)
     }
 
     /**
-     * Connects to a Demos wallet using the provided master seed.
+     * Connects to a Demos wallet. For mnemonic restoration, pass the phrase
+     * string directly: `await demos.connectWallet(mnemonic)`.
+     * Do not convert it to BIP39 seed bytes or a DemosWebAuth keypair first;
+     * those legacy paths derive different addresses and remain unchanged.
+     * Existing wallets must retain their original input type and derivation.
      *
-     * @param masterSeed - The master seed of the wallet
-     * @param algorithm - The algorithm to use for the wallet
+     * @param masterSeed - The mnemonic string of the wallet
      * @param options - The options for the wallet connection
      * @param options.algorithm - The algorithm to use for the wallet
      * @param options.dual_sign - Whether to include the ed25519 signature along with the PQC signature, when
@@ -318,16 +332,16 @@ export class Demos {
      *
      * @returns The public key of the wallet
      */
+    async connectWallet(masterSeed: string, options?: WalletConnectionOptions): Promise<string>
+    /**
+     * @deprecated For mnemonic restoration, use connectWallet(mnemonic) with the
+     * phrase string. Bytes derive a different address. Retained for existing wallets.
+     */
+    async connectWallet(masterSeed: Uint8Array, options?: WalletConnectionOptions): Promise<string>
+    async connectWallet(masterSeed: string | Uint8Array, options?: WalletConnectionOptions): Promise<string>
     async connectWallet(
         masterSeed: string | Uint8Array,
-        options?: {
-            algorithm?: SigningAlgorithm
-            /**
-             * Whether to include the ed25519 signature along with the PQC signature, when
-             * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
-             */
-            dual_sign?: boolean
-        },
+        options?: WalletConnectionOptions,
     ) {
         if (!masterSeed) {
             throw new Error(
@@ -347,6 +361,12 @@ export class Demos {
             throw new Error(
                 "Invalid master seed: must be a string or a Uint8Array",
             )
+        }
+
+        // BIP39 seed bytes are 64 bytes; service keys and the 128-byte
+        // prehashed master-seed path are not mnemonic restoration inputs.
+        if (masterSeed instanceof Uint8Array && masterSeed.length === 64) {
+            warnLegacySeedPath("bytes")
         }
 
         let hashable: string | Uint8Array = null
@@ -424,7 +444,7 @@ export class Demos {
                 "connectWalletFromPrivateKey: expected a 32-byte key as 64 hex chars (optionally 0x-prefixed).",
             )
         }
-        return await this.connectWallet(hexToUint8Array(clean), options)
+        return await this.connectWallet(hexToUint8Array(clean) as string | Uint8Array, options)
     }
 
     /**

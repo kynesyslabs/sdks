@@ -10,6 +10,16 @@
   encoding helpers, pinned to the node's shared vectors. `settle: false`
   keeps the pre-settlement transfer for networks without the fork.
 
+### Deprecated
+- Mnemonic wallets have one documented path: `Demos.connectWallet(mnemonic)`.
+  Restoring a mnemonic through 64-byte BIP39 seed bytes passed to
+  `connectWallet` / `start`, `DemosWebAuth.create(seed)`, `keyPairFromMnemonic`
+  or `Cryptography.newFromSeed` is deprecated: these derive a different address
+  from the same words. They keep working, return the same addresses as before,
+  and print a one-time `[demosdk] ... is deprecated` warning. 128-byte
+  prehashed seeds and 32-byte private keys are unchanged and do not warn. See
+  [Connecting a wallet](documentation/websdk.md#connecting-a-wallet).
+
 ### Fixed
 - `L2PS.encryptTx` no longer names the inner receiver in the public outer
   transaction (outer `to` is the sender) and pads the plaintext to 1024-char
