@@ -49,8 +49,11 @@ const res = await demos.identities.addWeb2IdentityViaTLSN(
   githubUsername,
   githubUserId,
   referralCode,
+  { legacy: true },
 )
 ```
+
+The call throws without `{ legacy: true }`. Nodes check only the presentation's shape, not the notary signature, so networks with `tlsnProofEnforcement` active, mainnet among them, refuse TLSN links until nodes verify the notary signature.
 
 ## 2. How `tlsn_identity_assign` is persisted in GCR
 

@@ -11,6 +11,7 @@
 
 import * as CommitmentService from './CommitmentService'
 import * as ProofGenerator from './ProofGenerator'
+import { ZK_ATTESTATION_CONTEXT } from './attestationContext'
 
 export interface IdentityCommitmentPayload {
     commitment_hash: string
@@ -126,14 +127,17 @@ export class ZKIdentity {
      * without revealing which one. Uses ZK-SNARKs for privacy.
      *
      * @param rpcUrl - Node RPC URL
-     * @param context - Context string for this attestation (e.g., "dao_vote_123")
+     * @param context - Context to prove under. Defaults to
+     *   `ZK_ATTESTATION_CONTEXT`, the only one nodes accept: any other
+     *   context would mint a fresh nullifier, and points, for the same
+     *   identity.
      * @returns Attestation transaction payload
      *
      * NOTE: Each context can only be used once per identity (nullifier prevents reuse)
      */
     async createAttestationTransaction(
         rpcUrl: string,
-        context: string,
+        context: string = ZK_ATTESTATION_CONTEXT,
     ): Promise<IdentityAttestationPayload> {
         // 1. Check if commitment exists in Merkle tree
         const commitment = this.getCommitment()
@@ -167,8 +171,9 @@ export class ZKIdentity {
         const merkleRoot = rootData.rootHash
 
         // 4. Check if nullifier has been used for this context
-        const nullifier = CommitmentService.generateNullifier(
+        const nullifier = CommitmentService.generateAttestationNullifier(
             this.providerId,
+            this.secret,
             context,
         )
         const nullifierResponse = await fetch(`${rpcUrl}/zk/nullifier/${nullifier}`)
@@ -195,7 +200,7 @@ export class ZKIdentity {
         // 6. Create attestation payload
         const payload: IdentityAttestationPayload = {
             nullifier_hash: publicSignals[0],
-            merkle_root: publicSignals[1],
+            merkle_root: publicSignals[2],
             proof,
             public_signals: publicSignals,
             provider: this.getProvider(),

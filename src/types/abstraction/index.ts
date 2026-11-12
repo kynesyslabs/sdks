@@ -324,17 +324,37 @@ export interface BaseHumanPassportIdentityPayload {
 }
 
 /**
- * Human Passport identity verification payload
- * Contains minimal data needed for node-side verification
- * Node will fetch fresh score from Human Passport API
+ * A Human Passport score as the node's `getHumanPassportClaim` routine
+ * reports it. The identity assign carries these values: every node stores the
+ * signed score instead of asking Human Passport during apply, so admission
+ * compares each value with what the provider reports and refuses a mismatch.
  */
-export interface HumanPassportIdentityData {
-    /** EVM address to verify */
+export interface HumanPassportClaim {
+    /** EVM address the score belongs to */
     address: string
-    /** Signature proving address ownership (optional, for enhanced verification) */
-    signature?: string
     /** Verification method: API or onchain */
     verificationMethod: "api" | "onchain"
+    /** Humanity score */
+    score: number
+    /** Passing threshold the score was judged against */
+    threshold: number
+    /** Provider names of the verified stamps */
+    stamps?: string[]
+    /** When Human Passport last computed the score (ISO date) */
+    lastScoreTimestamp?: string
+    /** When the score expires (ISO date), or null */
+    expirationTimestamp?: string | null
+}
+
+/**
+ * Human Passport identity assign payload: the claim from
+ * `getHumanPassportClaim`, sent unchanged. Build it with
+ * `Identities.createHumanPassportPayload`; nodes refuse a payload without
+ * `score` and `threshold`.
+ */
+export interface HumanPassportIdentityData extends HumanPassportClaim {
+    /** Not checked by the node: ownership is the linked xm identity */
+    signature?: string
     /** Chain ID for onchain verification */
     chainId?: number
     /** Optional referral code */

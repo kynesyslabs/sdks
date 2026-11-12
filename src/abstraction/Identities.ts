@@ -10,6 +10,7 @@ import {
     InferFromGithubPayload,
     InferFromXPayload,
     InferFromSignaturePayload,
+    InferFromSignatureTargetIdentityPayload,
     PqcIdentityAssignPayload,
     PqcIdentityRemovePayload,
     DiscordProof,
@@ -29,6 +30,7 @@ import {
     InferFromTLSNPayload,
     TLSNProofRanges,
     HumanPassportIdentityData,
+    HumanPassportClaim,
     Web2IdentityRemovePayload,
 } from "@/types/abstraction"
 import {
@@ -41,6 +43,7 @@ import { Account, RPCResponse, RPCResponseWithValidityData } from "@/types"
 import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
 import { resolveNonce } from "@/utils"
+import { xmBoundProofMessage } from "./xmProof"
 
 type IdentityContext = "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn"
 
@@ -64,6 +67,20 @@ function withUserId<T extends object>(
     return { ...payload, userId: String(userId) }
 }
 
+function assertHumanPassportScore(claim: Partial<HumanPassportClaim>): void {
+    const finite = (v: unknown) => typeof v === "number" && Number.isFinite(v)
+    if (!finite(claim.score) || !finite(claim.threshold)) {
+        throw new Error(
+            "Human Passport payload needs score and threshold: build it from getHumanPassportClaim",
+        )
+    }
+    if (claim.score! < claim.threshold!) {
+        throw new Error(
+            `Human Passport score ${claim.score} is below the threshold ${claim.threshold}`,
+        )
+    }
+}
+
 export class Identities {
     formats = {
         web2: {
@@ -84,31 +101,37 @@ export class Identities {
     /**
      * Create a web2 proof payload to publish on the account being claimed.
      *
-     * Pass the claim (`context` + `username`) and the signature is bound to
-     * it: the signed message is
-     * `demos-web2:v1:<context>:<username>:<ed25519Address>`, matching the
-     * node's `web2BoundProofMessage`. Without the claim the payload signs the
-     * legacy constant `"dw2p"`, which is the shape this replaces — that
-     * signature says only that the key took part, so a proof copied out of a
-     * public post is a valid proof under whatever handle it is republished
-     * on, and its signer can claim that handle.
+     * The signature is bound to the claim (`context` + `username`): the
+     * signed message is `demos-web2:v1:<context>:<username>:<ed25519Address>`,
+     * matching the node's `web2BoundProofMessage`.
      *
-     * Nodes accept both shapes until the `web2ProofBinding` fork activates;
-     * after that, only the bound one.
+     * The claim is required because mainnet runs `web2ProofBinding` from
+     * genesis. The legacy constant `"dw2p"` says only that the key took part,
+     * so a proof copied out of a public post is a valid proof under whatever
+     * handle it is republished on, and its signer can claim that handle.
+     * `legacy: true` still signs it, for networks where the fork is not
+     * active.
      *
      * @param demos A connected Demos instance.
-     * @param claim The identity being claimed. Omit only to talk to a node
-     *   that predates the bound shape.
+     * @param claim The identity being claimed.
+     * @param options `legacy: true` signs `"dw2p"` instead of the claim.
      * @returns The proof payload string (`demos:dw2p:<algorithm>:<signature>`).
+     * @throws When neither a claim nor `legacy: true` is given.
      */
     async createWeb2ProofPayload(
         demos: Demos,
         claim?: { context: "twitter" | "github" | "discord"; username: string },
+        options: { legacy?: boolean } = {},
     ) {
+        if (!options.legacy && !claim) {
+            throw new Error(
+                "createWeb2ProofPayload needs the claim ({ context, username }): nodes with web2ProofBinding active, mainnet among them, refuse the unbound \"dw2p\" proof. Pass { legacy: true } only for a network without that fork.",
+            )
+        }
         const sender = await demos.getEd25519Address()
-        const message = claim
-            ? `demos-web2:v1:${claim.context}:${claim.username.toLowerCase()}:${sender.toLowerCase()}`
-            : "dw2p"
+        const message = options.legacy
+            ? "dw2p"
+            : `demos-web2:v1:${claim.context}:${claim.username.toLowerCase()}:${sender.toLowerCase()}`
         const signature = await demos.crypto.sign(
             demos.algorithm,
             new TextEncoder().encode(message),
@@ -119,6 +142,73 @@ export class Identities {
         return `demos:dw2p:${demos.algorithm}:${uint8ArrayToHex(
             signature.signature,
         )}`
+    }
+
+    /**
+     * The message a cross-chain identity proof signs:
+     * `demos-xm:v1:<chain>:<targetAddress>:<ed25519Address>:<issuedAt>`,
+     * matching the node's `xmBoundProofMessage`. Use it when the wallet signs
+     * outside this SDK; otherwise {@link createXmIdentityProof} does both.
+     *
+     * @param demos A connected Demos instance; its ed25519 address is the
+     *   account the proof is for.
+     * @param chain The chain id the payload names (`target_identity.chain`).
+     * @param targetAddress The wallet address being linked, as the payload
+     *   sends it.
+     * @param issuedAt Epoch milliseconds; nodes refuse a proof older than ten
+     *   minutes, so sign and submit right away.
+     */
+    async createXmProofMessage(
+        demos: Demos,
+        chain: string,
+        targetAddress: string,
+        issuedAt: number = Date.now(),
+    ): Promise<string> {
+        const sender = await demos.getEd25519Address()
+        return xmBoundProofMessage(chain, targetAddress, sender, issuedAt)
+    }
+
+    /**
+     * Build a signed cross-chain identity proof for {@link inferXmIdentity}.
+     *
+     * `sign` signs the bound message ({@link createXmProofMessage}) with the
+     * wallet being linked, e.g. `(m) => evm.signMessage(m)`. Nodes accept the
+     * bound message before and after the `xmProofBinding` fork; once it is
+     * active, it is the only message they accept.
+     *
+     * `legacy: true` signs the account's ed25519 address instead, the text
+     * older SDK flows signed. Nodes accept it only while `xmProofBinding` is
+     * not active.
+     *
+     * @param demos A connected Demos instance.
+     * @param target The wallet being linked, without signature and signedData.
+     * @param sign Signs a UTF-8 message with the target wallet and returns the
+     *   signature in the form the chain's verifier expects.
+     * @param options `issuedAt` (epoch ms, default now) or `legacy`.
+     */
+    async createXmIdentityProof(
+        demos: Demos,
+        target: Omit<InferFromSignatureTargetIdentityPayload, "signature" | "signedData">,
+        sign: (message: string) => Promise<string>,
+        options: { issuedAt?: number; legacy?: boolean } = {},
+    ): Promise<InferFromSignaturePayload> {
+        // Copied before any await: a caller editing its object while the
+        // wallet prompt is open would otherwise send fields the signature
+        // does not cover.
+        const identity = { ...target }
+        const signedData = options.legacy
+            ? await demos.getEd25519Address()
+            : await this.createXmProofMessage(
+                demos,
+                identity.chain,
+                identity.targetAddress,
+                options.issuedAt,
+            )
+        const signature = await sign(signedData)
+        return {
+            method: "identity_assign_from_signature",
+            target_identity: { ...identity, signedData, signature },
+        }
     }
 
     /**
@@ -381,7 +471,10 @@ export class Identities {
      * @param username Username from the proven response.
      * @param userId User ID from the proven response.
      * @param referralCode Optional referral code.
+     * @param options Must carry `legacy: true`: networks with
+     *   `tlsnProofEnforcement` active, mainnet among them, refuse TLSN links.
      * @returns The response from the RPC call.
+     * @throws Without `legacy: true`.
      */
     async addWeb2IdentityViaTLSN(
         demos: Demos,
@@ -393,8 +486,18 @@ export class Identities {
         username: string,
         userId: string | number,
         referralCode?: string,
-        options?: { nonce?: number },
+        options?: { nonce?: number; legacy?: boolean },
     ): Promise<RPCResponseWithValidityData> {
+        // The node checks only the presentation's shape, not the notary
+        // signature, so any account could attach any handle by authoring its
+        // own bytes. Mainnet therefore refuses this link from genesis
+        // (tlsnProofEnforcement); failing here saves the fee of a refused
+        // transaction. legacy: true is for networks without that fork.
+        if (!options?.legacy) {
+            throw new Error(
+                "TLSN identity links are refused on networks with tlsnProofEnforcement active, mainnet among them, until nodes verify the notary signature. Pass { legacy: true } only for a network without that fork.",
+            )
+        }
         const payload: InferFromTLSNPayload = {
             context: context,
             proof: proof,
@@ -1579,14 +1682,15 @@ export class Identities {
     // ==================== Human Passport Identity ====================
 
     /**
-     * Fetch Human Passport score for an address.
+     * Fetch the bare Human Passport score for an address.
      *
-     * Calls the `getHumanPassportScore` GCR routine via the Demos RPC.
-     * This fetches the score from the node's cached data, not directly from Human Passport API.
+     * Calls the `getHumanPassportScore` GCR routine; `response` is the score
+     * as a number. To link the identity use {@link getHumanPassportClaim}:
+     * the assign has to carry the threshold and stamps too.
      *
      * @param demos A Demos instance used to communicate with the RPC.
      * @param address The EVM address to retrieve the Human Passport score for.
-     * @returns The RPC response containing the Human Passport score data.
+     * @returns The RPC response containing the Human Passport score.
      */
     async getHumanPassportScore(
         demos: Demos,
@@ -1603,6 +1707,81 @@ export class Identities {
         }
 
         return await demos.rpcCall(request, true)
+    }
+
+    /**
+     * Fetch the Human Passport claim an identity assign has to carry.
+     *
+     * Calls the `getHumanPassportClaim` GCR routine, which asks Human Passport
+     * for the current score. Pass the result to
+     * {@link createHumanPassportPayload} and sign the assign soon after:
+     * admission compares the claim with the provider's score at that time.
+     *
+     * @param demos A Demos instance used to communicate with the RPC.
+     * @param address The EVM address the claim is for.
+     * @returns The claim as the node reports it.
+     * @throws When the node does not answer with a claim.
+     */
+    async getHumanPassportClaim(
+        demos: Demos,
+        address: string,
+    ): Promise<HumanPassportClaim> {
+        const request = {
+            method: "gcr_routine",
+            params: [
+                {
+                    method: "getHumanPassportClaim",
+                    params: [address],
+                },
+            ],
+        }
+
+        const response = await demos.rpcCall(request, true)
+        if (response.result !== 200 || !response.response) {
+            const reason =
+                (response.extra as { error?: string } | undefined)?.error ??
+                (response as RPCResponse & { error?: { message: string } }).error?.message ??
+                `unexpected status ${response.result}`
+            throw new Error(`Failed to get Human Passport claim: ${reason}`)
+        }
+        return response.response as HumanPassportClaim
+    }
+
+    /**
+     * Build the Human Passport identity assign payload from a claim.
+     *
+     * Copies only the fields the node's admission reads, so a claim object
+     * that carries more (a later node version, a UI model) still yields the
+     * payload the node checks field by field against the provider.
+     *
+     * @param claim The claim from {@link getHumanPassportClaim}.
+     * @param options Onchain chain id, referral code, ownership signature.
+     * @returns The payload for {@link addHumanPassportIdentity}.
+     */
+    createHumanPassportPayload(
+        claim: HumanPassportClaim,
+        options: { chainId?: number; referralCode?: string; signature?: string } = {},
+    ): HumanPassportIdentityData {
+        assertHumanPassportScore(claim)
+        const payload: HumanPassportIdentityData = {
+            address: claim.address,
+            verificationMethod: claim.verificationMethod,
+            score: claim.score,
+            threshold: claim.threshold,
+        }
+        if (claim.stamps !== undefined) payload.stamps = [...claim.stamps]
+        if (claim.lastScoreTimestamp !== undefined) {
+            payload.lastScoreTimestamp = claim.lastScoreTimestamp
+        }
+        if (claim.expirationTimestamp !== undefined) {
+            payload.expirationTimestamp = claim.expirationTimestamp
+        }
+        if (options.chainId !== undefined) payload.chainId = options.chainId
+        if (options.signature !== undefined) payload.signature = options.signature
+        if (options.referralCode !== undefined) {
+            payload.referralCode = options.referralCode
+        }
+        return payload
     }
 
     /**
@@ -1642,19 +1821,22 @@ export class Identities {
     /**
      * Link a Human Passport identity to the GCR.
      *
-     * Verifies the Human Passport score via the node and persists
-     * the identity if the score meets the threshold (default: 20).
+     * The node checks the signed score, threshold and stamps against Human
+     * Passport and stores them as signed, so the payload must be built from
+     * a fresh {@link getHumanPassportClaim}. The wallet must already be
+     * linked to the account as an EVM xm identity.
      *
      * @param demos A Demos instance used to communicate with the RPC.
-     * @param payload The Human Passport identity data to be linked.
+     * @param payload The payload from {@link createHumanPassportPayload}.
      * @returns The RPC response for the identity inference operation.
      *
      * @example
      * ```typescript
-     * const result = await identities.addHumanPassportIdentity(demos, {
-     *     address: "0x...",
-     *     verificationMethod: "api"
-     * })
+     * const claim = await identities.getHumanPassportClaim(demos, "0x...")
+     * const result = await identities.addHumanPassportIdentity(
+     *     demos,
+     *     identities.createHumanPassportPayload(claim),
+     * )
      * ```
      */
     async addHumanPassportIdentity(
@@ -1665,6 +1847,8 @@ export class Identities {
         if (payload.verificationMethod === 'onchain' && payload.chainId == null) {
             throw new Error('chainId must be provided for onchain verification')
         }
+        // Fail here rather than pay for a transaction the node refuses.
+        assertHumanPassportScore(payload)
 
         return await this.inferIdentity(demos, "humanpassport", payload, options)
     }

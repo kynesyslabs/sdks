@@ -82,6 +82,8 @@ export interface SavedHumanPassportIdentity {
     score: number
     /** Whether score passed threshold */
     passingScore: boolean
+    /** Threshold the score was judged against; absent on records stored by older nodes */
+    threshold?: number
     /** List of verified stamp provider names */
     stamps: string[]
     /** Verification method used */

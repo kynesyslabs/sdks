@@ -9,6 +9,10 @@
 export * as CommitmentService from './CommitmentService'
 export * as ProofGenerator from './ProofGenerator'
 export { ZKIdentity } from './ZKIdentity'
+export {
+    ZK_ATTESTATION_CONTEXT,
+    attestationContextSignal,
+} from './attestationContext'
 
 // Re-export types for convenience
 export type {
