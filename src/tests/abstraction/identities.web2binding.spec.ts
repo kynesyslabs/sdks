@@ -92,13 +92,21 @@ describe("web2 proof binding", () => {
         expect(signatureOf(alice)).not.toBe(signatureOf(aliceGithub))
     })
 
-    it("still signs the legacy constant when no claim is given", async () => {
-        // Kept for nodes that predate the bound shape; the node accepts both
-        // until its web2ProofBinding fork activates.
+    it("refuses to sign without a claim, since mainnet refuses the unbound proof", async () => {
+        const demos = await connected()
+        await expect(new Identities().createWeb2ProofPayload(demos)).rejects.toThrow(
+            "needs the claim",
+        )
+    })
+
+    it("signs the legacy constant only when asked for it", async () => {
+        // For networks where web2ProofBinding is not active.
         const demos = await connected()
         const sender = await demos.getEd25519Address()
 
-        const payload = await new Identities().createWeb2ProofPayload(demos)
+        const payload = await new Identities().createWeb2ProofPayload(demos, undefined, {
+            legacy: true,
+        })
 
         await expect(
             verifyOver(demos, "dw2p", signatureOf(payload), sender),

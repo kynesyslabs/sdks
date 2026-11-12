@@ -10,6 +10,7 @@
  */
 
 import { IDENTITY_ARTIFACTS, loadArtifact } from './artifacts'
+import { stringToFieldElement } from './attestationContext'
 
 // REVIEW: Phase 10.1 - Production cryptographic implementation
 // snarkjs is loaded lazily (dynamic import inside the proof/verify functions):
@@ -66,7 +67,8 @@ export interface MerkleProof {
  *
  * @param providerId - Provider identifier (e.g., "github:12345")
  * @param secret - User's secret value
- * @param context - Context string for this attestation
+ * @param context - Context string for this attestation; nodes accept only
+ *   `ZK_ATTESTATION_CONTEXT`
  * @param merkleProof - Merkle proof from node RPC
  * @param merkleRoot - Current Merkle root from node RPC
  * @returns Proof and public signals
@@ -76,7 +78,7 @@ export interface MerkleProof {
  * const result = await ProofGenerator.generateIdentityProof(
  *     "github:12345",
  *     "secret123",
- *     "dao_vote_123",
+ *     ZK_ATTESTATION_CONTEXT,
  *     merkleProof,
  *     merkleRoot
  * )
@@ -91,9 +93,9 @@ export async function generateIdentityProof(
     merkleRoot: string,
 ): Promise<ProofGenerationResult> {
     // Convert inputs to BigInt/field elements
-    const providerIdBigInt = stringToBigInt(providerId)
-    const secretBigInt = stringToBigInt(secret)
-    const contextBigInt = stringToBigInt(context)
+    const providerIdBigInt = stringToFieldElement(providerId)
+    const secretBigInt = stringToFieldElement(secret)
+    const contextBigInt = stringToFieldElement(context)
 
     // Prepare circuit inputs
     const circuitInputs = {
@@ -194,25 +196,3 @@ export async function verifyProof(
     }
 }
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-const BN254_SCALAR_FIELD = BigInt(
-    '21888242871839275222246405745257275088548364400416034343698204186575808495617',
-)
-
-/**
- * Field element for a string input, reduced like poseidon-lite reduces the
- * commitment inputs. The witness calculator truncates an unreduced input to
- * 256 bits instead, so a generated secret (64 bytes) would yield a leaf that
- * is not the registered commitment.
- */
-function stringToBigInt(str: string): bigint {
-    const encoder = new TextEncoder()
-    const bytes = encoder.encode(str)
-    const hex = Array.from(bytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-    return BigInt('0x' + hex) % BN254_SCALAR_FIELD
-}

@@ -224,16 +224,22 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          *
          * @example
          * ```ts
-         * await demos.run.attest.xm({
-         *     chain: "eth",
-         *     subchain: "mainnet",
-         *     targetAddress: "0x...",
-         *     signature: "0x...",
-         * })
+         * const proof = await new Identities().createXmIdentityProof(
+         *     demos,
+         *     {
+         *         chain: "evm",
+         *         subchain: "mainnet",
+         *         chainId: 1,
+         *         targetAddress: evm.getAddress(),
+         *         isEVM: true,
+         *     },
+         *     message => evm.signMessage(message),
+         * )
+         * await demos.run.attest.xm(proof)
          * ```
          *
-         * @param payload - The signature-inference payload identifying the
-         *                   crosschain address to link.
+         * @param payload - The proof from `Identities.createXmIdentityProof`,
+         *                   which signs the `demos-xm:v1` bound message.
          * @param referralCode - Optional referral code for incentive points.
          * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
          */
@@ -477,13 +483,14 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          *
          * @example
          * ```ts
-         * await demos.run.attest.humanpassport({
-         *     address: "0x...",
-         *     verificationMethod: "api",
-         * })
+         * const identities = new Identities()
+         * const claim = await identities.getHumanPassportClaim(demos, "0x...")
+         * await demos.run.attest.humanpassport(
+         *     identities.createHumanPassportPayload(claim),
+         * )
          * ```
          *
-         * @param payload - The Human Passport identity data to link.
+         * @param payload - The payload built from `getHumanPassportClaim`.
          * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
          */
         humanpassport: (
@@ -597,8 +604,13 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          *     revealedRecv,
          *     "octocat",
          *     583231,
+         *     undefined,
+         *     { legacy: true },
          * )
          * ```
+         *
+         * Networks with `tlsnProofEnforcement` active, mainnet among them,
+         * refuse TLSN links, so the call throws unless `opts.legacy` is set.
          *
          * @param context - The platform context ("github", "discord", or
          *                   "telegram").
@@ -609,7 +621,9 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          * @param username - The username from the proven response.
          * @param userId - The user id from the proven response.
          * @param referralCode - Optional referral code for incentive points.
-         * @param opts - Fee ceiling / confirmation strategy / wait behaviour.
+         * @param opts - Fee ceiling / confirmation strategy / wait behaviour,
+         *               and `legacy: true` for a network without
+         *               `tlsnProofEnforcement`.
          */
         tlsn: (
             context: TLSNIdentityContext,
@@ -620,7 +634,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
             username: string,
             userId: string | number,
             referralCode?: string,
-            opts?: ProgrammaticTxOptions,
+            opts?: ProgrammaticTxOptions & { legacy?: boolean },
         ): Promise<ProgrammaticTxResult> =>
             ctx.run(
                 () =>
@@ -634,7 +648,7 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
                         username,
                         userId,
                         referralCode,
-                        { nonce: opts?.nonce },
+                        { nonce: opts?.nonce, legacy: opts?.legacy },
                     ),
                 opts,
             ),
