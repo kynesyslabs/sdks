@@ -16,7 +16,9 @@ export const DEFAULT_MAX_FEE_DEM = 5
  * Anything the runner can turn into a confirmed transaction:
  *  - a `Transaction` (signed or unsigned — unsigned is signed first),
  *  - an already-confirmed `RPCResponseWithValidityData` (e.g. the value the
- *    `Identities.*` builders return), or
+ *    `Identities.*` builders return); one for a native send that carries a
+ *    fee quote (`transaction.attrs.total_fee`) is refused, pass its
+ *    `Transaction` instead, or
  *  - a thunk producing either of the above.
  */
 export type TxSource =
@@ -33,7 +35,11 @@ export interface TxConfirmInfo {
     transaction: Transaction
     /** Raw validity data from the node (gas operation, reference block, …). */
     validityData: RPCResponseWithValidityData
-    /** Total fee for this transaction, in OS (smallest unit). */
+    /**
+     * Total fee for this transaction, in OS (smallest unit): the node's
+     * quoted charge (`transaction.attrs.total_fee`) when it gives one,
+     * else the sum of the fee fields.
+     */
     feeOs: bigint
     /** Total fee for this transaction, human-readable DEM string. */
     feeDem: string
