@@ -131,7 +131,8 @@ export default class L2PS {
 
         this.privateKey = privateKey;
         this.iv = iv;
-        this.id = Hashing.sha256(privateKey);
+        // privateKey is forge binary bytes, not text
+        this.id = Hashing.sha256(privateKey, "raw");
         L2PS.instances.set(this.id, this);
     }
 
@@ -425,7 +426,7 @@ export default class L2PS {
      * @returns Promise resolving to a 16-character fingerprint string
      */
     async getKeyFingerprint(): Promise<string> {
-        return Hashing.sha256(this.privateKey).substring(0, 16);
+        return Hashing.sha256(this.privateKey, "raw").substring(0, 16);
     }
 
     /**

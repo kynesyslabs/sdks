@@ -10,6 +10,20 @@
   encoding helpers, pinned to the node's shared vectors. `settle: false`
   keeps the pre-settlement transfer for networks without the fork.
 
+### Changed
+- `Hashing.sha256` hashes strings as UTF-8 unless passed `"raw"`; use it for
+  forge binary strings. Identity edit `proofHash` values keep their previous
+  raw encoding for node compatibility. Non-string input now throws `TypeError`
+  (it previously produced an incorrect hash for binary buffers). Transaction
+  hashes for non-ASCII content now match nodes using native SHA-256 (node
+  commit `dcbee323`, included in `v1.0.0-rc.1` and later); nodes built from
+  older code, such as the stale `testnet` branch, reject them with a hash mismatch.
+- TypeScript callers that pass `Hashing.sha256` directly as a callback (for
+  example, `.map(Hashing.sha256)`) no longer compile because of
+  the optional `encoding` parameter; wrap it as `.map(s => Hashing.sha256(s))`.
+- Web2 identity proof URLs must be ASCII; percent-encode non-ASCII path and
+  query characters and use the punycode (`xn--`) form for hostnames.
+
 ### Fixed
 - `L2PS.encryptTx` no longer names the inner receiver in the public outer
   transaction (outer `to` is the sender) and pads the plaintext to 1024-char

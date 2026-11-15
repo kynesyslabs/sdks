@@ -227,6 +227,15 @@ export class Identities {
         options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
+            if (
+                payload.context !== "telegram" &&
+                typeof payload.proof === "string" &&
+                /[^\x00-\x7F]/.test(payload.proof)
+            ) {
+                throw new Error(
+                    "web2 identity proof URLs must be ASCII; percent-encode non-ASCII path and query characters; use the punycode (xn--) form for hostnames",
+                )
+            }
             // Skip validation for telegram as it uses custom attestation format, not URL proofs
             if (
                 payload.context !== "telegram" &&
