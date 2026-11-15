@@ -9,6 +9,12 @@ import {
 import { mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import {
+  DEFAULT_RPC_MAX_RESPONSE_BYTES,
+  DEFAULT_RPC_TIMEOUT_MS,
+  fetchBounded,
+  NonRetryableRpcError,
+} from "./bounded-fetch.js";
+import {
   STORAGE_PROGRAM_CONSTANTS,
   type StorageProgramPayload,
 } from "./storage.js";
@@ -27,8 +33,30 @@ import type {
 const OS_PER_DEM = 1_000_000_000n;
 const FAILURE_CACHE_MS = 30_000;
 const RETRYABLE_STATUS = new Set([502, 503, 504]);
+// Node's fetch (undici) fails a request after 300 s without headers, as a
+// retryable error, so a longer deadline would never fire.
+const MAX_RPC_TIMEOUT_MS = 300_000;
 
-class NonRetryableRpcError extends Error {}
+/** Per-request bounds for the native client's RPC reads. */
+export interface DemosOptions {
+  /** Deadline for each RPC request, headers and body, in ms (default 120 000, at most 300 000). */
+  rpcTimeoutMs?: number;
+  /** Largest RPC response body accepted, in bytes (default 64 MiB). */
+  rpcMaxResponseBytes?: number;
+}
+
+function boundOption(
+  value: number | undefined,
+  fallback: number,
+  maximum: number,
+  label: string,
+): number {
+  const selected = value ?? fallback;
+  if (!Number.isSafeInteger(selected) || selected < 1 || selected > maximum) {
+    throw new TypeError(`${label} must be an integer from 1 to ${maximum}`);
+  }
+  return selected;
+}
 
 type NativeBuffer = Buffer;
 // privateKey is the 64-byte seed || publicKey form.
@@ -508,6 +536,23 @@ export class Demos {
   private networkInfo: NetworkInfo | null = null;
   private networkInfoRpc: string | null = null;
   private networkFailureAt = 0;
+  private readonly rpcTimeoutMs: number;
+  private readonly rpcMaxResponseBytes: number;
+
+  constructor(options?: DemosOptions) {
+    this.rpcTimeoutMs = boundOption(
+      options?.rpcTimeoutMs,
+      DEFAULT_RPC_TIMEOUT_MS,
+      MAX_RPC_TIMEOUT_MS,
+      "rpcTimeoutMs",
+    );
+    this.rpcMaxResponseBytes = boundOption(
+      options?.rpcMaxResponseBytes,
+      DEFAULT_RPC_MAX_RESPONSE_BYTES,
+      Number.MAX_SAFE_INTEGER,
+      "rpcMaxResponseBytes",
+    );
+  }
 
   get walletConnected(): boolean {
     return this.crypto.connected;
@@ -535,9 +580,12 @@ export class Demos {
         "Content-Type": "application/json",
       };
       if (this.walletConnected) Object.assign(headers, await this.authHeaders());
-      const response = await fetch(
+      const { response, text } = await fetchBounded(
         `${this.requireRpc()}/storage-program/${encodeURIComponent(address)}`,
         { headers },
+        true,
+        this.rpcTimeoutMs,
+        this.rpcMaxResponseBytes,
       );
       if (!response.ok) {
         const error = new Error(`Demos storage read failed with HTTP ${response.status}`) as Error & {
@@ -546,7 +594,7 @@ export class Demos {
         error.response = { status: response.status };
         throw error;
       }
-      return await response.json() as StorageProgramResponse;
+      return JSON.parse(text) as StorageProgramResponse;
     },
   };
 
@@ -600,7 +648,13 @@ export class Demos {
 
   /** Connect to an HTTP(S) Demos RPC after a successful liveness request. */
   async connect(rpcUrl: string): Promise<boolean> {
-    const response = await fetch(rpcUrl);
+    const { response } = await fetchBounded(
+      rpcUrl,
+      {},
+      false,
+      this.rpcTimeoutMs,
+      this.rpcMaxResponseBytes,
+    );
     if (!response.ok) throw new Error(`Demos RPC failed with HTTP ${response.status}`);
     if (this.rpcUrl !== rpcUrl) {
       this.networkInfo = null;
@@ -686,14 +740,20 @@ export class Demos {
     headers: Record<string, string>,
     body: string,
   ): Promise<RpcResponse> {
-    const response = await fetch(rpc, { method: "POST", headers, body });
+    const { response, text } = await fetchBounded(
+      rpc,
+      { method: "POST", headers, body },
+      true,
+      this.rpcTimeoutMs,
+      this.rpcMaxResponseBytes,
+    );
     if (!response.ok) {
       const message = `Demos RPC failed with HTTP ${response.status}`;
       if (RETRYABLE_STATUS.has(response.status)) throw new Error(message);
       throw new NonRetryableRpcError(message);
     }
     try {
-      return await response.json() as RpcResponse;
+      return JSON.parse(text) as RpcResponse;
     } catch {
       throw new NonRetryableRpcError(
         "Demos RPC returned an invalid JSON response",
