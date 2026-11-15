@@ -142,8 +142,55 @@ test("derives the existing Demos Ed25519 wallet identity", async () => {
   await assert.rejects(demos.signMessage(""), /must be a non-empty string/);
   await assert.rejects(
     new Demos().connectWallet("not a valid mnemonic"),
-    /Invalid mnemonic/,
+    /^Error: Invalid recovery phrase/,
   );
+});
+
+test("refuses a phrase that is not a valid BIP-39 mnemonic", async () => {
+  const wrongPhrases = {
+    capitalisedFirstWord: MNEMONIC.replace("abandon", "Abandon"),
+    typo: MNEMONIC.replace("about", "abot"),
+    badChecksum: MNEMONIC.replace("about", "abandon"),
+    wrongWordCount: "abandon abandon abandon",
+    // Both pass validateMnemonic, which applies NFKD, but are not canonical.
+    ideographicSpaces: MNEMONIC.replaceAll(" ", "\u{3000}"),
+    fullWidthLetter: MNEMONIC.replace("about", "\u{ff41}bout"),
+  };
+  for (const [name, phrase] of Object.entries(wrongPhrases)) {
+    const demos = new Demos();
+    await assert.rejects(
+      demos.connectWallet(phrase),
+      (error) => error.message.startsWith("Invalid recovery phrase") &&
+        !error.message.includes("abandon"),
+      name,
+    );
+    assert.equal(demos.crypto.connected, false, name);
+  }
+});
+
+// Addresses recorded at the base before the phrase check; it must not move them.
+test("keeps the address of a valid phrase and of seed inputs", async () => {
+  const phrase = "legal winner thank year wave sausage worth useful legal winner thank yellow";
+  assert.equal(
+    await new Demos().connectWallet(`  ${phrase}  `),
+    "0xaac8381cb0f464a48ddb8ef8829829de69ae8236b9318ed481c8d6589b6895bb",
+  );
+  assert.equal(
+    await new Demos().connectWallet(
+      Uint8Array.from({ length: 128 }, (_, i) => (i * 5 + 1) % 256),
+    ),
+    "0xe37e58b4b72dfeca5711d419ab396d9aa618bc2bc5018ec2d53896a6081435e3",
+  );
+  assert.equal(
+    await new Demos().connectWallet(
+      Uint8Array.from({ length: 32 }, (_, i) => (i * 5 + 1) % 256),
+    ),
+    "0x52a275a720c58f0bf12da3743b9443d44f2252dbdeef4730fb06edc04010c78a",
+  );
+  // A string with no whitespace never reaches the phrase check; as before the
+  // change it is rejected by the BIP-39 seed conversion.
+  const hexSeed = Array.from({ length: 128 }, (_, i) => "0123456789abcdef"[(i * 7 + 3) % 16]).join("");
+  await assert.rejects(new Demos().connectWallet(hexSeed), /^Error: Invalid mnemonic/);
 });
 
 // Keys and signatures recorded from the node-forge implementation this
