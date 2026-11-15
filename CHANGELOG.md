@@ -11,6 +11,30 @@
   keeps the pre-settlement transfer for networks without the fork.
 
 ### Fixed
+- `Demos.connectWallet(<string>)` now throws `Invalid recovery phrase` when the
+  string is not a valid BIP-39 mnemonic (a 128-character hex string still
+  throws `Invalid mnemonic`). A phrase with the right word count but
+  a misspelt word, a capitalised word or a bad checksum used to derive a
+  different wallet silently (#175). Valid phrases derive exactly the same keys
+  as before. Derivation never lowercased words, so such input is refused, not
+  normalised. It also throws when the phrase contains characters that NFKD
+  normalisation changes (for example full-width letters, or U+3000 between
+  words): bip39 validated the normalised form, but derivation hashed the
+  string as given, so such a phrase opened a different wallet. A refused call
+  leaves an already-connected wallet unchanged.
+  **Upgrade note:** a wallet that was only ever opened with a phrase that is
+  now refused (for example a capitalised first word, or full-width letters) is
+  no longer reachable through `connectWallet(<string>)`. Its keys are still
+  reachable with `connectWallet(bytes)`, where `bytes` is a SHA3-512 digest as
+  hex (without `0x`) encoded as UTF-8 (128 bytes). With
+  `trimmed = phrase.trim()`, the digest that 4.0.21 used is:
+  - `sha3_512(mnemonicToSeedSync(trimmed))` (`@scure/bip39`, no passphrase)
+    when `trimmed.length` is 128 and `validateMnemonic(trimmed, english)` is
+    false;
+  - `sha3_512(trimmed)`, over its UTF-8 bytes, in every other case.
+
+  These recipes reproduce the derivation used from 2.3.16 (commit `1d90dba`)
+  to 4.0.21; earlier builds derived differently.
 - `L2PS.encryptTx` no longer names the inner receiver in the public outer
   transaction (outer `to` is the sender) and pads the plaintext to 1024-char
   buckets so the ciphertext length does not reveal the amount's size.

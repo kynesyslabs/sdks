@@ -1,5 +1,6 @@
 import { Identities } from "@/abstraction"
 import { Demos } from "@/websdk"
+import { legacySeed } from "../utils/legacySeed"
 
 describe("Referrals", () => {
     const rpc = "https://node2.demos.sh"
@@ -9,7 +10,7 @@ describe("Referrals", () => {
 
     beforeAll(async () => {
         await demos.connect(rpc)
-        await demos.connectWallet("polar scale globe beauty stock employ rail exercise goat into sample embark")
+        await demos.connectWallet(legacySeed("polar scale globe beauty stock employ rail exercise goat into sample embark"))
     })
 
     test.skip("Validate referral code", async () => {

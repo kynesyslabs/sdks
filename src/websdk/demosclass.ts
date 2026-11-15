@@ -336,8 +336,6 @@ export class Demos {
         }
 
         let seed: Uint8Array = null
-        this.algorithm = options?.algorithm || "ed25519"
-        this.dual_sign = options?.dual_sign || false
         // TODO: Convert masterSeed to 128 bytes
 
         if (
@@ -354,12 +352,36 @@ export class Demos {
         if (typeof masterSeed === "string") {
             masterSeed = masterSeed.trim()
 
+            // bip39 validates the NFKD form, but derivation hashes the string
+            // as given, so full-width letters or U+3000 between words would
+            // pass validation and open a different wallet. Refuse them.
+            if (masterSeed.normalize("NFKD") !== masterSeed) {
+                throw new Error(
+                    "Invalid recovery phrase: it contains non-canonical characters (for example full-width letters or ideographic spaces). Only English BIP-39 phrases are accepted. Type it in plain lowercase letters separated by single ASCII spaces. If this exact phrase opened a wallet with SDK 2.3.16 to 4.0.21, see the upgrade note in https://github.com/kynesyslabs/sdks/blob/main/CHANGELOG.md",
+                )
+            }
+
             if (!bip39.validateMnemonic(masterSeed, wordList)) {
+                // A malformed phrase with an accepted word count (a typo,
+                // capitalised word or bad checksum) used to derive a different
+                // wallet silently; other invalid strings already threw
+                // `Invalid mnemonic` inside bip39. Refuse both. A 128-char hex
+                // string is let through and still fails inside bip39, as before.
+                if (!/^[0-9a-fA-F]{128}$/.test(masterSeed)) {
+                    throw new Error(
+                        "Invalid recovery phrase: not a valid English BIP-39 mnemonic. Check the spelling, that every word is lowercase, and that words are separated by single spaces. If this exact phrase opened a wallet with SDK 2.3.16 to 4.0.21, see the upgrade note in https://github.com/kynesyslabs/sdks/blob/main/CHANGELOG.md",
+                    )
+                }
                 hashable = bip39.mnemonicToSeedSync(masterSeed)
             } else {
                 hashable = masterSeed
             }
         }
+
+        // Set only after the seed checks above, so a refused call leaves the
+        // connected wallet's algorithm and dual signing untouched.
+        this.algorithm = options?.algorithm || "ed25519"
+        this.dual_sign = options?.dual_sign || false
 
         // NOTE: Reverted this bug to keep generating the same keypair
         // with the same mnemonic for mnemonics added to testnet during the incentives campaign.
@@ -389,9 +411,9 @@ export class Demos {
     /**
      * Connect a wallet from a hex-encoded key instead of a mnemonic.
      *
-     * `connectWallet(<string>)` treats a non-mnemonic string as a BIP-39
-     * *passphrase* (PBKDF2), so passing a raw hex key there silently derives an
-     * unexpected identity. This method decodes the hex to bytes and feeds them to
+     * `connectWallet(<string>)` refuses a string that is not a valid BIP-39
+     * mnemonic, so a raw hex key cannot be passed there. This method decodes the
+     * hex to bytes and feeds them to
      * `connectWallet` as the master seed — a deterministic identity from the key,
      * on the exact same derivation path as `connectWallet(<bytes>)`. Existing
      * derivation is unchanged.

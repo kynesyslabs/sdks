@@ -13,7 +13,7 @@ Instead of an ed25519 private key, `Demos.connectWallet` now accepts a master se
 1. A mnemonic string (12 or 24 words)
 2. A 128 byte `Uint8Array` representation of the masterseed
 
-If you pass anything else, it will be hashed using sha3-512 to create a 128 byte master seed.
+If you pass anything else, it will be hashed using sha3-512 to create a 128 byte master seed (since #175, a string that is not a valid English BIP-39 phrase is refused).
 
 
 The `connectWallet` method also supports these fields in the `option` parameter:

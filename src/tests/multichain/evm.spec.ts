@@ -2,6 +2,7 @@ import { Transaction, parseEther } from "ethers"
 
 import { EVM } from "@/multichain/localsdk"
 import { getSampleTranfers, verifyNumberOrder } from "../utils"
+import { legacySeed } from "../utils/legacySeed"
 import { wallets } from "../utils/wallets"
 import chainProviders from "./chainProviders"
 import { Demos, prepareXMPayload, prepareXMScript } from "@/websdk"
@@ -19,7 +20,9 @@ describe("EVM CHAIN TESTS", () => {
 
         await demos.connect(rpc)
         await demos.connectWallet(
-            "polar scale globe beauty stock employ rail exercise goat into sample embark",
+            legacySeed(
+                "polar scale globe beauty stock employ rail exercise goat into sample embark",
+            ),
         )
     })
 

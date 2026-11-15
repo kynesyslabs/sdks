@@ -1,5 +1,6 @@
 import { Demos } from "@/websdk"
 import { Identities } from "@/abstraction"
+import { legacySeed } from "../utils/legacySeed"
 
 describe("Web2 Identities", () => {
     // const rpc = "http://node2.demos.sh:53560"
@@ -13,7 +14,7 @@ describe("Web2 Identities", () => {
         await demos.connect(rpc)
         const mnemonic =
             "polar scale globe beauty stock employ rail exercise goat into sample embark"
-        await demos.connectWallet(mnemonic)
+        await demos.connectWallet(legacySeed(mnemonic))
     })
 
     test.skip("Create Web2 Proof Payload", async () => {
