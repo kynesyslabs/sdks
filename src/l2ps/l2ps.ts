@@ -15,7 +15,7 @@ import { Hashing } from "@/encryption/Hashing";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
 import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
 
-/** Plaintexts are padded to a multiple of this many characters before encryption. */
+/** Plaintexts are padded to a multiple of this many UTF-8 bytes before encryption. */
 export const L2PS_PLAINTEXT_BUCKET = 1024;
 
 /**
@@ -226,7 +226,8 @@ export default class L2PS {
             // AES-GCM ciphertext is as long as the plaintext, so an unpadded
             // transfer leaks the digit count of its amount. JSON.parse ignores
             // trailing whitespace, so decryptors of any version accept this.
-            const json = JSON.stringify(tx);
+            // UTF-8 bytes, as decryptTx decodes them; ASCII is unchanged.
+            const json = forge.util.encodeUtf8(JSON.stringify(tx));
             const txString = json.padEnd(
                 Math.ceil((json.length + 1) / L2PS_PLAINTEXT_BUCKET) * L2PS_PLAINTEXT_BUCKET,
                 " ",

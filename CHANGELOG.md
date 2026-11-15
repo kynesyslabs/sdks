@@ -12,8 +12,10 @@
 
 ### Fixed
 - `L2PS.encryptTx` no longer names the inner receiver in the public outer
-  transaction (outer `to` is the sender) and pads the plaintext to 1024-char
+  transaction (outer `to` is the sender) and pads the plaintext to 1024-byte
   buckets so the ciphertext length does not reveal the amount's size.
+- `L2PS.encryptTx` encodes the plaintext as UTF-8, so transactions with
+  non-ASCII content decrypt; ASCII plaintext bytes are unchanged.
 - `getNextNonce` / `getAddressNonce` docs state the exact nonce a node
   running the `nonceEnforcement` upgrade requires (confirmed + 1 + pending)
   and no longer quote error strings; tests drive a DAHR request and cover the
