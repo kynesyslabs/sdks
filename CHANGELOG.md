@@ -11,6 +11,42 @@
   keeps the pre-settlement transfer for networks without the fork.
 
 ### Fixed
+- RPC calls no longer hang on a node that accepts a request and never
+  answers. Each RPC attempt (`rpcCall`, `call`, `nodeCall` and everything
+  built on them) now has a 120 s wall-clock deadline and a 512 MiB ceiling on
+  reply size, in Node, Bun and browsers. The size ceiling matches V8's string
+  limit (Node, Chromium) and is stricter than needed on Bun; on the browser
+  XHR adapter it counts transferred, possibly compressed, bytes. The deadline
+  covers the upload, the node's work and the whole reply, so some legitimate
+  calls can pass it: an XM (`crosschainOperation`) broadcast runs its
+  outside-chain operations inside the call, and a large upload or a large
+  reply on a slow link (for example `getTxByHash` on a transaction with
+  inline IPFS content) can also take longer than 120 s. Such calls fail at the
+  deadline (there is no option to raise it yet); a broadcast then ends as an
+  unknown outcome while the node may keep working on the request. A missed
+  deadline fails like any other transport error (`call` returns the
+  `{ result: 500 }` envelope holding a `TransportError` whose cause has code
+  `ECONNABORTED`) and is not retried, since the node may already have the
+  request. For `broadcast` that is an
+  unknown outcome: `broadcastAndWait` keeps polling the transaction status.
+  An oversize reply is not retried either; its cause has code
+  `ERR_BAD_RESPONSE`, no `response` and a message starting
+  `maxContentLength size of`. HTTP 5xx replies share that code but carry a
+  `response`.
+  A request that times out settles through the existing failure path, so
+  callers that already turn a failed call into a fallback do the same after a
+  timeout, as they already do for a refused connection or a 5xx reply:
+  `getAddressNonce` returns 0, and for the 30 s failure TTL `getNetworkInfo`
+  returns the node's last answer, or `null` if it never answered, in which
+  case the legacy wire format is used. After a timeout the `TLSNotaryService`
+  helpers that broadcast (`requestAttestation`, `storeProof` and their
+  `WithConfirmation` variants) throw as if the request failed, although it
+  may have landed (a TLSN request burns 1 DEM). The `WithConfirmation`
+  variants pass the transaction hash to `onConfirm`, so check it before
+  retrying (`getTokenByTxHash` for an attestation request, `getTxByHash` for
+  a stored proof). `requestAttestation` and `storeProof` do not expose the
+  hash, so check whether the account nonce moved (`getAddressNonce`) before
+  retrying.
 - `L2PS.encryptTx` no longer names the inner receiver in the public outer
   transaction (outer `to` is the sender) and pads the plaintext to 1024-char
   buckets so the ciphertext length does not reveal the amount's size.
