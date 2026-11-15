@@ -2,6 +2,8 @@ import { describe, test, expect } from "@jest/globals"
 import * as forge from "node-forge"
 import L2PS from "@/l2ps/l2ps"
 import type { Transaction } from "@/types/blockchain/Transaction"
+import { Cryptography } from "@/encryption/Cryptography"
+import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 
 // AES-GCM AAD binding + per-call nonce validation contract for
 // `L2PS.encryptTx` / `L2PS.decryptTx`. Each test covers one rejection
@@ -9,13 +11,18 @@ import type { Transaction } from "@/types/blockchain/Transaction"
 // silently fall through to the legacy IV or pass authentication when
 // it should not.
 
+// decryptTx only returns transactions signed by their sender.
+const sender = forge.pki.ed25519.generateKeyPair()
+const SENDER = uint8ArrayToHex(sender.publicKey)
+const HASH = "deadbeef".repeat(8)
+
 function makeTx(): Transaction {
     return {
         content: {
             type: "native",
-            from: "0x" + "a".repeat(64),
+            from: SENDER,
             to: "0x" + "b".repeat(64),
-            from_ed25519_address: "0x" + "a".repeat(64),
+            from_ed25519_address: SENDER,
             amount: "100",
             data: [
                 "native",
@@ -31,8 +38,11 @@ function makeTx(): Transaction {
                 rpc_address: null,
             },
         },
-        hash: "deadbeef".repeat(8),
-        signature: null,
+        hash: HASH,
+        signature: {
+            type: "ed25519",
+            data: uint8ArrayToHex(Cryptography.sign(HASH, sender.privateKey)),
+        },
         ed25519_signature: null,
         status: null,
         blockNumber: null,

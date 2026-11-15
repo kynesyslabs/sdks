@@ -9,11 +9,12 @@
  * @version 1.0.0
  */
 
-import { UnifiedCrypto } from "@/encryption/unifiedCrypto";
+import { UnifiedCrypto, hexToUint8Array } from "@/encryption/unifiedCrypto";
 import forge from "node-forge";
 import { Hashing } from "@/encryption/Hashing";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
 import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
+import { txSignaturePreimage } from "@/websdk/utils/txSignaturePreimage";
 
 /** Plaintexts are padded to a multiple of this many characters before encryption. */
 export const L2PS_PLAINTEXT_BUCKET = 1024;
@@ -297,13 +298,20 @@ export default class L2PS {
      * 
      * Validates that the transaction is of type "l2psEncryptedTx", extracts the encrypted payload,
      * verifies the L2PS UID matches, performs AES-GCM decryption with authentication,
-     * and validates the original transaction hash for integrity.
+     * validates the original transaction hash for integrity, and checks that the
+     * original transaction is signed by its sender.
      * 
      * @param encryptedTx - Transaction object containing encrypted data
+     * @param options.chainId - The network's chain id. Needed to accept a
+     *   signature made after the node's `signatureDomain` fork, which covers
+     *   `demos-tx:v1:<chainId>:<hash>`. A signature over the legacy (bare-hash)
+     *   form is accepted even when `chainId` is given; which form a network
+     *   requires is enforced by the node.
      * @returns Promise resolving to the original decrypted Transaction
      * 
      * @throws {Error} If transaction is not l2psEncryptedTx type, wrong L2PS UID, 
-     *                 authentication fails, or hash mismatch
+     *                 authentication fails, hash mismatch, or the original
+     *                 transaction is unsigned or its signature does not verify
      * 
      * @example
      * ```typescript
@@ -312,7 +320,10 @@ export default class L2PS {
      * // originalTx is now the original transaction before encryption
      * ```
      */
-    async decryptTx(encryptedTx: L2PSTransaction): Promise<Transaction> {
+    async decryptTx(
+        encryptedTx: L2PSTransaction,
+        options?: { chainId?: number },
+    ): Promise<Transaction> {
         if (!encryptedTx || encryptedTx.content.type !== "l2psEncryptedTx") {
             throw new Error('Transaction must be of type l2psEncryptedTx');
         }
@@ -328,8 +339,6 @@ export default class L2PS {
             if (encryptedPayload.l2ps_uid !== (this.config?.uid || this.id)) {
                 throw new Error('Transaction encrypted for different L2PS');
             }
-
-            // TODO Verify the signature of the encrypted transaction
 
             const encryptedData = forge.util.createBuffer(forge.util.decode64(encryptedPayload.encrypted_data));
             const tag = forge.util.createBuffer(forge.util.decode64(encryptedPayload.tag));
@@ -380,10 +389,49 @@ export default class L2PS {
                 throw new Error('Decrypted transaction hash mismatch');
             }
 
+            if (!originalTx.signature?.data) {
+                throw new Error('Decrypted transaction is not signed');
+            }
+            if (!(await L2PS.signedBySender(originalTx, options?.chainId))) {
+                throw new Error('Decrypted transaction signature does not verify');
+            }
+
             return originalTx;
         } catch (error: any) {
             throw new Error(`Decryption failed: ${error.message}`);
         }
+    }
+
+    /**
+     * Whether `tx.signature` is `tx.content.from`'s signature over the bytes
+     * `Demos.sign` and `DemosTransactions.sign` sign (`txSignaturePreimage`),
+     * checked with `UnifiedCrypto.verify` for `tx.signature.type`.
+     */
+    private static async signedBySender(tx: Transaction, chainId?: number): Promise<boolean> {
+        const preimages = [txSignaturePreimage(tx.hash, 0, false)];
+        if (chainId !== undefined) {
+            preimages.push(txSignaturePreimage(tx.hash, chainId, true));
+        }
+        try {
+            const signature = hexToUint8Array(tx.signature.data);
+            const publicKey = hexToUint8Array(tx.content.from);
+            for (const message of preimages) {
+                // `verify` reads no keys of its own, so the default instance serves.
+                const verified = await UnifiedCrypto.getInstance().verify({
+                    algorithm: tx.signature.type,
+                    signature,
+                    publicKey,
+                    message,
+                });
+                if (verified) {
+                    return true;
+                }
+            }
+        } catch {
+            // Malformed hex, a key or signature of the wrong length, or an
+            // unknown algorithm: not a signature by the sender.
+        }
+        return false;
     }
 
     /**
