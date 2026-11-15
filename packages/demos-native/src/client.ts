@@ -1043,9 +1043,13 @@ export class Demos {
    */
   async transfer(to: string, amountOs: bigint): Promise<Transaction> {
     if (amountOs < 0n) throw new Error("amount must be non-negative");
-    const postFork = Boolean(
-      (await this.getNetworkInfo())?.forks?.osDenomination?.activated,
-    );
+    const postFork = (await this.getNetworkInfo())?.forks?.osDenomination
+      ?.activated;
+    if (typeof postFork !== "boolean") {
+      throw new TypeError(
+        "Demos denomination-fork state is unavailable; refusing to sign",
+      );
+    }
     if (!postFork && amountOs % OS_PER_DEM !== 0n) {
       throw new Error("sub-DEM precision is unsupported by the target node");
     }

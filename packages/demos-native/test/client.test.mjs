@@ -258,6 +258,9 @@ test("fails closed instead of signing nonce one after an RPC failure", async () 
   const demos = new Demos();
   await demos.connect(rpc);
   await demos.connectWallet(MNEMONIC);
+  demos.getNetworkInfo = async () => ({
+    forks: { osDenomination: { activated: true } },
+  });
   demos.nodeCall = async () => ({ result: 500, require_reply: false });
   await assert.rejects(
     demos.transfer(RECIPIENT, 1_000_000_000n),
@@ -424,10 +427,13 @@ test("ends an RPC request at the deadline", { timeout: 10_000 }, async (t) => {
   assert.equal(silent.result, 500);
   assert.equal(silent.response.message, late(`${base}/`));
   assert.equal(posts, 1);
-  await assert.rejects(
-    demos.transfer(RECIPIENT, 1_000_000_000n),
-    /valid address nonce/,
-  );
+  // The fork state is unreadable, so a transfer reports that, not a precision limit.
+  for (const amount of [1_500_000_000n, 1_000_000_000n]) {
+    await assert.rejects(
+      demos.transfer(RECIPIENT, amount),
+      { name: "TypeError", message: /denomination-fork state is unavailable/ },
+    );
+  }
   const storage = `stor-${"a".repeat(40)}`;
   await assert.rejects(
     demos.storagePrograms.read(storage),
