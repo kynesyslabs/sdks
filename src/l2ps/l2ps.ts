@@ -16,7 +16,7 @@ import { Hashing } from "@/encryption/Hashing";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
 import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
 
-/** Plaintexts are padded to a multiple of this many characters before encryption. */
+/** Plaintexts are padded to a multiple of this many UTF-8 bytes before encryption. */
 export const L2PS_PLAINTEXT_BUCKET = 1024;
 
 /**
@@ -140,7 +140,8 @@ export default class L2PS {
 
         this.privateKey = privateKey;
         this.iv = iv;
-        this.id = Hashing.sha256(privateKey);
+        // privateKey is forge binary bytes, not text
+        this.id = Hashing.sha256(privateKey, "raw");
         L2PS.instances.set(this.id, this);
     }
 
@@ -235,7 +236,8 @@ export default class L2PS {
             // AES-GCM ciphertext is as long as the plaintext, so an unpadded
             // transfer leaks the digit count of its amount. JSON.parse ignores
             // trailing whitespace, so decryptors of any version accept this.
-            const json = JSON.stringify(tx);
+            // UTF-8 bytes, as decryptTx decodes them; ASCII is unchanged.
+            const json = forge.util.encodeUtf8(JSON.stringify(tx));
             const txString = json.padEnd(
                 Math.ceil((json.length + 1) / L2PS_PLAINTEXT_BUCKET) * L2PS_PLAINTEXT_BUCKET,
                 " ",
@@ -459,7 +461,7 @@ export default class L2PS {
      * @returns Promise resolving to a 16-character fingerprint string
      */
     async getKeyFingerprint(): Promise<string> {
-        return Hashing.sha256(this.privateKey).substring(0, 16);
+        return Hashing.sha256(this.privateKey, "raw").substring(0, 16);
     }
 
     /**
