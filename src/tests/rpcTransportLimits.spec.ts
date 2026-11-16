@@ -320,10 +320,10 @@ describe("the default deadline on public calls", () => {
         expect(envelope.response).toBeInstanceOf(TransportError)
         expect(envelope.response.cause.code).toBe("ECONNABORTED")
 
-        // getAddressNonce keeps its legacy "0 on failure" answer.
+        // A failed lookup throws: defaulting to 0 would sign with nonce 1.
         await expect(
             demos.getAddressNonce("0x" + "ab".repeat(32)),
-        ).resolves.toBe(0)
+        ).rejects.toThrow(/getAddressNonce: node returned no valid nonce/)
     }, 8_000)
 
     it("reads a normal reply unchanged", async () => {
