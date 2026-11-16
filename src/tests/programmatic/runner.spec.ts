@@ -138,6 +138,38 @@ describe("totalFeeOs — fee wire-shape normalisation", () => {
         } as unknown as RPCResponseWithValidityData
         expect(totalFeeOs(vd)).toBe(2n * OS_PER_DEM)
     })
+
+    test("prefers gas_operation.fees over transaction.content.transaction_fee when both are present", () => {
+        // documentation/programmatic-transactions.md ("What `maxFee` covers")
+        // states this order; the cap is checked against the confirm-time fee,
+        // not the fee carried on the signed transaction.
+        const vd = {
+            response: {
+                data: {
+                    gas_operation: {
+                        fees: {
+                            network_fee: "1000000000",
+                            rpc_fee: "0",
+                            additional_fee: "0",
+                            rpc_address: null,
+                        },
+                    },
+                    transaction: {
+                        hash: "0xabc",
+                        content: {
+                            transaction_fee: {
+                                network_fee: "9000000000",
+                                rpc_fee: "0",
+                                additional_fee: "0",
+                                rpc_address: null,
+                            },
+                        },
+                    },
+                },
+            },
+        } as unknown as RPCResponseWithValidityData
+        expect(totalFeeOs(vd)).toBe(1n * OS_PER_DEM)
+    })
 })
 
 describe("runProgrammaticTx — auto mode & fee cap", () => {
@@ -195,6 +227,31 @@ describe("runProgrammaticTx — auto mode & fee cap", () => {
         expect(broadcast).toHaveBeenCalledTimes(1)
         expect(result.broadcasted).toBe(true)
         expect(result.feeOs).toBe(6n * OS_PER_DEM)
+    })
+
+    test("no fee in the confirm response counts as 0, so a finite cap passes and the tx broadcasts", async () => {
+        // documentation/programmatic-transactions.md ("What `maxFee` covers")
+        // states this; pinned so the doc and runner stay in step.
+        const vd = {
+            result: 200,
+            require_reply: false,
+            extra: null,
+            response: {
+                data: {
+                    valid: true,
+                    transaction: fakeTransaction,
+                    reference_block: 42,
+                    gas_operation: null,
+                },
+            },
+        } as unknown as RPCResponseWithValidityData
+        const { demos, broadcast } = makeMockDemos(vd)
+
+        const result = await runProgrammaticTx(demos, vd, { maxFee: 0 })
+
+        expect(broadcast).toHaveBeenCalledTimes(1)
+        expect(result.broadcasted).toBe(true)
+        expect(result.feeOs).toBe(0n)
     })
 
     test("maxFee: null disables the cap (huge fee still broadcasts)", async () => {
