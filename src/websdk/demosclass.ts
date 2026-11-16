@@ -4,7 +4,7 @@ This library contains all the functions that are used to interact with the demos
 
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
-import axios from "axios"
+import axios, { AxiosError } from "axios"
 import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
 import {
@@ -151,6 +151,28 @@ export class Demos {
      * current height and stops being true as the chain advances.
      */
     private static readonly _NETWORK_INFO_PENDING_FORK_TTL_MS = 30_000
+
+    /**
+     * Per-attempt deadline for an RPC POST in {@link _doPost}, covering the
+     * upload, the node's work and the whole reply. Generous on purpose, to
+     * bound a stuck node while leaving room for slow calls. Calls can still
+     * run longer (an XM broadcast runs its outside-chain operations inside the
+     * call; a large upload or a large reply on a slow link); they fail at the
+     * deadline, and a broadcast then ends as an unknown outcome while the
+     * node may keep working.
+     */
+    private static readonly _RPC_TIMEOUT_MS = 120_000
+
+    /**
+     * Largest RPC reply {@link _doPost} reads. `confirm` echoes the whole
+     * transaction back (inline IPFS content included), so the cap sits at V8's
+     * string limit (2^29 - 24 chars; Node, Chromium), where a bigger reply
+     * could not be decoded anyway; this stops it before it is buffered. Bun's
+     * string limit is higher, so there the cap is stricter than needed. On the
+     * browser XHR adapter the cap counts transferred, possibly compressed,
+     * bytes.
+     */
+    private static readonly _RPC_MAX_RESPONSE_BYTES = 512 * 1024 * 1024
 
     /**
      * Client-side nonce sequencer. Opt-in via {@link enableAutoNonce}. When
@@ -1184,6 +1206,15 @@ export class Demos {
      * Retry-After response header (numeric seconds, or HTTP-date) overrides
      * the computed backoff for that attempt.
      *
+     * Each attempt has a wall-clock deadline (`timeoutMs`, default
+     * {@link _RPC_TIMEOUT_MS}) and a reply size cap (`maxResponseBytes`,
+     * default {@link _RPC_MAX_RESPONSE_BYTES}). A missed deadline fails with
+     * code ECONNABORTED and is not retried: the node may already have the
+     * request, so the outcome is unknown. An oversize reply fails with code
+     * ERR_BAD_RESPONSE, no `response` and a message starting
+     * `maxContentLength size of`; HTTP 5xx replies share the code but carry a
+     * `response`.
+     *
      * On terminal failure, throws a TransportError carrying the underlying
      * cause and the total number of attempts. Callers that need the legacy
      * "never throws, returns {result: 500, response: error}" behavior should
@@ -1193,10 +1224,26 @@ export class Demos {
         url: string,
         request: any,
         headers: Record<string, string | undefined>,
-        opts: { retries?: number; baseSleepMs?: number } = {},
+        opts: {
+            retries?: number
+            baseSleepMs?: number
+            timeoutMs?: number
+            maxResponseBytes?: number
+        } = {},
     ): Promise<{ data: T }> {
         const maxRetries = opts.retries ?? 4
         const baseSleepMs = opts.baseSleepMs ?? 250
+        // An override that is not a usable limit (0, negative, NaN, or past
+        // the largest timer delay, which Node clamps to 1 ms) would fail every
+        // call, so it falls back to the default.
+        const t = opts.timeoutMs
+        const timeoutMs =
+            Number.isFinite(t) && t > 0 && t <= 2 ** 31 - 1
+                ? t
+                : Demos._RPC_TIMEOUT_MS
+        const b = opts.maxResponseBytes
+        const maxResponseBytes =
+            Number.isFinite(b) && b > 0 ? b : Demos._RPC_MAX_RESPONSE_BYTES
         const RETRYABLE_CODES = new Set([
             "ECONNRESET",
             "ECONNREFUSED",
@@ -1211,10 +1258,56 @@ export class Demos {
 
         // attempt 0 is the initial try; we then retry up to maxRetries times.
         for (; attempt <= maxRetries; attempt++) {
+            // The deadline is ours rather than axios' `timeout`: on Node that
+            // is a socket idle timer a node can hold open by trickling bytes,
+            // and the fetch adapter reports it as ETIMEDOUT, which the loop
+            // below retries as if the request never reached the node.
+            const controller = new AbortController()
+            let stopped: { message: string; code: string } | null = null
+            const stop = (message: string, code: string) => {
+                stopped = stopped ?? { message, code }
+                controller.abort()
+            }
+            const timer = setTimeout(
+                () =>
+                    stop(
+                        `timeout of ${timeoutMs}ms exceeded`,
+                        AxiosError.ECONNABORTED,
+                    ),
+                timeoutMs,
+            )
             try {
-                const response = await axios.post<T>(url, request, { headers })
+                const response = await axios
+                    .post<T>(url, request, {
+                        headers,
+                        signal: controller.signal,
+                        // Enforced by the Node http and fetch adapters. The
+                        // browser XHR adapter ignores it, so the progress
+                        // check below covers that one.
+                        maxContentLength: maxResponseBytes,
+                        onDownloadProgress: ({ loaded }) => {
+                            if (
+                                maxResponseBytes > 0 &&
+                                loaded > maxResponseBytes
+                            ) {
+                                stop(
+                                    `maxContentLength size of ${maxResponseBytes} exceeded`,
+                                    AxiosError.ERR_BAD_RESPONSE,
+                                )
+                            }
+                        },
+                    })
+                    .finally(() => clearTimeout(timer))
                 return { data: response.data }
-            } catch (error: any) {
+            } catch (caught: any) {
+                const error = stopped
+                    ? new AxiosError(
+                          stopped.message,
+                          stopped.code,
+                          caught?.config,
+                          caught?.request,
+                      )
+                    : caught
                 lastError = error
 
                 const code: string | undefined = error?.code
