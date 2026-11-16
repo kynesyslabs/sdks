@@ -38,7 +38,7 @@ function stubNetwork(
             }
         }
         if (message === "getAddressNonce") {
-            return { response: 0 }
+            return 0
         }
         if (message === "getNetworkParameters") {
             return null

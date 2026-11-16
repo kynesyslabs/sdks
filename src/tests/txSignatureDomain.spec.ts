@@ -19,6 +19,7 @@ function demosSeeing(networkInfo: unknown) {
     jest.spyOn(demos, "getNetworkInfo").mockResolvedValue(
         networkInfo as never,
     )
+    jest.spyOn(demos, "getAddressNonce").mockResolvedValue(0)
     return demos
 }
 

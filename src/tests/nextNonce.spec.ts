@@ -1,5 +1,8 @@
 import { Demos } from "@/websdk"
+import { TransportError } from "@/websdk/TransportError"
 import { Web2Proxy } from "@/websdk/Web2Calls"
+import { resolveNonce } from "@/utils"
+import axios from "axios"
 
 /**
  * The node returns the CONFIRMED nonce. Once its `nonceEnforcement` upgrade is
@@ -31,10 +34,177 @@ describe("getNextNonce", () => {
     })
 
     it("starts a fresh account at 1", async () => {
-        const demos = demosReporting(null)
+        const demos = demosReporting(0)
 
         await expect(demos.getAddressNonce(ADDRESS)).resolves.toBe(0)
         await expect(demos.getNextNonce(ADDRESS)).resolves.toBe(1)
+    })
+
+    it.each([null, undefined, {}, { result: 500 }])(
+        "rejects a missing nonce reply (%p)",
+        async reply => {
+            const demos = demosReporting(reply)
+
+            await expect(demos.getAddressNonce(ADDRESS)).rejects.toThrow(
+                /no valid nonce/,
+            )
+            await expect(demos.getNextNonce(ADDRESS)).rejects.toThrow(
+                /no valid nonce/,
+            )
+        },
+    )
+
+    it("limits unexpected reply text in errors", async () => {
+        for (const reply of ["x".repeat(1000), { response: new Error("x".repeat(1000)) }]) {
+            const demos = demosReporting(reply)
+            let error: unknown
+            try {
+                await demos.getAddressNonce(ADDRESS)
+            } catch (caught) {
+                error = caught
+            }
+            expect(error).toBeInstanceOf(Error)
+            expect((error as Error).message.length).toBeLessThan(400)
+        }
+    })
+
+    it("marks a truncated string reply with an ellipsis", async () => {
+        const error = (await demosReporting("x".repeat(1000))
+            .getAddressNonce(ADDRESS)
+            .catch(error => error)) as Error
+
+        expect(error.message).toMatch(/: x{200}…$/)
+    })
+
+    it("removes control characters from a string reply in the error", async () => {
+        const error = (await demosReporting("\u001b[2K\rOK nonce=999\nfake")
+            .getAddressNonce(ADDRESS)
+            .catch(error => error)) as Error
+
+        expect(error.message).toContain("?[2K?OK nonce=999?fake")
+        expect(error.message).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/)
+    })
+
+    it("removes Unicode line separators and bidi marks from a string reply", async () => {
+        const error = (await demosReporting("a\u2028FAKE LINE\u202eevil\u061cend")
+            .getAddressNonce(ADDRESS)
+            .catch(error => error)) as Error
+
+        expect(error.message).toContain("a?FAKE LINE?evil?end")
+        expect(error.message).not.toMatch(/[\u2028\u202e\u061c]/)
+    })
+
+    it("limits and sanitizes the address in the error", async () => {
+        // The bridge passes an RPC-compiled demoAddress here.
+        const address = "\u001b[2J\u001b[H" + "A".repeat(5000)
+        const error = (await demosReporting("Error in nodeCall: ")
+            .getAddressNonce(address)
+            .catch(error => error)) as Error
+
+        expect(error.message).toContain("for ?[2J?[H" + "A".repeat(193) + "…: ")
+        expect(error.message.length).toBeLessThan(400)
+        expect(error.message).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/)
+    })
+
+    it("shows a normal address unchanged in the error", async () => {
+        const error = (await demosReporting("Error in nodeCall: ")
+            .getAddressNonce(ADDRESS)
+            .catch(error => error)) as Error
+
+        expect(ADDRESS).toHaveLength(66)
+        expect(error.message).toBe(
+            `getAddressNonce: node returned no valid nonce for ${ADDRESS}: Error in nodeCall: `,
+        )
+    })
+
+    it("reports the HTTP status before the generic Axios code", async () => {
+        const failure = new TransportError("HTTP request failed", {
+            cause: { code: "ERR_BAD_RESPONSE", response: { status: 503 } },
+            attempts: 5,
+        })
+        const error = (await demosReporting({ result: 500, response: failure })
+            .getAddressNonce(ADDRESS)
+            .catch(error => error)) as Error
+
+        expect(error.message).toContain("transport failure after 5 attempt(s): 503")
+        expect(error.message).not.toContain("ERR_BAD_RESPONSE")
+    })
+
+    it("does not serialize a malformed object reply", async () => {
+        let serializationAttempts = 0
+        const reply = {
+            payload: "x".repeat(1024),
+            toJSON() {
+                serializationAttempts++
+                return this.payload
+            },
+        }
+
+        await expect(demosReporting(reply).getAddressNonce(ADDRESS)).rejects.toThrow(
+            /no valid nonce.*\[object\]/,
+        )
+        expect(serializationAttempts).toBe(0)
+    })
+
+    it("throws on the transport-error envelope instead of reporting 0", async () => {
+        const demos = demosReporting({
+            result: 500,
+            response: new Error("connect ECONNREFUSED"),
+            require_reply: false,
+            extra: null,
+        })
+
+        await expect(demos.getAddressNonce(ADDRESS)).rejects.toThrow(
+            /ECONNREFUSED/,
+        )
+        await expect(demos.getNextNonce(ADDRESS)).rejects.toThrow(
+            /no valid nonce/,
+        )
+    })
+
+    it("reports a connection refusal without exposing a long RPC URL", async () => {
+        const demos = new Demos()
+        const rpcPath = "x".repeat(300)
+        const rpcUrl = `http://user:s3cret@example.test/${rpcPath}`
+        Object.assign(demos, { rpc_url: rpcUrl })
+        const post = jest.spyOn(axios, "post").mockRejectedValue(
+            Object.assign(new Error("connect ECONNREFUSED"), {
+                code: "ECONNREFUSED",
+            }),
+        )
+
+        try {
+            const error = await demos.getAddressNonce(ADDRESS).catch(error => error)
+            expect(error.message).toMatch(/no valid nonce.*ECONNREFUSED/)
+            expect(error.message).not.toContain("s3cret")
+            expect(error.message).not.toContain(rpcPath.slice(-20))
+            expect(post).toHaveBeenCalledWith(
+                rpcUrl,
+                expect.anything(),
+                expect.anything(),
+            )
+        } finally {
+            post.mockRestore()
+        }
+    })
+
+    it.each([["abc"], [""], ["5abc"], ["-1"], [-1], [1.5], [NaN], [{}], [true]])(
+        "throws on a non-nonce reply (%p)",
+        async reply => {
+            const demos = demosReporting(reply)
+
+            await expect(demos.getAddressNonce(ADDRESS)).rejects.toThrow(
+                /no valid nonce/,
+            )
+        },
+    )
+
+    it("resolveNonce rejects when the nonce lookup fails", async () => {
+        const demos = demosReporting({ result: 500, response: "boom" })
+
+        await expect(
+            resolveNonce(undefined, () => demos.getAddressNonce(ADDRESS)),
+        ).rejects.toThrow(/no valid nonce/)
     })
 
     it("asks the node for the address it was given", async () => {

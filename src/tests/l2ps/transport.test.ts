@@ -115,10 +115,24 @@ async function inject(
     })
 }
 
-/** Wait for the adapter's internal drain chain to settle. */
-async function flush(): Promise<void> {
-    await new Promise(r => setTimeout(r, 0))
-    await new Promise(r => setTimeout(r, 0))
+/**
+ * Poll until `done()` holds, failing after `timeoutMs`. The adapter
+ * decrypts inbound frames with Web Crypto, which finishes off the main
+ * thread, so a fixed number of event-loop turns is not enough on a busy
+ * machine.
+ */
+async function waitFor(
+    done: () => boolean,
+    what: string,
+    timeoutMs = 5_000,
+): Promise<void> {
+    const deadline = Date.now() + timeoutMs
+    while (!done()) {
+        if (Date.now() > deadline) {
+            throw new Error(`timed out after ${timeoutMs} ms waiting for ${what}`)
+        }
+        await new Promise(r => setTimeout(r, 5))
+    }
 }
 
 describe("L2PSChannelTransport — reorder buffer", () => {
@@ -140,9 +154,9 @@ describe("L2PSChannelTransport — reorder buffer", () => {
     it("applies in-order arrivals immediately", async () => {
         const { peer, transport, applied } = setup()
         await inject(peer, makeMsg(1))
-        await flush()
+        await waitFor(() => applied.length >= 1, "seq 1 to be applied")
         await inject(peer, makeMsg(2))
-        await flush()
+        await waitFor(() => applied.length >= 2, "seq 2 to be applied")
         expect(applied).toEqual([1, 2])
         expect(transport.bufferedCount).toBe(0)
     })
@@ -151,17 +165,17 @@ describe("L2PSChannelTransport — reorder buffer", () => {
         const { peer, transport, applied } = setup()
         // seq 3 and 2 arrive before 1 (offline-queue replay / reorder)
         await inject(peer, makeMsg(3))
-        await flush()
+        await waitFor(() => transport.bufferedCount >= 1, "seq 3 to be buffered")
         expect(applied).toEqual([]) // held — gap at 1,2
         expect(transport.bufferedCount).toBe(1)
 
         await inject(peer, makeMsg(2))
-        await flush()
+        await waitFor(() => transport.bufferedCount >= 2, "seq 2 to be buffered")
         expect(applied).toEqual([]) // still held — gap at 1
         expect(transport.bufferedCount).toBe(2)
 
         await inject(peer, makeMsg(1))
-        await flush()
+        await waitFor(() => applied.length >= 3, "seqs 1-3 to be applied")
         // 1 fills the gap → 1,2,3 drain contiguously, in order
         expect(applied).toEqual([1, 2, 3])
         expect(transport.bufferedCount).toBe(0)
@@ -170,19 +184,29 @@ describe("L2PSChannelTransport — reorder buffer", () => {
     it("drops duplicates / already-applied sequences", async () => {
         const { peer, applied } = setup()
         await inject(peer, makeMsg(1))
-        await flush()
+        await waitFor(() => applied.length >= 1, "seq 1 to be applied")
         await inject(peer, makeMsg(1)) // replay
-        await flush()
-        expect(applied).toEqual([1])
+        // Frames are handled in arrival order, so once seq 2 is applied the
+        // replay before it has been handled too.
+        await inject(peer, makeMsg(2))
+        await waitFor(() => applied.length >= 2, "seq 2 to be applied")
+        expect(applied).toEqual([1, 2])
     })
 
     it("ignores envelopes for a different channel on the same subnet", async () => {
-        const { peer, applied } = setup()
+        const { peer, transport, applied } = setup()
         const other = makeMsg(1)
         ;(other as { channelId: string }).channelId = "ch-other"
         await inject(peer, other)
-        await flush()
-        expect(applied).toEqual([])
+        // Frames are handled in arrival order, so once our seq 2 is buffered
+        // or applied, the other channel's seq 1 has been handled too.
+        await inject(peer, makeMsg(2))
+        await waitFor(
+            () => transport.bufferedCount + applied.length > 0,
+            "seq 2 to be handled",
+        )
+        expect(applied).toEqual([]) // seq 1 from ch-other did not fill the gap
+        expect(transport.bufferedCount).toBe(1)
     })
 
     it("interleaves our sends with peer replies on the shared counter", async () => {
@@ -190,10 +214,10 @@ describe("L2PSChannelTransport — reorder buffer", () => {
         // We send seq 1; peer replies seq 2; we send seq 3; peer seq 4.
         await transport.send({ type: "offer", body: {} }) // seq 1 (outgoing)
         await inject(peer, makeMsg(2, "counter"))
-        await flush()
+        await waitFor(() => applied.length >= 1, "seq 2 to be applied")
         await transport.send({ type: "counter", body: {} }) // seq 3 (outgoing)
         await inject(peer, makeMsg(4, "accept"))
-        await flush()
+        await waitFor(() => applied.length >= 2, "seq 4 to be applied")
         // Only inbound (2,4) go through onMessage; sends are returned directly.
         expect(applied).toEqual([2, 4])
         expect(peer.sent.length).toBe(2) // one delivery per send to the single recipient
@@ -236,7 +260,7 @@ describe("L2PSChannelTransport — reorder buffer", () => {
         // appliedSeq still 0, so an inbound seq 1 is fresh and is applied —
         // proving the failed send did not consume the channel sequence.
         await inject(peer, makeMsg(1))
-        await flush()
+        await waitFor(() => recvApplied.length >= 1, "seq 1 to be received")
         expect(recvApplied).toEqual([1])
     })
 
@@ -277,7 +301,7 @@ describe("L2PSChannelTransport — reorder buffer", () => {
         transport.start()
         // appliedSeq is 0; a frame at seq 1000 is far beyond MAX_REORDER_AHEAD.
         await inject(peer, makeMsg(1000))
-        await flush()
+        await waitFor(() => errors.length >= 1, "seq 1000 to be rejected")
         expect(transport.bufferedCount).toBe(0) // not buffered
         expect(errors.some(e => /ahead of applied/.test(e.message))).toBe(true)
     })

@@ -1,0 +1,32 @@
+name: Offline tests
+
+permissions:
+  contents: read
+
+# No `paths:` filter: this is meant to be a required check, and a required
+# check that is skipped by a path filter never reports and blocks the merge.
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  offline-tests:
+    name: Offline Jest specs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.4.4'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Install dependencies without lifecycle scripts
+        run: bun install --ignore-scripts --frozen-lockfile
+      # Every Jest spec except those listed in jest.offline.config.ts
+      - name: Run offline specs
+        run: bun run test:offline
