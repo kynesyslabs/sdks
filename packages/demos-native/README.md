@@ -33,6 +33,16 @@ The `Demos` class preserves the DACS-used `demosdk` surface:
 - public and reverse identity lookups through `Identities`;
 - DAHR create/start flow through `demos.web2.createDahr()`.
 
+Each RPC request of a `Demos` client (`connect()`, calls,
+`storagePrograms.read()`) and of the static `StorageProgram.getByAddress()`
+and `StorageProgram.searchByName()` reads must finish within 120 s, response
+body included, and a response body may be at most 64 MiB. Either bound fails
+the request with an error naming the URL's origin and path (not its query
+string or hash). Set them for a `Demos` client with
+`new Demos({ rpcTimeoutMs, rpcMaxResponseBytes })`; `rpcTimeoutMs` may be 1 to
+300 000 ms, because Node's `fetch` already fails a request after 300 s without
+response headers. The static `StorageProgram` reads always use the defaults.
+
 Amounts passed to `transfer()` are OS `bigint` values (1 DEM = 10^9 OS).
 Transactions retain the current pre-/post-denomination-fork wire serializer and
 property ordering. Callers remain responsible for durable nonce/effect

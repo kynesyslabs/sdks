@@ -1,4 +1,9 @@
 import { createHash } from "node:crypto";
+import {
+  DEFAULT_RPC_MAX_RESPONSE_BYTES,
+  DEFAULT_RPC_TIMEOUT_MS,
+  fetchBounded,
+} from "./bounded-fetch.js";
 import type {
   StorageProgramListItem,
   StorageProgramResponse,
@@ -52,18 +57,24 @@ async function nodeCall<T>(
   message: string,
   data: Record<string, unknown>,
 ): Promise<{ result: number; response: T; extra?: unknown }> {
-  const response = await fetch(rpcUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      method: "nodeCall",
-      params: [{ message, data, muid: `storage-${Date.now()}` }],
-    }),
-  });
+  const { response, text } = await fetchBounded(
+    rpcUrl,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        method: "nodeCall",
+        params: [{ message, data, muid: `storage-${Date.now()}` }],
+      }),
+    },
+    true,
+    DEFAULT_RPC_TIMEOUT_MS,
+    DEFAULT_RPC_MAX_RESPONSE_BYTES,
+  );
   if (!response.ok) {
     throw new Error(`Demos storage RPC failed with HTTP ${response.status}`);
   }
-  return await response.json() as { result: number; response: T; extra?: unknown };
+  return JSON.parse(text) as { result: number; response: T; extra?: unknown };
 }
 
 // REVIEW: Keep this builder byte-compatible with the node and established SDK;

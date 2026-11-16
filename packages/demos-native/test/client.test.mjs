@@ -433,3 +433,203 @@ test("fails closed on a rejected DAHR session creation envelope", async () => {
     /DAHR session creation failed with RPC result 500/,
   );
 });
+
+async function listen(t, handler) {
+  const bounded = createServer(handler);
+  await new Promise((resolve) => bounded.listen(0, "127.0.0.1", resolve));
+  t.after(() => {
+    bounded.closeAllConnections();
+    bounded.close();
+  });
+  return `http://127.0.0.1:${bounded.address().port}`;
+}
+
+test("ends an RPC request at the deadline", { timeout: 10_000 }, async (t) => {
+  let posts = 0;
+  const base = await listen(t, (request, response) => {
+    request.resume();
+    if (request.method === "GET") {
+      if (request.url === "/" || request.url === "/drip") {
+        return send(response, 200, { ok: true });
+      }
+      return;
+    }
+    posts += 1;
+    if (request.url === "/drip") {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.write('{"result":200,');
+      const drip = setInterval(() => response.write(" "), 20);
+      response.on("close", () => clearInterval(drip));
+    }
+  });
+  const late = (url) => `Demos RPC request to ${url} exceeded the 200 ms deadline`;
+
+  const demos = new Demos({ rpcTimeoutMs: 200 });
+  await demos.connect(base);
+  await demos.connectWallet(MNEMONIC);
+  const silent = await demos.rpcCall({ method: "nodeCall", params: [] });
+  assert.equal(silent.result, 500);
+  assert.equal(silent.response.message, late(`${base}/`));
+  assert.equal(posts, 1);
+  await assert.rejects(
+    demos.transfer(RECIPIENT, 1_000_000_000n),
+    /valid address nonce/,
+  );
+  const storage = `stor-${"a".repeat(40)}`;
+  await assert.rejects(
+    demos.storagePrograms.read(storage),
+    { message: late(`${base}/storage-program/${storage}`) },
+  );
+
+  const dripping = new Demos({ rpcTimeoutMs: 200 });
+  await dripping.connect(`${base}/drip`);
+  const dripped = await dripping.rpcCall({ method: "nodeCall", params: [] });
+  assert.equal(dripped.response.message, late(`${base}/drip`));
+
+  // The query string and hash, which may carry an API key, stay out of the error.
+  await assert.rejects(
+    new Demos({ rpcTimeoutMs: 200 }).connect(`${base}/silent?key=SECRET#frag`),
+    { message: late(`${base}/silent`) },
+  );
+});
+
+test("ends a static Storage Program read at the default deadline", { timeout: 10_000 }, async (t) => {
+  let arrived;
+  const received = new Promise((resolve) => { arrived = resolve; });
+  const base = await listen(t, (request) => {
+    request.resume();
+    arrived();
+  });
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+
+  const read = StorageProgram.getByAddress(base, `stor-${"c".repeat(40)}`);
+  await received;
+  t.mock.timers.tick(120_000);
+  await assert.rejects(read, {
+    message: `Demos RPC request to ${base}/ exceeded the 120000 ms deadline`,
+  });
+});
+
+test("stops reading an RPC response past the size cap", { timeout: 30_000 }, async (t) => {
+  const reply = JSON.stringify({ result: 200, response: "within cap" });
+  const base = await listen(t, (request, response) => {
+    request.resume();
+    if (request.method === "GET" && !request.url.startsWith("/storage-program/")) {
+      return send(response, 200, { ok: true });
+    }
+    response.writeHead(200, { "Content-Type": "application/json" });
+    if (request.url.startsWith("/exact")) return response.end(reply);
+    // A finite reply 1 MiB past the default 64 MiB cap.
+    const chunk = Buffer.alloc(1024 * 1024, 0x61);
+    let left = 65;
+    response.write('{"result":200,"response":"');
+    const pump = () => {
+      while (left > 0 && !response.destroyed) {
+        left -= 1;
+        if (!response.write(chunk)) return response.once("drain", pump);
+      }
+      if (!response.destroyed) response.end('"}');
+    };
+    pump();
+  });
+  const tooLarge = (url, cap) =>
+    `Demos RPC response from ${url} exceeded the ${cap}-byte size cap`;
+
+  const demos = new Demos();
+  await demos.connect(base);
+  const oversized = await demos.rpcCall({ method: "nodeCall", params: [] });
+  assert.equal(oversized.result, 500);
+  assert.equal(oversized.response.message, tooLarge(`${base}/`, 64 * 1024 * 1024));
+
+  const storage = `stor-${"b".repeat(40)}`;
+  const small = new Demos({ rpcMaxResponseBytes: 1_024 });
+  await small.connect(base);
+  await assert.rejects(
+    small.storagePrograms.read(storage),
+    { message: tooLarge(`${base}/storage-program/${storage}`, 1_024) },
+  );
+
+  const exact = new Demos({ rpcMaxResponseBytes: reply.length });
+  await exact.connect(`${base}/exact`);
+  assert.deepEqual(
+    await exact.rpcCall({ method: "nodeCall", params: [] }),
+    JSON.parse(reply),
+  );
+  const short = new Demos({ rpcMaxResponseBytes: reply.length - 1 });
+  await short.connect(`${base}/exact?key=SECRET`);
+  assert.equal(
+    (await short.rpcCall({ method: "nodeCall", params: [] })).response.message,
+    tooLarge(`${base}/exact`, reply.length - 1),
+  );
+});
+
+test("rejects RPC bounds that are not positive integers in range", () => {
+  // Node's fetch ends a request after 300 s without headers, before a longer deadline.
+  assert.equal(new Demos({ rpcTimeoutMs: 300_000 }).walletConnected, false);
+  for (const options of [
+    { rpcTimeoutMs: 0 },
+    { rpcTimeoutMs: 1.5 },
+    { rpcTimeoutMs: 300_001 },
+    { rpcTimeoutMs: 2 ** 31 },
+    { rpcMaxResponseBytes: -1 },
+    { rpcMaxResponseBytes: Infinity },
+  ]) {
+    assert.throws(() => new Demos(options), TypeError);
+  }
+});
+
+test("never resends a POST once the node has replied", { timeout: 10_000 }, async (t) => {
+  let posts = 0;
+  const base = await listen(t, (request, response) => {
+    request.resume();
+    if (request.method === "GET") return send(response, 200, { ok: true });
+    posts += 1;
+    // Successful headers and part of the body, then the connection drops.
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.write('{"result":200,', () => setTimeout(() => response.destroy(), 50));
+  });
+
+  const demos = new Demos({ rpcTimeoutMs: 5_000 });
+  await demos.connect(base);
+  const cut = await demos.rpcCall({ method: "nodeCall", params: [] });
+  assert.equal(cut.result, 500);
+  assert.equal(
+    cut.response.message,
+    `Demos RPC response from ${base}/ could not be read`,
+  );
+  assert.equal(posts, 1);
+});
+
+test("closes an unread RPC body before returning", { timeout: 10_000 }, async (t) => {
+  const closed = [];
+  const base = await listen(t, (request, response) => {
+    request.resume();
+    // Headers, then a body that never ends.
+    response.writeHead(request.method === "GET" ? 200 : 500, {
+      "Content-Type": "application/json",
+    });
+    response.write("{");
+    const drip = setInterval(() => response.write(" "), 20);
+    closed.push(new Promise((resolve) => {
+      response.on("close", () => {
+        clearInterval(drip);
+        resolve();
+      });
+    }));
+  });
+  // Well inside the 5 s deadline, so only cancelling the body can close it.
+  const within = (closing) => Promise.race([
+    closing,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("unread body left open")), 1_000);
+    }),
+  ]);
+
+  const demos = new Demos({ rpcTimeoutMs: 5_000 });
+  await demos.connect(base);
+  await within(closed[0]);
+  const failed = await demos.rpcCall({ method: "nodeCall", params: [] });
+  assert.equal(failed.response.message, "Demos RPC failed with HTTP 500");
+  assert.equal(closed.length, 2);
+  await within(closed[1]);
+});
