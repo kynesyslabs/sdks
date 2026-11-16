@@ -93,6 +93,31 @@ async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+/** Bounded description of an unexpected nodeCall reply. */
+function describeNonceReply(reply: unknown): string {
+    const body = (reply as { response?: unknown } | null)?.response
+    let description: string
+    if (body instanceof TransportError) {
+        const cause = body.cause as {
+            code?: string
+            response?: { status?: number }
+        } | null
+        const reason = cause?.response?.status ?? cause?.code ?? "unknown"
+        return `transport failure after ${body.attempts} attempt(s): ${reason}`
+    } else if (body instanceof Error) {
+        return body.message.length > 200 ? `…${body.message.slice(-200)}` : body.message
+    } else if (typeof reply === "string") {
+        description = reply.slice(0, 201).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "?")
+    } else if (reply !== null && typeof reply === "object") {
+        description = Array.isArray(reply) ? "[array]" : "[object]"
+    } else if (typeof reply === "function" || typeof reply === "symbol" || typeof reply === "bigint") {
+        description = `[${typeof reply}]`
+    } else {
+        description = String(reply)
+    }
+    return description.length > 200 ? `${description.slice(0, 200)}…` : description
+}
+
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 
 /**
@@ -1746,25 +1771,30 @@ export class Demos {
      * For dependent sends see {@link waitForNonce} or {@link enableAutoNonce}.
      *
      * @param address - The address
-     * @returns The confirmed nonce, or 0 when the node reports none.
+     * @returns The confirmed nonce, including 0 for a fresh account.
+     * @throws When the lookup fails (transport error, node error reply) or the
+     * reply is not a non-negative integer. Defaulting to 0 there would make
+     * every builder sign with nonce 1.
      */
     async getAddressNonce(address: string): Promise<number> {
         const nonceValue = await this.nodeCall("getAddressNonce", {
             address,
         })
 
-        if (typeof nonceValue === "number" && Number.isFinite(nonceValue)) {
+        if (Number.isSafeInteger(nonceValue) && nonceValue >= 0) {
             return nonceValue
         }
 
-        if (typeof nonceValue === "string") {
-            const parsed = Number.parseInt(nonceValue, 10)
-            if (Number.isFinite(parsed)) {
+        if (typeof nonceValue === "string" && /^(?:0|[1-9]\d*)$/.test(nonceValue)) {
+            const parsed = Number(nonceValue)
+            if (Number.isSafeInteger(parsed)) {
                 return parsed
             }
         }
 
-        return 0
+        throw new Error(
+            `getAddressNonce: node returned no valid nonce for ${describeNonceReply(address)}: ${describeNonceReply(nonceValue)}`,
+        )
     }
 
     /**
