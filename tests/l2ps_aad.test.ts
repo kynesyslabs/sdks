@@ -1,6 +1,6 @@
 import { describe, test, expect } from "@jest/globals"
 import * as forge from "node-forge"
-import L2PS from "@/l2ps/l2ps"
+import L2PS, { sha256Utf8 } from "@/l2ps/l2ps"
 import type { Transaction } from "@/types/blockchain/Transaction"
 
 // AES-GCM AAD binding + per-call nonce validation contract for
@@ -10,28 +10,30 @@ import type { Transaction } from "@/types/blockchain/Transaction"
 // it should not.
 
 function makeTx(): Transaction {
-    return {
-        content: {
-            type: "native",
-            from: "0x" + "a".repeat(64),
-            to: "0x" + "b".repeat(64),
-            from_ed25519_address: "0x" + "a".repeat(64),
-            amount: "100",
-            data: [
-                "native",
-                { nativeOperation: "send", args: ["0x" + "b".repeat(64), "100"] },
-            ],
-            gcr_edits: [],
-            nonce: 1,
-            timestamp: 1_700_000_000_000,
-            transaction_fee: {
-                network_fee: "0",
-                rpc_fee: "0",
-                additional_fee: "0",
-                rpc_address: null,
-            },
+    const content = {
+        type: "native",
+        from: "0x" + "a".repeat(64),
+        to: "0x" + "b".repeat(64),
+        from_ed25519_address: "0x" + "a".repeat(64),
+        amount: "100",
+        data: [
+            "native",
+            { nativeOperation: "send", args: ["0x" + "b".repeat(64), "100"] },
+        ],
+        gcr_edits: [],
+        nonce: 1,
+        timestamp: 1_700_000_000_000,
+        transaction_fee: {
+            network_fee: "0",
+            rpc_fee: "0",
+            additional_fee: "0",
+            rpc_address: null,
         },
-        hash: "deadbeef".repeat(8),
+    }
+    return {
+        content,
+        // decryptTx recomputes the hash from the content.
+        hash: sha256Utf8(JSON.stringify(content)),
         signature: null,
         ed25519_signature: null,
         status: null,

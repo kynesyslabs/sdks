@@ -34,7 +34,9 @@ export function deriveKeyPairFromSeed(seed: string | Buffer | Uint8Array) {
     }
 
     const stringSeed = seed.toString()
-    const hashedSeed = Hashing.sha256(stringSeed)
+    // "raw" keeps keys derived from a Buffer seed (whose toString is
+    // not ASCII) the same as before Hashing.sha256 switched to UTF-8
+    const hashedSeed = Hashing.sha256(stringSeed, "raw")
     const bufferSeed = Buffer.from(hashedSeed, "hex")
 
     return forge.pki.ed25519.generateKeyPair({ seed: bufferSeed })

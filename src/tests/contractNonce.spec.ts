@@ -127,4 +127,26 @@ describe("token builders use the next nonce", () => {
 
         expect(tx.content.nonce).toBe(42)
     })
+
+    it("looks up the ed25519 account's nonce under a falcon signing key", async () => {
+        const demos = new Demos()
+        // Like the node: only an ed25519 address has a nonce, anything
+        // else gets the catch-all error reply.
+        ;(demos as any).nodeCall = async (message: string, args: any) =>
+            message === "getAddressNonce" && /^0x[0-9a-f]{64}$/i.test(args.address)
+                ? CONFIRMED
+                : "Error in nodeCall: "
+        ;(demos as any)._getNetworkParametersCached = async () => null
+        await demos.connectWallet(demos.newMnemonic(), { algorithm: "falcon" })
+        const tokens = new DemosTokens(demos)
+
+        const created = await tokens.createToken(TOKEN)
+        demos.enableAutoNonce()
+        const transfer = await tokens.transfer(CONTRACT, CONTRACT, "10")
+
+        expect(created.content.from).toBe(demos.getAddress())
+        expect(created.content.from).not.toBe(await demos.getEd25519Address())
+        expect(created.content.nonce).toBe(CONFIRMED + 1)
+        expect(transfer.content.nonce).toBe(CONFIRMED + 1)
+    })
 })

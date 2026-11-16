@@ -1,6 +1,6 @@
 {
     "name": "@kynesyslabs/demosdk",
-    "version": "4.0.20",
+    "version": "4.0.21",
     "type": "module",
     "description": "Demosdk is a JavaScript/TypeScript SDK that provides a unified interface for interacting with Demos network",
     "main": "build/index.js",
@@ -109,6 +109,7 @@
         "test:aptos": "node --require ts-node/register --require tsconfig-paths/register --test src/tests/multichain/aptos.node.spec.ts",
         "test:aptos:only": "node --require ts-node/register --require tsconfig-paths/register --test --test-only src/tests/multichain/aptos.node.spec.ts",
         "test:canonical": "jest --testPathPattern=utils.test.ts --verbose",
+        "test:offline": "jest --config jest.offline.config.ts --ci",
         "test:dacs-native": "npm --prefix packages/demos-native run verify:release",
         "test:messaging-export": "node scripts/verify-messaging-export.mjs",
         "test:package-esm": "node scripts/test-packed-esm.mjs"

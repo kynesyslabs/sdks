@@ -95,8 +95,24 @@ class Relay {
     }
 }
 
-async function flush(): Promise<void> {
-    for (let i = 0; i < 4; i++) await new Promise(r => setTimeout(r, 0))
+/**
+ * Poll until `done()` holds, failing after `timeoutMs`. The transport
+ * decrypts inbound frames with Web Crypto, which finishes off the main
+ * thread, so a fixed number of event-loop turns is not enough on a busy
+ * machine.
+ */
+async function waitFor(
+    done: () => boolean,
+    what: string,
+    timeoutMs = 5_000,
+): Promise<void> {
+    const deadline = Date.now() + timeoutMs
+    while (!done()) {
+        if (Date.now() > deadline) {
+            throw new Error(`timed out after ${timeoutMs} ms waiting for ${what}`)
+        }
+        await new Promise(r => setTimeout(r, 5))
+    }
 }
 
 describe("L2PSChannelTransport — E2E with real identities", () => {
@@ -154,11 +170,11 @@ describe("L2PSChannelTransport — E2E with real identities", () => {
         bTx.start()
 
         await aTx.send({ type: "offer", body: { price: 100 } }) // seq 1
-        await flush()
+        await waitFor(() => bRecv.length + bErr.length >= 1, "bob to handle seq 1")
         await bTx.send({ type: "counter", body: { price: 90 }, repliesTo: 1 }) // seq 2
-        await flush()
+        await waitFor(() => aRecv.length + aErr.length >= 1, "alice to handle seq 2")
         await aTx.send({ type: "accept", body: { price: 90 }, repliesTo: 2 }) // seq 3
-        await flush()
+        await waitFor(() => bRecv.length + bErr.length >= 2, "bob to handle seq 3")
 
         // bob received alice's offer(1) + accept(3); alice received bob's counter(2)
         expect(bRecv).toEqual([1, 3])
@@ -185,7 +201,7 @@ describe("L2PSChannelTransport — E2E with real identities", () => {
         await aTx.send({ type: "counter", body: { n: 2 } }) // seq 2
         // Deliver REVERSED: seq2 arrives before seq1.
         relay.flush([1, 0])
-        await flush()
+        await waitFor(() => bRecv.length + bErr.length >= 2, "bob to handle seqs 1-2")
 
         // Despite reversed arrival, bob applied them in sequence order.
         expect(bRecv).toEqual([1, 2])
@@ -204,7 +220,7 @@ describe("L2PSChannelTransport — E2E with real identities", () => {
         relay.hold = true
         await aTx.send({ type: "offer", body: { n: 1 } }) // seq 1
         relay.flushTampered()
-        await flush()
+        await waitFor(() => bErr.length >= 1, "bob to reject the tampered frame")
 
         // Corrupted ciphertext → decrypt fails → onError, nothing applied.
         expect(bRecv).toEqual([])

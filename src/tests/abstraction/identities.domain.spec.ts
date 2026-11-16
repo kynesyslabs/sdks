@@ -104,6 +104,7 @@ describe("Domain Identities (offline SDK logic)", () => {
 
     test("addDomainIdentity builds the correct web2/domain request", async () => {
         const payload = await identities.createDomainProofPayload(demos, "example.com")
+        jest.spyOn(demos, "getAddressNonce").mockResolvedValue(0)
 
         let proofUrlSeen: string | null = null
         let signedTx: any = null
