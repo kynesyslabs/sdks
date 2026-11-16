@@ -276,6 +276,15 @@ function deriveKeyPair(secret: string | Uint8Array): KeyPair {
   let source: string | Uint8Array | null = null;
   if (typeof secret === "string") {
     const trimmed = secret.trim();
+    // validateMnemonic applies NFKD itself, so a phrase with full-width
+    // letters or ideographic spaces passes it yet hashes to another address.
+    const canonical = trimmed.normalize("NFKD") === trimmed &&
+      validateMnemonic(trimmed, wordlist);
+    if (/\s/.test(trimmed) && !canonical) {
+      throw new Error(
+        "Invalid recovery phrase: check the spelling, order and checksum of the words",
+      );
+    }
     source = validateMnemonic(trimmed, wordlist)
       ? trimmed
       : mnemonicToSeedSync(trimmed);
