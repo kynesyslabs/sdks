@@ -586,7 +586,7 @@ export class HandleIdentityOperations {
                         username: payload.username,
                         userId: payload.userId,
                         proof: payload.proof,
-                        proofHash: Hashing.sha256(proofString),
+                        proofHash: Hashing.sha256(proofString, "raw"),
                         timestamp: tx.content.timestamp,
                     },
                 } as Web2GCRData
@@ -640,7 +640,7 @@ export class HandleIdentityOperations {
                         username: payload.username,
                         userId: payload.userId,
                         proof: proofString,
-                        proofHash: Hashing.sha256(proofString),
+                        proofHash: Hashing.sha256(proofString, "raw"),
                         recvHash: payload.recvHash,
                         proofRanges: payload.proofRanges,
                         revealedRecv: payload.revealedRecv,

@@ -75,10 +75,12 @@ export class DemosTokens {
 
         // Get deployer info for address derivation preview
         const deployerAddress = this.demos.getAddress()
+        // The nonce belongs to the ed25519 account, also under PQC signing keys
+        const nonceAddress = await this.demos.getEd25519Address()
         const nonce = await resolveNonce(
             options?.nonce,
-            () => this.demos.getAddressNonce(deployerAddress),
-            this.demos._nonceReserver(deployerAddress),
+            () => this.demos.getAddressNonce(nonceAddress),
+            this.demos._nonceReserver(nonceAddress),
         )
 
         // Derive the token address (preview - actual derivation happens on-chain)
@@ -441,10 +443,11 @@ export class DemosTokens {
         }
 
         const senderAddress = this.demos.getAddress()
+        const nonceAddress = await this.demos.getEd25519Address()
         const nonce = await resolveNonce(
             options?.nonce,
-            () => this.demos.getAddressNonce(senderAddress),
-            this.demos._nonceReserver(senderAddress),
+            () => this.demos.getAddressNonce(nonceAddress),
+            this.demos._nonceReserver(nonceAddress),
         )
 
         const tx: Transaction = {

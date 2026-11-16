@@ -4,7 +4,7 @@ This library contains all the functions that are used to interact with the demos
 
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
-import axios from "axios"
+import axios, { AxiosError } from "axios"
 import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
 import {
@@ -63,6 +63,7 @@ import {
 } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
+import { warnLegacySeedPath } from "@/encryption/legacySeedWarning"
 import { OS_PER_DEM, demToOs, parseOsString } from "@/denomination"
 import { assertValidNonce, resolveNonce } from "@/utils"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
@@ -125,6 +126,37 @@ function checkRecoveryPhrase(phrase: string): boolean {
     return false
 }
 
+type WalletConnectionOptions = {
+    algorithm?: SigningAlgorithm
+    /** Include the ed25519 signature when signing with an unlinked PQC keypair. */
+    dual_sign?: boolean
+}
+
+/** Bounded description of an unexpected nodeCall reply. */
+function describeNonceReply(reply: unknown): string {
+    const body = (reply as { response?: unknown } | null)?.response
+    let description: string
+    if (body instanceof TransportError) {
+        const cause = body.cause as {
+            code?: string
+            response?: { status?: number }
+        } | null
+        const reason = cause?.response?.status ?? cause?.code ?? "unknown"
+        return `transport failure after ${body.attempts} attempt(s): ${reason}`
+    } else if (body instanceof Error) {
+        return body.message.length > 200 ? `…${body.message.slice(-200)}` : body.message
+    } else if (typeof reply === "string") {
+        description = reply.slice(0, 201).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "?")
+    } else if (reply !== null && typeof reply === "object") {
+        description = Array.isArray(reply) ? "[array]" : "[object]"
+    } else if (typeof reply === "function" || typeof reply === "symbol" || typeof reply === "bigint") {
+        description = `[${typeof reply}]`
+    } else {
+        description = String(reply)
+    }
+    return description.length > 200 ? `${description.slice(0, 200)}…` : description
+}
+
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 
 /**
@@ -183,6 +215,28 @@ export class Demos {
      * current height and stops being true as the chain advances.
      */
     private static readonly _NETWORK_INFO_PENDING_FORK_TTL_MS = 30_000
+
+    /**
+     * Per-attempt deadline for an RPC POST in {@link _doPost}, covering the
+     * upload, the node's work and the whole reply. Generous on purpose, to
+     * bound a stuck node while leaving room for slow calls. Calls can still
+     * run longer (an XM broadcast runs its outside-chain operations inside the
+     * call; a large upload or a large reply on a slow link); they fail at the
+     * deadline, and a broadcast then ends as an unknown outcome while the
+     * node may keep working.
+     */
+    private static readonly _RPC_TIMEOUT_MS = 120_000
+
+    /**
+     * Largest RPC reply {@link _doPost} reads. `confirm` echoes the whole
+     * transaction back (inline IPFS content included), so the cap sits at V8's
+     * string limit (2^29 - 24 chars; Node, Chromium), where a bigger reply
+     * could not be decoded anyway; this stops it before it is buffered. Bun's
+     * string limit is higher, so there the cap is stricter than needed. On the
+     * browser XHR adapter the cap counts transferred, possibly compressed,
+     * bytes.
+     */
+    private static readonly _RPC_MAX_RESPONSE_BYTES = 512 * 1024 * 1024
 
     /**
      * Client-side nonce sequencer. Opt-in via {@link enableAutoNonce}. When
@@ -292,18 +346,20 @@ export class Demos {
      * ```
      *
      * @param rpc_url - The URL of the demos node.
-     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     * @param wallet - Mnemonic string. Raw seed bytes are deprecated for mnemonic
+     *                 restoration and produce a different address.
      *                 Omit to connect without a wallet.
      * @param walletOptions - Forwarded to {@link connectWallet}.
      * @returns This connected Demos instance.
      */
+    async start(rpc_url: string, wallet?: string, walletOptions?: WalletConnectionOptions): Promise<this>
+    /** @deprecated Seed bytes derive a different address; pass the mnemonic string for new wallets. */
+    async start(rpc_url: string, wallet: Uint8Array, walletOptions?: WalletConnectionOptions): Promise<this>
+    async start(rpc_url: string, wallet?: string | Uint8Array, walletOptions?: WalletConnectionOptions): Promise<this>
     async start(
         rpc_url: string,
         wallet?: string | Uint8Array,
-        walletOptions?: {
-            algorithm?: SigningAlgorithm
-            dual_sign?: boolean
-        },
+        walletOptions?: WalletConnectionOptions,
     ): Promise<this> {
         await this.connect(rpc_url)
         if (wallet !== undefined) {
@@ -323,26 +379,31 @@ export class Demos {
      * ```
      *
      * @param rpc_url - The URL of the demos node.
-     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     * @param wallet - Mnemonic string. Raw seed bytes are deprecated for mnemonic
+     *                 restoration and produce a different address.
      * @param walletOptions - Forwarded to {@link connectWallet}.
      * @returns The started shared Demos instance.
      */
+    static async start(rpc_url: string, wallet?: string, walletOptions?: WalletConnectionOptions): Promise<Demos>
+    /** @deprecated Seed bytes derive a different address; pass the mnemonic string for new wallets. */
+    static async start(rpc_url: string, wallet: Uint8Array, walletOptions?: WalletConnectionOptions): Promise<Demos>
+    static async start(rpc_url: string, wallet?: string | Uint8Array, walletOptions?: WalletConnectionOptions): Promise<Demos>
     static async start(
         rpc_url: string,
         wallet?: string | Uint8Array,
-        walletOptions?: {
-            algorithm?: SigningAlgorithm
-            dual_sign?: boolean
-        },
+        walletOptions?: WalletConnectionOptions,
     ): Promise<Demos> {
         return Demos.instance.start(rpc_url, wallet, walletOptions)
     }
 
     /**
-     * Connects to a Demos wallet using the provided master seed.
+     * Connects to a Demos wallet. For mnemonic restoration, pass the phrase
+     * string directly: `await demos.connectWallet(mnemonic)`.
+     * Do not convert it to BIP39 seed bytes or a DemosWebAuth keypair first;
+     * those legacy paths derive different addresses and remain unchanged.
+     * Existing wallets must retain their original input type and derivation.
      *
-     * @param masterSeed - The master seed of the wallet
-     * @param algorithm - The algorithm to use for the wallet
+     * @param masterSeed - The mnemonic string of the wallet
      * @param options - The options for the wallet connection
      * @param options.algorithm - The algorithm to use for the wallet
      * @param options.dual_sign - Whether to include the ed25519 signature along with the PQC signature, when
@@ -350,16 +411,16 @@ export class Demos {
      *
      * @returns The public key of the wallet
      */
+    async connectWallet(masterSeed: string, options?: WalletConnectionOptions): Promise<string>
+    /**
+     * @deprecated For mnemonic restoration, use connectWallet(mnemonic) with the
+     * phrase string. Bytes derive a different address. Retained for existing wallets.
+     */
+    async connectWallet(masterSeed: Uint8Array, options?: WalletConnectionOptions): Promise<string>
+    async connectWallet(masterSeed: string | Uint8Array, options?: WalletConnectionOptions): Promise<string>
     async connectWallet(
         masterSeed: string | Uint8Array,
-        options?: {
-            algorithm?: SigningAlgorithm
-            /**
-             * Whether to include the ed25519 signature along with the PQC signature, when
-             * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
-             */
-            dual_sign?: boolean
-        },
+        options?: WalletConnectionOptions,
     ) {
         if (!masterSeed) {
             throw new Error(
@@ -377,6 +438,12 @@ export class Demos {
             throw new Error(
                 "Invalid master seed: must be a string or a Uint8Array",
             )
+        }
+
+        // BIP39 seed bytes are 64 bytes; service keys and the 128-byte
+        // prehashed master-seed path are not mnemonic restoration inputs.
+        if (masterSeed instanceof Uint8Array && masterSeed.length === 64) {
+            warnLegacySeedPath("bytes")
         }
 
         let hashable: string | Uint8Array = null
@@ -459,7 +526,7 @@ export class Demos {
                 "connectWalletFromPrivateKey: expected a 32-byte key as 64 hex chars (optionally 0x-prefixed).",
             )
         }
-        return await this.connectWallet(hexToUint8Array(clean), options)
+        return await this.connectWallet(hexToUint8Array(clean) as string | Uint8Array, options)
     }
 
     /**
@@ -1219,6 +1286,15 @@ export class Demos {
      * Retry-After response header (numeric seconds, or HTTP-date) overrides
      * the computed backoff for that attempt.
      *
+     * Each attempt has a wall-clock deadline (`timeoutMs`, default
+     * {@link _RPC_TIMEOUT_MS}) and a reply size cap (`maxResponseBytes`,
+     * default {@link _RPC_MAX_RESPONSE_BYTES}). A missed deadline fails with
+     * code ECONNABORTED and is not retried: the node may already have the
+     * request, so the outcome is unknown. An oversize reply fails with code
+     * ERR_BAD_RESPONSE, no `response` and a message starting
+     * `maxContentLength size of`; HTTP 5xx replies share the code but carry a
+     * `response`.
+     *
      * On terminal failure, throws a TransportError carrying the underlying
      * cause and the total number of attempts. Callers that need the legacy
      * "never throws, returns {result: 500, response: error}" behavior should
@@ -1228,10 +1304,26 @@ export class Demos {
         url: string,
         request: any,
         headers: Record<string, string | undefined>,
-        opts: { retries?: number; baseSleepMs?: number } = {},
+        opts: {
+            retries?: number
+            baseSleepMs?: number
+            timeoutMs?: number
+            maxResponseBytes?: number
+        } = {},
     ): Promise<{ data: T }> {
         const maxRetries = opts.retries ?? 4
         const baseSleepMs = opts.baseSleepMs ?? 250
+        // An override that is not a usable limit (0, negative, NaN, or past
+        // the largest timer delay, which Node clamps to 1 ms) would fail every
+        // call, so it falls back to the default.
+        const t = opts.timeoutMs
+        const timeoutMs =
+            Number.isFinite(t) && t > 0 && t <= 2 ** 31 - 1
+                ? t
+                : Demos._RPC_TIMEOUT_MS
+        const b = opts.maxResponseBytes
+        const maxResponseBytes =
+            Number.isFinite(b) && b > 0 ? b : Demos._RPC_MAX_RESPONSE_BYTES
         const RETRYABLE_CODES = new Set([
             "ECONNRESET",
             "ECONNREFUSED",
@@ -1246,10 +1338,56 @@ export class Demos {
 
         // attempt 0 is the initial try; we then retry up to maxRetries times.
         for (; attempt <= maxRetries; attempt++) {
+            // The deadline is ours rather than axios' `timeout`: on Node that
+            // is a socket idle timer a node can hold open by trickling bytes,
+            // and the fetch adapter reports it as ETIMEDOUT, which the loop
+            // below retries as if the request never reached the node.
+            const controller = new AbortController()
+            let stopped: { message: string; code: string } | null = null
+            const stop = (message: string, code: string) => {
+                stopped = stopped ?? { message, code }
+                controller.abort()
+            }
+            const timer = setTimeout(
+                () =>
+                    stop(
+                        `timeout of ${timeoutMs}ms exceeded`,
+                        AxiosError.ECONNABORTED,
+                    ),
+                timeoutMs,
+            )
             try {
-                const response = await axios.post<T>(url, request, { headers })
+                const response = await axios
+                    .post<T>(url, request, {
+                        headers,
+                        signal: controller.signal,
+                        // Enforced by the Node http and fetch adapters. The
+                        // browser XHR adapter ignores it, so the progress
+                        // check below covers that one.
+                        maxContentLength: maxResponseBytes,
+                        onDownloadProgress: ({ loaded }) => {
+                            if (
+                                maxResponseBytes > 0 &&
+                                loaded > maxResponseBytes
+                            ) {
+                                stop(
+                                    `maxContentLength size of ${maxResponseBytes} exceeded`,
+                                    AxiosError.ERR_BAD_RESPONSE,
+                                )
+                            }
+                        },
+                    })
+                    .finally(() => clearTimeout(timer))
                 return { data: response.data }
-            } catch (error: any) {
+            } catch (caught: any) {
+                const error = stopped
+                    ? new AxiosError(
+                          stopped.message,
+                          stopped.code,
+                          caught?.config,
+                          caught?.request,
+                      )
+                    : caught
                 lastError = error
 
                 const code: string | undefined = error?.code
@@ -1688,25 +1826,30 @@ export class Demos {
      * For dependent sends see {@link waitForNonce} or {@link enableAutoNonce}.
      *
      * @param address - The address
-     * @returns The confirmed nonce, or 0 when the node reports none.
+     * @returns The confirmed nonce, including 0 for a fresh account.
+     * @throws When the lookup fails (transport error, node error reply) or the
+     * reply is not a non-negative integer. Defaulting to 0 there would make
+     * every builder sign with nonce 1.
      */
     async getAddressNonce(address: string): Promise<number> {
         const nonceValue = await this.nodeCall("getAddressNonce", {
             address,
         })
 
-        if (typeof nonceValue === "number" && Number.isFinite(nonceValue)) {
+        if (Number.isSafeInteger(nonceValue) && nonceValue >= 0) {
             return nonceValue
         }
 
-        if (typeof nonceValue === "string") {
-            const parsed = Number.parseInt(nonceValue, 10)
-            if (Number.isFinite(parsed)) {
+        if (typeof nonceValue === "string" && /^(?:0|[1-9]\d*)$/.test(nonceValue)) {
+            const parsed = Number(nonceValue)
+            if (Number.isSafeInteger(parsed)) {
                 return parsed
             }
         }
 
-        return 0
+        throw new Error(
+            `getAddressNonce: node returned no valid nonce for ${describeNonceReply(address)}: ${describeNonceReply(nonceValue)}`,
+        )
     }
 
     /**
