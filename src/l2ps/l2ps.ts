@@ -10,6 +10,7 @@
  */
 
 import { UnifiedCrypto } from "@/encryption/unifiedCrypto";
+import { serializeTransactionContent } from "@/denomination/serializerGate";
 import forge from "node-forge";
 import { Hashing } from "@/encryption/Hashing";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
@@ -17,6 +18,14 @@ import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
 
 /** Plaintexts are padded to a multiple of this many UTF-8 bytes before encryption. */
 export const L2PS_PLAINTEXT_BUCKET = 1024;
+
+/**
+ * sha256 of a string's UTF-8 bytes, as hex: the node hashes transaction
+ * content with `crypto.createHash("sha256").update(str)`, which is UTF-8.
+ */
+export function sha256Utf8(text: string): string {
+    return forge.md.sha256.create().update(forge.util.encodeUtf8(text), "raw").digest().toHex();
+}
 
 /**
  * Configuration interface for L2PS instances.
@@ -380,6 +389,31 @@ export default class L2PS {
 
             if (originalTx.hash !== encryptedPayload.original_hash) {
                 throw new Error('Decrypted transaction hash mismatch');
+            }
+
+            // The `.hash` field is data the sender chose, so also recompute
+            // it from the decrypted content with the node's two
+            // `Transaction.checkCoherence` forms, each hashed as UTF-8: raw
+            // `JSON.stringify` before the osDenomination fork, the post-fork
+            // serializer after it. The payload does not record the fork
+            // state, so accept either. The pre-fork serializer is never used:
+            // it turns OS strings into DEM by integer division, so different
+            // content would match one hash. A form that throws or gives no
+            // string (no content) counts as no match, as in the node.
+            const hashForms = [
+                () => JSON.stringify(originalTx.content),
+                () => serializeTransactionContent(originalTx.content, true),
+            ];
+            const recomputesToHash = hashForms.some((form) => {
+                try {
+                    const text = form();
+                    return typeof text === "string" && sha256Utf8(text) === encryptedPayload.original_hash;
+                } catch {
+                    return false;
+                }
+            });
+            if (!recomputesToHash) {
+                throw new Error('Decrypted transaction content does not match its hash');
             }
 
             return originalTx;
