@@ -2,13 +2,16 @@ import { describe, test, expect } from "@jest/globals"
 import * as forge from "node-forge"
 import L2PS, { L2PS_PLAINTEXT_BUCKET } from "@/l2ps/l2ps"
 import type { Transaction } from "@/types/blockchain/Transaction"
+import { Hashing } from "@/encryption/Hashing"
 
 // `L2PS.decryptTx` decodes the plaintext as UTF-8, so `L2PS.encryptTx`
 // must encode it as UTF-8. ASCII-only transactions keep the exact
 // plaintext bytes older SDKs produced.
 
+// decryptTx recomputes the hash from the decrypted content, so the
+// fixture carries the real UTF-8 content hash.
 function makeTx(memo: string): Transaction {
-    return {
+    const tx = {
         content: {
             type: "native",
             from: "0x" + "a".repeat(64),
@@ -33,12 +36,14 @@ function makeTx(memo: string): Transaction {
                 rpc_address: null,
             },
         },
-        hash: "deadbeef".repeat(8),
+        hash: "",
         signature: null,
         ed25519_signature: null,
         status: null,
         blockNumber: null,
     } as unknown as Transaction
+    tx.hash = Hashing.sha256(JSON.stringify(tx.content))
+    return tx
 }
 
 // Raw plaintext bytes (as a binary string) of an encryptTx payload.
