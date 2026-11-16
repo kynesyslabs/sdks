@@ -93,6 +93,38 @@ async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+/**
+ * Throws unless the trimmed `connectWallet` string `phrase` is a canonical
+ * English BIP-39 mnemonic or a 128-char hex string. Returns whether it is a
+ * valid mnemonic.
+ */
+function checkRecoveryPhrase(phrase: string): boolean {
+    // bip39 validates the NFKD form, but derivation hashes the string
+    // as given, so full-width letters or U+3000 between words would
+    // pass validation and open a different wallet. Refuse them.
+    if (phrase.normalize("NFKD") !== phrase) {
+        throw new Error(
+            "Invalid recovery phrase: it contains non-canonical characters (for example full-width letters or ideographic spaces). Only English BIP-39 phrases are accepted. Type it in plain lowercase letters separated by single ASCII spaces. If this exact phrase opened a wallet with SDK 2.3.16 to 4.0.21, see the upgrade note in https://github.com/kynesyslabs/sdks/blob/main/CHANGELOG.md",
+        )
+    }
+
+    if (bip39.validateMnemonic(phrase, wordList)) {
+        return true
+    }
+
+    // A malformed phrase with an accepted word count (a typo, capitalised
+    // word or bad checksum) used to derive a different wallet silently;
+    // other invalid strings already threw `Invalid mnemonic` inside bip39.
+    // Refuse both. A 128-char hex string is let through and still fails
+    // inside bip39, as before.
+    if (!/^[0-9a-fA-F]{128}$/.test(phrase)) {
+        throw new Error(
+            "Invalid recovery phrase: not a valid English BIP-39 mnemonic. Check the spelling, that every word is lowercase, and that words are separated by single spaces. If this exact phrase opened a wallet with SDK 2.3.16 to 4.0.21, see the upgrade note in https://github.com/kynesyslabs/sdks/blob/main/CHANGELOG.md",
+        )
+    }
+    return false
+}
+
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
 
 /**
@@ -352,26 +384,7 @@ export class Demos {
         if (typeof masterSeed === "string") {
             masterSeed = masterSeed.trim()
 
-            // bip39 validates the NFKD form, but derivation hashes the string
-            // as given, so full-width letters or U+3000 between words would
-            // pass validation and open a different wallet. Refuse them.
-            if (masterSeed.normalize("NFKD") !== masterSeed) {
-                throw new Error(
-                    "Invalid recovery phrase: it contains non-canonical characters (for example full-width letters or ideographic spaces). Only English BIP-39 phrases are accepted. Type it in plain lowercase letters separated by single ASCII spaces. If this exact phrase opened a wallet with SDK 2.3.16 to 4.0.21, see the upgrade note in https://github.com/kynesyslabs/sdks/blob/main/CHANGELOG.md",
-                )
-            }
-
-            if (!bip39.validateMnemonic(masterSeed, wordList)) {
-                // A malformed phrase with an accepted word count (a typo,
-                // capitalised word or bad checksum) used to derive a different
-                // wallet silently; other invalid strings already threw
-                // `Invalid mnemonic` inside bip39. Refuse both. A 128-char hex
-                // string is let through and still fails inside bip39, as before.
-                if (!/^[0-9a-fA-F]{128}$/.test(masterSeed)) {
-                    throw new Error(
-                        "Invalid recovery phrase: not a valid English BIP-39 mnemonic. Check the spelling, that every word is lowercase, and that words are separated by single spaces. If this exact phrase opened a wallet with SDK 2.3.16 to 4.0.21, see the upgrade note in https://github.com/kynesyslabs/sdks/blob/main/CHANGELOG.md",
-                    )
-                }
+            if (!checkRecoveryPhrase(masterSeed)) {
                 hashable = bip39.mnemonicToSeedSync(masterSeed)
             } else {
                 hashable = masterSeed

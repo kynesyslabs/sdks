@@ -45,6 +45,12 @@ const FIXTURE_PHRASE =
 const FIXTURE_LEGACY_ADDRESS =
     "0xf79f5f69fc01600f8e7e796b05549b088bf7d5dac768d6b0404842a8da283aeb"
 
+// Byte seeds: 32 bytes of 7 and 128 bytes of 9.
+const SHORT_BYTE_SEED_ADDRESS =
+    "0xbdbc71593cf1f813fe8bb41f4b89835e58b8e94f86fc95ed246903423423aa8b"
+const RAW_128_BYTE_SEED_ADDRESS =
+    "0x51ca40cf297a419192bd2e9248db88f65a98e1ca046c301284969e3f7a99a57c"
+
 const INVALID = /invalid recovery phrase/i
 const NON_CANONICAL = /invalid recovery phrase: .*non-canonical characters/i
 
@@ -197,12 +203,13 @@ describe("connectWallet recovery phrase validation (#175)", () => {
     })
 
     it("leaves the byte-array seed paths unchanged", async () => {
+        // Addresses these seeds opened before this check (SDK 4.0.21, base
+        // 6071ad93bd): a short seed is hashed, 128 bytes are used as given.
         const short = new Uint8Array(32).fill(7)
         const raw128 = new Uint8Array(128).fill(9)
 
-        expect(await addressOf(short)).toBe(await addressOf(short))
-        expect(await addressOf(raw128)).toBe(await addressOf(raw128))
-        expect(await addressOf(short)).not.toBe(await addressOf(raw128))
+        expect(await addressOf(short)).toBe(SHORT_BYTE_SEED_ADDRESS)
+        expect(await addressOf(raw128)).toBe(RAW_128_BYTE_SEED_ADDRESS)
     })
 
     it("keeps the address a refused phrase used to open reachable by byte seed", async () => {
@@ -211,8 +218,8 @@ describe("connectWallet recovery phrase validation (#175)", () => {
         const capitalised = PHRASE.replace("abandon", "Abandon")
         const seed = legacySeed(capitalised)
 
-        expect(capitalised.length).toBe(93)
-        expect(seed.length).toBe(128)
+        expect(capitalised).toHaveLength(93)
+        expect(seed).toHaveLength(128)
         expect(await addressOf(seed)).toBe(CAPITALISED_LEGACY_ADDRESS)
     })
 
@@ -229,7 +236,7 @@ describe("connectWallet recovery phrase validation (#175)", () => {
     it("keeps the address a refused 128-char phrase used to open reachable by byte seed", async () => {
         // At exactly 128 chars, an invalid phrase was hashed via its bip39
         // seed, not as written.
-        expect(INVALID_128.length).toBe(128)
+        expect(INVALID_128).toHaveLength(128)
         await expect(addressOf(INVALID_128)).rejects.toThrow(INVALID)
 
         expect(
