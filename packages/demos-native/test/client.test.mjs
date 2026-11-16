@@ -530,3 +530,59 @@ test("rejects RPC bounds that are not positive integers in range", () => {
     assert.throws(() => new Demos(options), TypeError);
   }
 });
+
+test("never resends a POST once the node has replied", { timeout: 10_000 }, async (t) => {
+  let posts = 0;
+  const base = await listen(t, (request, response) => {
+    request.resume();
+    if (request.method === "GET") return send(response, 200, { ok: true });
+    posts += 1;
+    // Successful headers and part of the body, then the connection drops.
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.write('{"result":200,', () => setTimeout(() => response.destroy(), 50));
+  });
+
+  const demos = new Demos({ rpcTimeoutMs: 5_000 });
+  await demos.connect(base);
+  const cut = await demos.rpcCall({ method: "nodeCall", params: [] });
+  assert.equal(cut.result, 500);
+  assert.equal(
+    cut.response.message,
+    `Demos RPC response from ${base}/ could not be read`,
+  );
+  assert.equal(posts, 1);
+});
+
+test("closes an unread RPC body before returning", { timeout: 10_000 }, async (t) => {
+  const closed = [];
+  const base = await listen(t, (request, response) => {
+    request.resume();
+    // Headers, then a body that never ends.
+    response.writeHead(request.method === "GET" ? 200 : 500, {
+      "Content-Type": "application/json",
+    });
+    response.write("{");
+    const drip = setInterval(() => response.write(" "), 20);
+    closed.push(new Promise((resolve) => {
+      response.on("close", () => {
+        clearInterval(drip);
+        resolve();
+      });
+    }));
+  });
+  // Well inside the 5 s deadline, so only cancelling the body can close it.
+  const within = (closing) => Promise.race([
+    closing,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("unread body left open")), 1_000);
+    }),
+  ]);
+
+  const demos = new Demos({ rpcTimeoutMs: 5_000 });
+  await demos.connect(base);
+  await within(closed[0]);
+  const failed = await demos.rpcCall({ method: "nodeCall", params: [] });
+  assert.equal(failed.response.message, "Demos RPC failed with HTTP 500");
+  assert.equal(closed.length, 2);
+  await within(closed[1]);
+});

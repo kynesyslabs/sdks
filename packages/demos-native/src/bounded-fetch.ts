@@ -9,7 +9,7 @@ function urlForError(url: string): string {
     const { origin, pathname } = new URL(url);
     return origin + pathname;
   } catch {
-    return url.replace(/[?#].*$/s, "");
+    return url.split(/[?#]/, 1)[0] ?? "";
   }
 }
 
@@ -40,7 +40,8 @@ async function readCapped(
 
 /**
  * Fetch one RPC URL within `timeoutMs`, headers and body included. With
- * `readBody`, an OK body is read as text up to `maxBytes`.
+ * `readBody`, an OK body is read as text up to `maxBytes`; any other body is
+ * cancelled so its connection does not outlive the call.
  */
 export async function fetchBounded(
   url: string,
@@ -51,16 +52,25 @@ export async function fetchBounded(
 ): Promise<{ response: Response; text: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response | undefined;
   try {
-    const response = await fetch(url, { ...init, signal: controller.signal });
-    const text = readBody && response.ok
-      ? await readCapped(response, url, maxBytes)
-      : "";
-    return { response, text };
+    response = await fetch(url, { ...init, signal: controller.signal });
+    if (!readBody || !response.ok) {
+      await response.body?.cancel().catch(() => {});
+      return { response, text: "" };
+    }
+    return { response, text: await readCapped(response, url, maxBytes) };
   } catch (error) {
-    if (!controller.signal.aborted) throw error;
+    if (controller.signal.aborted) {
+      throw new NonRetryableRpcError(
+        `Demos RPC request to ${urlForError(url)} exceeded the ${timeoutMs} ms deadline`,
+        { cause: error },
+      );
+    }
+    // The node has answered, so it may have acted on the request: never resend.
+    if (!response || error instanceof NonRetryableRpcError) throw error;
     throw new NonRetryableRpcError(
-      `Demos RPC request to ${urlForError(url)} exceeded the ${timeoutMs} ms deadline`,
+      `Demos RPC response from ${urlForError(url)} could not be read`,
       { cause: error },
     );
   } finally {
