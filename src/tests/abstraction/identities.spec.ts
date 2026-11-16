@@ -19,6 +19,7 @@ import { Demos, DemosWebAuth } from "@/websdk"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import chainProviders from "../multichain/chainProviders"
 import { wallets } from "../utils/wallets"
+import { legacySeed } from "../utils/legacySeed"
 import { uint8ArrayToHex } from "@/encryption"
 
 describe.only("IDENTITIES V2", () => {
@@ -30,7 +31,7 @@ describe.only("IDENTITIES V2", () => {
     beforeAll(async () => {
         demos = new Demos()
         await demos.connect(rpc)
-        await demos.connectWallet("polar scale globe beauty stock employ rail exercise goat into sample embark",
+        await demos.connectWallet(legacySeed("polar scale globe beauty stock employ rail exercise goat into sample embark"),
             // {
             //     algorithm: "falcon",
             //     dual_sign: true,

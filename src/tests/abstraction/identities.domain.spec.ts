@@ -1,5 +1,6 @@
 import { Demos } from "@/websdk"
 import { Identities } from "@/abstraction"
+import { legacySeed } from "../utils/legacySeed"
 
 const MNEMONIC =
     "polar scale globe beauty stock employ rail exercise goat into sample embark"
@@ -14,7 +15,7 @@ describe("Domain Identities (offline SDK logic)", () => {
     const identities = new Identities()
 
     beforeAll(async () => {
-        await demos.connectWallet(MNEMONIC) // local crypto only, no node
+        await demos.connectWallet(legacySeed(MNEMONIC)) // local crypto only, no node
     })
 
     test("createDomainProofPayload signs a host+sender-bound message", async () => {

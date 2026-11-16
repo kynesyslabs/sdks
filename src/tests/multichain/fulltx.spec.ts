@@ -1,6 +1,7 @@
 import { XRPL, EVM } from "@/multichain/websdk"
 import chainProviders from "./chainProviders"
 import { wallets } from "../utils/wallets"
+import { legacySeed } from "../utils/legacySeed"
 import {
     Demos,
     DemosWebAuth,
@@ -90,7 +91,9 @@ describe("DEMOS Transaction", () => {
         // 5. Connect to the DEMOS node
         await demos.connect(rpc)
         await demos.connectWallet(
-            "polar scale globe beauty stock employ rail exercise goat into sample embark",
+            legacySeed(
+                "polar scale globe beauty stock employ rail exercise goat into sample embark",
+            ),
             {
                 algorithm: "falcon",
                 dual_sign: true,

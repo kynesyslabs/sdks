@@ -17,6 +17,7 @@ Historically, `Demos.connectWallet` accepted a master seed in the following two 
 2. A 128 byte `Uint8Array` representation of the masterseed
 
 Other byte inputs are hashed using sha3-512 to create a 128 byte master seed.
+A string that is not a valid English BIP-39 phrase is refused (since #175).
 A 64-byte BIP39 seed is not interchangeable with the phrase string. For new
 mnemonic wallets, pass the phrase directly to `connectWallet(mnemonic)`.
 

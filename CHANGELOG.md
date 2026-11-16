@@ -35,6 +35,30 @@
   query characters and use the punycode (`xn--`) form for hostnames.
 
 ### Fixed
+- `Demos.connectWallet(<string>)` now throws `Invalid recovery phrase` when the
+  string is not a valid BIP-39 mnemonic (a 128-character hex string still
+  throws `Invalid mnemonic`). A phrase with the right word count but
+  a misspelt word, a capitalised word or a bad checksum used to derive a
+  different wallet silently (#175). Valid phrases derive exactly the same keys
+  as before. Derivation never lowercased words, so such input is refused, not
+  normalised. It also throws when the phrase contains characters that NFKD
+  normalisation changes (for example full-width letters, or U+3000 between
+  words): bip39 validated the normalised form, but derivation hashed the
+  string as given, so such a phrase opened a different wallet. A refused call
+  leaves an already-connected wallet unchanged.
+  **Upgrade note:** a wallet that was only ever opened with a phrase that is
+  now refused (for example a capitalised first word, or full-width letters) is
+  no longer reachable through `connectWallet(<string>)`. Its keys are still
+  reachable with `connectWallet(bytes)`, where `bytes` is a SHA3-512 digest as
+  hex (without `0x`) encoded as UTF-8 (128 bytes). With
+  `trimmed = phrase.trim()`, the digest that 4.0.21 used is:
+  - `sha3_512(mnemonicToSeedSync(trimmed))` (`@scure/bip39`, no passphrase)
+    when `trimmed.length` is 128 and `validateMnemonic(trimmed, english)` is
+    false;
+  - `sha3_512(trimmed)`, over its UTF-8 bytes, in every other case.
+
+  These recipes reproduce the derivation used from 2.3.16 (commit `1d90dba`)
+  to 4.0.21; earlier builds derived differently.
 - RPC calls no longer hang on a node that accepts a request and never
   answers. Each RPC attempt (`rpcCall`, `call`, `nodeCall` and everything
   built on them) now has a 120 s wall-clock deadline and a 512 MiB ceiling on
@@ -60,8 +84,8 @@
   A request that times out settles through the existing failure path, so
   callers that already turn a failed call into a fallback do the same after a
   timeout, as they already do for a refused connection or a 5xx reply:
-  `getAddressNonce` returns 0, and for the 30 s failure TTL `getNetworkInfo`
-  returns the node's last answer, or `null` if it never answered, in which
+  `getAddressNonce` throws (see the nonce entry below), and for the 30 s
+  failure TTL `getNetworkInfo` returns the node's last answer, or `null` if it never answered, in which
   case the legacy wire format is used. After a timeout the `TLSNotaryService`
   helpers that broadcast (`requestAttestation`, `storeProof` and their
   `WithConfirmation` variants) throw as if the request failed, although it
