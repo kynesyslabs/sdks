@@ -102,6 +102,7 @@ export {
     buildBindValue,
     withBindHeader,
     parseHttpMessage,
+    parseHttpResponses,
     mergeRanges,
     mandatorySentRanges,
     computeRevealRanges,

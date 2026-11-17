@@ -5,6 +5,7 @@ import {
     enforceRevealPolicy,
     mergeRanges,
     parseHttpMessage,
+    parseHttpResponses,
     TLSN_BIND_HEADER,
     withBindHeader,
 } from "@/tlsnotary/revealPolicy"
@@ -217,6 +218,45 @@ describe("default reveal ranges, every header order", () => {
             revealResponseBody: false,
         })
         expect(revealed(recv, find(RESPONSE, BODY))).toBe(false)
+    })
+})
+
+describe("interim responses", () => {
+    const EARLY = "HTTP/1.1 103 Early Hints\r\nLink: </style.css>; rel=preload\r\n\r\n"
+    const WITH_EARLY = enc(EARLY + Buffer.from(RESPONSE).toString("latin1"))
+    const FINAL_COOKIE = "_gh_sess=test-only-session-value; path=/; HttpOnly"
+
+    it("parses the final response after a 103", () => {
+        const blocks = parseHttpResponses(WITH_EARLY)
+        expect(blocks).toHaveLength(2)
+        expect(blocks[0].body).toBeNull()
+        expect(blocks[1].headers.map(h => h.name)).toContain("set-cookie")
+        expect(blocks[1].body).toEqual(find(WITH_EARLY, BODY))
+    })
+
+    it("keeps the final Set-Cookie value hidden and reveals the final body", () => {
+        const { recv } = computeRevealRanges(request(HEADERS), WITH_EARLY)
+        expect(revealed(recv, find(WITH_EARLY, FINAL_COOKIE))).toBe(false)
+        expect(fully(recv, find(WITH_EARLY, "Set-Cookie: "))).toBe(true)
+        expect(fully(recv, find(WITH_EARLY, "HTTP/1.1 200 OK\r\n"))).toBe(true)
+        expect(fully(recv, find(WITH_EARLY, BODY))).toBe(true)
+    })
+
+    it("refuses caller ranges over the final Set-Cookie value", () => {
+        expect(() =>
+            enforceRevealPolicy(request(HEADERS), WITH_EARLY, {
+                sent: [],
+                recv: [{ start: 0, end: WITH_EARLY.length }],
+            }),
+        ).toThrow("set-cookie")
+    })
+
+    it("reveals nothing after a 101 upgrade", () => {
+        const upgraded = enc(
+            "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n\r\nopaque-frames",
+        )
+        const { recv } = computeRevealRanges(request(HEADERS), upgraded)
+        expect(revealed(recv, find(upgraded, "opaque-frames"))).toBe(false)
     })
 })
 

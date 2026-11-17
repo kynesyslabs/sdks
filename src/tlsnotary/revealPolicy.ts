@@ -162,8 +162,11 @@ function latin1(bytes: Uint8Array, start: number, end: number): string {
  * message can be revealed safely.
  */
 export function parseHttpMessage(input: Uint8Array | number[]): HttpMessageSpans {
-    const bytes = input instanceof Uint8Array ? input : Uint8Array.from(input)
-    const startEnd = lineEnd(bytes, 0)
+    return parseMessageAt(input instanceof Uint8Array ? input : Uint8Array.from(input), 0)
+}
+
+function parseMessageAt(bytes: Uint8Array, offset: number): HttpMessageSpans {
+    const startEnd = lineEnd(bytes, offset)
     if (startEnd < 0) {
         throw new Error("TLSNotary transcript has no complete HTTP start line")
     }
@@ -209,13 +212,42 @@ export function parseHttpMessage(input: Uint8Array | number[]): HttpMessageSpans
     if (!headersEnd) {
         // Without the blank line the rest cannot be told apart from a header
         // that was cut off, so it is left unrevealed.
-        return { startLine: { start: 0, end: startEnd }, headers, headersEnd: null, body: null }
+        return { startLine: { start: offset, end: startEnd }, headers, headersEnd: null, body: null }
     }
     return {
-        startLine: { start: 0, end: startEnd },
+        startLine: { start: offset, end: startEnd },
         headers,
         headersEnd,
         body: at < bytes.length ? { start: at, end: bytes.length } : null,
+    }
+}
+
+function statusCode(bytes: Uint8Array, line: Range): number | null {
+    const match = /^HTTP\/\d(?:\.\d)? (\d{3})/.exec(latin1(bytes, line.start, line.end))
+    return match ? Number(match[1]) : null
+}
+
+/**
+ * Every header block of a received transcript, in order. A server may send
+ * interim 1xx responses (103 Early Hints) before the final one; parsing only
+ * the first block would treat the final response's headers, `Set-Cookie`
+ * included, as body and reveal them. Interim blocks and a 101 upgrade carry
+ * no body that may be revealed.
+ */
+export function parseHttpResponses(input: Uint8Array | number[]): HttpMessageSpans[] {
+    const bytes = input instanceof Uint8Array ? input : Uint8Array.from(input)
+    const blocks: HttpMessageSpans[] = []
+    let at = 0
+    for (;;) {
+        const msg = parseMessageAt(bytes, at)
+        blocks.push(msg)
+        const code = statusCode(bytes, msg.startLine)
+        if (code === null || code < 100 || code > 199) return blocks
+        msg.body = null
+        if (code === 101 || !msg.headersEnd || msg.headersEnd.end >= bytes.length) {
+            return blocks
+        }
+        at = msg.headersEnd.end
     }
 }
 
@@ -280,8 +312,9 @@ export interface RevealPolicyOptions {
  * structural headers in full; every other header by name only, and
  * `Authorization`/`Cookie` by name only always. The request body stays hidden.
  *
- * Received: the status line and the headers (`Set-Cookie` by name only),
- * and the body unless `revealResponseBody` is false. Identity links need the
+ * Received: the status line and the headers of every response block,
+ * interim 1xx ones included (`Set-Cookie` by name only), and the final
+ * body unless `revealResponseBody` is false. Identity links need the
  * JSON body, from which the node reads the account.
  */
 export function computeRevealRanges(
@@ -303,18 +336,19 @@ export function computeRevealRanges(
     const recvBytes = recv instanceof Uint8Array ? recv : Uint8Array.from(recv)
     const recvRanges: Range[] = []
     if (recvBytes.length > 0) {
-        const res = parseHttpMessage(recvBytes)
-        recvRanges.push(res.startLine)
-        for (const h of res.headers) {
-            if (SECRET_RESPONSE_HEADERS.has(h.name)) {
-                recvRanges.push(...nameOnly(h))
-            } else {
-                recvRanges.push(h.line)
+        for (const res of parseHttpResponses(recvBytes)) {
+            recvRanges.push(res.startLine)
+            for (const h of res.headers) {
+                if (SECRET_RESPONSE_HEADERS.has(h.name)) {
+                    recvRanges.push(...nameOnly(h))
+                } else {
+                    recvRanges.push(h.line)
+                }
             }
-        }
-        if (res.headersEnd) recvRanges.push(res.headersEnd)
-        if (res.body && options.revealResponseBody !== false) {
-            recvRanges.push(res.body)
+            if (res.headersEnd) recvRanges.push(res.headersEnd)
+            if (res.body && options.revealResponseBody !== false) {
+                recvRanges.push(res.body)
+            }
         }
     }
 
@@ -362,8 +396,8 @@ export function enforceRevealPolicy(
         }
     }
     if (recvBytes.length > 0) {
-        const res = parseHttpMessage(recvBytes)
-        for (const h of res.headers) {
+        const headers = parseHttpResponses(recvBytes).flatMap(res => res.headers)
+        for (const h of headers) {
             if (SECRET_RESPONSE_HEADERS.has(h.name) && overlaps(commit.recv, h.value)) {
                 throw new Error(
                     `TLSNotary reveal ranges expose the value of the ${h.name} response header; reveal its name only`,

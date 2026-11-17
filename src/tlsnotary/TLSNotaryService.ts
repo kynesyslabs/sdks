@@ -43,7 +43,7 @@ import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { OS_PER_DEM, osToDem } from "@/denomination"
 import { TLSNotary } from "./TLSNotary"
 import { calculateStorageFee, presentationByteLength } from "./helpers"
-import { resolveNonce } from "@/utils"
+import { resolveNonce, sleep } from "@/utils"
 import type { StatusCallback } from "./types"
 import type { TLSNBindPurpose } from "./revealPolicy"
 import {
@@ -939,7 +939,5 @@ function assertHttps(targetUrl: string): void {
         throw new Error("Only HTTPS URLs are supported for TLS attestation")
     }
 }
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 export default TLSNotaryService
