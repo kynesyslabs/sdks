@@ -121,7 +121,13 @@ function quotedFeeOs(
  *
  * Prefers the node's quote of what it will charge
  * (`transaction.attrs.total_fee`), which can differ from the signed fee
- * fields. Without a quote (older nodes, other than native sends), sums
+ * fields. The quote is the node's own only when the transaction was sent to
+ * `demos.confirm` without an `attrs.total_fee`: a node without the fee quote
+ * echoes `attrs` back unchanged, so a quote left from an earlier confirmation
+ * at the same height comes back as if it were new. Direct callers must remove
+ * `attrs.total_fee` before confirming, as the runner does, or the result may
+ * be a quote the node did not make. Without a quote (older nodes, other than
+ * native sends), sums
  * `network_fee + rpc_fee + additional_fee` from:
  *  - `gas_operation.fees` — the node's authoritative gas operation, when the
  *    node populates it (post-fork gas-separation model), preferred; else
