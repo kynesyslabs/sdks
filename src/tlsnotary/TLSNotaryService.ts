@@ -5,9 +5,11 @@
  * and storing proofs on the Demos Network blockchain.
  *
  * The attestation flow:
- * 1. Request attestation token (burns 1 DEM) → get tokenId + proxyUrl
- * 2. Perform attestation using the proxy
- * 3. Store proof on-chain or IPFS (burns 1 + ceil(size/1024) DEM)
+ * 1. Submit a `tlsn_request` (burns 1 DEM) and wait until it is in a block;
+ *    its hash is the token id, then a proxy is requested for it
+ * 2. Attest through the proxy; the request carries `X-Demos-Bind`, which
+ *    names the sender and the request hash, and is always revealed
+ * 3. Store the proof on chain (burns 1 + ceil(size/1024) DEM)
  *
  * @example
  * ```typescript
@@ -19,14 +21,12 @@
  *
  * const service = new TLSNotaryService(demos);
  *
- * // Request attestation token
- * const { proxyUrl, tokenId } = await service.requestAttestation({
- *   targetUrl: 'https://api.github.com/users/octocat'
+ * // Request a token and a TLSNotary instance bound to it
+ * const { tlsn, tokenId } = await service.createTLSNotary({
+ *   targetUrl: 'https://api.github.com/users/octocat',
+ *   purpose: 'store',
  * });
- *
- * // Perform attestation (using TLSNotary class)
- * const tlsn = await demos.tlsnotary();
- * const result = await tlsn.attest({ url: targetUrl });
+ * const result = await tlsn.attest({ url: 'https://api.github.com/users/octocat' });
  *
  * // Store proof on-chain
  * const { txHash } = await service.storeProof(
@@ -42,9 +42,15 @@ import { DemosTransactions } from "@/websdk/DemosTransactions"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { OS_PER_DEM, osToDem } from "@/denomination"
 import { TLSNotary } from "./TLSNotary"
-import { calculateStorageFee } from "./helpers"
+import { calculateStorageFee, presentationByteLength } from "./helpers"
 import { resolveNonce } from "@/utils"
 import type { StatusCallback } from "./types"
+import type { TLSNBindPurpose } from "./revealPolicy"
+import {
+    isTlsnVerifiedActive,
+    reportedMaxPresentationBytes,
+    resolveNotary,
+} from "./network"
 
 /**
  * Response from requestAttestation
@@ -52,7 +58,10 @@ import type { StatusCallback } from "./types"
 export interface AttestationTokenResponse {
     /** WebSocket proxy URL for this attestation */
     proxyUrl: string
-    /** Unique token ID for this attestation */
+    /**
+     * Token ID for this attestation. On a network with `tlsnVerified` active
+     * it is the hash of the included `tlsn_request`.
+     */
     tokenId: string
     /** Unix timestamp when token expires */
     expiresAt: number
@@ -60,6 +69,8 @@ export interface AttestationTokenResponse {
     retriesLeft: number
     /** Transaction hash of the attestation request */
     txHash: string
+    /** The requesting address, `0x` + hex: the sender the bind header names. */
+    owner: string
 }
 
 /**
@@ -110,15 +121,34 @@ export interface RequestAttestationOptions {
     /** Target HTTPS URL to attest */
     targetUrl: string
     nonce?: number
+    /**
+     * What the attestation is for, named in the `X-Demos-Bind` header: the
+     * identity context it will be linked under, or `"store"` (default) for a
+     * proof stored with `storeProof`. Nodes refuse a proof whose bind header
+     * names another purpose.
+     */
+    purpose?: TLSNBindPurpose
+    /** How long to wait for the `tlsn_request` to be included (default 60 s). */
+    inclusionTimeoutMs?: number
+    /** Delay between inclusion polls (default 1 s). */
+    pollIntervalMs?: number
 }
 
 /**
  * Options for storing a proof
  */
 export interface StoreProofOptions {
-    /** Storage location: on-chain or IPFS */
-    storage: "onchain" | "ipfs"
+    /**
+     * Storage location. Only `"onchain"`: nodes refuse IPFS storage of
+     * TLSNotary proofs.
+     */
+    storage?: "onchain"
     nonce?: number
+    /**
+     * Largest presentation the network stores, in bytes. Defaults to what
+     * the node reports in `tlsnotary.getInfo`, else the mainnet value.
+     */
+    maxPresentationBytes?: number
 }
 
 /**
@@ -180,11 +210,14 @@ export class TLSNotaryService {
     /**
      * Request an attestation token for a target URL
      *
-     * This submits a TLSN_REQUEST native transaction that burns 1 DEM
-     * and returns a token ID with a proxy URL for performing the attestation.
+     * This submits a TLSN_REQUEST native transaction that burns 1 DEM,
+     * waits until it is in a block, and returns a token ID with a proxy URL
+     * for performing the attestation. On a network with `tlsnVerified`
+     * active the token ID is the request's transaction hash.
      *
      * @param options - Request options including target URL
      * @returns Attestation token response with proxyUrl and tokenId
+     * @throws when the request is refused, fails, or is not included in time
      *
      * @example
      * ```typescript
@@ -196,88 +229,14 @@ export class TLSNotaryService {
     async requestAttestation(
         options: RequestAttestationOptions,
     ): Promise<AttestationTokenResponse> {
-        const { targetUrl } = options
+        assertHttps(options.targetUrl)
 
-        // Validate URL is HTTPS
-        const url = new URL(targetUrl)
-        if (url.protocol !== "https:") {
-            throw new Error("Only HTTPS URLs are supported for TLS attestation")
-        }
-
-        // 1. Create and submit TLSN_REQUEST native transaction (burns 1 DEM)
+        // Burns 1 DEM
         const tx = await this.createTlsnRequestTransaction(
-            targetUrl,
+            options.targetUrl,
             options.nonce,
         )
-
-        // 2. Confirm and broadcast the transaction
-        const confirmResult = await DemosTransactions.confirm(tx, this.demos)
-        const broadcastResult = await DemosTransactions.broadcast(
-            confirmResult,
-            this.demos,
-        )
-
-        if (broadcastResult.result !== 200) {
-            throw new Error(
-                `Failed to submit attestation request: ${broadcastResult.response?.message || "Unknown error"}`,
-            )
-        }
-
-        // 3. Wait for token to be created by polling with txHash
-        // Token is created when tx is processed (included in block), not when broadcast
-        const txHash = tx.hash
-        let tokenId: string | undefined
-        const maxAttempts = 30 // 30 attempts
-        const pollInterval = 1000 // 1 second between attempts
-
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            const tokenResponse = await this.demos.nodeCall("tlsnotary.getToken", {
-                txHash,
-            }) as { token?: { id: string } } | null
-
-            if (tokenResponse?.token?.id) {
-                tokenId = tokenResponse.token.id
-                break
-            }
-
-            // Wait before next attempt
-            if (attempt < maxAttempts - 1) {
-                await new Promise(resolve => setTimeout(resolve, pollInterval))
-            }
-        }
-
-        if (!tokenId) {
-            throw new Error(
-                `Token not created after ${maxAttempts} seconds. Transaction may still be pending in mempool. txHash: ${txHash}`,
-            )
-        }
-
-        // 4. Get owner address
-        const { publicKey } = await this.demos.crypto.getIdentity("ed25519")
-        const owner = uint8ArrayToHex(publicKey as Uint8Array)
-
-        // 5. Call nodeCall to get proxy URL using the actual tokenId
-        const proxyResponse = (await this.demos.nodeCall("requestTLSNproxy", {
-            tokenId,
-            owner,
-            targetUrl,
-        })) as {
-            websocketProxyUrl: string
-            expiresIn: number
-            retriesLeft?: number
-        }
-
-        if (!proxyResponse || !proxyResponse.websocketProxyUrl) {
-            throw new Error("Failed to get proxy URL from node")
-        }
-
-        return {
-            proxyUrl: proxyResponse.websocketProxyUrl,
-            tokenId,
-            expiresAt: Date.now() + (proxyResponse.expiresIn || 30000),
-            retriesLeft: proxyResponse.retriesLeft ?? 3,
-            txHash,
-        }
+        return await this.submitRequest(tx, options)
     }
 
     /**
@@ -315,12 +274,7 @@ export class TLSNotaryService {
     ): Promise<AttestationTokenResponse> {
         const { targetUrl } = options
         const { onConfirm } = confirmOptions
-
-        // Validate URL is HTTPS
-        const url = new URL(targetUrl)
-        if (url.protocol !== "https:") {
-            throw new Error("Only HTTPS URLs are supported for TLS attestation")
-        }
+        assertHttps(targetUrl)
 
         // 1. Create the transaction (but don't broadcast yet)
         const tx = await this.createTlsnRequestTransaction(
@@ -342,63 +296,62 @@ export class TLSNotaryService {
             throw new Error("Transaction rejected by user")
         }
 
-        // 3. Now confirm and broadcast the transaction
-        const confirmResult = await DemosTransactions.confirm(tx, this.demos)
+        return await this.submitRequest(tx, options)
+    }
+
+    /**
+     * Broadcast a signed `tlsn_request`, wait until it is in a block, then
+     * open a proxy for it.
+     *
+     * The proxy is only requested after inclusion: a node that admitted the
+     * request to its mempool may not be the one serving the proxy, and on a
+     * `tlsnVerified` network the token is the on-chain request itself, keyed
+     * by its hash.
+     */
+    private async submitRequest(
+        tx: Awaited<ReturnType<TLSNotaryService["createTlsnRequestTransaction"]>>,
+        options: RequestAttestationOptions,
+    ): Promise<AttestationTokenResponse> {
+        const { targetUrl } = options
+        const validity = await DemosTransactions.confirm(tx, this.demos)
+        // The node indexes the transaction under the hash it recalculated.
+        const txHash: string =
+            validity?.response?.data?.transaction?.hash || tx.hash
         const broadcastResult = await DemosTransactions.broadcast(
-            confirmResult,
+            validity,
             this.demos,
         )
-
         if (broadcastResult.result !== 200) {
             throw new Error(
                 `Failed to submit attestation request: ${broadcastResult.response?.message || "Unknown error"}`,
             )
         }
 
-        // 4. Wait for token to be created by polling with txHash
-        const txHash = tx.hash
-        let tokenId: string | undefined
-        const maxAttempts = 30
-        const pollInterval = 1000
+        await this.waitForInclusion(txHash, options)
 
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            const tokenResponse = await this.demos.nodeCall("tlsnotary.getToken", {
-                txHash,
-            }) as { token?: { id: string } } | null
+        const tokenId = isTlsnVerifiedActive(await this.demos.getNetworkInfo())
+            ? txHash
+            : await this.legacyTokenId(txHash)
 
-            if (tokenResponse?.token?.id) {
-                tokenId = tokenResponse.token.id
-                break
-            }
-
-            if (attempt < maxAttempts - 1) {
-                await new Promise(resolve => setTimeout(resolve, pollInterval))
-            }
-        }
-
-        if (!tokenId) {
-            throw new Error(
-                `Token not created after ${maxAttempts} seconds. Transaction may still be pending in mempool. txHash: ${txHash}`,
-            )
-        }
-
-        // 5. Get owner address
         const { publicKey } = await this.demos.crypto.getIdentity("ed25519")
         const owner = uint8ArrayToHex(publicKey as Uint8Array)
 
-        // 6. Call nodeCall to get proxy URL using the actual tokenId
         const proxyResponse = (await this.demos.nodeCall("requestTLSNproxy", {
             tokenId,
             owner,
             targetUrl,
         })) as {
-            websocketProxyUrl: string
-            expiresIn: number
+            websocketProxyUrl?: string
+            expiresIn?: number
             retriesLeft?: number
+            error?: string
+            message?: string
         }
 
-        if (!proxyResponse || !proxyResponse.websocketProxyUrl) {
-            throw new Error("Failed to get proxy URL from node")
+        if (!proxyResponse?.websocketProxyUrl) {
+            throw new Error(
+                `Failed to get proxy URL from node: ${proxyResponse?.message || proxyResponse?.error || "no proxy in response"}`,
+            )
         }
 
         return {
@@ -407,20 +360,80 @@ export class TLSNotaryService {
             expiresAt: Date.now() + (proxyResponse.expiresIn || 30000),
             retriesLeft: proxyResponse.retriesLeft ?? 3,
             txHash,
+            owner,
         }
+    }
+
+    /**
+     * Poll `getTransactionStatus` until the transaction is in a block.
+     *
+     * @throws when it is included as failed, or not seen before the timeout.
+     */
+    private async waitForInclusion(
+        hash: string,
+        options: { inclusionTimeoutMs?: number; pollIntervalMs?: number },
+    ): Promise<number | undefined> {
+        const timeoutMs = options.inclusionTimeoutMs ?? 60_000
+        const pollIntervalMs = options.pollIntervalMs ?? 1_000
+        const deadline = Date.now() + timeoutMs
+        let lastState = "unknown"
+        for (let first = true; first || Date.now() < deadline; first = false) {
+            if (!first) await sleep(pollIntervalMs)
+            const status = (await this.demos.call(
+                "nodeCall",
+                "getTransactionStatus",
+                { hash },
+            )) as { state?: unknown; blockNumber?: number; result?: number } | null
+            const state = status && typeof status.state === "string" ? status.state : null
+            if (!state) continue
+            lastState = state
+            if (state === "included") return status?.blockNumber
+            if (state === "failed") {
+                throw new Error(
+                    `TLSNotary attestation request ${hash} was included as failed`,
+                )
+            }
+        }
+        throw new Error(
+            `TLSNotary attestation request ${hash} not included after ${timeoutMs} ms (last state: ${lastState}); it may still land, check it before paying again`,
+        )
+    }
+
+    /**
+     * Token id on a network without `tlsnVerified`, where the node keeps the
+     * token off chain under its own id.
+     */
+    private async legacyTokenId(txHash: string): Promise<string> {
+        const attempts = 10
+        for (let attempt = 0; attempt < attempts; attempt++) {
+            const tokenResponse = (await this.demos.nodeCall("tlsnotary.getToken", {
+                txHash,
+            })) as { token?: { id: string } } | null
+            if (tokenResponse?.token?.id) return tokenResponse.token.id
+            if (attempt < attempts - 1) await sleep(1_000)
+        }
+        throw new Error(
+            `Attestation request ${txHash} is included but the node reports no token for it`,
+        )
     }
 
     /**
      * Request attestation token and create a pre-configured TLSNotary instance
      *
      * This is the recommended way to perform attestations. It handles:
-     * 1. Creating and broadcasting the TLSN_REQUEST transaction
-     * 2. Waiting for the token to be created
-     * 3. Getting the proxy URL
-     * 4. Creating a TLSNotary instance configured with that proxy
-     * 5. Initializing the WASM module
+     * 1. Resolving the notary (pinned on mainnet, from the node elsewhere)
+     * 2. Creating and broadcasting the TLSN_REQUEST transaction
+     * 3. Waiting until it is in a block
+     * 4. Getting the proxy URL for that token
+     * 5. Creating a TLSNotary instance configured with that proxy, trusting
+     *    only the resolved notary keys, and binding its requests to the
+     *    sender and the request hash (`X-Demos-Bind`, purpose from
+     *    `options.purpose`)
+     * 6. Initializing the WASM module
      *
      * The returned TLSNotary instance is ready to call `attest()` immediately.
+     * For an identity link pass the context as `purpose` (e.g. `"github"`);
+     * the default `"store"` binds the proof to `storeProof`.
      *
      * @param options - Request options including target URL
      * @param onStatus - Optional status callback for progress updates
@@ -432,7 +445,8 @@ export class TLSNotaryService {
      *
      * // Get a ready-to-use TLSNotary instance
      * const { tlsn, tokenId, proxyUrl } = await service.createTLSNotary({
-     *   targetUrl: 'https://api.github.com/users/octocat'
+     *   targetUrl: 'https://api.github.com/users/octocat',
+     *   purpose: 'store',
      * });
      *
      * // Perform attestation - the proxy is already configured!
@@ -450,36 +464,19 @@ export class TLSNotaryService {
     ): Promise<{ tlsn: TLSNotary; tokenId: string; proxyUrl: string; expiresAt: number; requestTxHash: string }> {
         const status = onStatus || (() => {})
 
-        // Step 1: Request attestation token and get proxy URL
+        // Resolved before paying, so a network without a usable notary
+        // costs nothing.
+        status("Getting notary configuration...")
+        const notary = await resolveNotary(this.demos)
+
         status("Requesting attestation token...")
         const tokenResponse = await this.requestAttestation(options)
 
         status(`Token obtained: ${tokenResponse.tokenId}`)
 
-        // Step 2: Get notary info from the node
-        status("Getting notary configuration...")
-        const notaryInfo = (await this.demos.nodeCall("tlsnotary.getInfo", {})) as {
-            notaryUrl: string
-            publicKey: string
-        }
-
-        if (!notaryInfo?.notaryUrl) {
-            throw new Error("Failed to get notary info from node")
-        }
-
-        // Step 3: Create TLSNotary instance with the pre-obtained proxy URL
-        // IMPORTANT: We only set websocketProxyUrl (not rpcUrl) so that TLSNotary
-        // uses our pre-obtained proxy instead of trying to request its own
         status("Creating TLSNotary instance...")
-        const tlsn = new TLSNotary({
-            notaryUrl: notaryInfo.notaryUrl,
-            websocketProxyUrl: tokenResponse.proxyUrl, // Use the proxy we already obtained!
-            notaryPublicKey: notaryInfo.publicKey,
-            // Note: rpcUrl is intentionally NOT set - this prevents TLSNotary
-            // from trying to request its own proxy in getProxyUrl()
-        })
+        const tlsn = this.boundTLSNotary(notary, tokenResponse, options)
 
-        // Step 4: Initialize WASM
         status("Initializing TLSNotary WASM...")
         await tlsn.initialize()
 
@@ -503,9 +500,10 @@ export class TLSNotaryService {
      * 1. Creating the TLSN_REQUEST transaction
      * 2. **Asking the user to confirm via the onConfirm callback**
      * 3. Broadcasting the transaction if confirmed
-     * 4. Waiting for the token to be created
+     * 4. Waiting until it is in a block
      * 5. Getting the proxy URL
-     * 6. Creating a TLSNotary instance configured with that proxy
+     * 6. Creating a TLSNotary instance configured with that proxy and bound
+     *    to the sender and the request hash, as `createTLSNotary` does
      * 7. Initializing the WASM module
      *
      * @param options - Request options including target URL
@@ -547,32 +545,17 @@ export class TLSNotaryService {
     ): Promise<{ tlsn: TLSNotary; tokenId: string; proxyUrl: string; expiresAt: number; requestTxHash: string }> {
         const status = onStatus || (() => {})
 
-        // Step 1: Request attestation token with user confirmation
+        status("Getting notary configuration...")
+        const notary = await resolveNotary(this.demos)
+
         status("Preparing attestation request...")
         const tokenResponse = await this.requestAttestationWithConfirmation(options, confirmOptions)
 
         status(`Token obtained: ${tokenResponse.tokenId}`)
 
-        // Step 2: Get notary info from the node
-        status("Getting notary configuration...")
-        const notaryInfo = (await this.demos.nodeCall("tlsnotary.getInfo", {})) as {
-            notaryUrl: string
-            publicKey: string
-        }
-
-        if (!notaryInfo?.notaryUrl) {
-            throw new Error("Failed to get notary info from node")
-        }
-
-        // Step 3: Create TLSNotary instance with the pre-obtained proxy URL
         status("Creating TLSNotary instance...")
-        const tlsn = new TLSNotary({
-            notaryUrl: notaryInfo.notaryUrl,
-            websocketProxyUrl: tokenResponse.proxyUrl,
-            notaryPublicKey: notaryInfo.publicKey,
-        })
+        const tlsn = this.boundTLSNotary(notary, tokenResponse, options)
 
-        // Step 4: Initialize WASM
         status("Initializing TLSNotary WASM...")
         await tlsn.initialize()
 
@@ -588,7 +571,64 @@ export class TLSNotaryService {
     }
 
     /**
-     * Store a TLSNotary proof on-chain or IPFS
+     * A TLSNotary instance that attests through the proxy opened for this
+     * token, trusts only the resolved notary keys and binds every request to
+     * the token's sender and `tlsn_request`.
+     *
+     * Only websocketProxyUrl is set, not rpcUrl, so the instance uses this
+     * proxy instead of requesting one of its own.
+     */
+    private boundTLSNotary(
+        notary: Awaited<ReturnType<typeof resolveNotary>>,
+        token: AttestationTokenResponse,
+        options: RequestAttestationOptions,
+    ): TLSNotary {
+        return new TLSNotary({
+            notaryUrl: notary.notaryUrl,
+            websocketProxyUrl: token.proxyUrl,
+            trustedNotaryKeys: notary.trustedNotaryKeys,
+            binding: {
+                purpose: options.purpose ?? "store",
+                sender: token.owner,
+                requestTxHash: token.txHash,
+            },
+        })
+    }
+
+    /**
+     * Refuse a store the network would refuse, before any fee is signed:
+     * anything but on-chain storage, or a presentation over the network's
+     * size limit.
+     */
+    private async checkStorable(proof: string, options: StoreProofOptions): Promise<void> {
+        const storage: string = options?.storage ?? "onchain"
+        if (storage !== "onchain") {
+            throw new Error(
+                `TLSNotary proofs are stored on chain only, got storage ${JSON.stringify(storage)}`,
+            )
+        }
+        const limit = options.maxPresentationBytes ?? (await this.maxPresentationBytes())
+        const size = presentationByteLength(proof)
+        if (size > limit) {
+            throw new Error(
+                `TLSNotary presentation is ${size} bytes, over the network limit of ${limit} bytes`,
+            )
+        }
+    }
+
+    /** The node's presentation size limit, or the mainnet value when it reports none. */
+    private async maxPresentationBytes(): Promise<number> {
+        let info: unknown = null
+        try {
+            info = await this.demos.nodeCall("tlsnotary.getInfo", {})
+        } catch {
+            info = null
+        }
+        return reportedMaxPresentationBytes(info)
+    }
+
+    /**
+     * Store a TLSNotary proof on chain
      *
      * This submits a TLSN_STORE native transaction that burns:
      * - 1 DEM base fee
@@ -596,7 +636,7 @@ export class TLSNotaryService {
      *
      * @param tokenId - The attestation token ID
      * @param proof - The proof data (JSON string or serialized presentation)
-     * @param options - Storage options (on-chain or IPFS)
+     * @param options - Storage options; only on-chain storage is accepted
      * @returns Storage response with transaction hash and fee
      *
      * @example
@@ -614,7 +654,8 @@ export class TLSNotaryService {
         proof: string,
         options: StoreProofOptions,
     ): Promise<StoreProofResponse> {
-        const { storage } = options
+        await this.checkStorable(proof, options)
+        const storage = "onchain"
 
         // 1. Calculate storage fee
         const proofSizeKB = Math.ceil(proof.length / 1024)
@@ -651,7 +692,7 @@ export class TLSNotaryService {
     }
 
     /**
-     * Store a TLSNotary proof on-chain or IPFS with user confirmation
+     * Store a TLSNotary proof on chain with user confirmation
      *
      * This method shows the transaction details to the user via the onConfirm callback
      * and only broadcasts if the user confirms. This is the recommended way to store
@@ -659,7 +700,7 @@ export class TLSNotaryService {
      *
      * @param tokenId - The attestation token ID
      * @param proof - The proof data (JSON string or serialized presentation)
-     * @param options - Storage options (on-chain or IPFS)
+     * @param options - Storage options; only on-chain storage is accepted
      * @param confirmOptions - Options containing the confirmation callback
      * @returns Storage response with transaction hash and fee
      * @throws Error if user rejects the transaction
@@ -689,8 +730,9 @@ export class TLSNotaryService {
         options: StoreProofOptions,
         confirmOptions: WithConfirmationOptions,
     ): Promise<StoreProofResponse> {
-        const { storage } = options
         const { onConfirm } = confirmOptions
+        await this.checkStorable(proof, options)
+        const storage = "onchain"
 
         // 1. Calculate storage fee
         const proofSizeKB = Math.ceil(proof.length / 1024)
@@ -710,7 +752,7 @@ export class TLSNotaryService {
             transaction: tx,
             txHash: tx.hash,
             amount: storageFee,
-            description: `Store TLSNotary proof ${storage === 'onchain' ? 'on-chain' : 'on IPFS'} (burns ${osToDem(storageFee)} DEM)`,
+            description: `Store TLSNotary proof on-chain (burns ${osToDem(storageFee)} DEM)`,
             tokenId,
         }
 
@@ -857,7 +899,7 @@ export class TLSNotaryService {
     private async createTlsnStoreTransaction(
         tokenId: string,
         proof: string,
-        storageType: "onchain" | "ipfs",
+        storageType: "onchain",
         fee: bigint,
         customNonce?: number,
     ) {
@@ -891,5 +933,13 @@ export class TLSNotaryService {
         return await this.demos.sign(tx)
     }
 }
+
+function assertHttps(targetUrl: string): void {
+    if (new URL(targetUrl).protocol !== "https:") {
+        throw new Error("Only HTTPS URLs are supported for TLS attestation")
+    }
+}
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 export default TLSNotaryService

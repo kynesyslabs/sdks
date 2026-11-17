@@ -2,7 +2,42 @@
 
 ## Unreleased
 
+### Breaking
+- TLSNotary at launch (`tlsnVerified`). `addWeb2IdentityViaTLSN` no longer
+  needs `{ legacy: true }` on a network where `tlsnVerified` is active; it
+  refuses the `telegram` context there (use `addTelegramIdentity`). On a
+  network with only `tlsnProofEnforcement` it still throws, and
+  `legacy: true` stays for networks with neither fork.
+- `TLSNotary.attest` and `attestQuick` compute reveal ranges from the
+  transcript instead of fixed byte prefixes: the request line, `Host` and
+  the whole `X-Demos-Bind` header are revealed; `Authorization`,
+  `Proxy-Authorization`, `Cookie` and other non-structural request headers
+  by name only; the request body stays hidden; the response is revealed
+  with `Set-Cookie` by name only (`revealResponseBody: false` hides the
+  body). A caller `commit` that reveals a credential value throws.
+  `attestQuick` now runs the same path as `attest`.
+- `TLSNotary.verify` checks the presentation against trusted notary keys
+  (`trustedNotaryKeys`, `notaryPublicKey`, or the notary's own key) and
+  throws `NotaryKeyMismatchError` for any other key, or when no trusted
+  key is known.
+- `TLSNotaryService.requestAttestation*` waits for the `tlsn_request` to be
+  included before asking for a proxy, and on `tlsnVerified` networks uses
+  the request tx hash as the token id. A request included as failed, or
+  not included in time, throws without asking for a proxy.
+- `TLSNotaryService.storeProof*` stores on chain only and refuses a
+  presentation over the network's `maxPresentationBytes` (65536 when the
+  node does not report one) before signing.
+- Mainnet (chain id 8587492) uses the notary URL and keys pinned in
+  `tlsnotary/network.ts`. They are placeholders until the notary key
+  ceremony, so attesting on mainnet throws in this build.
+
 ### Added
+- TLSNotary: the `X-Demos-Bind: demos-tlsn:v1:<context|store>:<sender>:<request tx hash>`
+  header is added to every attestation made through `TLSNotaryService`;
+  `computeRevealRanges`, `enforceRevealPolicy`, `buildBindValue`,
+  `resolveNotary`, `checkNotaryKey`, `presentationByteLength` and the
+  `TLSN_MAINNET_*` pins are exported; `NetworkInfo.forks` reports
+  `tlsnProofEnforcement` and `tlsnVerified`.
 - L2PS settlement v1: `buildSettledL2PSTransfer` builds the inner native
   send of an L2PS transfer with `data[1].settlement = { fee, salt,
   commitment, signature }` (Poseidon commitment, ed25519 signature over

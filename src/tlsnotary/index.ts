@@ -93,7 +93,41 @@ export type {
 export { default } from "./TLSNotary"
 
 // Helper function exports
-export { calculateStorageFee } from "./helpers"
+export { calculateStorageFee, presentationByteLength } from "./helpers"
+
+// Reveal ranges computed from the transcript, and the sender binding header
+export {
+    TLSN_BIND_HEADER,
+    TLSN_BIND_DOMAIN,
+    buildBindValue,
+    withBindHeader,
+    parseHttpMessage,
+    mergeRanges,
+    mandatorySentRanges,
+    computeRevealRanges,
+    enforceRevealPolicy,
+    bindHeaderFullyRevealed,
+    type TLSNBindPurpose,
+    type TLSNotaryBinding,
+    type RevealPolicyOptions,
+    type HttpMessageSpans,
+    type HeaderSpan,
+} from "./revealPolicy"
+
+// The notary each network trusts (mainnet pinned in the SDK)
+export {
+    TLSN_MAINNET_CHAIN_ID,
+    TLSN_MAINNET_NOTARY_URL,
+    TLSN_MAINNET_NOTARY_KEYS,
+    TLSN_DEFAULT_MAX_PRESENTATION_BYTES,
+    TLSN_PLACEHOLDER_PREFIX,
+    isTlsnPlaceholder,
+    isTlsnVerifiedActive,
+    reportedMaxPresentationBytes,
+    resolveNotary,
+    type ResolvedNotary,
+    type NotaryResolverHost,
+} from "./network"
 
 // Comparing a presentation's signer against the notary you pinned.
 // `NotaryKeyMismatchError` is thrown by `verify()`, so consumers need it here
@@ -101,6 +135,7 @@ export { calculateStorageFee } from "./helpers"
 // `instanceof` check rather than by matching on a message.
 export {
     NotaryKeyMismatchError,
+    checkNotaryKey,
     normaliseNotaryKey,
     notaryKeyMatches,
 } from "./notaryKey"

@@ -34,11 +34,15 @@
  */
 
 import * as Comlink from "comlink"
-import {
-    notaryKeyMatches,
-    NotaryKeyMismatchError,
-} from "./notaryKey"
+import { checkNotaryKey } from "./notaryKey"
+import { spawnTlsnWorker } from "./spawnWorker"
 import { NotaryServer, Transcript } from "./tlsn-runtime"
+import {
+    buildBindValue,
+    computeRevealRanges,
+    enforceRevealPolicy,
+    withBindHeader,
+} from "./revealPolicy"
 import type {
     Prover as TProver,
     Presentation as TPresentation,
@@ -131,12 +135,7 @@ export class TLSNotary {
 
         this.initializingPromise = (async () => {
             try {
-                // Create Web Worker for WASM operations
-                // Note: This requires a bundler that supports worker URLs (webpack, vite, etc.)
-                // Using .js extension for compatibility with compiled output
-                this.worker = new Worker(new URL("./worker.js", import.meta.url), {
-                    type: "module",
-                })
+                this.worker = spawnTlsnWorker()
 
                 this.wasm = Comlink.wrap(this.worker)
 
@@ -261,21 +260,27 @@ export class TLSNotary {
      * This provides full control over the attestation process including
      * custom commit ranges for selective disclosure.
      *
+     * Without `commit`, the reveal ranges are computed from the transcript:
+     * the request line, `Host` and the `X-Demos-Bind` header in full, other
+     * headers by name (credential headers such as `Authorization` and
+     * `Cookie` always by name only), and the response with its body
+     * (`Set-Cookie` by name only). A caller's `commit` is checked against
+     * the same rules: the request line, `Host` and bind header are added,
+     * and a range over a credential value throws before notarisation.
+     *
      * @param request - Request configuration (URL, method, headers, body)
      * @param commit - Optional commit ranges for selective disclosure
      * @param onStatus - Optional status callback for progress updates
      * @returns Attestation result with proof and verification
+     * @throws {NotaryKeyMismatchError} when the notary that signed is not trusted
      *
      * @example
      * ```typescript
      * const result = await tlsn.attest({
      *   url: 'https://api.example.com/user',
      *   method: 'GET',
+     *   // Revealed as "authorization: " with the value hidden
      *   headers: { 'Authorization': 'Bearer token' },
-     * }, {
-     *   // Hide authorization header in the proof
-     *   sent: [{ start: 0, end: 50 }, { start: 100, end: 200 }],
-     *   recv: [{ start: 0, end: 500 }],
      * });
      * ```
      */
@@ -318,10 +323,7 @@ export class TLSNotary {
 
             // Step 5: Send the HTTPS request
             status(`Sending attested request to ${serverDns}...`)
-            const headers: Record<string, string> = {
-                Accept: "application/json",
-                ...request.headers,
-            }
+            const headers = this.requestHeaders(request)
 
             await prover.sendRequest(proxyUrl, {
                 url: request.url,
@@ -335,12 +337,14 @@ export class TLSNotary {
             const transcript = await prover.transcript()
             const { sent, recv } = transcript
 
-            // Step 7: Create commit ranges (what to reveal)
+            // Step 7: Create commit ranges (what to reveal). Header order
+            // differs per run, so the ranges come from these exact bytes.
             status("Creating attestation commitment...")
-            const commitRanges: Commit = commit || {
-                sent: [{ start: 0, end: Math.min(sent.length, 200) }],
-                recv: [{ start: 0, end: Math.min(recv.length, 300) }],
-            }
+            const commitRanges: Commit = commit
+                ? enforceRevealPolicy(sent, recv, commit)
+                : computeRevealRanges(sent, recv, {
+                      revealResponseBody: request.revealResponseBody,
+                  })
 
             // Step 8: Notarize
             status("Generating attestation (this may take a moment)...")
@@ -396,60 +400,25 @@ export class TLSNotary {
      * ```
      */
     async attestQuick(options: AttestOptions): Promise<AttestResult> {
-        if (!this.initialized || !this.wasm) {
-            throw new Error("TLSNotary not initialized. Call initialize() first.")
-        }
-
+        // tlsn-js's one-shot Prover.notarize takes the reveal ranges before
+        // the transcript exists, so it can only use fixed offsets. Going
+        // through attest() computes them from the bytes actually sent.
         const { onStatus, commit, ...request } = options
-        const status = onStatus || (() => {})
-
-        // Request dynamic proxy for this target
-        const proxyUrl = await this.getProxyUrl(request.url, status)
-
-        status("Running quick attestation...")
-
-        const presentationJSON = await (
-            this.wasm.Prover.notarize as typeof TProver.notarize
-        )({
-            notaryUrl: this.config.notaryUrl,
-            websocketProxyUrl: proxyUrl,
-            maxSentData: request.maxSentData || 16384,
-            maxRecvData: request.maxRecvData || 16384,
-            url: request.url,
-            method: (request.method || "GET") as Method,
-            headers: {
-                Accept: "application/json",
-                ...request.headers,
-            },
-            body: request.body,
-            commit: commit || {
-                sent: [{ start: 0, end: 100 }],
-                recv: [{ start: 0, end: 200 }],
-            },
-            serverIdentity: true,
-        })
-
-        status("Verifying attestation...")
-        const verification = await this.verify(presentationJSON)
-
-        status("Quick attestation complete!")
-
-        return {
-            presentation: presentationJSON,
-            verification,
-        }
+        return this.attest(request, commit, onStatus)
     }
 
     /**
      * Verify a presentation/proof
      *
      * Can be used to verify proofs from other sources.
-     * This operation can be done offline.
+     * Offline when a notary key is pinned (`trustedNotaryKeys` or `notaryPublicKey`).
      *
      * @param presentationJSON - The presentation to verify
      * @returns Verification result with extracted data
-     * @throws {NotaryKeyMismatchError} When `notaryPublicKey` is configured
-     * and the presentation was signed by a different notary. A presentation
+     * @throws {NotaryKeyMismatchError} When the presentation was signed by a
+     * notary other than the trusted ones: `trustedNotaryKeys` and
+     * `notaryPublicKey`, or, when neither is set, the key the configured
+     * notary serves (verification throws if it cannot be read). A presentation
      * proves that *some* notary signed the transcript, so this is the check
      * that makes it evidence — catch it to tell that apart from a malformed
      * proof. Exported from `@kynesyslabs/demosdk/tlsnotary`.
@@ -484,38 +453,11 @@ export class TLSNotary {
 
             const vk = await proof.verifyingKey()
 
-            // Try to get notary key if available
-            let notaryKey = "N/A"
-            try {
-                if (this.config.notaryPublicKey) {
-                    notaryKey = this.config.notaryPublicKey
-                } else {
-                    const notary = NotaryServer.from(this.config.notaryUrl)
-                    notaryKey = await notary.publicKey("hex")
-                }
-            } catch (error) {
-                // Notary might not be running for offline verification
-                console.warn(
-                    "[TLSNotary] Could not fetch notary public key:",
-                    error instanceof Error ? error.message : error,
-                )
-            }
-
             const verifyingKey = Buffer.from(vk.data).toString("hex")
-
-            // The presentation proves that SOME notary signed this transcript.
-            // Comparing its signer against the notary we trust is what makes it
-            // evidence — without it, a presentation notarised by whoever
-            // produced it verifies exactly like a real one.
-            if (
-                this.config.notaryPublicKey &&
-                !notaryKeyMatches(verifyingKey, this.config.notaryPublicKey)
-            ) {
-                throw new NotaryKeyMismatchError(
-                    verifyingKey,
-                    this.config.notaryPublicKey,
-                )
-            }
+            const notaryKey = checkNotaryKey(
+                verifyingKey,
+                await this.trustedKeys(),
+            )
 
             return {
                 time: verifierOutput.connection_info.time,
@@ -530,6 +472,43 @@ export class TLSNotary {
             if (proof) {
                 await proof.free()
             }
+        }
+    }
+
+    /**
+     * Headers of the notarised request, with the bind header when this
+     * instance is bound to a sender and a `tlsn_request`.
+     */
+    private requestHeaders(request: AttestRequest): Record<string, string> {
+        const headers: Record<string, string> = {
+            Accept: "application/json",
+            ...request.headers,
+        }
+        return this.config.binding
+            ? withBindHeader(headers, buildBindValue(this.config.binding))
+            : headers
+    }
+
+    /**
+     * The keys a presentation may be signed by: the pinned ones, or the key
+     * the configured notary serves when nothing is pinned.
+     */
+    private async trustedKeys(): Promise<string[]> {
+        const pinned = [
+            ...(this.config.trustedNotaryKeys ?? []),
+            ...(this.config.notaryPublicKey ? [this.config.notaryPublicKey] : []),
+        ]
+        if (pinned.length > 0) return pinned
+        try {
+            const notary = NotaryServer.from(this.config.notaryUrl)
+            return [await notary.publicKey("hex")]
+        } catch (error) {
+            // Without a key to compare against, a presentation proves only
+            // that some notary signed it, so verification cannot succeed.
+            throw new Error(
+                "TLSNotary verify needs a trusted notary key: pin notaryPublicKey or trustedNotaryKeys, or reach the notary to read its key. " +
+                    (error instanceof Error ? error.message : String(error)),
+            )
         }
     }
 
@@ -566,10 +545,7 @@ export class TLSNotary {
             await prover.sendRequest(proxyUrl, {
                 url: request.url,
                 method: (request.method || "GET") as Method,
-                headers: {
-                    Accept: "application/json",
-                    ...request.headers,
-                },
+                headers: this.requestHeaders(request),
                 body: request.body,
             })
 

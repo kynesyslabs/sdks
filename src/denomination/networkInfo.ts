@@ -52,6 +52,17 @@ export interface NetworkInfo {
          * preimage.
          */
         signatureDomain?: ForkStatus
+        /**
+         * Nodes refuse TLSNotary identity links they cannot verify. Optional
+         * like every fork added after the field was introduced.
+         */
+        tlsnProofEnforcement?: ForkStatus
+        /**
+         * Nodes verify TLSNotary presentations against the notary keys of
+         * the fork payload, so TLSN identity links and stored proofs are
+         * accepted again, bound to their sender.
+         */
+        tlsnVerified?: ForkStatus
     }
     /**
      * Network identity from the node's genesis. Bound into the signature
