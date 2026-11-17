@@ -476,9 +476,10 @@ describe("totalFeeOs — node's charged native send fee (attrs.total_fee)", () =
     })
 
     test.each([
-        ["missing", undefined],
-        ["null", null],
-    ])("a quote with a %s network_fee throws instead of guessing its unit", (form, networkFee) => {
+        ["missing", undefined, "undefined"],
+        ["null", null, "null"],
+        ["object", { amount: 1 }, `{"amount":1}`],
+    ])("a quote with a %s network_fee throws instead of guessing its unit", (form, networkFee, shown) => {
         // A pre-osDenomination node quotes whole DEM: reading its "1" as
         // 1 OS would report the fee 10⁹ times too small and pass any cap.
         for (const quotedAt of [42, 41]) {
@@ -487,7 +488,13 @@ describe("totalFeeOs — node's charged native send fee (attrs.total_fee)", () =
                 form,
                 networkFee,
             )
-            expect(() => totalFeeOs(vd)).toThrow(`invalid fee quote "1"`)
+            // A type check: a `TypeError`, naming the value (never
+            // `[object Object]`).
+            expect(() => totalFeeOs(vd)).toThrow(TypeError)
+            expect(() => totalFeeOs(vd)).toThrow(
+                `invalid fee quote "1" in the node's confirm response: ` +
+                    `network_fee ${shown} does not tell its unit`,
+            )
         }
     })
 

@@ -13,7 +13,7 @@ import {
 } from "./types"
 
 /** A non-negative base-10 integer without sign, padding or leading zeros. */
-const DECIMAL_INTEGER = /^(0|[1-9][0-9]*)$/
+const DECIMAL_INTEGER = /^(0|[1-9]\d*)$/
 
 /**
  * Normalise a single {@link TxFee} field to OS (`bigint`).
@@ -104,10 +104,10 @@ function quotedFeeOs(
     const networkFee: unknown =
         transaction?.content?.transaction_fee?.network_fee
     if (typeof networkFee !== "number" && typeof networkFee !== "string") {
-        throw new Error(
+        throw new TypeError(
             `[programmatic-tx] invalid fee quote ${JSON.stringify(
                 quote,
-            )} in the node's confirm response: network_fee ${String(
+            )} in the node's confirm response: network_fee ${JSON.stringify(
                 networkFee,
             )} does not tell its unit`,
         )
