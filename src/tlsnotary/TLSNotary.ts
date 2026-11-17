@@ -9,19 +9,13 @@
  *
  * @example
  * ```typescript
- * import { TLSNotary } from '@kynesyslabs/demosdk/tlsnotary';
+ * import { TLSNotaryService } from '@kynesyslabs/demosdk/tlsnotary';
  *
- * // Option 1: Explicit configuration
- * const tlsn = new TLSNotary({
- *   notaryUrl: 'wss://node.demos.sh:7047',
- *   websocketProxyUrl: 'wss://node.demos.sh:55688',
+ * // A proxy session is opened for a paid tlsn_request, by its sender:
+ * const service = new TLSNotaryService(demos);
+ * const { tlsn } = await service.createTLSNotary({
+ *   targetUrl: 'https://api.github.com/users/octocat',
  * });
- *
- * // Option 2: Discovery via Demos instance (preferred)
- * const demos = new Demos({ rpc: 'https://node.demos.sh' });
- * const tlsn = await demos.tlsnotary();
- *
- * await tlsn.initialize();
  *
  * const result = await tlsn.attest({
  *   url: 'https://api.github.com/users/octocat',
@@ -60,10 +54,7 @@ import type {
     AttestOptions,
     StatusCallback,
     TranscriptInfo,
-    ProxyRequestResponse,
-    ProxyRequestError,
 } from "@/tlsnotary/types"
-import axios from "axios"
 
 /**
  * TLSNotary class for browser-based HTTPS attestation
@@ -160,97 +151,21 @@ export class TLSNotary {
     }
 
     /**
-     * Request a dynamic WebSocket proxy for a target URL
+     * The proxy session URL this instance attests through.
      *
-     * This method calls the node's `requestTLSNproxy` endpoint to get a
-     * dynamically allocated proxy for the specific target domain.
-     * Proxies auto-expire after 30 seconds of inactivity.
-     *
-     * @param targetUrl - The HTTPS URL to create a proxy for
-     * @returns Proxy response with websocketProxyUrl
-     * @throws Error if RPC URL is not configured or proxy request fails
-     *
-     * @internal This is called automatically by attest/attestQuick methods
+     * Nodes open a proxy only for a call signed by the account that sent the
+     * `tlsn_request`, so an instance cannot ask for one itself; the session
+     * comes from `TLSNotaryService` and is used as returned.
      */
-    private async requestProxy(targetUrl: string): Promise<ProxyRequestResponse> {
-        if (!this.config.rpcUrl) {
-            // Fallback to static proxy if no RPC URL configured (legacy mode)
-            if (this.config.websocketProxyUrl) {
-                const url = new URL(targetUrl)
-                return {
-                    websocketProxyUrl: this.config.websocketProxyUrl,
-                    targetDomain: url.hostname,
-                    expiresIn: 0, // Static proxy doesn't expire
-                    proxyId: "static",
-                }
-            }
-            throw new Error(
-                "No RPC URL configured for dynamic proxy requests. " +
-                    "Either provide rpcUrl in config or use Demos.tlsnotary() for auto-configuration.",
-            )
-        }
-
-        try {
-            const response = await axios.post(this.config.rpcUrl, {
-                method: "nodeCall",
-                params: [
-                    {
-                        message: "requestTLSNproxy",
-                        data: { targetUrl },
-                    },
-                ],
-            })
-
-            const result = response.data
-
-            if (result.result !== 200) {
-                const error = result.response as ProxyRequestError
-                throw new Error(
-                    `Failed to request proxy: ${error.message || error.error || "Unknown error"}`,
-                )
-            }
-
-            return result.response as ProxyRequestResponse
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                throw new Error(`Proxy request failed: ${error.message}`)
-            }
-            throw error
-        }
-    }
-
-    /**
-     * Get the WebSocket proxy URL for a target URL
-     *
-     * Automatically requests a dynamic proxy from the node if rpcUrl is configured,
-     * otherwise falls back to the static websocketProxyUrl.
-     *
-     * @param targetUrl - The target HTTPS URL
-     * @param onStatus - Optional status callback
-     * @returns The websocket proxy URL to use
-     */
-    private async getProxyUrl(
-        targetUrl: string,
-        onStatus?: StatusCallback,
-    ): Promise<string> {
-        const status = onStatus || (() => {})
-
-        // If we have rpcUrl, always request a dynamic proxy
-        if (this.config.rpcUrl) {
-            status("Requesting WebSocket proxy...")
-            const proxyResponse = await this.requestProxy(targetUrl)
-            status(`Proxy allocated for ${proxyResponse.targetDomain}`)
-            return proxyResponse.websocketProxyUrl
-        }
-
-        // Fallback to static proxy URL (legacy/explicit config mode)
+    private getProxyUrl(): string {
         if (this.config.websocketProxyUrl) {
             return this.config.websocketProxyUrl
         }
-
         throw new Error(
-            "No proxy configuration available. " +
-                "Configure rpcUrl for dynamic proxies or websocketProxyUrl for static proxy.",
+            "No proxy session configured. Nodes open a TLSNotary proxy only for a " +
+                "signed request from the account that paid for the tlsn_request: use " +
+                "TLSNotaryService.createTLSNotary(), or pass the proxyUrl from " +
+                "TLSNotaryService.requestAttestation() as websocketProxyUrl.",
         )
     }
 
@@ -299,8 +214,8 @@ export class TLSNotary {
         const url = new URL(request.url)
         const serverDns = url.hostname
 
-        // Step 1: Request dynamic proxy for this target
-        const proxyUrl = await this.getProxyUrl(request.url, status)
+        // Step 1: The proxy session opened for this attestation's token
+        const proxyUrl = this.getProxyUrl()
 
         // Step 2: Connect to Notary
         status("Connecting to Notary server...")
@@ -528,8 +443,7 @@ export class TLSNotary {
         const url = new URL(request.url)
         const serverDns = url.hostname
 
-        // Request dynamic proxy for this target
-        const proxyUrl = await this.getProxyUrl(request.url)
+        const proxyUrl = this.getProxyUrl()
 
         const notary = NotaryServer.from(this.config.notaryUrl)
 

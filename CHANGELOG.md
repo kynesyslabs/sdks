@@ -30,6 +30,24 @@
 - Mainnet (chain id 8587492) uses the notary URL and keys pinned in
   `tlsnotary/network.ts`. They are placeholders until the notary key
   ceremony, so attesting on mainnet throws in this build.
+- TLSNotary proxies follow node#1244. `TLSNotaryService.requestAttestation*`
+  and `createTLSNotary*` send `requestTLSNproxy` over the HTTP RPC signed in
+  the body-bound form: the signature covers the SHA-256 of the exact body
+  and names the connected node (its `/publickey`) as audience. The token id
+  is always the included `tlsn_request` hash (64 lowercase hex, no `0x`),
+  also on networks without `tlsnVerified`, where the returned `tokenId` for
+  `storeProof` stays the node-local one. The request no longer carries
+  `owner`. The returned `proxyUrl` is the session's websocket URL, ending in
+  its secret session id, and is used as returned. Nodes with node#1244 refuse
+  the old unsigned call (401) and `tlsn_<uuid>` token ids (400).
+- `TLSNotary` no longer requests a proxy from `rpcUrl`: that call was
+  unsigned, which nodes now refuse, and an instance has no key to sign it.
+  `rpcUrl` is deprecated and ignored; `attest`/`getTranscript` throw unless
+  `websocketProxyUrl` is set to a session URL (`createTLSNotary` sets it).
+  `Demos.tlsnotary()` returns an instance without a proxy, for `verify`.
+  Do not use the fixed `TLSNOTARY_PROXY_PORT` (55688) or the `proxyUrl` from
+  `tlsnotary.getInfo`: nodes still report it for old clients but no longer
+  listen on it.
 
 ### Added
 - TLSNotary: the `X-Demos-Bind: demos-tlsn:v1:<context|store>:<sender>:<request tx hash>`
@@ -44,6 +62,11 @@
   `l2ps-settlement:v1:<chainId>:<l2psUid>:<commitment>`), plus the pure
   encoding helpers, pinned to the node's shared vectors. `settle: false`
   keeps the pre-settlement transfer for networks without the fork.
+- `Demos.bodyBoundNodeCall(message, data)`: a nodeCall signed over its exact
+  body with the account's ed25519 key and naming the connected node as
+  audience, as nodes require for `requestTLSNproxy`. `bodyBoundAuthHeaders`,
+  `httpAuthMessage` and `audienceKey` (exported from `websdk`) build the
+  same headers as the node's `peerHttpAuth.ts`.
 
 ### Deprecated
 - Mnemonic wallets have one documented path: `Demos.connectWallet(mnemonic)`.

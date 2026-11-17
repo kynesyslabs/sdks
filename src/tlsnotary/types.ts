@@ -13,11 +13,18 @@ export interface TLSNotaryConfig {
     /** Notary server URL (e.g., 'wss://node.demos.sh:7047') */
     notaryUrl: string
     /**
-     * WebSocket proxy URL for TCP tunneling (e.g., 'wss://node.demos.sh:55688')
-     * @deprecated Use rpcUrl instead - proxies are now dynamically allocated per-request
+     * The proxy session URL a node returned for this attestation's
+     * `tlsn_request` (`TLSNotaryService.requestAttestation` returns it as
+     * `proxyUrl`; `createTLSNotary` sets it). It ends in the session's secret
+     * id and is used exactly as returned.
      */
     websocketProxyUrl?: string
-    /** RPC URL for requesting dynamic proxies (e.g., 'https://node.demos.sh') */
+    /**
+     * @deprecated Ignored. Nodes open a proxy only for a call signed by the
+     * account that sent the `tlsn_request`, which a TLSNotary instance cannot
+     * sign; use `TLSNotaryService.createTLSNotary`, or pass the `proxyUrl`
+     * from `requestAttestation` as `websocketProxyUrl`.
+     */
     rpcUrl?: string
     /** Notary's public key (hex string) for verification */
     notaryPublicKey?: string
@@ -37,24 +44,37 @@ export interface TLSNotaryConfig {
 }
 
 /**
- * Response from requestTLSNproxy RPC call
+ * Response from the requestTLSNproxy nodeCall
  */
 export interface ProxyRequestResponse {
-    /** Dynamic WebSocket proxy URL for this request */
+    /**
+     * WebSocket URL of this session. Its last path segment is the session's
+     * secret id, so it is used as returned and not shared.
+     */
     websocketProxyUrl: string
-    /** Target domain the proxy is configured for */
+    /** Target domain the proxy relays to */
     targetDomain: string
-    /** Milliseconds until proxy expires (resets on activity) */
+    /** Milliseconds until the session ends, whatever it relays */
     expiresIn: number
-    /** Unique proxy identifier */
+    /** Public id of the session */
     proxyId: string
+    /** Bytes the session relays to the target before it ends */
+    maxSentBytes?: number
+    /** Bytes the session relays from the target before it ends */
+    maxRecvBytes?: number
+    /** The token the session was opened for: the `tlsn_request` hash */
+    tokenId?: string
+    /** Sessions the token can still open */
+    retriesLeft?: number
 }
 
 /**
  * Error response from requestTLSNproxy RPC call
  */
 export interface ProxyRequestError {
-    /** Error code (e.g., 'INVALID_URL', 'PROXY_SPAWN_FAILED') */
+    /** HTTP-style status of the refusal (e.g., 400, 403, 429) */
+    status?: number
+    /** Error code (e.g., 'INVALID_TOKEN', 'TOKEN_OWNER_MISMATCH') */
     error: string
     /** Human-readable error message */
     message: string
@@ -70,7 +90,11 @@ export interface ProxyRequestError {
 export interface TLSNotaryDiscoveryInfo {
     /** Notary WebSocket URL */
     notaryUrl: string
-    /** WebSocket proxy URL */
+    /**
+     * @deprecated A fixed proxy port nodes no longer listen on; still
+     * reported for old clients. Proxies are per-session URLs from
+     * `TLSNotaryService.requestAttestation`.
+     */
     proxyUrl: string
     /** Notary's public key (hex) */
     publicKey: string

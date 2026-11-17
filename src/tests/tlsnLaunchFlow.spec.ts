@@ -26,7 +26,8 @@ import type { Range } from "@/tlsnotary/types"
 
 const MNEMONIC = "test test test test test test test test test test test junk"
 const TARGET = "https://api.github.com/user"
-const PROXY = "wss://node.example/tlsn/55001/"
+// A session URL as nodes return it: the session id is the last segment.
+const PROXY = "wss://node.example/tlsn/55001/" + "5e".repeat(32)
 const NOTARY_URL = "https://notary.example"
 // Test-only key bytes: a compressed-point shape, not a real notary key.
 const NOTARY_KEY = "02" + "5a".repeat(32)
@@ -87,21 +88,34 @@ async function connectedDemos(options: NodeOptions = {}) {
                     return getInfo
                 case "tlsnotary.getToken":
                     return { token: { id: "node-local-token" } }
-                case "requestTLSNproxy":
-                    return { websocketProxyUrl: PROXY, expiresIn: 30000, retriesLeft: 3 }
                 default:
                     return null
             }
         },
     )
+    // requestTLSNproxy is signed over its body (tlsnSignedProxy.spec.ts
+    // covers that request); here only its answer matters.
+    ;(demos as any).bodyBoundNodeCall = jest.fn(async (message: string) => {
+        log.push(message)
+        return {
+            result: 200,
+            response: { websocketProxyUrl: PROXY, expiresIn: 30000, retriesLeft: 3 },
+            require_reply: false,
+            extra: null,
+        }
+    })
     await demos.connectWallet(MNEMONIC, { algorithm: "ed25519" })
     demos.connected = true
     const { publicKey } = await demos.crypto.getIdentity("ed25519")
     const sender = "0x" + Buffer.from(publicKey as Uint8Array).toString("hex")
-    const nodeCalls = () =>
-        (demos.call as jest.Mock).mock.calls
+    const nodeCalls = () => [
+        ...(demos.call as jest.Mock).mock.calls
             .filter(([method]) => method === "nodeCall")
-            .map(([, message, data]) => ({ message, data }))
+            .map(([, message, data]) => ({ message, data })),
+        ...((demos as any).bodyBoundNodeCall as jest.Mock).mock.calls.map(
+            ([message, data]) => ({ message, data }),
+        ),
+    ]
     return { demos, log, executed, sender, nodeCalls }
 }
 
@@ -137,7 +151,7 @@ describe("tlsn_request: inclusion before the proxy", () => {
         expect(lastPoll).toBeLessThan(firstProxy)
 
         const proxyCall = nodeCalls().find(c => c.message === "requestTLSNproxy")!
-        expect(proxyCall.data).toEqual({ tokenId: tx.hash, owner: sender, targetUrl: TARGET })
+        expect(proxyCall.data).toEqual({ tokenId: tx.hash, targetUrl: TARGET })
         expect(token).toMatchObject({ tokenId: tx.hash, txHash: tx.hash, owner: sender, proxyUrl: PROXY })
         expect(log).not.toContain("tlsnotary.getToken")
     })
@@ -162,8 +176,8 @@ describe("tlsn_request: inclusion before the proxy", () => {
         expect(log).not.toContain("requestTLSNproxy")
     })
 
-    it("keeps the node-local token id on a network without tlsnVerified", async () => {
-        const { demos, log, nodeCalls } = await connectedDemos({ tlsnVerified: false })
+    it("keeps the node-local token id on a network without tlsnVerified, but opens the proxy by the tx hash", async () => {
+        const { demos, log, executed, nodeCalls } = await connectedDemos({ tlsnVerified: false })
         const token = await new TLSNotaryService(demos).requestAttestation({
             targetUrl: TARGET,
             ...fast,
@@ -171,7 +185,7 @@ describe("tlsn_request: inclusion before the proxy", () => {
         expect(log.indexOf("getTransactionStatus")).toBeLessThan(log.indexOf("tlsnotary.getToken"))
         expect(token.tokenId).toBe("node-local-token")
         expect(nodeCalls().find(c => c.message === "requestTLSNproxy")!.data.tokenId).toBe(
-            "node-local-token",
+            executed[0].hash,
         )
     })
 })

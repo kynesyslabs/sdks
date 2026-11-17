@@ -26,6 +26,11 @@ export { bufferize } from "./utils/bufferizer"
 export { required, _required } from "./utils/required"
 export { forgeToString, stringToForge } from "./utils/forge_converter"
 export {
+    bodyBoundAuthHeaders,
+    httpAuthMessage,
+    audienceKey,
+} from "./utils/bodyBoundAuth"
+export {
     personalMessagePreimage,
     DEMOS_MESSAGE_PREFIX,
 } from "./utils/personalMessage"

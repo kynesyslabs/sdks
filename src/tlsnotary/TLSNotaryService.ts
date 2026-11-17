@@ -44,7 +44,11 @@ import { OS_PER_DEM, osToDem } from "@/denomination"
 import { TLSNotary } from "./TLSNotary"
 import { calculateStorageFee, presentationByteLength } from "./helpers"
 import { resolveNonce, sleep } from "@/utils"
-import type { StatusCallback } from "./types"
+import type {
+    ProxyRequestError,
+    ProxyRequestResponse,
+    StatusCallback,
+} from "./types"
 import type { TLSNBindPurpose } from "./revealPolicy"
 import {
     isTlsnVerifiedActive,
@@ -336,32 +340,53 @@ export class TLSNotaryService {
         const { publicKey } = await this.demos.crypto.getIdentity("ed25519")
         const owner = uint8ArrayToHex(publicKey as Uint8Array)
 
-        const proxyResponse = (await this.demos.nodeCall("requestTLSNproxy", {
-            tokenId,
-            owner,
-            targetUrl,
-        })) as {
-            websocketProxyUrl?: string
-            expiresIn?: number
-            retriesLeft?: number
-            error?: string
-            message?: string
-        }
-
-        if (!proxyResponse?.websocketProxyUrl) {
-            throw new Error(
-                `Failed to get proxy URL from node: ${proxyResponse?.message || proxyResponse?.error || "no proxy in response"}`,
-            )
-        }
+        const proxy = await this.requestProxy(txHash, targetUrl)
 
         return {
-            proxyUrl: proxyResponse.websocketProxyUrl,
+            proxyUrl: proxy.websocketProxyUrl,
             tokenId,
-            expiresAt: Date.now() + (proxyResponse.expiresIn || 30000),
-            retriesLeft: proxyResponse.retriesLeft ?? 3,
+            expiresAt: Date.now() + (proxy.expiresIn || 30000),
+            retriesLeft: proxy.retriesLeft ?? 0,
             txHash,
             owner,
         }
+    }
+
+    /**
+     * Open a proxy session for an included `tlsn_request`.
+     *
+     * Nodes hand a session only to the account that sent the request, so
+     * the call is signed over its exact body and names the node; the token
+     * is the request's hash whatever the network's token ids are, since the
+     * node reads the request from the chain. The session URL ends in the
+     * session's secret id and is used as returned: the node's relay refuses
+     * any other path.
+     *
+     * @throws with the node's reason when it refuses
+     */
+    private async requestProxy(
+        txHash: string,
+        targetUrl: string,
+    ): Promise<ProxyRequestResponse> {
+        const reply = await this.demos.bodyBoundNodeCall("requestTLSNproxy", {
+            tokenId: normalizeTxHash(txHash),
+            targetUrl,
+        })
+        const proxy = (reply?.response ?? null) as
+            | (Partial<ProxyRequestResponse> & Partial<ProxyRequestError>)
+            | null
+        const url = proxy?.websocketProxyUrl
+        if (reply?.result !== 200 || typeof url !== "string" || !/^wss?:\/\//.test(url)) {
+            const reason =
+                proxy?.message ||
+                proxy?.error ||
+                (typeof reply?.response === "string" ? reply.response : "") ||
+                "no proxy in response"
+            throw new Error(
+                `Failed to get proxy URL from node (${reply?.result ?? "no result"}): ${reason}`,
+            )
+        }
+        return proxy as ProxyRequestResponse
     }
 
     /**
@@ -932,6 +957,18 @@ export class TLSNotaryService {
 
         return await this.demos.sign(tx)
     }
+}
+
+/**
+ * A tx hash as nodes key it: 64 lowercase hex characters without 0x. The
+ * proxy refuses anything else, such as a legacy `tlsn_<uuid>` token id.
+ */
+function normalizeTxHash(hash: string): string {
+    const hex = hash.trim().toLowerCase().replace(/^0x/, "")
+    if (!/^[0-9a-f]{64}$/.test(hex)) {
+        throw new Error(`Not a transaction hash: ${hash}`)
+    }
+    return hex
 }
 
 function assertHttps(targetUrl: string): void {
