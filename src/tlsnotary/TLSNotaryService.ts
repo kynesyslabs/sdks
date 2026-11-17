@@ -11,6 +11,13 @@
  *    names the sender and the request hash, and is always revealed
  * 3. Store the proof on chain (burns 1 + ceil(size/1024) DEM)
  *
+ * Step 3 has a deadline. Nodes refuse a presentation attested more than
+ * `TLSN_ATTESTATION_MAX_AGE_SECONDS` (3600 s on mainnet) before the time of
+ * the block the store lands in, even though the `tlsn_request` token lives
+ * 500 blocks (about 83 minutes at 10 s blocks). The store must therefore be
+ * included within one hour of `attest()` and before the token expires,
+ * whichever comes first. The same holds for a TLSN identity link.
+ *
  * @example
  * ```typescript
  * import { TLSNotaryService } from '@kynesyslabs/demosdk/tlsnotary';
@@ -237,6 +244,10 @@ export class TLSNotaryService {
      * waits until it is in a block, and returns a token ID with a proxy URL
      * for performing the attestation. On a network with `tlsnVerified`
      * active the token ID is the request's transaction hash.
+     *
+     * The token lives 500 blocks, but a proof made with it must be stored
+     * within `TLSN_ATTESTATION_MAX_AGE_SECONDS` of attesting; see
+     * `storeProof`.
      *
      * @param options - Request options including target URL
      * @returns Attestation token response with proxyUrl and tokenId
@@ -479,6 +490,10 @@ export class TLSNotaryService {
      * For an identity link pass the context as `purpose` (e.g. `"github"`);
      * the default `"store"` binds the proof to `storeProof`.
      *
+     * After `attest()` the proof must be stored (or the identity linked)
+     * within `TLSN_ATTESTATION_MAX_AGE_SECONDS` (3600 s on mainnet), even
+     * though the token lives 500 blocks; see `storeProof`.
+     *
      * @param options - Request options including target URL
      * @param onStatus - Optional status callback for progress updates
      * @returns Object with TLSNotary instance, tokenId, and proxyUrl
@@ -678,6 +693,13 @@ export class TLSNotaryService {
      * - 1 DEM base fee
      * - 1 DEM per KB of proof data
      *
+     * Deadline: the store must be included in a block whose time is at most
+     * `TLSN_ATTESTATION_MAX_AGE_SECONDS` (3600 s on mainnet) after the
+     * attestation, and before the token expires (500 blocks after the
+     * `tlsn_request`), whichever comes first. A store past the age limit is
+     * refused with "attestation is stale" and the proof has to be made again.
+     * Store right after `attest()`.
+     *
      * @param tokenId - The attestation token ID
      * @param proof - The proof data (JSON string or serialized presentation)
      * @param options - Storage options; only on-chain storage is accepted
@@ -741,6 +763,10 @@ export class TLSNotaryService {
      * This method shows the transaction details to the user via the onConfirm callback
      * and only broadcasts if the user confirms. This is the recommended way to store
      * proofs in user-facing applications.
+     *
+     * The deadline of `storeProof` applies: include the store within
+     * `TLSN_ATTESTATION_MAX_AGE_SECONDS` of the attestation, so do not leave
+     * the confirmation dialog open for long.
      *
      * @param tokenId - The attestation token ID
      * @param proof - The proof data (JSON string or serialized presentation)
