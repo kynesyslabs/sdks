@@ -165,6 +165,8 @@ interface StubNode {
     url: string
     keys: NodeKeys
     sessionId: string
+    /** Answer /genesisBlock with this many bytes of padding. */
+    genesisPadding: number
     received: { body: Buffer; headers: http.IncomingHttpHeaders; verdict: ReturnType<typeof nodeAccepts> }[]
     close(): Promise<void>
 }
@@ -178,6 +180,7 @@ async function stubNode(): Promise<StubNode> {
     const node: Omit<StubNode, "url" | "close"> = {
         keys: { own, served: "0x" + own },
         sessionId: randomBytes(32).toString("hex"),
+        genesisPadding: 0,
         received: [],
     }
     const server = http.createServer((req, res) => {
@@ -190,7 +193,9 @@ async function stubNode(): Promise<StubNode> {
             }
             if (req.method === "GET" && req.url === "/") return json(200, { message: "Hello, World!" })
             if (req.method === "GET" && req.url === "/publickey") return json(200, node.keys.served)
-            if (req.method === "GET" && req.url === "/genesisBlock") return json(200, { hash: GENESIS })
+            if (req.method === "GET" && req.url === "/genesisBlock") {
+                return json(200, { hash: GENESIS, padding: "x".repeat(node.genesisPadding) })
+            }
             if (req.method !== "POST") return json(404, {})
 
             const body = Buffer.concat(chunks)
@@ -235,11 +240,11 @@ async function stubNode(): Promise<StubNode> {
     })
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve))
     const { port } = server.address() as AddressInfo
-    return {
-        ...node,
+    // The same object the server reads, so tests can change its answers.
+    return Object.assign(node, {
         url: `http://127.0.0.1:${port}`,
         close: () => new Promise<void>(resolve => server.close(() => resolve())),
-    }
+    })
 }
 
 /** A connected Demos whose transaction path is answered in process. */
@@ -352,6 +357,17 @@ describe("requestTLSNproxy through TLSNotaryService", () => {
             new TLSNotaryService(demos).requestAttestation({ targetUrl: TARGET, ...fast }),
         ).rejects.toThrow(/HTTP 401.*another node/)
         expect(node.received.map(r => r.verdict.status)).toEqual([401])
+    })
+})
+
+describe("node discovery for a body-bound call", () => {
+    it("refuses an oversized genesis block reply instead of reading it whole", async () => {
+        node.genesisPadding = 2 * 1024 * 1024
+        const { demos } = await connectedDemos(node.url)
+        await expect(demos.bodyBoundNodeCall("requestTLSNproxy", {})).rejects.toThrow(
+            /genesisBlock failed: maxContentLength/,
+        )
+        expect(node.received).toHaveLength(0)
     })
 })
 

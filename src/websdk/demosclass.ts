@@ -1734,10 +1734,9 @@ export class Demos {
      * node.
      */
     private async _nodePublicKey(rpcUrl: string): Promise<string> {
-        const res = await axios.get(`${rpcUrl.replace(/\/+$/, "")}/publickey`, {
-            timeout: Demos._RPC_TIMEOUT_MS,
-            validateStatus: () => true,
-        })
+        const res = await this._boundedGet(
+            `${rpcUrl.replace(/\/+$/, "")}/publickey`,
+        )
         const key = res.data as unknown
         if (
             res.status !== 200 ||
@@ -1751,14 +1750,54 @@ export class Demos {
         return audienceKey(key)
     }
 
+    /**
+     * A GET with a hard deadline and a reply size cap. axios' `timeout` is a
+     * socket idle timer on Node, so a node trickling bytes could otherwise
+     * hold a call that a paid attestation waits on open indefinitely.
+     */
+    private async _boundedGet(
+        url: string,
+        maxResponseBytes = 1024 * 1024,
+    ): Promise<{ status: number; data: unknown }> {
+        const controller = new AbortController()
+        let stopped: string | null = null
+        const stop = (reason: string) => {
+            stopped = stopped ?? reason
+            controller.abort()
+        }
+        const timer = setTimeout(
+            () => stop(`timeout of ${Demos._RPC_TIMEOUT_MS}ms exceeded`),
+            Demos._RPC_TIMEOUT_MS,
+        )
+        try {
+            const res = await axios.get(url, {
+                signal: controller.signal,
+                validateStatus: () => true,
+                maxContentLength: maxResponseBytes,
+                // The browser XHR adapter ignores maxContentLength.
+                onDownloadProgress: ({ loaded }) => {
+                    if (loaded > maxResponseBytes) {
+                        stop(`maxContentLength size of ${maxResponseBytes} exceeded`)
+                    }
+                },
+            })
+            return { status: res.status, data: res.data }
+        } catch (error) {
+            throw new Error(
+                `GET ${url} failed: ${stopped ?? (error as Error)?.message}`,
+            )
+        } finally {
+            clearTimeout(timer)
+        }
+    }
+
     /** The genesis block hash the node serves, which names its network. */
     private async _genesisHash(rpcUrl: string): Promise<string> {
         if (this._genesisHashCache?.rpcUrl === rpcUrl) {
             return this._genesisHashCache.hash
         }
-        const res = await axios.get(
+        const res = await this._boundedGet(
             `${rpcUrl.replace(/\/+$/, "")}/genesisBlock`,
-            { timeout: Demos._RPC_TIMEOUT_MS, validateStatus: () => true },
         )
         const hash = (res.data as { hash?: unknown } | null)?.hash
         if (res.status !== 200 || typeof hash !== "string" || !hash) {
