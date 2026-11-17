@@ -1678,11 +1678,7 @@ export class Demos {
         message: string,
         data: Record<string, unknown> = {},
     ): Promise<RPCResponse> {
-        if (!this.walletConnected) {
-            throw new Error(
-                "Error: Wallet not connected! Please connect a private key using demos.connectWallet(privateKey) or provide one via the privateKey parameter",
-            )
-        }
+        required(this.walletConnected, "Wallet not connected")
         required(this.rpc_url, "Not connected to a node")
         const rpcUrl = this.rpc_url
         const [audience, genesisHash] = await Promise.all([
@@ -2642,7 +2638,7 @@ export class Demos {
      * @example
      * ```typescript
      * const demos = new Demos();
-     * await demos.connect('https://node.demos.sh');
+     * await demos.connect(rpcUrl);
      * const tlsn = await demos.tlsnotary();
      * const verification = await tlsn.verify(presentation);
      * ```
