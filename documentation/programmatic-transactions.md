@@ -82,14 +82,18 @@ quote`) when the echoed `transaction_fee.network_fee` is neither a number
 nor a string: the node sends the quote without a unit, and the runner tells
 DEM from OS by that field's type.
 
-To send a whole balance, confirm a send of an amount the balance covers (for
-example with `confirm: "manual"`, which confirms without broadcasting),
-subtract its `feeOs` from the balance, then send that amount. With
+On nodes that return `attrs.total_fee` (check
+`r.transaction.attrs?.total_fee !== undefined`), you can send a whole
+balance: confirm a send of an amount the balance covers (for example with
+`confirm: "manual"`, which confirms without broadcasting), subtract its
+`feeOs` from the balance, then send that amount. On other nodes `feeOs` is
+the summed signed fee, which can be lower than the fee the node charges, so
+do not use this recipe there. With
 auto-nonce on (`demos.enableAutoNonce()`), the first confirmation reserves a
 nonce it never broadcasts, so pass the first result's nonce to the final
 send (`{ nonce: r.transaction.content.nonce }`), or call
 `demos.resetNonce()` first. Do not start by confirming the whole balance:
-the node refuses a native send whose balance does not also cover its fee,
+such a node refuses a native send whose balance does not also cover its fee,
 so `demos.confirm` throws
 `[Confirm] Transaction is not valid` and no `feeOs` comes back. The native
 send fee does not depend on the amount: the node's quote
