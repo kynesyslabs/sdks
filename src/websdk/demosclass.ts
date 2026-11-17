@@ -63,6 +63,7 @@ import {
 } from "@/encryption/unifiedCrypto"
 import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
+import { audienceKey, bodyBoundAuthHeaders } from "./utils/bodyBoundAuth"
 import { warnLegacySeedPath } from "@/encryption/legacySeedWarning"
 import { OS_PER_DEM, demToOs, parseOsString } from "@/denomination"
 import { assertValidNonce, resolveNonce } from "@/utils"
@@ -172,6 +173,9 @@ export class Demos {
 
     /** Cached TLSNotary instance */
     private _tlsnotaryInstance: TLSNotary | null = null
+
+    /** The genesis hash body-bound calls name, per RPC URL. */
+    private _genesisHashCache: { rpcUrl: string; hash: string } | null = null
 
     private _cachedNetworkParameters: NetworkParameters | null = null
     private _cachedNetworkParametersAt = 0
@@ -1307,6 +1311,12 @@ export class Demos {
             baseSleepMs?: number
             timeoutMs?: number
             maxResponseBytes?: number
+            /**
+             * Send a string body as these exact bytes. A body-bound
+             * signature covers them, and axios would otherwise reparse
+             * and trim a JSON string.
+             */
+            rawBody?: boolean
         } = {},
     ): Promise<{ data: T }> {
         const maxRetries = opts.retries ?? 4
@@ -1359,6 +1369,9 @@ export class Demos {
                     .post<T>(url, request, {
                         headers,
                         signal: controller.signal,
+                        ...(opts.rawBody
+                            ? { transformRequest: [(data: unknown) => data] }
+                            : {}),
                         // Enforced by the Node http and fetch adapters. The
                         // browser XHR adapter ignores it, so the progress
                         // check below covers that one.
@@ -1641,6 +1654,159 @@ export class Demos {
      */
     async nodeCall(message: any, args = {}) {
         return this.call("nodeCall", message, args)
+    }
+
+    /**
+     * A nodeCall signed over its exact body and naming the connected node as
+     * its audience. Nodes require this form for calls that hand the signer
+     * something only they may hold, such as `requestTLSNproxy`: with the
+     * plain `nodeCall` form, captured headers could carry any body.
+     *
+     * It is signed with the account's ed25519 key, the key its address and
+     * transactions are under, and sent once: the node refuses a resend of
+     * the same signed bytes as a replay.
+     *
+     * @param message - The nodeCall message
+     * @param data - The nodeCall data
+     * @returns The node's RPC response; a handler refusal comes back as its
+     *   `result` code and `response` body.
+     * @throws when no wallet is connected, the node does not serve its
+     *   public key or genesis block, or the node refuses the request itself
+     *   (for example HTTP 401 for a signature it does not accept).
+     */
+    async bodyBoundNodeCall(
+        message: string,
+        data: Record<string, unknown> = {},
+    ): Promise<RPCResponse> {
+        required(this.walletConnected, "Wallet not connected")
+        required(this.rpc_url, "Not connected to a node")
+        const rpcUrl = this.rpc_url
+        const [audience, genesisHash] = await Promise.all([
+            this._nodePublicKey(rpcUrl),
+            this._genesisHash(rpcUrl),
+        ])
+        const { publicKey } = await this.crypto.getIdentity("ed25519")
+        const identity = "ed25519:" + uint8ArrayToHex(publicKey as Uint8Array)
+        const body = JSON.stringify({
+            method: "nodeCall",
+            params: [{ message, data }],
+        })
+        const headers = await bodyBoundAuthHeaders({
+            genesisHash,
+            identity,
+            body,
+            audience,
+            sign: async bytes =>
+                (await this.crypto.sign("ed25519", bytes)).signature,
+        })
+
+        try {
+            const response = await this._doPost<RPCResponse>(
+                rpcUrl,
+                body,
+                { "Content-Type": "application/json", ...headers },
+                { retries: 0, rawBody: true },
+            )
+            return response.data
+        } catch (error) {
+            const reply = (error as any)?.cause?.response
+            // A node reset at the same URL has a new genesis; read it again
+            // next time instead of failing every call.
+            if (reply?.status === 401) this._genesisHashCache = null
+            // The auth middleware answers `{ error, details }`, the RPC
+            // route `{ result, response }`.
+            const body = reply?.data
+            const reason =
+                body?.response ??
+                ([body?.error, body?.details].filter(Boolean).join(": ") ||
+                    (error as Error)?.message)
+            throw new Error(
+                `${message} failed${reply?.status ? ` (HTTP ${reply.status})` : ""}: ` +
+                    (typeof reason === "string" ? reason : JSON.stringify(reason)),
+            )
+        }
+    }
+
+    /**
+     * The public key the node serves, which a body-bound call names as its
+     * audience. Read for every call rather than cached: the node behind a URL
+     * can change, and a stale key makes every call fail as meant for another
+     * node.
+     */
+    private async _nodePublicKey(rpcUrl: string): Promise<string> {
+        const res = await this._boundedGet(
+            `${rpcUrl.replace(/\/+$/, "")}/publickey`,
+        )
+        const key = res.data as unknown
+        if (
+            res.status !== 200 ||
+            typeof key !== "string" ||
+            !/^(0x)?[0-9a-fA-F]{64}$/.test(key)
+        ) {
+            throw new Error(
+                `${rpcUrl} did not serve its public key (HTTP ${res.status})`,
+            )
+        }
+        return audienceKey(key)
+    }
+
+    /**
+     * A GET with a hard deadline and a reply size cap. axios' `timeout` is a
+     * socket idle timer on Node, so a node trickling bytes could otherwise
+     * hold a call that a paid attestation waits on open indefinitely.
+     */
+    private async _boundedGet(
+        url: string,
+        maxResponseBytes = 1024 * 1024,
+    ): Promise<{ status: number; data: unknown }> {
+        const controller = new AbortController()
+        let stopped: string | null = null
+        const stop = (reason: string) => {
+            stopped = stopped ?? reason
+            controller.abort()
+        }
+        const timer = setTimeout(
+            () => stop(`timeout of ${Demos._RPC_TIMEOUT_MS}ms exceeded`),
+            Demos._RPC_TIMEOUT_MS,
+        )
+        try {
+            const res = await axios.get(url, {
+                signal: controller.signal,
+                validateStatus: () => true,
+                maxContentLength: maxResponseBytes,
+                // The browser XHR adapter ignores maxContentLength.
+                onDownloadProgress: ({ loaded }) => {
+                    if (loaded > maxResponseBytes) {
+                        stop(`maxContentLength size of ${maxResponseBytes} exceeded`)
+                    }
+                },
+            })
+            return { status: res.status, data: res.data }
+        } catch (error) {
+            throw new Error(
+                `GET ${url} failed: ${stopped ?? (error as Error)?.message}`,
+            )
+        } finally {
+            clearTimeout(timer)
+        }
+    }
+
+    /** The genesis block hash the node serves, which names its network. */
+    private async _genesisHash(rpcUrl: string): Promise<string> {
+        if (this._genesisHashCache?.rpcUrl === rpcUrl) {
+            return this._genesisHashCache.hash
+        }
+        const res = await this._boundedGet(
+            `${rpcUrl.replace(/\/+$/, "")}/genesisBlock`,
+        )
+        const hash = (res.data as { hash?: unknown } | null)?.hash
+        if (res.status !== 200 || typeof hash !== "string" || !hash) {
+            throw new Error(
+                `${rpcUrl} did not serve its genesis block (HTTP ${res.status})`,
+            )
+        }
+        this._genesisHashCache = { rpcUrl, hash }
+        return hash
     }
 
     // SECTION Predefined nodeCall methods
@@ -2495,32 +2661,25 @@ export class Demos {
 
     // ANCHOR TLSNotary
     /**
-     * Create a TLSNotary instance for HTTPS attestation.
+     * Create a TLSNotary instance with the notary endpoints of the connected
+     * node, for verifying presentations.
      *
-     * This method discovers the notary endpoints from the connected node
-     * and returns an initialized TLSNotary instance.
+     * The instance has no proxy session, so it cannot attest on its own:
+     * nodes open a proxy only for a signed request from the account that
+     * paid for the `tlsn_request`. Attest through
+     * `TLSNotaryService.createTLSNotary`, or pass the `proxyUrl` from
+     * `TLSNotaryService.requestAttestation` as `websocketProxyUrl` in an
+     * explicit config.
      *
      * @param config - Optional explicit configuration (overrides discovery)
      * @returns Initialized TLSNotary instance
      *
      * @example
      * ```typescript
-     * // Option 1: Auto-discovery from connected node (preferred)
-     * const demos = new Demos({ rpc: 'https://node.demos.sh' });
-     * await demos.connect();
+     * const demos = new Demos();
+     * await demos.connect(rpcUrl);
      * const tlsn = await demos.tlsnotary();
-     *
-     * // Option 2: Explicit configuration
-     * const tlsn = await demos.tlsnotary({
-     *   notaryUrl: 'wss://other-node.demos.sh:7047',
-     *   websocketProxyUrl: 'wss://other-node.demos.sh:55688',
-     * });
-     *
-     * // Attest an HTTPS request
-     * const result = await tlsn.attest({
-     *   url: 'https://api.github.com/users/octocat',
-     * });
-     * console.log('Verified server:', result.verification.serverName);
+     * const verification = await tlsn.verify(presentation);
      * ```
      */
     async tlsnotary(config?: TLSNotaryConfig): Promise<TLSNotary> {
@@ -2555,9 +2714,7 @@ export class Demos {
 
             tlsnConfig = {
                 notaryUrl: notary.notaryUrl,
-                rpcUrl: this.rpc_url,
                 trustedNotaryKeys: notary.trustedNotaryKeys,
-                // Note: websocketProxyUrl is deprecated - proxies are now requested dynamically
             }
         }
 
