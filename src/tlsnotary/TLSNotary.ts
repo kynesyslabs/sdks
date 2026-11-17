@@ -184,6 +184,11 @@ export class TLSNotary {
      * the same rules: the request line, `Host` and bind header are added,
      * and a range over a credential value throws before notarisation.
      *
+     * The notary signs the time of the attestation. Nodes refuse a store or
+     * identity link of the result once it is older than
+     * `TLSN_ATTESTATION_MAX_AGE_SECONDS` (3600 s on mainnet) at the time of
+     * its block, so submit it right away.
+     *
      * @param request - Request configuration (URL, method, headers, body)
      * @param commit - Optional commit ranges for selective disclosure
      * @param onStatus - Optional status callback for progress updates

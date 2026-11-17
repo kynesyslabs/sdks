@@ -55,6 +55,13 @@ export const TLSN_MAINNET_NOTARY_KEYS: readonly {
  */
 export const TLSN_DEFAULT_MAX_PRESENTATION_BYTES = 65536
 
+/**
+ * The mainnet `freshnessWindowSec`: nodes refuse a store or identity link
+ * whose attestation is older than this at its block's time ("attestation is
+ * stale"), even while its 500-block `tlsn_request` token is still valid.
+ */
+export const TLSN_ATTESTATION_MAX_AGE_SECONDS = 3600
+
 export const isTlsnPlaceholder = (value: string) =>
     value.trim().startsWith(TLSN_PLACEHOLDER_PREFIX)
 
