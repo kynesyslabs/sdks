@@ -39,6 +39,19 @@ This is generated in `Identities.inferIdentity(...)`.
 ### 1.3 Example usage
 
 ```ts
+const service = new TLSNotaryService(demos)
+
+// Pays the tlsn_request, waits for it to be included, opens a proxy, and
+// returns a TLSNotary bound to this account and request (X-Demos-Bind).
+const { tlsn } = await service.createTLSNotary({
+  targetUrl: "https://api.github.com/user",
+  purpose: "github",
+})
+const attestResult = await tlsn.attest({
+  url: "https://api.github.com/user",
+  headers: { Authorization: `Bearer ${githubToken}` }, // value never revealed
+})
+
 const res = await demos.identities.addWeb2IdentityViaTLSN(
   demos,
   "github",
@@ -49,11 +62,32 @@ const res = await demos.identities.addWeb2IdentityViaTLSN(
   githubUsername,
   githubUserId,
   referralCode,
-  { legacy: true },
 )
 ```
 
-The call throws without `{ legacy: true }`. Nodes check only the presentation's shape, not the notary signature, so networks with `tlsnProofEnforcement` active, mainnet among them, refuse TLSN links until nodes verify the notary signature.
+### 1.4 Which networks accept the link
+
+- `tlsnVerified` active (`getNetworkInfo().forks.tlsnVerified.activated`),
+  mainnet among them: the node verifies the presentation against the notary
+  keys of the fork and checks the bind header, so the link is sent as is. The
+  `telegram` context is refused.
+- Only `tlsnProofEnforcement`: the node would refuse the link, so the SDK
+  throws before signing.
+- Neither fork: pass `{ legacy: true }`; the node checks only the
+  presentation's shape.
+
+### 1.5 What the presentation reveals
+
+The ranges are computed from the transcript, since tlsn-wasm sends headers in
+a different order on each run:
+
+- the request line, `Host` and the whole `X-Demos-Bind` header;
+- `Authorization`, `Proxy-Authorization` and `Cookie` by name only, never
+  their values; other non-structural headers by name only;
+- the response, body included (the node reads the account from the JSON
+  body), with `Set-Cookie` by name only.
+
+A `commit` passed to `attest` is checked against the same rules.
 
 ## 2. How `tlsn_identity_assign` is persisted in GCR
 
@@ -79,3 +113,6 @@ Also in `src/websdk/GCRGeneration.ts` under native handling:
 - `tlsn_store`: burns `1 + ceil(proof.length / 1024)` DEM
 
 These are balance edits only. Node-side logic handles token/proof lifecycle.
+On a `tlsnVerified` network the token is the included `tlsn_request`, keyed
+by its hash, and `storeProof` sends on-chain storage only, refusing a
+presentation over the network's `maxPresentationBytes` before signing.

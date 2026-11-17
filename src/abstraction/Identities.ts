@@ -44,6 +44,7 @@ import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
 import { resolveNonce } from "@/utils"
 import { xmBoundProofMessage } from "./xmProof"
+import { isTlsnVerifiedActive } from "@/tlsnotary/network"
 
 type IdentityContext = "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn"
 
@@ -480,10 +481,12 @@ export class Identities {
      * @param username Username from the proven response.
      * @param userId User ID from the proven response.
      * @param referralCode Optional referral code.
-     * @param options Must carry `legacy: true`: networks with
-     *   `tlsnProofEnforcement` active, mainnet among them, refuse TLSN links.
+     * @param options `legacy: true` sends the link to a network that has
+     *   neither `tlsnVerified` nor `tlsnProofEnforcement`.
      * @returns The response from the RPC call.
-     * @throws Without `legacy: true`.
+     * @throws When the network does not verify TLSNotary presentations
+     *   (`tlsnVerified` inactive) and `legacy` is not set, and for the
+     *   telegram context once `tlsnVerified` is active.
      */
     async addWeb2IdentityViaTLSN(
         demos: Demos,
@@ -497,14 +500,22 @@ export class Identities {
         referralCode?: string,
         options?: { nonce?: number; legacy?: boolean },
     ): Promise<RPCResponseWithValidityData> {
-        // The node checks only the presentation's shape, not the notary
-        // signature, so any account could attach any handle by authoring its
-        // own bytes. Mainnet therefore refuses this link from genesis
-        // (tlsnProofEnforcement); failing here saves the fee of a refused
-        // transaction. legacy: true is for networks without that fork.
-        if (!options?.legacy) {
+        // Failing here saves the fee of a transaction the node would refuse.
+        if (isTlsnVerifiedActive(await demos.getNetworkInfo())) {
+            // The node verifies the notary signature and the sender binding,
+            // but a Telegram proof comes from the Demos backend, not from
+            // Telegram, so it proves nothing about the account.
+            if (context === "telegram") {
+                throw new Error(
+                    "TLSN identity links for the telegram context are refused on networks with tlsnVerified active; link Telegram with addTelegramIdentity.",
+                )
+            }
+        } else if (!options?.legacy) {
+            // Without tlsnVerified the node checks only the presentation's
+            // shape, so any account could attach any handle by authoring its
+            // own bytes; networks with tlsnProofEnforcement refuse the link.
             throw new Error(
-                "TLSN identity links are refused on networks with tlsnProofEnforcement active, mainnet among them, until nodes verify the notary signature. Pass { legacy: true } only for a network without that fork.",
+                "TLSN identity links are refused on networks with tlsnProofEnforcement active until tlsnVerified is active. Pass { legacy: true } only for a network without either fork.",
             )
         }
         const payload: InferFromTLSNPayload = {

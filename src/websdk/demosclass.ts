@@ -77,11 +77,9 @@ import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
 // TLSNotary is dynamically imported to avoid bundling issues with webpack
 // The worker.js reference and WASM dependencies break static bundling
-import type {
-    TLSNotary,
-    TLSNotaryConfig,
-    TLSNotaryDiscoveryInfo,
-} from "@/tlsnotary"
+import type { TLSNotary, TLSNotaryConfig } from "@/tlsnotary"
+// Plain constants and a resolver, no wasm: safe to import statically.
+import { resolveNotary } from "@/tlsnotary/network"
 import { wordList } from "@/encryption/PQC/falconts"
 import {
     StorageProgram,
@@ -2551,21 +2549,14 @@ export class Demos {
                 )
             }
 
-            const info = (await this.nodeCall(
-                "tlsnotary.getInfo",
-            )) as TLSNotaryDiscoveryInfo
-
-            if (!info || !info.notaryUrl) {
-                throw new Error(
-                    "Node does not support TLSNotary or tlsnotary.getInfo failed. " +
-                        "Provide explicit config or use a node with TLSNotary enabled.",
-                )
-            }
+            // Mainnet uses the notary pinned in the SDK, not the key an RPC
+            // reports; other networks use the node's tlsnotary.getInfo.
+            const notary = await resolveNotary(this)
 
             tlsnConfig = {
-                notaryUrl: info.notaryUrl,
+                notaryUrl: notary.notaryUrl,
                 rpcUrl: this.rpc_url,
-                notaryPublicKey: info.publicKey,
+                trustedNotaryKeys: notary.trustedNotaryKeys,
                 // Note: websocketProxyUrl is deprecated - proxies are now requested dynamically
             }
         }

@@ -1,10 +1,19 @@
 import { readFileSync } from "fs"
 import { join } from "path"
 import {
+    checkNotaryKey,
     normaliseNotaryKey,
     notaryKeyMatches,
     NotaryKeyMismatchError,
 } from "@/tlsnotary/notaryKey"
+import {
+    isTlsnPlaceholder,
+    resolveNotary,
+    TLSN_DEFAULT_MAX_PRESENTATION_BYTES,
+    TLSN_MAINNET_CHAIN_ID,
+    TLSN_MAINNET_NOTARY_KEYS,
+    TLSN_MAINNET_NOTARY_URL,
+} from "@/tlsnotary/network"
 
 /**
  * `verify()` read both the notary key it trusts and the key carried by the
@@ -101,5 +110,82 @@ describe("the mismatch error reaches consumers", () => {
         expect(error).toBeInstanceOf(NotaryKeyMismatchError)
         expect(error).toBeInstanceOf(Error)
         expect(error.name).toBe("NotaryKeyMismatchError")
+    })
+})
+
+describe("checkNotaryKey", () => {
+    it("returns the trusted key the presentation was signed with", () => {
+        expect(checkNotaryKey(NOTARY_KEY, [OTHER_KEY, NOTARY_KEY])).toBe(NOTARY_KEY)
+        expect(checkNotaryKey(NOTARY_KEY, [PEM_FOR_NOTARY])).toBe(PEM_FOR_NOTARY)
+    })
+
+    it("refuses a foreign key, and refuses everything when nothing is trusted", () => {
+        expect(() => checkNotaryKey(OTHER_KEY, [NOTARY_KEY])).toThrow(NotaryKeyMismatchError)
+        expect(() => checkNotaryKey(NOTARY_KEY, [])).toThrow(NotaryKeyMismatchError)
+    })
+})
+
+describe("mainnet notary pins", () => {
+    /**
+     * The keys are filled after the notary key ceremony. Until then they must
+     * match nothing, so a build released early fails closed on mainnet.
+     */
+    it("are placeholders that match nothing, or real compressed secp256k1 keys", () => {
+        expect(
+            isTlsnPlaceholder(TLSN_MAINNET_NOTARY_URL) ||
+                new URL(TLSN_MAINNET_NOTARY_URL).protocol === "https:",
+        ).toBe(true)
+        expect(TLSN_MAINNET_NOTARY_KEYS.length).toBeGreaterThan(0)
+        for (const key of TLSN_MAINNET_NOTARY_KEYS) {
+            expect(key.alg).toBe("k256")
+            if (isTlsnPlaceholder(key.hex)) {
+                expect(notaryKeyMatches("02" + "ab".repeat(32), key.hex)).toBe(false)
+            } else {
+                expect(key.hex).toMatch(/^0[23][0-9a-f]{64}$/)
+            }
+        }
+    })
+})
+
+describe("resolveNotary", () => {
+    const host = (chainId: number, getInfo: unknown) => ({
+        getNetworkInfo: async () =>
+            ({ forks: { osDenomination: { activated: true } }, chainId }) as any,
+        nodeCall: jest.fn(async () => getInfo),
+    })
+    const info = { notaryUrl: "https://notary.example", publicKey: NOTARY_KEY }
+
+    it("trusts the key the node reports outside mainnet", async () => {
+        await expect(resolveNotary(host(1, info))).resolves.toEqual({
+            notaryUrl: "https://notary.example",
+            trustedNotaryKeys: [NOTARY_KEY],
+            maxPresentationBytes: TLSN_DEFAULT_MAX_PRESENTATION_BYTES,
+            pinned: false,
+        })
+        await expect(
+            resolveNotary(host(1, { ...info, maxPresentationBytes: 2048 })),
+        ).resolves.toMatchObject({ maxPresentationBytes: 2048 })
+    })
+
+    it("never takes a mainnet key from the node", async () => {
+        // An RPC reporting its own notary key must not become trusted on
+        // mainnet: either the pins are used, or, while they are
+        // placeholders, the call refuses.
+        const pinned = !isTlsnPlaceholder(TLSN_MAINNET_NOTARY_URL)
+        const result = resolveNotary(host(TLSN_MAINNET_CHAIN_ID, info))
+        if (pinned) {
+            const resolved = await result
+            expect(resolved.pinned).toBe(true)
+            expect(resolved.notaryUrl).toBe(TLSN_MAINNET_NOTARY_URL)
+            expect(resolved.trustedNotaryKeys).not.toContain(NOTARY_KEY)
+        } else {
+            await expect(result).rejects.toThrow("no mainnet TLSNotary notary pinned")
+        }
+    })
+
+    it("refuses a node without a notary", async () => {
+        await expect(resolveNotary(host(1, { success: false }))).rejects.toThrow(
+            "does not support TLSNotary",
+        )
     })
 })

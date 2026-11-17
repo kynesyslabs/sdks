@@ -4,6 +4,8 @@
  * TypeScript interfaces for the TLSNotary SDK module.
  */
 
+import type { TLSNotaryBinding } from "./revealPolicy"
+
 /**
  * Configuration for TLSNotary instance
  */
@@ -19,6 +21,17 @@ export interface TLSNotaryConfig {
     rpcUrl?: string
     /** Notary's public key (hex string) for verification */
     notaryPublicKey?: string
+    /**
+     * Notary keys a presentation may be signed by. `verify()` refuses any
+     * other signer. Combined with `notaryPublicKey` when both are set.
+     */
+    trustedNotaryKeys?: string[]
+    /**
+     * Binds every attestation to a sender and its `tlsn_request`: the
+     * `X-Demos-Bind` header is added to the request and always revealed.
+     * Set by `TLSNotaryService.createTLSNotary`.
+     */
+    binding?: TLSNotaryBinding
     /** Logging level: 'Debug' | 'Info' | 'Warn' | 'Error' */
     loggingLevel?: "Debug" | "Info" | "Warn" | "Error"
 }
@@ -81,6 +94,12 @@ export interface AttestRequest {
     maxSentData?: number
     /** Max bytes to receive (default: 16384) */
     maxRecvData?: number
+    /**
+     * Reveal the response body (default true). Identity links need it; a
+     * stored proof is public, so turn it off or pass `commit.recv` when the
+     * body is private.
+     */
+    revealResponseBody?: boolean
 }
 
 /**

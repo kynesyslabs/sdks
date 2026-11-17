@@ -77,3 +77,21 @@ export class NotaryKeyMismatchError extends Error {
         this.expectedKey = expectedKey
     }
 }
+
+/**
+ * Compare a presentation's signer with the trusted notary keys and return
+ * the key it matched.
+ *
+ * A presentation proves only that SOME notary signed the transcript; the
+ * match against a trusted key is what makes it evidence. Without it, a
+ * presentation notarised by whoever produced it verifies like a real one.
+ *
+ * @throws {NotaryKeyMismatchError} when no trusted key matches.
+ */
+export function checkNotaryKey(verifyingKey: string, trusted: string[]): string {
+    const match = trusted.find(key => notaryKeyMatches(verifyingKey, key))
+    if (!match) {
+        throw new NotaryKeyMismatchError(verifyingKey, trusted.join(",") || "none")
+    }
+    return match
+}
