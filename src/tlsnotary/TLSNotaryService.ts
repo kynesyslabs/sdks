@@ -57,6 +57,25 @@ import {
 } from "./network"
 
 /**
+ * Nodes put a broadcast refusal in `extra` (an `{ error }` object or a bare
+ * string) and leave `response` false, so reading only `response.message`
+ * turns every refusal into "Unknown error".
+ */
+export function broadcastRefusal(result: { response?: unknown; extra?: unknown }): string {
+    const fromValue = (value: unknown): string | null => {
+        if (typeof value === "string" && value.trim()) return value
+        if (value && typeof value === "object") {
+            const v = value as { error?: unknown; message?: unknown }
+            if (typeof v.error === "string" && v.error.trim()) return v.error
+            if (typeof v.message === "string" && v.message.trim()) return v.message
+        }
+        return null
+    }
+    return fromValue(result.extra) ?? fromValue(result.response) ?? "Unknown error"
+}
+
+
+/**
  * Response from requestAttestation
  */
 export interface AttestationTokenResponse {
@@ -327,7 +346,7 @@ export class TLSNotaryService {
         )
         if (broadcastResult.result !== 200) {
             throw new Error(
-                `Failed to submit attestation request: ${broadcastResult.response?.message || "Unknown error"}`,
+                `Failed to submit attestation request: ${broadcastRefusal(broadcastResult)}`,
             )
         }
 
@@ -704,7 +723,7 @@ export class TLSNotaryService {
 
         if (broadcastResult.result !== 200) {
             throw new Error(
-                `Failed to store proof: ${broadcastResult.response?.message || "Unknown error"}`,
+                `Failed to store proof: ${broadcastRefusal(broadcastResult)}`,
             )
         }
 
@@ -795,7 +814,7 @@ export class TLSNotaryService {
 
         if (broadcastResult.result !== 200) {
             throw new Error(
-                `Failed to store proof: ${broadcastResult.response?.message || "Unknown error"}`,
+                `Failed to store proof: ${broadcastRefusal(broadcastResult)}`,
             )
         }
 

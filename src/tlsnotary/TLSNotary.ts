@@ -27,6 +27,7 @@
  * ```
  */
 
+import { Buffer } from "buffer"
 import * as Comlink from "comlink"
 import { checkNotaryKey } from "./notaryKey"
 import { spawnTlsnWorker } from "./spawnWorker"
