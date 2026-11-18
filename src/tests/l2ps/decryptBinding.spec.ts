@@ -30,6 +30,7 @@ async function signedInner(postFork = true) {
         chainId: 4242,
     } as never)
     jest.spyOn(demos, "getAddressNonce").mockResolvedValue(6)
+    jest.spyOn(demos, "getL2PSNonce").mockResolvedValue(6)
     const internals = demos as unknown as { _getNetworkParametersCached: () => Promise<unknown> }
     jest.spyOn(internals, "_getNetworkParametersCached").mockResolvedValue({
         networkFee: 1,

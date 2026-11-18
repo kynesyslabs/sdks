@@ -73,6 +73,11 @@ describe("encoding rules", () => {
     const A = "0x" + "11".repeat(32)
     const base = { from: A, to: A, amount: 1n, fee: 1n, nonce: 1n, salt: 1n }
 
+    it("refuses a subnet uid past 128 characters, as the node does", () => {
+        expect(() => l2psSettlementMessage(1, "u".repeat(129), 1n)).toThrow("invalid L2PS uid")
+        expect(() => l2psSettlementMessage(1, "u".repeat(128), 1n)).not.toThrow()
+    })
+
     it("splits an account into two big-endian 128-bit limbs", () => {
         const [hi, lo] = l2psAccountLimbs("0x" + "ff".repeat(16) + "00".repeat(15) + "01")
         expect(hi).toBe((1n << 128n) - 1n)
@@ -116,11 +121,15 @@ const NETWORK_INFO = {
     chainId: CHAIN_ID,
 }
 
-/** A Demos whose only node contact is network info, fee parameters and nonce. */
-async function connectedDemos(confirmedNonce = 6) {
+/**
+ * A Demos whose only node contact is network info, fee parameters and the
+ * nonces. The L1 and L2PS nonces differ, so a test sees which one was used.
+ */
+async function connectedDemos(confirmedNonce = 6, l2psNonce = 2) {
     const demos = new Demos()
     jest.spyOn(demos, "getNetworkInfo").mockResolvedValue(NETWORK_INFO as never)
     jest.spyOn(demos, "getAddressNonce").mockResolvedValue(confirmedNonce)
+    jest.spyOn(demos, "getL2PSNonce").mockResolvedValue(l2psNonce)
     const internals = demos as unknown as { _getNetworkParametersCached: () => Promise<unknown> }
     jest.spyOn(internals, "_getNetworkParametersCached").mockResolvedValue({
         networkFee: 1,
@@ -147,7 +156,7 @@ describe("buildSettledL2PSTransfer", () => {
         expect(tx.content.type).toBe("native")
         expect(tx.content.from).toBe(from)
         expect(tx.content.to).toBe(TO.toLowerCase())
-        expect(tx.content.nonce).toBe(7)
+        expect(tx.content.nonce).toBe(3)
         expect(payload.nativeOperation).toBe("send")
         expect(payload.args).toEqual([TO.toLowerCase(), "5000000000"])
         expect(payload.l2ps_uid).toBe(UID)
@@ -251,6 +260,54 @@ describe("buildSettledL2PSTransfer", () => {
             ),
         ).toBe(true)
         expect(demos.getAddressNonce).not.toHaveBeenCalled()
+        expect(demos.getL2PSNonce).not.toHaveBeenCalled()
+    })
+
+    it("signs the next L2PS nonce of the subnet, never the L1 nonce", async () => {
+        const demos = await connectedDemos(40, 2)
+        const tx = await buildSettledL2PSTransfer(demos, { to: TO, amount: 1n, l2psUid: UID })
+        const from = (await demos.getEd25519Address()).toLowerCase()
+        expect(tx.content.nonce).toBe(3)
+        expect(demos.getL2PSNonce).toHaveBeenCalledWith(from, UID)
+        expect(demos.getAddressNonce).not.toHaveBeenCalled()
+        // The commitment binds the same nonce the content carries.
+        const s = payloadOf(tx).settlement!
+        const c = l2psSettlementCommitment({
+            from,
+            to: TO.toLowerCase(),
+            amount: 1n,
+            fee: BigInt(s.fee),
+            nonce: 3n,
+            salt: l2psHexToField(s.salt),
+        })
+        expect(l2psFieldToHex(c)).toBe(s.commitment)
+    })
+
+    it("with auto-nonce, sequences each subnet on its own counter, apart from L1", async () => {
+        const demos = await connectedDemos(40, 2)
+        const nonceIn = jest.fn(async (_address: string, uid: string) => (uid === UID ? 2 : 10))
+        jest.spyOn(demos, "getL2PSNonce").mockImplementation(nonceIn)
+        demos.enableAutoNonce()
+        const build = (l2psUid: string) =>
+            buildSettledL2PSTransfer(demos, { to: TO, amount: 1n, l2psUid })
+
+        // Two transfers sent before either settles must not share a nonce.
+        const [a, b] = await Promise.all([build(UID), build(UID)])
+        expect([a.content.nonce, b.content.nonce].sort()).toEqual([3, 4])
+        expect((await build("other_subnet")).content.nonce).toBe(11)
+        expect((await build(UID)).content.nonce).toBe(5)
+        expect(nonceIn).toHaveBeenCalledTimes(2)
+
+        // The L1 counter is untouched by them.
+        const from = (await demos.getEd25519Address()).toLowerCase()
+        const l1 = demos._nonceReserver(from)!
+        expect(await l1()).toBe(41)
+
+        // A reset of one subnet reseeds only that subnet.
+        demos.resetNonce(from, UID)
+        expect((await build(UID)).content.nonce).toBe(3)
+        expect((await build("other_subnet")).content.nonce).toBe(12)
+        expect(await l1()).toBe(42)
     })
 
     it("refuses a given fee below the node's native transfer fee", async () => {
@@ -286,7 +343,9 @@ describe("buildSettledL2PSTransfer", () => {
             args: [TO.toLowerCase(), "2000000000"],
             l2ps_uid: UID,
         })
+        // Without settlement the node still sequences L2PS sends on L1.
         expect(tx.content.nonce).toBe(7)
+        expect(demos.getL2PSNonce).not.toHaveBeenCalled()
     })
 
     it("refuses to settle without a chain id or before the OS denomination", async () => {
@@ -306,5 +365,30 @@ describe("buildSettledL2PSTransfer", () => {
         await expect(
             buildSettledL2PSTransfer(preFork, { to: TO, amount: 1n, l2psUid: UID }),
         ).rejects.toThrow(/osDenomination/)
+    })
+})
+
+describe("Demos.getL2PSNonce", () => {
+    const ADDRESS = "0x" + "11".repeat(32)
+
+    it("asks the node for the subnet's nonce of the account", async () => {
+        const demos = new Demos()
+        const nodeCall = jest.spyOn(demos, "nodeCall").mockResolvedValue(4 as never)
+        expect(await demos.getL2PSNonce(ADDRESS, UID)).toBe(4)
+        expect(nodeCall).toHaveBeenCalledWith("getL2PSNonce", { l2psUid: UID, address: ADDRESS })
+    })
+
+    it("reads 0 for an account that never settled there", async () => {
+        const demos = new Demos()
+        jest.spyOn(demos, "nodeCall").mockResolvedValue(0 as never)
+        expect(await demos.getL2PSNonce(ADDRESS, UID)).toBe(0)
+    })
+
+    it("throws on a reply that is not a nonce instead of defaulting to 0", async () => {
+        const demos = new Demos()
+        for (const reply of [null, undefined, -1, 1.5, "3", "Failed to read the L2PS nonce", {}]) {
+            jest.spyOn(demos, "nodeCall").mockResolvedValue(reply as never)
+            await expect(demos.getL2PSNonce(ADDRESS, UID)).rejects.toThrow(/no valid L2PS nonce/)
+        }
     })
 })

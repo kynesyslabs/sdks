@@ -137,6 +137,11 @@ type WalletConnectionOptions = {
 }
 
 /** Bounded description of an unexpected nodeCall reply. */
+/** The nonce-manager key of an account's private transfers in one subnet; no address holds ":". */
+function l2psNonceKey(address: string, l2psUid: string): string {
+    return `${address}:l2ps:${l2psUid}`
+}
+
 function describeNonceReply(reply: unknown): string {
     const body = (reply as { response?: unknown } | null)?.response
     let description: string
@@ -2046,6 +2051,37 @@ export class Demos {
     }
 
     /**
+     * The nonce of the last private transfer `address` settled in the L2PS
+     * subnet `l2psUid`; the next transfer there signs this + 1.
+     *
+     * Private transfers settle against this per-subnet nonce, never against
+     * the L1 nonce of {@link getAddressNonce}, so an L1 send does not wait for
+     * a private transfer to settle and the two counters move independently.
+     * It is consensus state, so any node answers it, member of the subnet or
+     * not. It advances when the transfer's batch settles, not when the subnet
+     * accepts the transfer.
+     *
+     * @param address - The account address (hex)
+     * @param l2psUid - The subnet uid
+     * @returns The settled L2PS nonce, 0 for an account that never settled there.
+     * @throws When the lookup fails or the reply is not a non-negative integer.
+     */
+    async getL2PSNonce(address: string, l2psUid: string): Promise<number> {
+        const nonceValue = await this.nodeCall("getL2PSNonce", {
+            l2psUid,
+            address,
+        })
+
+        if (Number.isSafeInteger(nonceValue) && nonceValue >= 0) {
+            return nonceValue
+        }
+
+        throw new Error(
+            `getL2PSNonce: node returned no valid L2PS nonce for ${describeNonceReply(address)} in ${describeNonceReply(l2psUid)}: ${describeNonceReply(nonceValue)}`,
+        )
+    }
+
+    /**
      * Read an account's transaction history from an L2PS subnet.
      *
      * Subnet transactions are encrypted, so no explorer can resolve them and
@@ -2307,11 +2343,14 @@ export class Demos {
     /**
      * Reseed the local nonce counter for `address` (or every address) from the
      * node on the next send. Call after a nonce-rejection, or when the same
-     * key may have sent from another client.
+     * key may have sent from another client. With `l2psUid`, reseeds the
+     * private-transfer counter of that subnet instead of the L1 one.
      */
-    resetNonce(address?: string): void {
+    resetNonce(address?: string, l2psUid?: string): void {
         if (address === undefined) {
             this._nonceManager.resetAll()
+        } else if (l2psUid !== undefined) {
+            this._nonceManager.reset(l2psNonceKey(address, l2psUid))
         } else {
             this._nonceManager.reset(address)
         }
@@ -2341,6 +2380,26 @@ export class Demos {
             this._nonceManager.reserve(
                 address,
                 async () => (await this.getAddressNonce(address)) + 1,
+            )
+    }
+
+    /**
+     * The `_nonceReserver` of private transfers in one subnet: its own counter,
+     * seeded from {@link getL2PSNonce}, because the L1 counter does not
+     * sequence them. Only the next nonce settles there, so a client sending
+     * several private transfers before their batch settles needs this local
+     * counter to keep them distinct.
+     *
+     * @internal
+     */
+    _l2psNonceReserver(address: string, l2psUid: string): (() => Promise<number>) | undefined {
+        if (!this._autoNonce) {
+            return undefined
+        }
+        return () =>
+            this._nonceManager.reserve(
+                l2psNonceKey(address, l2psUid),
+                async () => (await this.getL2PSNonce(address, l2psUid)) + 1,
             )
     }
 
