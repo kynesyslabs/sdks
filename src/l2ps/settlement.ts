@@ -41,7 +41,7 @@ export interface L2PSSettlementOpening {
     amount: bigint
     /** OS. */
     fee: bigint
-    /** The sender's L1 nonce this transfer spends. */
+    /** The sender's L2PS nonce in the subnet this transfer settles in. */
     nonce: bigint
     salt: bigint
 }
@@ -131,7 +131,10 @@ export interface SettledL2PSTransferOptions {
      * connected node; a lower fee is refused here, as settlement would.
      */
     fee?: bigint
-    /** Defaults to the sender's next L1 nonce (or the auto-nonce reservation). */
+    /**
+     * Defaults to the sender's next L2PS nonce in `l2psUid` (or the auto-nonce
+     * reservation for that subnet). With `settle: false`, the next L1 nonce.
+     */
     nonce?: number
     /** Defaults to the chain id the connected node reports. */
     chainId?: number
@@ -181,11 +184,15 @@ export async function buildSettledL2PSTransfer(
     }
     await internals._assertAmountAcceptableOnTargetNode(amount)
 
-    const nonce = await resolveNonce(
-        options.nonce,
-        () => demos.getAddressNonce(from),
-        demos._nonceReserver(from),
-    )
+    // A settled transfer spends the sender's nonce in this subnet, not the L1
+    // one; a node without settlement still sequences L2PS sends on L1.
+    const nonce = settle
+        ? await resolveNonce(
+              options.nonce,
+              () => demos.getL2PSNonce(from, options.l2psUid),
+              demos._l2psNonceReserver(from, options.l2psUid),
+          )
+        : await resolveNonce(options.nonce, () => demos.getAddressNonce(from), demos._nonceReserver(from))
 
     const tx = await demos.tx.prepare()
     tx.content.type = "native"
