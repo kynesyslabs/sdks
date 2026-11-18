@@ -1,6 +1,7 @@
 import forge from 'node-forge'
 import { DemosWebAuth } from './DemosWebAuth'
 import { required } from './utils/required'
+import { hideSecretFields, INSPECT_CUSTOM, redactedInspect } from '@/encryption/secretFields'
 
 // INFO This class is to be used as part of DemosWebAuthenticator (e.g. DemosWebAuth.getInstance().rsa().refresh())
 export class RSA {
@@ -8,7 +9,18 @@ export class RSA {
   keypair = <forge.pki.rsa.KeyPair | null>null
   stringified_keypair = ""
 
-  constructor () {}
+  constructor () {
+    hideSecretFields(this, ['keypair', 'stringified_keypair'])
+  }
+
+  /** Serialises without key material. Read `keypair` by name to export it. */
+  toJSON () {
+    return { hasKeypair: !!this.keypair }
+  }
+
+  [INSPECT_CUSTOM] () {
+    return redactedInspect('RSA', this.toJSON())
+  }
 
   // INFO Singleton pattern
   static getInstance () {

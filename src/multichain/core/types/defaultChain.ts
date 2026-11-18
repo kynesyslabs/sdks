@@ -6,6 +6,11 @@ import {
     SolanaReadAccountDataOptions,
     XmTransactionResponse,
 } from "./interfaces"
+import {
+    hideSecretFields,
+    INSPECT_CUSTOM,
+    redactedInspect,
+} from "@/encryption/secretFields"
 
 export abstract class DefaultChain {
     provider: any = null
@@ -20,9 +25,30 @@ export abstract class DefaultChain {
     // if the user specifies the rpc_url in the constructor,
     // as we cannot use await in the constructor
     constructor(rpc_url: string) {
+        // Subclasses keep keypairs, signers and HD wallets in these two fields.
+        hideSecretFields(this, ["signer", "wallet"])
         if (rpc_url) {
             this.setRpc(rpc_url)
         }
+    }
+
+    /**
+     * Serialises without key material. rpc_url is left out because provider
+     * URLs often carry an API key.
+     */
+    toJSON() {
+        return {
+            name: this.name,
+            connected: this.connected,
+            walletConnected: !!(this.wallet || this.signer),
+        }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect(
+            `${this.constructor?.name ?? "DefaultChain"}`,
+            this.toJSON(),
+        )
     }
 
     // SECTION: Global methods

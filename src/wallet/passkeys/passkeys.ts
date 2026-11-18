@@ -39,7 +39,6 @@ export class PasskeyGenerator {
             console.log(`Successfully generated a passkey!`);
             // Read the private key from the file
             const privateKey = fs.readFileSync('hmywallet/private_key.txt', 'utf8');
-            console.log(`Private key: ${privateKey}`);
             fs.rmSync('hmywallet/private_key.txt');
             return privateKey;
 

@@ -13,6 +13,7 @@ import { UnifiedCrypto } from "@/encryption/unifiedCrypto";
 import { serializeTransactionContent } from "@/denomination/serializerGate";
 import forge from "node-forge";
 import { Hashing } from "@/encryption/Hashing";
+import { hideSecretFields, INSPECT_CUSTOM, redactedInspect } from "@/encryption/secretFields";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
 import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
 
@@ -138,11 +139,21 @@ export default class L2PS {
             throw new Error('Private key and IV are required');
         }
 
+        hideSecretFields(this, ["privateKey", "iv"]);
         this.privateKey = privateKey;
         this.iv = iv;
         // privateKey is forge binary bytes, not text
         this.id = Hashing.sha256(privateKey, "raw");
         L2PS.instances.set(this.id, this);
+    }
+
+    /** Serialises without the AES key and IV; `id` is a hash of the key, not the key. */
+    toJSON() {
+        return { id: this.id, config: this.config ?? null };
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("L2PS", this.toJSON());
     }
 
     /**
