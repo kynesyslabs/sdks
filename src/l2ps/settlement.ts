@@ -105,9 +105,17 @@ export function l2psSettlementMessage(
     )
 }
 
+/** Longest subnet uid a node settles; it becomes a key in the signer's stored L2PS nonces. */
+export const L2PS_UID_MAX_LENGTH = 128
+
 function assertL2psUid(l2psUid: string): void {
     // A colon in the uid would let one message parse as another subnet's.
-    if (typeof l2psUid !== "string" || l2psUid.length === 0 || l2psUid.includes(":")) {
+    if (
+        typeof l2psUid !== "string" ||
+        l2psUid.length === 0 ||
+        l2psUid.length > L2PS_UID_MAX_LENGTH ||
+        l2psUid.includes(":")
+    ) {
         throw new Error("invalid L2PS uid")
     }
 }

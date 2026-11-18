@@ -73,6 +73,11 @@ describe("encoding rules", () => {
     const A = "0x" + "11".repeat(32)
     const base = { from: A, to: A, amount: 1n, fee: 1n, nonce: 1n, salt: 1n }
 
+    it("refuses a subnet uid past 128 characters, as the node does", () => {
+        expect(() => l2psSettlementMessage(1, "u".repeat(129), 1n)).toThrow("invalid L2PS uid")
+        expect(() => l2psSettlementMessage(1, "u".repeat(128), 1n)).not.toThrow()
+    })
+
     it("splits an account into two big-endian 128-bit limbs", () => {
         const [hi, lo] = l2psAccountLimbs("0x" + "ff".repeat(16) + "00".repeat(15) + "01")
         expect(hi).toBe((1n << 128n) - 1n)
