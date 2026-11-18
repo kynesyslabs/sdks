@@ -22,7 +22,7 @@ import { OS_PER_DEM } from "@/denomination"
 import { resolveNonce } from "@/utils"
 
 export const L2PS_SETTLEMENT_VERSION = 1
-export const L2PS_SETTLEMENT_SIGNATURE_DOMAIN = "l2ps-settlement:v1:"
+export const L2PS_SETTLEMENT_SIGNATURE_DOMAIN = "l2ps-settlement:v2:"
 /** Amounts, fees, balances and net change magnitudes stay below this. */
 export const L2PS_SETTLEMENT_AMOUNT_LIMIT = 1n << 128n
 export const L2PS_SETTLEMENT_NONCE_LIMIT = 1n << 64n
@@ -89,7 +89,7 @@ export function l2psSettlementCommitment(o: L2PSSettlementOpening): bigint {
 
 /**
  * What the sender signs with their account key:
- * `l2ps-settlement:v1:<chainId>:<l2psUid>:<c as 0x + 64 hex>`.
+ * `l2ps-settlement:v2:<chainId>:<l2psUid>:<c as 0x + 64 hex>`.
  */
 export function l2psSettlementMessage(
     chainId: number,
