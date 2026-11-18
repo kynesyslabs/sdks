@@ -6,6 +6,11 @@ import { RSA } from "./rsa"
 import { IKeyPair, IStringifiedKeyPair } from "./types/KeyPair"
 import { Cryptography, deriveKeyPairFromSeed } from "@/encryption/Cryptography"
 import { warnLegacySeedPath } from "@/encryption/legacySeedWarning"
+import {
+    hideSecretFields,
+    INSPECT_CUSTOM,
+    redactedInspect,
+} from "@/encryption/secretFields"
 
 // TODO Could this be an universal "Sign in with DEMOS" ? Maybe
 
@@ -18,9 +23,19 @@ export class DemosWebAuth {
     stringified_keypair = <IStringifiedKeyPair>null
 
     constructor() {
+        hideSecretFields(this, ["keypair", "stringified_keypair"])
         this.loggedIn = false
         this.keypair = null
         this.stringified_keypair = null
+    }
+
+    /** Serialises without key material. Read `keypair` by name to export it. */
+    toJSON() {
+        return { loggedIn: this.loggedIn }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("DemosWebAuth", this.toJSON())
     }
 
     /**

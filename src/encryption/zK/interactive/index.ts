@@ -1,5 +1,10 @@
 import bigInt from "big-integer"
 import generateLargePrime from "@/encryption/zK/primer"
+import {
+    hideSecretFields,
+    INSPECT_CUSTOM,
+    redactedInspect,
+} from "@/encryption/secretFields"
 
 export class Prover {
     private secret: bigInt.BigInteger
@@ -7,8 +12,19 @@ export class Prover {
     private randomValue: any
 
     constructor(prime1: any, prime2: any, secret: bigInt.BigInteger) {
+        // randomValue is the per-round nonce; with the response it reveals the secret.
+        hideSecretFields(this, ["secret", "randomValue"])
         this.modulus = prime1.multiply(prime2)
         this.secret = secret
+    }
+
+    /** Serialises without the secret or the round nonce. */
+    toJSON() {
+        return { modulus: this.modulus?.toString() ?? null }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("Prover", this.toJSON())
     }
 
     generateCommitment(): any {

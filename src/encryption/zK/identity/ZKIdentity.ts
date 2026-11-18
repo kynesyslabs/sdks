@@ -12,6 +12,7 @@
 import * as CommitmentService from './CommitmentService'
 import * as ProofGenerator from './ProofGenerator'
 import { ZK_ATTESTATION_CONTEXT } from './attestationContext'
+import { hideSecretFields, INSPECT_CUSTOM, redactedInspect } from '../../secretFields'
 
 export interface IdentityCommitmentPayload {
     commitment_hash: string
@@ -62,8 +63,18 @@ export class ZKIdentity {
      * If lost, you cannot create attestations for this commitment.
      */
     constructor(providerId: string, secret?: string) {
+        hideSecretFields(this, ['secret'])
         this.providerId = providerId
         this.secret = secret || CommitmentService.generateSecret()
+    }
+
+    /** Serialises without the secret. Use export() for a backup that includes it. */
+    toJSON() {
+        return { providerId: this.providerId }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect('ZKIdentity', this.toJSON())
     }
 
     /**

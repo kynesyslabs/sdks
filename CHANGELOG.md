@@ -93,6 +93,21 @@
   query characters and use the punycode (`xn--`) form for hostnames.
 
 ### Fixed
+- Objects that hold seeds or private keys no longer expose them through
+  `JSON.stringify`, `console.log`/`util.inspect`, object spread,
+  `Object.keys` or `structuredClone`: `Demos`, `UnifiedCrypto`, `Enigma`,
+  `Falcon`, `DemosWebAuth`, `RSA`, `wallet.Wallet`, `L2PS`, `ZKIdentity`,
+  the interactive zK `Prover` and every XM chain SDK (`DefaultChain`
+  subclasses). The key fields are non-enumerable and each class has a
+  redacting `toJSON()` and Node inspect hook. Reading a field by name
+  (`demos.crypto.masterSeed`, `demos.keypair`, `wallet.ed25519_hex`, ...)
+  and the explicit export methods (`ZKIdentity.export()`,
+  `Falcon.getPrivateKey()`, ...) still return the secret. Browser devtools
+  still show non-enumerable fields when an object is expanded by hand.
+  `PasskeyGenerator.generate` no longer logs the private key,
+  `EVM.getContractInstance` no longer logs the instance, and the Falcon
+  `mnemonicToUint8Array` error names the word's position instead of the
+  word.
 - `Demos.connectWallet(<string>)` now throws `Invalid recovery phrase` when the
   string is not a valid BIP-39 mnemonic (a 128-character hex string still
   throws `Invalid mnemonic`). A phrase with the right word count but

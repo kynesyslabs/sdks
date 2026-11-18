@@ -1,5 +1,10 @@
 import { sha256 } from '@noble/hashes/sha2';
 import { Enigma } from "./PQC/enigma"
+import {
+    hideSecretFields,
+    INSPECT_CUSTOM,
+    redactedInspect,
+} from "./secretFields"
 import { hkdf } from "@noble/hashes/hkdf"
 import { randomBytes } from "@noble/hashes/utils"
 import * as forge from "node-forge"
@@ -136,9 +141,27 @@ export class UnifiedCrypto {
     private instanceId: string
 
     private constructor(instanceId: string, masterSeed?: Uint8Array) {
+        hideSecretFields(this, [
+            "masterSeed",
+            "ed25519KeyPair",
+            "rsaKeyPair",
+            "enigma",
+        ])
         this.enigma = new Enigma()
         this.masterSeed = masterSeed
         this.instanceId = instanceId
+    }
+
+    /** Serialises without key material. Read the key fields by name to export them. */
+    toJSON() {
+        return {
+            instanceId: this.instanceId,
+            hasMasterSeed: !!this.masterSeed,
+        }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("UnifiedCrypto", this.toJSON())
     }
 
     // Multiton pattern: get an instance by ID or create a new one
@@ -207,7 +230,6 @@ export class UnifiedCrypto {
     ): Promise<Uint8Array> {
         // Creating a new seed if none is provided and the master seed is not set
         await this.ensureSeed(seed)
-        //console.log("[UnifiedCrypto] Master seed:", this.masterSeed)
 
         // Deriving the seed for the given algorithms
 

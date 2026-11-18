@@ -65,6 +65,11 @@ import { GCRGeneration } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import { audienceKey, bodyBoundAuthHeaders } from "./utils/bodyBoundAuth"
 import { warnLegacySeedPath } from "@/encryption/legacySeedWarning"
+import {
+    hideSecretFields,
+    INSPECT_CUSTOM,
+    redactedInspect,
+} from "@/encryption/secretFields"
 import { OS_PER_DEM, demToOs, parseOsString } from "@/denomination"
 import { assertValidNonce, resolveNonce } from "@/utils"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
@@ -278,7 +283,31 @@ export class Demos {
     }
 
     constructor() {
+        hideSecretFields(this, ["crypto"])
         this.crypto = UnifiedCrypto.getInstance(this._cryptoInstanceId)
+    }
+
+    /**
+     * Serialises without key material. The keys stay reachable by name
+     * (`demos.keypair`, `demos.crypto`) for callers that export them on purpose.
+     */
+    toJSON() {
+        let walletConnected = false
+        try {
+            walletConnected = !!this.walletConnected
+        } catch {
+            // An unknown algorithm makes the keypair getter throw; a log line must not.
+        }
+        return {
+            algorithm: this.algorithm,
+            connected: this.connected,
+            walletConnected,
+            dual_sign: this.dual_sign,
+        }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("Demos", this.toJSON())
     }
 
     static get instance() {

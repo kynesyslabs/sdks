@@ -60,10 +60,11 @@ export function mnemonicToUint8Array(mnemonic: string): Uint8Array {
     
     // Convert each word to its index in the word list
     const indices: number[] = [];
-    for (const word of words) {
+    for (const [position, word] of words.entries()) {
         const index = wordList.indexOf(word);
         if (index === -1) {
-            throw new Error(`Invalid word in mnemonic: ${word}`);
+            // A mistyped word is most of a real word, so it is a secret too.
+            throw new Error(`Invalid mnemonic: word ${position + 1} is not in the wordlist`);
         }
         indices.push(index);
     }

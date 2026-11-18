@@ -7,6 +7,7 @@ import { required } from "./utils"
 import axios from "axios"
 import { ECPairAPI, ECPairFactory, ECPairInterface } from "ecpair"
 import { DefaultChain } from "@/multichain/core/types/defaultChain"
+import { hideSecretFields } from "@/encryption/secretFields"
 import { IPayParams } from "@/multichain/core/types/interfaces"
 
 const ECPair: ECPairAPI = ECPairFactory(ecc)
@@ -42,6 +43,8 @@ export class BTC extends DefaultChain {
         network: bitcoin.Network = BITCOIN_CONSTANTS.DEFAULT_NETWORK,
     ) {
         super(rpc_url)
+        // Entries carry the derived HD child keys used to sign the last tx.
+        hideSecretFields(this, ["lastUsedUtxos"])
         this.name = "btc"
         this.provider = rpc_url
         this.network = network
