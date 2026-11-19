@@ -63,6 +63,11 @@ export interface NetworkInfo {
          * accepted again, bound to their sender.
          */
         tlsnVerified?: ForkStatus
+        /**
+         * Nodes link GitHub, Discord and Twitter accounts through TLSNotary
+         * only and refuse the web2 proof-URL path for them.
+         */
+        keylessWeb2Identity?: ForkStatus
     }
     /**
      * Network identity from the node's genesis. Bound into the signature

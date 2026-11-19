@@ -44,7 +44,7 @@ import { uint8ArrayToHex, UnifiedCrypto } from "@/encryption"
 import { _required as required, DemosTransactions } from "@/websdk"
 import { resolveNonce } from "@/utils"
 import { xmBoundProofMessage } from "./xmProof"
-import { isTlsnVerifiedActive } from "@/tlsnotary/network"
+import { isKeylessWeb2IdentityActive, isTlsnVerifiedActive } from "@/tlsnotary/network"
 
 type IdentityContext = "xm" | "web2" | "pqc" | "ud" | "nomis" | "humanpassport" | "ethos" | "tlsn"
 
@@ -78,6 +78,31 @@ function assertHumanPassportScore(claim: Partial<HumanPassportClaim>): void {
     if (claim.score! < claim.threshold!) {
         throw new Error(
             `Human Passport score ${claim.score} is below the threshold ${claim.threshold}`,
+        )
+    }
+}
+
+/** Contexts that `keylessWeb2Identity` moves off the web2 proof-URL path. */
+const KEYLESS_WEB2_CONTEXTS: ReadonlySet<string> = new Set(["github", "discord", "twitter"])
+
+/**
+ * Failing locally saves the fee of a link the node would refuse. A client
+ * that cannot read the network's forks sends the transaction and lets the
+ * node decide.
+ */
+async function keylessWeb2IdentityActive(demos: Demos): Promise<boolean> {
+    if (typeof demos?.getNetworkInfo !== "function") return false
+    try {
+        return isKeylessWeb2IdentityActive(await demos.getNetworkInfo())
+    } catch {
+        return false
+    }
+}
+
+async function assertWeb2ProofPathOpen(demos: Demos, context: string): Promise<void> {
+    if (KEYLESS_WEB2_CONTEXTS.has(context) && (await keylessWeb2IdentityActive(demos))) {
+        throw new Error(
+            `${context} accounts link through TLSNotary on this network (keylessWeb2Identity); use addWeb2IdentityViaTLSN.`,
         )
     }
 }
@@ -228,6 +253,7 @@ export class Identities {
         options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
+            await assertWeb2ProofPathOpen(demos, payload.context)
             if (
                 payload.context !== "telegram" &&
                 typeof payload.proof === "string" &&
@@ -446,6 +472,9 @@ export class Identities {
         referralCode?: string,
         options?: { nonce?: number },
     ) {
+        // Before the platform lookup, so the caller sees why the link is
+        // refused rather than a lookup error.
+        await assertWeb2ProofPathOpen(demos, "github")
         const username = payload.split("/")[3]
         const ghUser = await axios.get(
             `https://api.github.com/users/${username}`,
@@ -474,9 +503,11 @@ export class Identities {
      * - "github": api.github.com/user
      * - "discord": discord.com/api/users/@me
      * - "telegram": backend's /api/telegram/user
+     * - "twitter": api.x.com/2/users/me (user OAuth2 token; `data.username`,
+     *   `data.id` as a decimal string), with keylessWeb2Identity active
      *
      * @param demos A Demos instance to communicate with the RPC.
-     * @param context The platform context ("github", "discord", or "telegram").
+     * @param context The platform context ("github", "discord", "telegram" or "twitter").
      * @param proof The TLSNotary presentation (from attestResult.presentation).
      * @param username Username from the proven response.
      * @param userId User ID from the proven response.
@@ -501,7 +532,15 @@ export class Identities {
         options?: { nonce?: number; legacy?: boolean },
     ): Promise<RPCResponseWithValidityData> {
         // Failing here saves the fee of a transaction the node would refuse.
-        if (isTlsnVerifiedActive(await demos.getNetworkInfo())) {
+        const info = await demos.getNetworkInfo()
+        // Only nodes with keylessWeb2Identity know the X endpoint; `legacy`
+        // keeps older links working and does not open a new context.
+        if (context === "twitter" && !isKeylessWeb2IdentityActive(info)) {
+            throw new Error(
+                "TLSN identity links for the twitter context need keylessWeb2Identity active on the network.",
+            )
+        }
+        if (isTlsnVerifiedActive(info)) {
             // The node verifies the notary signature and the sender binding,
             // but a Telegram proof comes from the Demos backend, not from
             // Telegram, so it proves nothing about the account.
@@ -574,6 +613,9 @@ export class Identities {
         referralCode?: string,
         options?: { nonce?: number },
     ) {
+        // Before the platform lookup, so the caller sees why the link is
+        // refused rather than a lookup error.
+        await assertWeb2ProofPathOpen(demos, "twitter")
         const data = await demos.web2.getTweet(payload)
 
         if (!data.success) {
@@ -610,6 +652,9 @@ export class Identities {
         referralCode?: string,
         options?: { nonce?: number },
     ) {
+        // Before the platform lookup, so the caller sees why the link is
+        // refused rather than a lookup error.
+        await assertWeb2ProofPathOpen(demos, "discord")
         const data = await demos.web2.getDiscordMessage(payload)
 
         if (!data.success) {

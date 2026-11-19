@@ -28,6 +28,7 @@ const BIND_PURPOSES: ReadonlySet<string> = new Set<TLSNBindPurpose>([
     "github",
     "discord",
     "telegram",
+    "twitter",
     "store",
 ])
 

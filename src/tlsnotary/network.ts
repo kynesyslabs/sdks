@@ -70,6 +70,15 @@ export function isTlsnVerifiedActive(info: NetworkInfo | null | undefined): bool
     return info?.forks?.tlsnVerified?.activated === true
 }
 
+/**
+ * Whether the network links GitHub, Discord and Twitter accounts through
+ * TLSNotary only (`keylessWeb2Identity`), so validators need no platform API
+ * keys and refuse the web2 proof-URL path for those contexts.
+ */
+export function isKeylessWeb2IdentityActive(info: NetworkInfo | null | undefined): boolean {
+    return info?.forks?.keylessWeb2Identity?.activated === true
+}
+
 /** The notary an attestation should use and trust. */
 export interface ResolvedNotary {
     notaryUrl: string
