@@ -99,6 +99,14 @@ async function keylessWeb2IdentityActive(demos: Demos): Promise<boolean> {
     }
 }
 
+async function assertWeb2ProofPathOpen(demos: Demos, context: string): Promise<void> {
+    if (KEYLESS_WEB2_CONTEXTS.has(context) && (await keylessWeb2IdentityActive(demos))) {
+        throw new Error(
+            `${context} accounts link through TLSNotary on this network (keylessWeb2Identity); use addWeb2IdentityViaTLSN.`,
+        )
+    }
+}
+
 export class Identities {
     formats = {
         web2: {
@@ -245,14 +253,7 @@ export class Identities {
         options?: { nonce?: number },
     ): Promise<RPCResponseWithValidityData> {
         if (context === "web2") {
-            if (
-                KEYLESS_WEB2_CONTEXTS.has(payload.context) &&
-                (await keylessWeb2IdentityActive(demos))
-            ) {
-                throw new Error(
-                    `${payload.context} accounts link through TLSNotary on this network (keylessWeb2Identity); use addWeb2IdentityViaTLSN.`,
-                )
-            }
+            await assertWeb2ProofPathOpen(demos, payload.context)
             if (
                 payload.context !== "telegram" &&
                 typeof payload.proof === "string" &&
@@ -471,6 +472,9 @@ export class Identities {
         referralCode?: string,
         options?: { nonce?: number },
     ) {
+        // Before the platform lookup, so the caller sees why the link is
+        // refused rather than a lookup error.
+        await assertWeb2ProofPathOpen(demos, "github")
         const username = payload.split("/")[3]
         const ghUser = await axios.get(
             `https://api.github.com/users/${username}`,
@@ -529,6 +533,13 @@ export class Identities {
     ): Promise<RPCResponseWithValidityData> {
         // Failing here saves the fee of a transaction the node would refuse.
         const info = await demos.getNetworkInfo()
+        // Only nodes with keylessWeb2Identity know the X endpoint; `legacy`
+        // keeps older links working and does not open a new context.
+        if (context === "twitter" && !isKeylessWeb2IdentityActive(info)) {
+            throw new Error(
+                "TLSN identity links for the twitter context need keylessWeb2Identity active on the network.",
+            )
+        }
         if (isTlsnVerifiedActive(info)) {
             // The node verifies the notary signature and the sender binding,
             // but a Telegram proof comes from the Demos backend, not from
@@ -536,11 +547,6 @@ export class Identities {
             if (context === "telegram") {
                 throw new Error(
                     "TLSN identity links for the telegram context are refused on networks with tlsnVerified active; link Telegram with addTelegramIdentity.",
-                )
-            }
-            if (context === "twitter" && !isKeylessWeb2IdentityActive(info)) {
-                throw new Error(
-                    "TLSN identity links for the twitter context need keylessWeb2Identity active on the network.",
                 )
             }
         } else if (!options?.legacy) {
@@ -607,6 +613,9 @@ export class Identities {
         referralCode?: string,
         options?: { nonce?: number },
     ) {
+        // Before the platform lookup, so the caller sees why the link is
+        // refused rather than a lookup error.
+        await assertWeb2ProofPathOpen(demos, "twitter")
         const data = await demos.web2.getTweet(payload)
 
         if (!data.success) {
@@ -643,6 +652,9 @@ export class Identities {
         referralCode?: string,
         options?: { nonce?: number },
     ) {
+        // Before the platform lookup, so the caller sees why the link is
+        // refused rather than a lookup error.
+        await assertWeb2ProofPathOpen(demos, "discord")
         const data = await demos.web2.getDiscordMessage(payload)
 
         if (!data.success) {

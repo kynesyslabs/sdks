@@ -50,7 +50,11 @@ const web2Link = (demos: Demos, context: string, proof: string) =>
         userId: "583231",
     } as any)
 
-const tlsnLink = (demos: Demos, context: "github" | "twitter") =>
+const tlsnLink = (
+    demos: Demos,
+    context: "github" | "twitter",
+    options?: { legacy?: boolean },
+) =>
     new Identities().addWeb2IdentityViaTLSN(
         demos,
         context,
@@ -60,6 +64,8 @@ const tlsnLink = (demos: Demos, context: "github" | "twitter") =>
         [1, 2, 3],
         "octocat",
         "583231",
+        undefined,
+        options,
     )
 
 const PROOFS: Record<string, string> = {
@@ -110,9 +116,42 @@ describe("twitter TLSN link", () => {
         expect(signed).toHaveLength(0)
     })
 
+    it("is refused in legacy mode on a network without keylessWeb2Identity", async () => {
+        const { demos, signed } = await signingDemos({})
+        await expect(tlsnLink(demos, "twitter", { legacy: true })).rejects.toThrow(
+            "keylessWeb2Identity",
+        )
+        expect(signed).toHaveLength(0)
+    })
+
     it("leaves github TLSN links unchanged without the fork", async () => {
         const { demos, signed } = await signingDemos({ tlsnVerified: true })
         await tlsnLink(demos, "github")
         expect(signed).toHaveLength(1)
+    })
+})
+
+describe("convenience web2 methods under keylessWeb2Identity", () => {
+    it("refuse before any platform lookup", async () => {
+        const { demos, signed } = await signingDemos({
+            tlsnVerified: true,
+            keylessWeb2Identity: true,
+        })
+        const lookups = [
+            jest.spyOn(demos.web2, "getTweet"),
+            jest.spyOn(demos.web2, "getDiscordMessage"),
+        ]
+        const ids = new Identities()
+        await expect(ids.addGithubIdentity(demos, PROOFS.github as any)).rejects.toThrow(
+            "keylessWeb2Identity",
+        )
+        await expect(ids.addTwitterIdentity(demos, PROOFS.twitter as any)).rejects.toThrow(
+            "keylessWeb2Identity",
+        )
+        await expect(ids.addDiscordIdentity(demos, PROOFS.discord as any)).rejects.toThrow(
+            "keylessWeb2Identity",
+        )
+        for (const lookup of lookups) expect(lookup).not.toHaveBeenCalled()
+        expect(signed).toHaveLength(0)
     })
 })
