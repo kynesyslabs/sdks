@@ -20,6 +20,7 @@ export * from './TokenTransaction'
 export * from './ValidatorStakeTransaction'
 export * from './ValidatorUnstakeTransaction'
 export * from './ValidatorExitTransaction'
+export * from './ValidatorChallengeTransaction'
 // Stackable-genesis governance (Phase 1 / upgradable_network)
 export * from './NetworkUpgradeTransaction'
 export * from './NetworkUpgradeVoteTransaction'
@@ -49,6 +50,7 @@ import { TokenExecutionTransaction } from './TokenTransaction'
 import { ValidatorStakeTransaction } from './ValidatorStakeTransaction'
 import { ValidatorUnstakeTransaction } from './ValidatorUnstakeTransaction'
 import { ValidatorExitTransaction } from './ValidatorExitTransaction'
+import { ValidatorChallengeTransaction } from './ValidatorChallengeTransaction'
 import { NetworkUpgradeTransaction } from './NetworkUpgradeTransaction'
 import { NetworkUpgradeVoteTransaction } from './NetworkUpgradeVoteTransaction'
 import { AtomicWorkTransaction } from './AtomicWorkTransaction'
@@ -77,6 +79,7 @@ export type SpecificTransaction =
     | ValidatorStakeTransaction
     | ValidatorUnstakeTransaction
     | ValidatorExitTransaction
+    | ValidatorChallengeTransaction
     | NetworkUpgradeTransaction
     | NetworkUpgradeVoteTransaction
     | AtomicWorkTransaction
