@@ -101,7 +101,7 @@ describe("bind header", () => {
         const ok = { purpose: "github" as const, sender: SENDER, requestTxHash: REQUEST_HASH }
         expect(() => buildBindValue({ ...ok, sender: "11".repeat(32) })).toThrow("sender")
         expect(() => buildBindValue({ ...ok, requestTxHash: "abc" })).toThrow("hash")
-        expect(() => buildBindValue({ ...ok, purpose: "twitter" as any })).toThrow("purpose")
+        expect(() => buildBindValue({ ...ok, purpose: "slack" as any })).toThrow("purpose")
         expect(() => buildBindValue({ ...ok, sender: `${SENDER}\r\nx: y` })).toThrow("sender")
     })
 

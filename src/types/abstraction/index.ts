@@ -442,7 +442,7 @@ export type EthosIdentityPayload =
 /**
  * Supported TLSN identity contexts
  */
-export type TLSNIdentityContext = "github" | "discord" | "telegram"
+export type TLSNIdentityContext = "github" | "discord" | "telegram" | "twitter"
 
 /**
  * Generic Web2 identity payload via TLSNotary
