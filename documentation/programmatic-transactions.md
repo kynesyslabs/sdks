@@ -64,6 +64,52 @@ within `maxFee` (DEM, default `5`). If it is exceeded, the tx is **signed and
 confirmed but NOT broadcast**, and the runner throws `FeeCapExceededError`
 carrying the fee details — a loud safety net against surprise fees.
 
+The confirmed fee (`feeOs` / `feeDem`) is the fee the node says it will
+charge, `transaction.attrs.total_fee`, when the confirm response carries it
+(native sends on nodes with kynesyslabs/node#1174). It can differ from the
+signed `transaction_fee` fields in either direction, depending on the node's
+forks. Without it (older nodes, other transactions) the runner sums the
+`transaction_fee` fields as before; a `total_fee` on anything other than a
+native send (including other native operations such as `tlsn_request`) is
+ignored, since the node quotes only native sends. A native send's
+`total_fee` that is present but not a non-negative base-10 integer string
+(digits only: no sign, hex, spaces, decimal point, exponent or leading zero)
+throws instead. The runner removes
+a `total_fee` left on the transaction by an earlier confirmation before it
+confirms, and ignores a quote whose `attrs.reference_block` is not the
+confirmation's `reference_block`. A quote is also refused (`invalid fee
+quote`) when the echoed `transaction_fee.network_fee` is neither a number
+nor a string: the node sends the quote without a unit, and the runner tells
+DEM from OS by that field's type.
+
+On nodes that return `attrs.total_fee` (check
+`r.transaction.attrs?.total_fee !== undefined`), you can send a whole
+balance: confirm a send of an amount the balance covers (for example with
+`confirm: "manual"`, which confirms without broadcasting), subtract its
+`feeOs` from the balance, then send that amount. On other nodes `feeOs` is
+the summed signed fee, which can be lower than the fee the node charges, so
+do not use this recipe there. With
+auto-nonce on (`demos.enableAutoNonce()`), the first confirmation reserves a
+nonce it never broadcasts, so pass the first result's nonce to the final
+send (`{ nonce: r.transaction.content.nonce }`), or call
+`demos.resetNonce()` first. Do not start by confirming the whole balance:
+such a node refuses a native send whose balance does not also cover its fee,
+so `demos.confirm` throws
+`[Confirm] Transaction is not valid` and no `feeOs` comes back. The native
+send fee does not depend on the amount: the node's quote
+(`quoteNativeSendFee` in kynesyslabs/node#1174) is its gas edit plus the
+distribution fees. Confirm again whenever balances, fees or forks may have
+changed, since the quote only holds for the state it was computed on.
+
+The runner only trusts a native send's quote from a confirmation it made
+itself. If you pass already-confirmed validity data (or a thunk returning
+it) for a native send whose transaction carries `attrs.total_fee`, the
+runner throws without broadcasting: a node without kynesyslabs/node#1174
+echoes the transaction's `attrs`, so that quote may be an earlier one. Pass
+the `Transaction` instead and the runner confirms it. Already-confirmed
+validity data for a native send without a quote is still checked against
+the summed `transaction_fee` fields, as before.
+
 ```ts
 import { FeeCapExceededError } from "@kynesyslabs/demosdk/websdk"
 
