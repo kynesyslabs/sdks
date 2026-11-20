@@ -41,7 +41,11 @@ export {
     type ChannelIdRegistry,
 } from "./channelIdRegistry"
 
-export { ChannelSession, type ChannelSessionOpts } from "./session"
+export {
+    ChannelSession,
+    type ChannelSessionOpts,
+    type ChannelSessionSnapshot,
+} from "./session"
 
 export {
     checkLiveness,
@@ -78,6 +82,7 @@ export {
     type RfqAcceptBody,
     type RfqEndBody,
     type StandingProposal,
+    type RfqSessionSnapshot,
 } from "./negotiate"
 
 export {
