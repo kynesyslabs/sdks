@@ -68,6 +68,12 @@ export interface NetworkInfo {
          * only and refuse the web2 proof-URL path for them.
          */
         keylessWeb2Identity?: ForkStatus
+        /**
+         * Validator seats are backed by a Solana node NFT instead of bonded
+         * DEM: a stake carries amount 0 and an NFT proof, seat transactions
+         * pay no gas, and `validatorChallenge` evicts a seat whose NFT moved.
+         */
+        nftValidatorGating?: ForkStatus
     }
     /**
      * Network identity from the node's genesis. Bound into the signature
@@ -110,4 +116,9 @@ export class SubDemPrecisionError extends Error {
         this.amountOs = amountOs
         this.subDemRemainderOs = subDemRemainderOs
     }
+}
+
+/** Whether the network backs validator seats with NFTs (`nftValidatorGating`). */
+export function isNftValidatorGatingActive(info: NetworkInfo | null | undefined): boolean {
+    return info?.forks?.nftValidatorGating?.activated === true
 }

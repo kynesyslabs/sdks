@@ -61,7 +61,7 @@ import {
     uint8ArrayToHex,
     UnifiedCrypto,
 } from "@/encryption/unifiedCrypto"
-import { GCRGeneration } from "./GCRGeneration"
+import { GCRGeneration, VALIDATOR_SEAT_TX_TYPES } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
 import { audienceKey, bodyBoundAuthHeaders } from "./utils/bodyBoundAuth"
 import { warnLegacySeedPath } from "@/encryption/legacySeedWarning"
@@ -75,6 +75,7 @@ import { assertValidNonce, resolveNonce } from "@/utils"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
 import {
     SubDemPrecisionError,
+    isNftValidatorGatingActive,
     type ForkStatus,
     type NetworkInfo,
 } from "@/denomination/networkInfo"
@@ -982,7 +983,14 @@ export class Demos {
             raw_tx.content.from = "0x" + raw_tx.content.from
         }
 
-        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
+        // Only seat txs depend on nftValidatorGating, so no other type waits
+        // on the fork lookup.
+        const nftValidatorGating =
+            VALIDATOR_SEAT_TX_TYPES.has(raw_tx.content.type) &&
+            (await this._isNftValidatorGatingActiveCached())
+        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx, false, {
+            nftValidatorGating,
+        })
 
         // Node is source of truth for governance-driven fees; edits-derived
         // calc kicks in only if RPC is unreachable or endpoint is missing.
@@ -2425,6 +2433,16 @@ export class Demos {
     }
 
     /**
+     * The validator whose seat a Solana NFT mint currently backs, active or
+     * unstaking. Returns null when the mint is free to back a new seat.
+     */
+    async getValidatorByMint(mint: string): Promise<ValidatorInfo | null> {
+        return (await this.nodeCall("getValidatorByMint", {
+            mint,
+        })) as ValidatorInfo | null
+    }
+
+    /**
      * Convenience: return a single validator's current staked amount as a
      * bigint-encoded string. Returns `"0"` for non-validators.
      */
@@ -2650,6 +2668,20 @@ export class Demos {
     private async _isSignatureDomainActiveCached(): Promise<boolean> {
         const info = await this.getNetworkInfo()
         return Boolean(info?.forks?.signatureDomain?.activated)
+    }
+
+    /**
+     * @internal
+     * Whether the node backs validator seats with NFTs, which makes seat txs
+     * gasless. `false` when the node cannot be read: a node that predates the
+     * fork still expects the gas edit.
+     */
+    private async _isNftValidatorGatingActiveCached(): Promise<boolean> {
+        try {
+            return isNftValidatorGatingActive(await this.getNetworkInfo())
+        } catch {
+            return false
+        }
     }
 
     /**

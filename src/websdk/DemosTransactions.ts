@@ -1,5 +1,9 @@
 import forge from "node-forge"
 import { AtomicWorkPayload } from "@/types/blockchain/TransactionSubtypes/AtomicWorkTransaction"
+import type {
+    ValidatorNftProof,
+    ValidatorStakePayload,
+} from "@/types/blockchain/TransactionSubtypes/ValidatorStakeTransaction"
 
 import { Demos } from "./demosclass"
 import { sha256 } from "./utils/sha256"
@@ -9,7 +13,7 @@ import type { SigningAlgorithm, Transaction } from "@/types"
 import type { L2PSHashPayload } from "@/types/blockchain/TransactionSubtypes/L2PSHashTransaction"
 import type { NetworkParameters } from "@/types/blockchain/NetworkParameters"
 import { IKeyPair } from "./types/KeyPair"
-import { GCRGeneration } from "./GCRGeneration"
+import { GCRGeneration, isSolanaBase58 } from "./GCRGeneration"
 import { _required as required } from "./utils/required"
 import { RPCResponse, RPCResponseWithValidityData } from "@/types/communication/rpc"
 import { Cryptography } from "@/encryption"
@@ -20,6 +24,7 @@ import { BroadcastFailedError } from "./BroadcastFailedError"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
 import { txSignaturePreimage } from "./utils/txSignaturePreimage"
 import { OS_PER_DEM } from "@/denomination"
+import { isNftValidatorGatingActive } from "@/denomination/networkInfo"
 import { normalizeHexAddress, resolveNonce } from "@/utils"
 
 // Connection-error codes indicating the request never reached the node.
@@ -31,6 +36,32 @@ const NO_SERVER_CONTACT_CODES = new Set([
     "ECONNRESET",
     "ETIMEDOUT",
 ])
+
+/**
+ * Whether the connected network backs validator seats with NFTs. A node that
+ * cannot report its forks is treated as without the fork, the same reading
+ * `sign()` makes when it decides whether seat txs carry a gas edit.
+ */
+async function nftValidatorGatingActive(demos: Demos): Promise<boolean> {
+    try {
+        return isNftValidatorGatingActive(await demos.getNetworkInfo())
+    } catch {
+        return false
+    }
+}
+
+/** The proof as the node reads it, or a throw naming the malformed field. */
+function checkedNftProof(nft: ValidatorNftProof): ValidatorNftProof {
+    if (nft === null || typeof nft !== "object") {
+        throw new Error("nft must be an object with mint, owner and proofTx")
+    }
+    for (const key of ["mint", "owner", "proofTx"] as const) {
+        if (!isSolanaBase58(nft[key])) {
+            throw new Error(`nft.${key} must be a base58 Solana address or signature`)
+        }
+    }
+    return { mint: nft.mint, owner: nft.owner, proofTx: nft.proofTx }
+}
 
 export const DemosTransactions = {
     // REVIEW All this part
@@ -716,16 +747,23 @@ export const DemosTransactions = {
      * Create a signed `validatorStake` transaction. Used both for initial
      * validator registration and to top up an existing stake.
      *
+     * Without `nftValidatorGating` a seat is bonded DEM: `amount` must be
+     * positive and no NFT proof is accepted. Under the fork a seat is backed by
+     * a Solana node NFT: `amount` must be "0", and the stake that creates the
+     * validator carries `options.nft`.
+     *
      * @param amount - Stake amount in base-unit DEMOS, encoded as a bigint string.
      * @param connectionUrl - Validator's public endpoint (required on first stake;
      *                        subsequent top-ups may overwrite it).
      * @param demos - The demos instance (for nonce + signing).
+     * @param options.nft - NFT proof, required on the stake that creates the
+     *                      validator under `nftValidatorGating`, omitted otherwise.
      */
     async stake(
         amount: string,
         connectionUrl: string,
         demos: Demos,
-        options?: { nonce?: number },
+        options?: { nonce?: number; nft?: ValidatorNftProof },
     ) {
         required(demos.keypair, "Wallet not connected")
         required(amount, "Stake amount is required")
@@ -734,8 +772,22 @@ export const DemosTransactions = {
                 "Invalid stake amount: expected a non-negative bigint-encoded string",
             )
         }
-        if (BigInt(amount) <= 0n) {
-            throw new Error("Stake amount must be greater than 0")
+        const nftGating = await nftValidatorGatingActive(demos)
+        if (nftGating) {
+            if (BigInt(amount) !== 0n) {
+                throw new Error(
+                    "Stake amount must be 0 on this network (nftValidatorGating): a seat is backed by its NFT, not by DEM",
+                )
+            }
+        } else {
+            if (options?.nft !== undefined) {
+                throw new Error(
+                    "This network does not back validator seats with NFTs (nftValidatorGating is not active); stake DEM without an nft proof",
+                )
+            }
+            if (BigInt(amount) <= 0n) {
+                throw new Error("Stake amount must be greater than 0")
+            }
         }
         required(connectionUrl, "Connection URL is required")
         try {
@@ -745,6 +797,8 @@ export const DemosTransactions = {
                 "Invalid connectionUrl: expected an absolute URL (e.g. https://node.example)",
             )
         }
+        const nft =
+            options?.nft !== undefined ? checkedNftProof(options.nft) : undefined
 
         const tx = DemosTransactions.empty()
         const { publicKey } = await demos.crypto.getIdentity("ed25519")
@@ -762,7 +816,63 @@ export const DemosTransactions = {
         tx.content.amount = 0
         tx.content.type = "validatorStake"
         tx.content.timestamp = Date.now()
-        tx.content.data = ["validatorStake", { amount, connectionUrl }]
+        const payload: ValidatorStakePayload = { amount, connectionUrl }
+        if (nft !== undefined) payload.nft = nft
+        tx.content.data = ["validatorStake", payload]
+
+        return await demos.sign(tx)
+    },
+
+    /**
+     * Create a signed `validatorChallenge` transaction (`nftValidatorGating`
+     * only). Any account may submit one; the network evicts `validator` when
+     * `evidenceTx` is a finalized Solana transfer that moved its NFT out of the
+     * recorded wallet, and only while the seat still rests on `proofTx`.
+     */
+    async challengeValidator(
+        validator: string,
+        evidenceTx: string,
+        proofTx: string,
+        demos: Demos,
+        options?: { nonce?: number },
+    ) {
+        required(demos.keypair, "Wallet not connected")
+        if (typeof validator !== "string" || !/^(0x)?[0-9a-fA-F]{64}$/.test(validator)) {
+            throw new Error("Validator address must be a 32-byte ed25519 hex address")
+        }
+        if (!isSolanaBase58(evidenceTx)) {
+            throw new Error("evidenceTx must be a base58 Solana transaction signature")
+        }
+        if (!isSolanaBase58(proofTx)) {
+            throw new Error("proofTx must be a base58 Solana transaction signature")
+        }
+        if (!(await nftValidatorGatingActive(demos))) {
+            throw new Error(
+                "validatorChallenge needs nftValidatorGating active on the network; this network refuses the transaction type",
+            )
+        }
+        // The node keys validators by lowercase 0x hex and reads the payload
+        // address lowercased, so the evict edit must name the same spelling.
+        const target = normalizeHexAddress(validator)
+
+        const tx = DemosTransactions.empty()
+        const { publicKey } = await demos.crypto.getIdentity("ed25519")
+        const publicKeyHex = uint8ArrayToHex(publicKey as Uint8Array)
+        const nonce = await resolveNonce(
+            options?.nonce,
+            () => demos.getAddressNonce(publicKeyHex),
+            demos._nonceReserver(publicKeyHex),
+        )
+
+        tx.content.to = target
+        tx.content.nonce = nonce
+        tx.content.amount = 0
+        tx.content.type = "validatorChallenge"
+        tx.content.timestamp = Date.now()
+        tx.content.data = [
+            "validatorChallenge",
+            { validator: target, evidenceTx, proofTx },
+        ]
 
         return await demos.sign(tx)
     },

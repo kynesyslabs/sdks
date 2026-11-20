@@ -2,6 +2,7 @@ import {
     GCREdit,
     GCREditIdentity,
     GCREditStorageProgram,
+    GCREditValidatorStake,
     Web2TLSNGCRData,
     Web2GCRData,
 } from "@/types/blockchain/GCREdit"
@@ -17,6 +18,7 @@ import {
 import { Hashing } from "@/encryption/Hashing"
 import { INativePayload } from "@/types/native"
 import { Transaction, TransactionContent } from "@/types/blockchain/Transaction"
+import type { ValidatorNftProof } from "@/types/blockchain/TransactionSubtypes/ValidatorStakeTransaction"
 import {
     StorageProgramPayload,
     STORAGE_PROGRAM_CONSTANTS,
@@ -24,12 +26,70 @@ import {
 import { OS_PER_DEM } from "@/denomination"
 import { validateEd25519Address } from "@/utils"
 
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,88}$/
+// The node derives the evict edit from this same pattern, so the SDK must not
+// be stricter or looser than it about the challenged address.
+const ED25519_HEX = /^(0x)?[0-9a-fA-F]{64}$/
+
+/** Whether `value` is a base58 string of Solana address or signature length. */
+export function isSolanaBase58(value: unknown): value is string {
+    return typeof value === "string" && BASE58.test(value)
+}
+
+/** Types that ship no gas edit on any network. */
+const ALWAYS_GASLESS_TX_TYPES: ReadonlySet<string> = new Set([
+    "identity",
+    "d402_payment",
+])
+
+/** Validator seat transactions; they pay no gas under `nftValidatorGating`. */
+export const VALIDATOR_SEAT_TX_TYPES: ReadonlySet<string> = new Set([
+    "validatorStake",
+    "validatorUnstake",
+    "validatorExit",
+    "validatorChallenge",
+])
+
+/** Network rules edit generation depends on, read from `getNetworkInfo().forks`. */
+export interface GCRGenerationOptions {
+    /** `nftValidatorGating` is active: seats are NFT-backed and seat txs are gasless. */
+    nftValidatorGating?: boolean
+}
+
+/** Whether a transaction of `type` ships no gas edit. Mirrors the node's rule. */
+export function isGaslessTxType(type: string, nftValidatorGating = false): boolean {
+    return (
+        ALWAYS_GASLESS_TX_TYPES.has(type) ||
+        (nftValidatorGating && VALIDATOR_SEAT_TX_TYPES.has(type))
+    )
+}
+
 /**
  * This class is responsible for generating the GCREdit for a transaction and is used
  * both in the client and the node.
  * Note that the node will be responsible for checking if the gas can be paid.
  */
 export class GCRGeneration {
+    /** The three base58 fields of an NFT proof, or a throw naming the bad one. */
+    private static requireNftProof(raw: unknown): ValidatorNftProof {
+        if (raw === null || typeof raw !== "object") {
+            throw new Error("[GCRGeneration] validatorStake.nft must be an object")
+        }
+        const nft = raw as Record<string, unknown>
+        for (const key of ["mint", "owner", "proofTx"] as const) {
+            if (!isSolanaBase58(nft[key])) {
+                throw new Error(
+                    `[GCRGeneration] validatorStake.nft.${key} must be a base58 string`,
+                )
+            }
+        }
+        return {
+            mint: nft.mint as string,
+            owner: nft.owner as string,
+            proofTx: nft.proofTx as string,
+        }
+    }
+
     // Fail-fast payload extractor — throws explicitly instead of silently
     // defaulting missing/wrong-typed fields, which can flip semantics
     // (e.g. a vote without `approve` would become an implicit reject).
@@ -54,7 +114,9 @@ export class GCRGeneration {
     static async generate(
         tx: Transaction,
         isRollback: boolean = false,
+        options: GCRGenerationOptions = {},
     ): Promise<GCREdit[]> {
+        const nftGating = options.nftValidatorGating === true
         const gcrEdits: GCREdit[] = []
         const { content } = tx
 
@@ -110,6 +172,7 @@ export class GCRGeneration {
                 const p = this.requirePayload<{
                     amount: string
                     connectionUrl: string
+                    nft?: ValidatorNftProof
                 }>(content, "validatorStake")
                 if (typeof p.amount !== "string" || !/^\d+$/.test(p.amount)) {
                     throw new Error(
@@ -121,13 +184,57 @@ export class GCRGeneration {
                         "[GCRGeneration] validatorStake.connectionUrl must be a string",
                     )
                 }
-                gcrEdits.push({
+                const edit: GCREditValidatorStake = {
                     type: "validatorStake",
                     isRollback,
                     account: content.from_ed25519_address,
                     operation: "stake",
                     amount: p.amount,
                     connectionUrl: p.connectionUrl,
+                    txhash: tx.hash,
+                }
+                // Before the fork the node reads no proof, so none may reach the edit.
+                if (nftGating && p.nft !== undefined) {
+                    edit.nft = this.requireNftProof(p.nft)
+                }
+                gcrEdits.push(edit)
+                break
+            }
+            case "validatorChallenge": {
+                // The type does not exist before the fork; it gets only the
+                // universal edits, as every unknown type does.
+                if (!nftGating) break
+                const p = this.requirePayload<{
+                    validator: string
+                    evidenceTx: string
+                    proofTx: string
+                }>(content, "validatorChallenge")
+                if (
+                    typeof p.validator !== "string" ||
+                    !ED25519_HEX.test(p.validator)
+                ) {
+                    throw new Error(
+                        "[GCRGeneration] validatorChallenge.validator must be an ed25519 address",
+                    )
+                }
+                if (!isSolanaBase58(p.evidenceTx)) {
+                    throw new Error(
+                        "[GCRGeneration] validatorChallenge.evidenceTx must be a base58 signature",
+                    )
+                }
+                if (!isSolanaBase58(p.proofTx)) {
+                    throw new Error(
+                        "[GCRGeneration] validatorChallenge.proofTx must be a base58 signature",
+                    )
+                }
+                gcrEdits.push({
+                    type: "validatorStake",
+                    isRollback,
+                    account: p.validator,
+                    operation: "evict",
+                    amount: "0",
+                    evidenceTx: p.evidenceTx,
+                    proofTx: p.proofTx,
                     txhash: tx.hash,
                 })
                 break
@@ -243,11 +350,9 @@ export class GCRGeneration {
 
         // Add gas operation edit with check for availability of gas amount in the sender's balance
         nonceEdits: try {
-            // INFO: Skip gas for identity and D402 payments (gasless/sponsored transactions)
-            if (
-                content.type === "identity" ||
-                content.type === "d402_payment"
-            ) {
+            // INFO: Skip gas for identity and D402 payments (gasless/sponsored
+            // transactions), and for validator seat txs under nftValidatorGating
+            if (isGaslessTxType(content.type, nftGating)) {
                 break nonceEdits
             }
 
