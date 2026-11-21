@@ -91,6 +91,7 @@
   the optional `encoding` parameter; wrap it as `.map(s => Hashing.sha256(s))`.
 - Web2 identity proof URLs must be ASCII; percent-encode non-ASCII path and
   query characters and use the punycode (`xn--`) form for hostnames.
+- Removed the unfinished TEN chain integration (never exported).
 
 ### Fixed
 - Objects that hold seeds or private keys no longer expose them through

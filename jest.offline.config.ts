@@ -45,7 +45,6 @@ export const NETWORKED_SPECS: string[] = [
 	'src/tests/multichain/near.spec.ts',
 	'src/tests/multichain/solana.spec.ts',
 	'src/tests/multichain/template.test.ts', // template with no chain behind it
-	'src/tests/multichain/ten.spec.ts',
 	'src/tests/multichain/ton.spec.ts',
 	'src/tests/multichain/xrpl.spec.ts',
 
