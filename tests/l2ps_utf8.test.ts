@@ -10,7 +10,7 @@ import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 // must encode it as UTF-8. ASCII-only transactions keep the exact
 // plaintext bytes older SDKs produced.
 
-// decryptTx only returns transactions signed by their sender.
+// decryptTx only returns transactions signed by the key in `content.from`.
 const sender = forge.pki.ed25519.generateKeyPair()
 const SENDER = uint8ArrayToHex(sender.publicKey)
 

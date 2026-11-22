@@ -11,7 +11,7 @@ import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 // silently fall through to the legacy IV or pass authentication when
 // it should not.
 
-// decryptTx only returns transactions signed by their sender.
+// decryptTx only returns transactions signed by the key in `content.from`.
 const sender = forge.pki.ed25519.generateKeyPair()
 const SENDER = uint8ArrayToHex(sender.publicKey)
 

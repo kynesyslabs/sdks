@@ -321,8 +321,11 @@ export default class L2PS {
      * Validates that the transaction is of type "l2psEncryptedTx", extracts the encrypted payload,
      * verifies the L2PS UID matches, performs AES-GCM decryption with authentication,
      * validates the original transaction hash for integrity, and checks that the
-     * original transaction is signed by its sender.
-     * 
+     * original transaction is signed by the key in `content.from`.
+     * `content.from_ed25519_address` and `ed25519_signature` are not checked by
+     * `decryptTx`. A caller that needs the account address must check that it
+     * matches `content.from` itself, as the node does.
+     *
      * @param encryptedTx - Transaction object containing encrypted data
      * @param options.chainId - The network's chain id. Needed to accept a
      *   signature made after the node's `signatureDomain` fork, which covers

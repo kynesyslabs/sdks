@@ -87,7 +87,7 @@ describe("L2PS.decryptTx inner signature", () => {
     })
 
     // Content is left as is: decryptTx checks the content against the hash first.
-    it("refuses a signature by a key other than the sender's", async () => {
+    it("refuses a signature by a key other than the one in content.from", async () => {
         const inner = await signedTx("ed25519")
         const other = forge.pki.ed25519.generateKeyPair()
         inner.signature = {
