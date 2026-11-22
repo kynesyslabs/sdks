@@ -107,7 +107,8 @@ export interface L2PSEncryptedBytes {
  * const encryptedTx = await l2ps.encryptTx(originalTransaction);
  * 
  * // Decrypt a transaction
- * const decryptedTx = await l2ps.decryptTx(encryptedTx);
+ * // chainId: the network's chain id; needed once the signatureDomain fork is active
+ * const decryptedTx = await l2ps.decryptTx(encryptedTx, { chainId });
  * ```
  */
 export default class L2PS {
@@ -341,7 +342,8 @@ export default class L2PS {
      * @example
      * ```typescript
      * const encryptedTx: Transaction = {  encrypted transaction  };
-     * const originalTx = await l2ps.decryptTx(encryptedTx);
+     * // chainId: the network's chain id; needed once the signatureDomain fork is active
+     * const originalTx = await l2ps.decryptTx(encryptedTx, { chainId });
      * // originalTx is now the original transaction before encryption
      * ```
      */
