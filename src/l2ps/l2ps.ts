@@ -480,8 +480,8 @@ export default class L2PS {
                 }
             }
         } catch {
-            // Malformed hex, a key or signature of the wrong length, or an
-            // unknown algorithm: not a signature by the sender.
+            // Any error here counts as "not verified": malformed hex, a wrong-length key or signature, an unknown algorithm,
+            // or a fault inside the verifier itself (for example a PQC module that fails to load).
         }
         return false;
     }
