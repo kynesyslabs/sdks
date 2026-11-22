@@ -32,6 +32,8 @@ export interface TransactionContent {
   transaction_fee: TransactionFee;
   from_ed25519_address?: string;
   gcr_edits?: GcrEdit[];
+  /** Chain height the transaction was signed against; set by `sign()`. */
+  reference_block: number;
   [key: string]: unknown;
 }
 

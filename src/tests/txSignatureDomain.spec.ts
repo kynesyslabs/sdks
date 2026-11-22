@@ -20,6 +20,7 @@ function demosSeeing(networkInfo: unknown) {
         networkInfo as never,
     )
     jest.spyOn(demos, "getAddressNonce").mockResolvedValue(0)
+    jest.spyOn(demos, "getLastBlockNumber").mockResolvedValue(100)
     return demos
 }
 
@@ -123,7 +124,7 @@ describe("the deprecated standalone signer", () => {
                 privateKey: (demos as never as { keypair: { privateKey: Uint8Array } })
                     .keypair.privateKey,
             } as never,
-            options,
+            { ...options, referenceBlock: 100 },
         )
     }
 
