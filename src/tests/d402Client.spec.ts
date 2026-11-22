@@ -25,6 +25,7 @@ async function clientWithNode(script: NodeScript = {}) {
     const calls: string[] = []
     ;(demos as any).nodeCall = async (message: string, data: any) => {
         calls.push(`nodeCall:${message}`)
+        if (message === "getLastBlockNumber") return 100
         if (message === "getAddressNonce") return 4
         if (message === "getTxByHash" && script.lookupError) {
             return { result: 500, response: { code: "ECONNRESET" }, require_reply: false, extra: null }

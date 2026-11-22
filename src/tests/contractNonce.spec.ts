@@ -17,7 +17,9 @@ const CONFIRMED = 5
 async function buildingDemos(): Promise<{ demos: Demos; built: any[] }> {
     const demos = new Demos()
     ;(demos as any).nodeCall = async (message: string) =>
-        message === "getAddressNonce" ? CONFIRMED : null
+        message === "getLastBlockNumber"
+            ? 100
+            : message === "getAddressNonce" ? CONFIRMED : null
     ;(demos as any).rpcCall = async () => ({
         result: 500,
         response: { error: "stop after build" },
@@ -87,7 +89,9 @@ describe("token builders use the next nonce", () => {
     async function tokenDemos(): Promise<Demos> {
         const demos = new Demos()
         ;(demos as any).nodeCall = async (message: string) =>
-            message === "getAddressNonce" ? CONFIRMED : null
+            message === "getLastBlockNumber"
+                ? 100
+                : message === "getAddressNonce" ? CONFIRMED : null
         ;(demos as any)._getNetworkParametersCached = async () => null
         await demos.connectWallet(demos.newMnemonic())
         return demos
@@ -133,7 +137,9 @@ describe("token builders use the next nonce", () => {
         // Like the node: only an ed25519 address has a nonce, anything
         // else gets the catch-all error reply.
         ;(demos as any).nodeCall = async (message: string, args: any) =>
-            message === "getAddressNonce" && /^0x[0-9a-f]{64}$/i.test(args.address)
+            message === "getLastBlockNumber"
+                ? 100
+                : message === "getAddressNonce" && /^0x[0-9a-f]{64}$/i.test(args.address)
                 ? CONFIRMED
                 : "Error in nodeCall: "
         ;(demos as any)._getNetworkParametersCached = async () => null

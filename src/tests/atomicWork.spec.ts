@@ -105,6 +105,7 @@ describe("DemosTransactions.atomicWork", () => {
                         osDenomination: { activated: postFork, activationHeight: 1, currentHeight: 10 },
                     },
                 }
+            if (message === "getLastBlockNumber") return 100
             if (message === "getAddressNonce") return 4
             return null
         }

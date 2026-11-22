@@ -111,6 +111,7 @@ describe("GCRGeneration for granular storage operations", () => {
         const demos: any = new Demos()
         await demos.connectWalletFromPrivateKey("0x" + "11".repeat(32), { algorithm: "ed25519" })
         demos.getAddressNonce = async () => 4
+        demos.getLastBlockNumber = async () => 100
         demos._isPostForkCached = async () => false
         demos._assertAmountAcceptableOnTargetNode = async () => {}
         demos._getNetworkParametersCached = async () => ({ networkFee: 1, rpcFee: 0 })

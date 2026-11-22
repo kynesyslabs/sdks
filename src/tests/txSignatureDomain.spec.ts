@@ -96,6 +96,53 @@ describe("what the signer commits to", () => {
     })
 })
 
+describe("the signed reference block", () => {
+    async function connected() {
+        const demos = demosSeeing(PRE_FORK)
+        await demos.connectWallet(
+            "test test test test test test test test test test test junk",
+            { algorithm: "ed25519" },
+        )
+        return demos
+    }
+
+    it("is the node's block height, read again for every signature", async () => {
+        const demos = await connected()
+        const tx = await demos.pay("0x" + "ab".repeat(32), 1_000_000_000n)
+        expect(tx.content.reference_block).toBe(100)
+
+        jest.spyOn(demos, "getLastBlockNumber").mockResolvedValue(107)
+        const hashBefore = tx.hash
+        const again = await demos.sign(tx)
+        expect(again.content.reference_block).toBe(107)
+        expect(again.hash).not.toBe(hashBefore)
+    })
+
+    it("refuses to sign when the node gives no block height", async () => {
+        const demos = await connected()
+        for (const reply of [null, "100", 1.5, -1, { result: 500 }]) {
+            jest.spyOn(demos, "getLastBlockNumber").mockResolvedValue(
+                reply as never,
+            )
+            await expect(
+                demos.pay("0x" + "ab".repeat(32), 1_000_000_000n),
+            ).rejects.toThrow("no valid block height")
+        }
+    })
+
+    it("is required by the deprecated signer, which cannot read it", async () => {
+        const demos = await connected()
+        const built = await demos.pay("0x" + "ab".repeat(32), 1_000_000_000n)
+        await expect(
+            DemosTransactions.sign(
+                built,
+                { publicKey: new Uint8Array(32), privateKey: new Uint8Array(64) } as never,
+                { algorithm: "ed25519" } as never,
+            ),
+        ).rejects.toThrow("referenceBlock")
+    })
+})
+
 describe("the deprecated standalone signer", () => {
     /**
      * It has no `Demos` instance, so it cannot ask a node anything. Left as

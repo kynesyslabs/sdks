@@ -200,6 +200,7 @@ describe("anchorEncryptedTranscript — policy gating (WI-3)", () => {
             .spyOn(alice.demos as any, "confirm")
             .mockResolvedValueOnce({ ok: true })
         jest.spyOn(alice.demos as any, "getAddressNonce").mockResolvedValue(0)
+        jest.spyOn(alice.demos as any, "getLastBlockNumber").mockResolvedValue(100)
 
         const { anchorEncryptedTranscript } = await import("@/l2ps/anchor")
         const result = await anchorEncryptedTranscript({
@@ -221,6 +222,7 @@ describe("anchorEncryptedTranscript — policy gating (WI-3)", () => {
         const transcript = await buildTranscript(alice, bob)
         const l2ps = await L2PS.create()
         jest.spyOn(alice.demos as any, "getAddressNonce").mockResolvedValue(0)
+        jest.spyOn(alice.demos as any, "getLastBlockNumber").mockResolvedValue(100)
         jest.spyOn(alice.demos as any, "confirm").mockResolvedValue({ ok: true })
         jest
             .spyOn(alice.demos as any, "broadcast")
@@ -311,6 +313,7 @@ describe("decrypt + tamper-evidence (WI-3 acceptance)", () => {
         let captured: AnchoredTranscriptPayload | null = null
         let address = ""
         jest.spyOn(signer.demos as any, "getAddressNonce").mockResolvedValue(0)
+        jest.spyOn(signer.demos as any, "getLastBlockNumber").mockResolvedValue(100)
         jest.spyOn(signer.demos as any, "confirm").mockImplementation(
             async (tx: any) => {
                 const inner = tx.content.data[1]
