@@ -6,6 +6,11 @@ import * as websdk from "@/websdk"
 import { DemosTransactions } from "@/websdk"
 import { PasskeyGenerator } from "./passkeys/passkeys"
 import { Cryptography } from "@/encryption/Cryptography"
+import {
+    hideSecretFields,
+    INSPECT_CUSTOM,
+    redactedInspect,
+} from "@/encryption/secretFields"
 import { Address } from "@/types/blockchain/WalletTypes"
 import { RPCResponseWithValidityData } from "@/types/communication/rpc"
 
@@ -26,8 +31,18 @@ export default class Wallet {
     }
 
     private constructor() {
+        hideSecretFields(this, ["ed25519", "ed25519_hex", "rsa", "rsa_hex"])
         this.ed25519 = null
         this.rsa = null
+    }
+
+    /** Serialises without key material. Read `ed25519_hex` by name to export the key. */
+    toJSON() {
+        return { publicKey: this.ed25519_hex?.publicKey ?? null }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("Wallet", this.toJSON())
     }
 
     // Create a public static method to get the instance of the Wallet class

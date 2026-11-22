@@ -39,6 +39,19 @@ This is generated in `Identities.inferIdentity(...)`.
 ### 1.3 Example usage
 
 ```ts
+const service = new TLSNotaryService(demos)
+
+// Pays the tlsn_request, waits for it to be included, opens a proxy, and
+// returns a TLSNotary bound to this account and request (X-Demos-Bind).
+const { tlsn } = await service.createTLSNotary({
+  targetUrl: "https://api.github.com/user",
+  purpose: "github",
+})
+const attestResult = await tlsn.attest({
+  url: "https://api.github.com/user",
+  headers: { Authorization: `Bearer ${githubToken}` }, // value never revealed
+})
+
 const res = await demos.identities.addWeb2IdentityViaTLSN(
   demos,
   "github",
@@ -49,11 +62,32 @@ const res = await demos.identities.addWeb2IdentityViaTLSN(
   githubUsername,
   githubUserId,
   referralCode,
-  { legacy: true },
 )
 ```
 
-The call throws without `{ legacy: true }`. Nodes check only the presentation's shape, not the notary signature, so networks with `tlsnProofEnforcement` active, mainnet among them, refuse TLSN links until nodes verify the notary signature.
+### 1.4 Which networks accept the link
+
+- `tlsnVerified` active (`getNetworkInfo().forks.tlsnVerified.activated`),
+  mainnet among them: the node verifies the presentation against the notary
+  keys of the fork and checks the bind header, so the link is sent as is. The
+  `telegram` context is refused.
+- Only `tlsnProofEnforcement`: the node would refuse the link, so the SDK
+  throws before signing.
+- Neither fork: pass `{ legacy: true }`; the node checks only the
+  presentation's shape.
+
+### 1.5 What the presentation reveals
+
+The ranges are computed from the transcript, since tlsn-wasm sends headers in
+a different order on each run:
+
+- the request line, `Host` and the whole `X-Demos-Bind` header;
+- `Authorization`, `Proxy-Authorization` and `Cookie` by name only, never
+  their values; other non-structural headers by name only;
+- the response, body included (the node reads the account from the JSON
+  body), with `Set-Cookie` by name only.
+
+A `commit` passed to `attest` is checked against the same rules.
 
 ## 2. How `tlsn_identity_assign` is persisted in GCR
 
@@ -79,3 +113,29 @@ Also in `src/websdk/GCRGeneration.ts` under native handling:
 - `tlsn_store`: burns `1 + ceil(proof.length / 1024)` DEM
 
 These are balance edits only. Node-side logic handles token/proof lifecycle.
+On a `tlsnVerified` network the token is the included `tlsn_request`, keyed
+by its hash, and `storeProof` sends on-chain storage only, refusing a
+presentation over the network's `maxPresentationBytes` before signing.
+
+## 4. Time limit: store within one hour of attesting
+
+On a `tlsnVerified` network two limits apply to a presentation, and the
+earlier one wins:
+
+| Limit | Value (mainnet) | Measured from | Node constant |
+|---|---|---|---|
+| `tlsn_request` token lifetime | 500 blocks (about 83 min at 10 s blocks, 58 min at 7 s) | the block the request landed in | `TLSN_REQUEST_TTL_BLOCKS` |
+| Attestation age | 3600 s | the time the notary attested, to the time of the block the store or link lands in | genesis `freshnessWindowSec` |
+
+The token deadline is fixed at the request height + 500 blocks; the age
+deadline is the attested time + 3600 s. At 10 s blocks with a prompt
+attestation the age limit binds: a `tlsn_store` or TLSN identity link
+included more than 3600 s after `attest()` is refused with
+`attestation is stale` even if its token is still unused and unexpired. A
+user who attests long after the request, or a chain with faster blocks, hits
+the token expiry first. Either way, attest soon after the request, store or
+link right after attesting, and keep confirmation dialogs short.
+
+The SDK exports the value as `TLSN_ATTESTATION_MAX_AGE_SECONDS` from
+`@kynesyslabs/demosdk/tlsnotary`. It is a consensus value set in the genesis
+and changes only through a scheduled network release.

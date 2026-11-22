@@ -1,9 +1,14 @@
 import { sha256 } from '@noble/hashes/sha2';
 import { Enigma } from "./PQC/enigma"
+import {
+    hideSecretFields,
+    INSPECT_CUSTOM,
+    redactedInspect,
+} from "./secretFields"
 import { hkdf } from "@noble/hashes/hkdf"
 import { randomBytes } from "@noble/hashes/utils"
 import * as forge from "node-forge"
-import { Cryptography } from "./Cryptography"
+import { Cryptography, deriveKeyPairFromSeed } from "./Cryptography"
 import { PQCAlgorithm, SigningAlgorithm } from '@/types/cryptography';
 
 /* The two interfaces below are used to route the encrypted and signed data through the unified crypto system */
@@ -136,9 +141,27 @@ export class UnifiedCrypto {
     private instanceId: string
 
     private constructor(instanceId: string, masterSeed?: Uint8Array) {
+        hideSecretFields(this, [
+            "masterSeed",
+            "ed25519KeyPair",
+            "rsaKeyPair",
+            "enigma",
+        ])
         this.enigma = new Enigma()
         this.masterSeed = masterSeed
         this.instanceId = instanceId
+    }
+
+    /** Serialises without key material. Read the key fields by name to export them. */
+    toJSON() {
+        return {
+            instanceId: this.instanceId,
+            hasMasterSeed: !!this.masterSeed,
+        }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("UnifiedCrypto", this.toJSON())
     }
 
     // Multiton pattern: get an instance by ID or create a new one
@@ -207,7 +230,6 @@ export class UnifiedCrypto {
     ): Promise<Uint8Array> {
         // Creating a new seed if none is provided and the master seed is not set
         await this.ensureSeed(seed)
-        //console.log("[UnifiedCrypto] Master seed:", this.masterSeed)
 
         // Deriving the seed for the given algorithms
 
@@ -254,7 +276,7 @@ export class UnifiedCrypto {
 
         // Generating the identity for the given algorithm
         if (algorithm === "ed25519") {
-            this.ed25519KeyPair = Cryptography.newFromSeed(seed)
+            this.ed25519KeyPair = deriveKeyPairFromSeed(seed)
         } else if (algorithm === "falcon") {
             await this.enigma.generate_falcon_signing_keypair(seed)
         } else if (algorithm === "ml-dsa") {

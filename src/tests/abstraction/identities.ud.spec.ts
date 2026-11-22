@@ -2,6 +2,7 @@ import { Identities } from "@/abstraction"
 import { Demos } from "@/websdk"
 import { uint8ArrayToHex } from "@/encryption"
 import { ethers } from "ethers"
+import { legacySeed } from "../utils/legacySeed"
 
 describe("UNSTOPPABLE DOMAINS IDENTITIES", () => {
     const rpc = "https://node2.demos.sh"
@@ -12,7 +13,9 @@ describe("UNSTOPPABLE DOMAINS IDENTITIES", () => {
         demos = new Demos()
         await demos.connect(rpc)
         await demos.connectWallet(
-            "polar scale globe beauty stock employ rail exercise goat into sample embark"
+            legacySeed(
+                "polar scale globe beauty stock employ rail exercise goat into sample embark"
+            )
         )
         identities = new Identities()
     })

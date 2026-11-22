@@ -1,4 +1,5 @@
 export { Demos, Web2Proxy } from "./client.js";
+export type { DemosOptions } from "./client.js";
 export { Identities } from "./identity-read.js";
 export { L2PSMessagingPeer } from "./messaging.js";
 export type {

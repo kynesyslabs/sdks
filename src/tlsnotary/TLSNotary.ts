@@ -9,19 +9,13 @@
  *
  * @example
  * ```typescript
- * import { TLSNotary } from '@kynesyslabs/demosdk/tlsnotary';
+ * import { TLSNotaryService } from '@kynesyslabs/demosdk/tlsnotary';
  *
- * // Option 1: Explicit configuration
- * const tlsn = new TLSNotary({
- *   notaryUrl: 'wss://node.demos.sh:7047',
- *   websocketProxyUrl: 'wss://node.demos.sh:55688',
+ * // A proxy session is opened for a paid tlsn_request, by its sender:
+ * const service = new TLSNotaryService(demos);
+ * const { tlsn } = await service.createTLSNotary({
+ *   targetUrl: 'https://api.github.com/users/octocat',
  * });
- *
- * // Option 2: Discovery via Demos instance (preferred)
- * const demos = new Demos({ rpc: 'https://node.demos.sh' });
- * const tlsn = await demos.tlsnotary();
- *
- * await tlsn.initialize();
  *
  * const result = await tlsn.attest({
  *   url: 'https://api.github.com/users/octocat',
@@ -33,12 +27,17 @@
  * ```
  */
 
+import { Buffer } from "buffer"
 import * as Comlink from "comlink"
-import {
-    notaryKeyMatches,
-    NotaryKeyMismatchError,
-} from "./notaryKey"
+import { checkNotaryKey } from "./notaryKey"
+import { spawnTlsnWorker } from "./spawnWorker"
 import { NotaryServer, Transcript } from "./tlsn-runtime"
+import {
+    buildBindValue,
+    computeRevealRanges,
+    enforceRevealPolicy,
+    withBindHeader,
+} from "./revealPolicy"
 import type {
     Prover as TProver,
     Presentation as TPresentation,
@@ -56,10 +55,7 @@ import type {
     AttestOptions,
     StatusCallback,
     TranscriptInfo,
-    ProxyRequestResponse,
-    ProxyRequestError,
 } from "@/tlsnotary/types"
-import axios from "axios"
 
 /**
  * TLSNotary class for browser-based HTTPS attestation
@@ -131,12 +127,7 @@ export class TLSNotary {
 
         this.initializingPromise = (async () => {
             try {
-                // Create Web Worker for WASM operations
-                // Note: This requires a bundler that supports worker URLs (webpack, vite, etc.)
-                // Using .js extension for compatibility with compiled output
-                this.worker = new Worker(new URL("./worker.js", import.meta.url), {
-                    type: "module",
-                })
+                this.worker = spawnTlsnWorker()
 
                 this.wasm = Comlink.wrap(this.worker)
 
@@ -161,97 +152,21 @@ export class TLSNotary {
     }
 
     /**
-     * Request a dynamic WebSocket proxy for a target URL
+     * The proxy session URL this instance attests through.
      *
-     * This method calls the node's `requestTLSNproxy` endpoint to get a
-     * dynamically allocated proxy for the specific target domain.
-     * Proxies auto-expire after 30 seconds of inactivity.
-     *
-     * @param targetUrl - The HTTPS URL to create a proxy for
-     * @returns Proxy response with websocketProxyUrl
-     * @throws Error if RPC URL is not configured or proxy request fails
-     *
-     * @internal This is called automatically by attest/attestQuick methods
+     * Nodes open a proxy only for a call signed by the account that sent the
+     * `tlsn_request`, so an instance cannot ask for one itself; the session
+     * comes from `TLSNotaryService` and is used as returned.
      */
-    private async requestProxy(targetUrl: string): Promise<ProxyRequestResponse> {
-        if (!this.config.rpcUrl) {
-            // Fallback to static proxy if no RPC URL configured (legacy mode)
-            if (this.config.websocketProxyUrl) {
-                const url = new URL(targetUrl)
-                return {
-                    websocketProxyUrl: this.config.websocketProxyUrl,
-                    targetDomain: url.hostname,
-                    expiresIn: 0, // Static proxy doesn't expire
-                    proxyId: "static",
-                }
-            }
-            throw new Error(
-                "No RPC URL configured for dynamic proxy requests. " +
-                    "Either provide rpcUrl in config or use Demos.tlsnotary() for auto-configuration.",
-            )
-        }
-
-        try {
-            const response = await axios.post(this.config.rpcUrl, {
-                method: "nodeCall",
-                params: [
-                    {
-                        message: "requestTLSNproxy",
-                        data: { targetUrl },
-                    },
-                ],
-            })
-
-            const result = response.data
-
-            if (result.result !== 200) {
-                const error = result.response as ProxyRequestError
-                throw new Error(
-                    `Failed to request proxy: ${error.message || error.error || "Unknown error"}`,
-                )
-            }
-
-            return result.response as ProxyRequestResponse
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                throw new Error(`Proxy request failed: ${error.message}`)
-            }
-            throw error
-        }
-    }
-
-    /**
-     * Get the WebSocket proxy URL for a target URL
-     *
-     * Automatically requests a dynamic proxy from the node if rpcUrl is configured,
-     * otherwise falls back to the static websocketProxyUrl.
-     *
-     * @param targetUrl - The target HTTPS URL
-     * @param onStatus - Optional status callback
-     * @returns The websocket proxy URL to use
-     */
-    private async getProxyUrl(
-        targetUrl: string,
-        onStatus?: StatusCallback,
-    ): Promise<string> {
-        const status = onStatus || (() => {})
-
-        // If we have rpcUrl, always request a dynamic proxy
-        if (this.config.rpcUrl) {
-            status("Requesting WebSocket proxy...")
-            const proxyResponse = await this.requestProxy(targetUrl)
-            status(`Proxy allocated for ${proxyResponse.targetDomain}`)
-            return proxyResponse.websocketProxyUrl
-        }
-
-        // Fallback to static proxy URL (legacy/explicit config mode)
+    private getProxyUrl(): string {
         if (this.config.websocketProxyUrl) {
             return this.config.websocketProxyUrl
         }
-
         throw new Error(
-            "No proxy configuration available. " +
-                "Configure rpcUrl for dynamic proxies or websocketProxyUrl for static proxy.",
+            "No proxy session configured. Nodes open a TLSNotary proxy only for a " +
+                "signed request from the account that paid for the tlsn_request: use " +
+                "TLSNotaryService.createTLSNotary(), or pass the proxyUrl from " +
+                "TLSNotaryService.requestAttestation() as websocketProxyUrl.",
         )
     }
 
@@ -261,21 +176,32 @@ export class TLSNotary {
      * This provides full control over the attestation process including
      * custom commit ranges for selective disclosure.
      *
+     * Without `commit`, the reveal ranges are computed from the transcript:
+     * the request line, `Host` and the `X-Demos-Bind` header in full, other
+     * headers by name (credential headers such as `Authorization` and
+     * `Cookie` always by name only), and the response with its body
+     * (`Set-Cookie` by name only). A caller's `commit` is checked against
+     * the same rules: the request line, `Host` and bind header are added,
+     * and a range over a credential value throws before notarisation.
+     *
+     * The notary signs the time of the attestation. Nodes refuse a store or
+     * identity link of the result once it is older than
+     * `TLSN_ATTESTATION_MAX_AGE_SECONDS` (3600 s on mainnet) at the time of
+     * its block, so submit it right away.
+     *
      * @param request - Request configuration (URL, method, headers, body)
      * @param commit - Optional commit ranges for selective disclosure
      * @param onStatus - Optional status callback for progress updates
      * @returns Attestation result with proof and verification
+     * @throws {NotaryKeyMismatchError} when the notary that signed is not trusted
      *
      * @example
      * ```typescript
      * const result = await tlsn.attest({
      *   url: 'https://api.example.com/user',
      *   method: 'GET',
+     *   // Revealed as "authorization: " with the value hidden
      *   headers: { 'Authorization': 'Bearer token' },
-     * }, {
-     *   // Hide authorization header in the proof
-     *   sent: [{ start: 0, end: 50 }, { start: 100, end: 200 }],
-     *   recv: [{ start: 0, end: 500 }],
      * });
      * ```
      */
@@ -294,8 +220,8 @@ export class TLSNotary {
         const url = new URL(request.url)
         const serverDns = url.hostname
 
-        // Step 1: Request dynamic proxy for this target
-        const proxyUrl = await this.getProxyUrl(request.url, status)
+        // Step 1: The proxy session opened for this attestation's token
+        const proxyUrl = this.getProxyUrl()
 
         // Step 2: Connect to Notary
         status("Connecting to Notary server...")
@@ -318,10 +244,7 @@ export class TLSNotary {
 
             // Step 5: Send the HTTPS request
             status(`Sending attested request to ${serverDns}...`)
-            const headers: Record<string, string> = {
-                Accept: "application/json",
-                ...request.headers,
-            }
+            const headers = this.requestHeaders(request)
 
             await prover.sendRequest(proxyUrl, {
                 url: request.url,
@@ -335,12 +258,14 @@ export class TLSNotary {
             const transcript = await prover.transcript()
             const { sent, recv } = transcript
 
-            // Step 7: Create commit ranges (what to reveal)
+            // Step 7: Create commit ranges (what to reveal). Header order
+            // differs per run, so the ranges come from these exact bytes.
             status("Creating attestation commitment...")
-            const commitRanges: Commit = commit || {
-                sent: [{ start: 0, end: Math.min(sent.length, 200) }],
-                recv: [{ start: 0, end: Math.min(recv.length, 300) }],
-            }
+            const commitRanges: Commit = commit
+                ? enforceRevealPolicy(sent, recv, commit)
+                : computeRevealRanges(sent, recv, {
+                      revealResponseBody: request.revealResponseBody,
+                  })
 
             // Step 8: Notarize
             status("Generating attestation (this may take a moment)...")
@@ -396,60 +321,25 @@ export class TLSNotary {
      * ```
      */
     async attestQuick(options: AttestOptions): Promise<AttestResult> {
-        if (!this.initialized || !this.wasm) {
-            throw new Error("TLSNotary not initialized. Call initialize() first.")
-        }
-
+        // tlsn-js's one-shot Prover.notarize takes the reveal ranges before
+        // the transcript exists, so it can only use fixed offsets. Going
+        // through attest() computes them from the bytes actually sent.
         const { onStatus, commit, ...request } = options
-        const status = onStatus || (() => {})
-
-        // Request dynamic proxy for this target
-        const proxyUrl = await this.getProxyUrl(request.url, status)
-
-        status("Running quick attestation...")
-
-        const presentationJSON = await (
-            this.wasm.Prover.notarize as typeof TProver.notarize
-        )({
-            notaryUrl: this.config.notaryUrl,
-            websocketProxyUrl: proxyUrl,
-            maxSentData: request.maxSentData || 16384,
-            maxRecvData: request.maxRecvData || 16384,
-            url: request.url,
-            method: (request.method || "GET") as Method,
-            headers: {
-                Accept: "application/json",
-                ...request.headers,
-            },
-            body: request.body,
-            commit: commit || {
-                sent: [{ start: 0, end: 100 }],
-                recv: [{ start: 0, end: 200 }],
-            },
-            serverIdentity: true,
-        })
-
-        status("Verifying attestation...")
-        const verification = await this.verify(presentationJSON)
-
-        status("Quick attestation complete!")
-
-        return {
-            presentation: presentationJSON,
-            verification,
-        }
+        return this.attest(request, commit, onStatus)
     }
 
     /**
      * Verify a presentation/proof
      *
      * Can be used to verify proofs from other sources.
-     * This operation can be done offline.
+     * Offline when a notary key is pinned (`trustedNotaryKeys` or `notaryPublicKey`).
      *
      * @param presentationJSON - The presentation to verify
      * @returns Verification result with extracted data
-     * @throws {NotaryKeyMismatchError} When `notaryPublicKey` is configured
-     * and the presentation was signed by a different notary. A presentation
+     * @throws {NotaryKeyMismatchError} When the presentation was signed by a
+     * notary other than the trusted ones: `trustedNotaryKeys` and
+     * `notaryPublicKey`, or, when neither is set, the key the configured
+     * notary serves (verification throws if it cannot be read). A presentation
      * proves that *some* notary signed the transcript, so this is the check
      * that makes it evidence — catch it to tell that apart from a malformed
      * proof. Exported from `@kynesyslabs/demosdk/tlsnotary`.
@@ -484,38 +374,11 @@ export class TLSNotary {
 
             const vk = await proof.verifyingKey()
 
-            // Try to get notary key if available
-            let notaryKey = "N/A"
-            try {
-                if (this.config.notaryPublicKey) {
-                    notaryKey = this.config.notaryPublicKey
-                } else {
-                    const notary = NotaryServer.from(this.config.notaryUrl)
-                    notaryKey = await notary.publicKey("hex")
-                }
-            } catch (error) {
-                // Notary might not be running for offline verification
-                console.warn(
-                    "[TLSNotary] Could not fetch notary public key:",
-                    error instanceof Error ? error.message : error,
-                )
-            }
-
             const verifyingKey = Buffer.from(vk.data).toString("hex")
-
-            // The presentation proves that SOME notary signed this transcript.
-            // Comparing its signer against the notary we trust is what makes it
-            // evidence — without it, a presentation notarised by whoever
-            // produced it verifies exactly like a real one.
-            if (
-                this.config.notaryPublicKey &&
-                !notaryKeyMatches(verifyingKey, this.config.notaryPublicKey)
-            ) {
-                throw new NotaryKeyMismatchError(
-                    verifyingKey,
-                    this.config.notaryPublicKey,
-                )
-            }
+            const notaryKey = checkNotaryKey(
+                verifyingKey,
+                await this.trustedKeys(),
+            )
 
             return {
                 time: verifierOutput.connection_info.time,
@@ -530,6 +393,43 @@ export class TLSNotary {
             if (proof) {
                 await proof.free()
             }
+        }
+    }
+
+    /**
+     * Headers of the notarised request, with the bind header when this
+     * instance is bound to a sender and a `tlsn_request`.
+     */
+    private requestHeaders(request: AttestRequest): Record<string, string> {
+        const headers: Record<string, string> = {
+            Accept: "application/json",
+            ...request.headers,
+        }
+        return this.config.binding
+            ? withBindHeader(headers, buildBindValue(this.config.binding))
+            : headers
+    }
+
+    /**
+     * The keys a presentation may be signed by: the pinned ones, or the key
+     * the configured notary serves when nothing is pinned.
+     */
+    private async trustedKeys(): Promise<string[]> {
+        const pinned = [
+            ...(this.config.trustedNotaryKeys ?? []),
+            ...(this.config.notaryPublicKey ? [this.config.notaryPublicKey] : []),
+        ]
+        if (pinned.length > 0) return pinned
+        try {
+            const notary = NotaryServer.from(this.config.notaryUrl)
+            return [await notary.publicKey("hex")]
+        } catch (error) {
+            // Without a key to compare against, a presentation proves only
+            // that some notary signed it, so verification cannot succeed.
+            throw new Error(
+                "TLSNotary verify needs a trusted notary key: pin notaryPublicKey or trustedNotaryKeys, or reach the notary to read its key. " +
+                    (error instanceof Error ? error.message : String(error)),
+            )
         }
     }
 
@@ -549,8 +449,7 @@ export class TLSNotary {
         const url = new URL(request.url)
         const serverDns = url.hostname
 
-        // Request dynamic proxy for this target
-        const proxyUrl = await this.getProxyUrl(request.url)
+        const proxyUrl = this.getProxyUrl()
 
         const notary = NotaryServer.from(this.config.notaryUrl)
 
@@ -566,10 +465,7 @@ export class TLSNotary {
             await prover.sendRequest(proxyUrl, {
                 url: request.url,
                 method: (request.method || "GET") as Method,
-                headers: {
-                    Accept: "application/json",
-                    ...request.headers,
-                },
+                headers: this.requestHeaders(request),
                 body: request.body,
             })
 

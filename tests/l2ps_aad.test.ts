@@ -1,6 +1,6 @@
 import { describe, test, expect } from "@jest/globals"
 import * as forge from "node-forge"
-import L2PS from "@/l2ps/l2ps"
+import L2PS, { sha256Utf8 } from "@/l2ps/l2ps"
 import type { Transaction } from "@/types/blockchain/Transaction"
 import { Cryptography } from "@/encryption/Cryptography"
 import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
@@ -14,34 +14,36 @@ import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 // decryptTx only returns transactions signed by their sender.
 const sender = forge.pki.ed25519.generateKeyPair()
 const SENDER = uint8ArrayToHex(sender.publicKey)
-const HASH = "deadbeef".repeat(8)
 
 function makeTx(): Transaction {
-    return {
-        content: {
-            type: "native",
-            from: SENDER,
-            to: "0x" + "b".repeat(64),
-            from_ed25519_address: SENDER,
-            amount: "100",
-            data: [
-                "native",
-                { nativeOperation: "send", args: ["0x" + "b".repeat(64), "100"] },
-            ],
-            gcr_edits: [],
-            nonce: 1,
-            timestamp: 1_700_000_000_000,
-            transaction_fee: {
-                network_fee: "0",
-                rpc_fee: "0",
-                additional_fee: "0",
-                rpc_address: null,
-            },
+    const content = {
+        type: "native",
+        from: SENDER,
+        to: "0x" + "b".repeat(64),
+        from_ed25519_address: SENDER,
+        amount: "100",
+        data: [
+            "native",
+            { nativeOperation: "send", args: ["0x" + "b".repeat(64), "100"] },
+        ],
+        gcr_edits: [],
+        nonce: 1,
+        timestamp: 1_700_000_000_000,
+        transaction_fee: {
+            network_fee: "0",
+            rpc_fee: "0",
+            additional_fee: "0",
+            rpc_address: null,
         },
-        hash: HASH,
+    }
+    // decryptTx recomputes the hash from the content.
+    const hash = sha256Utf8(JSON.stringify(content))
+    return {
+        content,
+        hash,
         signature: {
             type: "ed25519",
-            data: uint8ArrayToHex(Cryptography.sign(HASH, sender.privateKey)),
+            data: uint8ArrayToHex(Cryptography.sign(hash, sender.privateKey)),
         },
         ed25519_signature: null,
         status: null,

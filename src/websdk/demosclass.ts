@@ -4,7 +4,7 @@ This library contains all the functions that are used to interact with the demos
 
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
-import axios from "axios"
+import axios, { AxiosError } from "axios"
 import { Buffer } from "buffer"
 import * as skeletons from "./utils/skeletons"
 import {
@@ -61,13 +61,21 @@ import {
     uint8ArrayToHex,
     UnifiedCrypto,
 } from "@/encryption/unifiedCrypto"
-import { GCRGeneration } from "./GCRGeneration"
+import { GCRGeneration, VALIDATOR_SEAT_TX_TYPES } from "./GCRGeneration"
 import { Hashing } from "@/encryption/Hashing"
+import { audienceKey, bodyBoundAuthHeaders } from "./utils/bodyBoundAuth"
+import { warnLegacySeedPath } from "@/encryption/legacySeedWarning"
+import {
+    hideSecretFields,
+    INSPECT_CUSTOM,
+    redactedInspect,
+} from "@/encryption/secretFields"
 import { OS_PER_DEM, demToOs, parseOsString } from "@/denomination"
 import { assertValidNonce, resolveNonce } from "@/utils"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
 import {
     SubDemPrecisionError,
+    isNftValidatorGatingActive,
     type ForkStatus,
     type NetworkInfo,
 } from "@/denomination/networkInfo"
@@ -76,11 +84,9 @@ import { TweetSimplified } from "@/types"
 import { GetDiscordMessageResult } from "@/types/web2/discord"
 // TLSNotary is dynamically imported to avoid bundling issues with webpack
 // The worker.js reference and WASM dependencies break static bundling
-import type {
-    TLSNotary,
-    TLSNotaryConfig,
-    TLSNotaryDiscoveryInfo,
-} from "@/tlsnotary"
+import type { TLSNotary, TLSNotaryConfig } from "@/tlsnotary"
+// Plain constants and a resolver, no wasm: safe to import statically.
+import { resolveNotary } from "@/tlsnotary/network"
 import { wordList } from "@/encryption/PQC/falconts"
 import {
     StorageProgram,
@@ -91,6 +97,74 @@ import { StorageProgramResponse } from "@/storage/StorageProgram"
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * Throws unless the trimmed `connectWallet` string `phrase` is a canonical
+ * English BIP-39 mnemonic or a 128-char hex string. Returns whether it is a
+ * valid mnemonic.
+ */
+function checkRecoveryPhrase(phrase: string): boolean {
+    // bip39 validates the NFKD form, but derivation hashes the string
+    // as given, so full-width letters or U+3000 between words would
+    // pass validation and open a different wallet. Refuse them.
+    if (phrase.normalize("NFKD") !== phrase) {
+        throw new Error(
+            "Invalid recovery phrase: it contains non-canonical characters (for example full-width letters or ideographic spaces). Only English BIP-39 phrases are accepted. Type it in plain lowercase letters separated by single ASCII spaces. If this exact phrase opened a wallet with SDK 2.3.16 to 4.0.21, see the upgrade note in https://github.com/kynesyslabs/sdks/blob/main/CHANGELOG.md",
+        )
+    }
+
+    if (bip39.validateMnemonic(phrase, wordList)) {
+        return true
+    }
+
+    // A malformed phrase with an accepted word count (a typo, capitalised
+    // word or bad checksum) used to derive a different wallet silently;
+    // other invalid strings already threw `Invalid mnemonic` inside bip39.
+    // Refuse both. A 128-char hex string is let through and still fails
+    // inside bip39, as before.
+    if (!/^[0-9a-fA-F]{128}$/.test(phrase)) {
+        throw new Error(
+            "Invalid recovery phrase: not a valid English BIP-39 mnemonic. Check the spelling, that every word is lowercase, and that words are separated by single spaces. If this exact phrase opened a wallet with SDK 2.3.16 to 4.0.21, see the upgrade note in https://github.com/kynesyslabs/sdks/blob/main/CHANGELOG.md",
+        )
+    }
+    return false
+}
+
+type WalletConnectionOptions = {
+    algorithm?: SigningAlgorithm
+    /** Include the ed25519 signature when signing with an unlinked PQC keypair. */
+    dual_sign?: boolean
+}
+
+/** Bounded description of an unexpected nodeCall reply. */
+/** The nonce-manager key of an account's private transfers in one subnet; no address holds ":". */
+function l2psNonceKey(address: string, l2psUid: string): string {
+    return `${address}:l2ps:${l2psUid}`
+}
+
+function describeNonceReply(reply: unknown): string {
+    const body = (reply as { response?: unknown } | null)?.response
+    let description: string
+    if (body instanceof TransportError) {
+        const cause = body.cause as {
+            code?: string
+            response?: { status?: number }
+        } | null
+        const reason = cause?.response?.status ?? cause?.code ?? "unknown"
+        return `transport failure after ${body.attempts} attempt(s): ${reason}`
+    } else if (body instanceof Error) {
+        return body.message.length > 200 ? `…${body.message.slice(-200)}` : body.message
+    } else if (typeof reply === "string") {
+        description = reply.slice(0, 201).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "?")
+    } else if (reply !== null && typeof reply === "object") {
+        description = Array.isArray(reply) ? "[array]" : "[object]"
+    } else if (typeof reply === "function" || typeof reply === "symbol" || typeof reply === "bigint") {
+        description = `[${typeof reply}]`
+    } else {
+        description = String(reply)
+    }
+    return description.length > 200 ? `${description.slice(0, 200)}…` : description
 }
 
 // TODO WIP modularize this behemoth (see l2psCalls as an example)
@@ -110,6 +184,9 @@ export class Demos {
 
     /** Cached TLSNotary instance */
     private _tlsnotaryInstance: TLSNotary | null = null
+
+    /** The genesis hash body-bound calls name, per RPC URL. */
+    private _genesisHashCache: { rpcUrl: string; hash: string } | null = null
 
     private _cachedNetworkParameters: NetworkParameters | null = null
     private _cachedNetworkParametersAt = 0
@@ -153,6 +230,28 @@ export class Demos {
     private static readonly _NETWORK_INFO_PENDING_FORK_TTL_MS = 30_000
 
     /**
+     * Per-attempt deadline for an RPC POST in {@link _doPost}, covering the
+     * upload, the node's work and the whole reply. Generous on purpose, to
+     * bound a stuck node while leaving room for slow calls. Calls can still
+     * run longer (an XM broadcast runs its outside-chain operations inside the
+     * call; a large upload or a large reply on a slow link); they fail at the
+     * deadline, and a broadcast then ends as an unknown outcome while the
+     * node may keep working.
+     */
+    private static readonly _RPC_TIMEOUT_MS = 120_000
+
+    /**
+     * Largest RPC reply {@link _doPost} reads. `confirm` echoes the whole
+     * transaction back (inline IPFS content included), so the cap sits at V8's
+     * string limit (2^29 - 24 chars; Node, Chromium), where a bigger reply
+     * could not be decoded anyway; this stops it before it is buffered. Bun's
+     * string limit is higher, so there the cap is stricter than needed. On the
+     * browser XHR adapter the cap counts transferred, possibly compressed,
+     * bytes.
+     */
+    private static readonly _RPC_MAX_RESPONSE_BYTES = 512 * 1024 * 1024
+
+    /**
      * Client-side nonce sequencer. Opt-in via {@link enableAutoNonce}. When
      * enabled, transaction builders reserve nonces from this manager instead
      * of re-reading the lagging chain nonce, so batched sends from the same
@@ -190,7 +289,31 @@ export class Demos {
     }
 
     constructor() {
+        hideSecretFields(this, ["crypto"])
         this.crypto = UnifiedCrypto.getInstance(this._cryptoInstanceId)
+    }
+
+    /**
+     * Serialises without key material. The keys stay reachable by name
+     * (`demos.keypair`, `demos.crypto`) for callers that export them on purpose.
+     */
+    toJSON() {
+        let walletConnected = false
+        try {
+            walletConnected = !!this.walletConnected
+        } catch {
+            // An unknown algorithm makes the keypair getter throw; a log line must not.
+        }
+        return {
+            algorithm: this.algorithm,
+            connected: this.connected,
+            walletConnected,
+            dual_sign: this.dual_sign,
+        }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("Demos", this.toJSON())
     }
 
     static get instance() {
@@ -260,18 +383,20 @@ export class Demos {
      * ```
      *
      * @param rpc_url - The URL of the demos node.
-     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     * @param wallet - Mnemonic string. Raw seed bytes are deprecated for mnemonic
+     *                 restoration and produce a different address.
      *                 Omit to connect without a wallet.
      * @param walletOptions - Forwarded to {@link connectWallet}.
      * @returns This connected Demos instance.
      */
+    async start(rpc_url: string, wallet?: string, walletOptions?: WalletConnectionOptions): Promise<this>
+    /** @deprecated Seed bytes derive a different address; pass the mnemonic string for new wallets. */
+    async start(rpc_url: string, wallet: Uint8Array, walletOptions?: WalletConnectionOptions): Promise<this>
+    async start(rpc_url: string, wallet?: string | Uint8Array, walletOptions?: WalletConnectionOptions): Promise<this>
     async start(
         rpc_url: string,
         wallet?: string | Uint8Array,
-        walletOptions?: {
-            algorithm?: SigningAlgorithm
-            dual_sign?: boolean
-        },
+        walletOptions?: WalletConnectionOptions,
     ): Promise<this> {
         await this.connect(rpc_url)
         if (wallet !== undefined) {
@@ -291,26 +416,31 @@ export class Demos {
      * ```
      *
      * @param rpc_url - The URL of the demos node.
-     * @param wallet - Master seed / mnemonic (string) or raw seed bytes.
+     * @param wallet - Mnemonic string. Raw seed bytes are deprecated for mnemonic
+     *                 restoration and produce a different address.
      * @param walletOptions - Forwarded to {@link connectWallet}.
      * @returns The started shared Demos instance.
      */
+    static async start(rpc_url: string, wallet?: string, walletOptions?: WalletConnectionOptions): Promise<Demos>
+    /** @deprecated Seed bytes derive a different address; pass the mnemonic string for new wallets. */
+    static async start(rpc_url: string, wallet: Uint8Array, walletOptions?: WalletConnectionOptions): Promise<Demos>
+    static async start(rpc_url: string, wallet?: string | Uint8Array, walletOptions?: WalletConnectionOptions): Promise<Demos>
     static async start(
         rpc_url: string,
         wallet?: string | Uint8Array,
-        walletOptions?: {
-            algorithm?: SigningAlgorithm
-            dual_sign?: boolean
-        },
+        walletOptions?: WalletConnectionOptions,
     ): Promise<Demos> {
         return Demos.instance.start(rpc_url, wallet, walletOptions)
     }
 
     /**
-     * Connects to a Demos wallet using the provided master seed.
+     * Connects to a Demos wallet. For mnemonic restoration, pass the phrase
+     * string directly: `await demos.connectWallet(mnemonic)`.
+     * Do not convert it to BIP39 seed bytes or a DemosWebAuth keypair first;
+     * those legacy paths derive different addresses and remain unchanged.
+     * Existing wallets must retain their original input type and derivation.
      *
-     * @param masterSeed - The master seed of the wallet
-     * @param algorithm - The algorithm to use for the wallet
+     * @param masterSeed - The mnemonic string of the wallet
      * @param options - The options for the wallet connection
      * @param options.algorithm - The algorithm to use for the wallet
      * @param options.dual_sign - Whether to include the ed25519 signature along with the PQC signature, when
@@ -318,16 +448,16 @@ export class Demos {
      *
      * @returns The public key of the wallet
      */
+    async connectWallet(masterSeed: string, options?: WalletConnectionOptions): Promise<string>
+    /**
+     * @deprecated For mnemonic restoration, use connectWallet(mnemonic) with the
+     * phrase string. Bytes derive a different address. Retained for existing wallets.
+     */
+    async connectWallet(masterSeed: Uint8Array, options?: WalletConnectionOptions): Promise<string>
+    async connectWallet(masterSeed: string | Uint8Array, options?: WalletConnectionOptions): Promise<string>
     async connectWallet(
         masterSeed: string | Uint8Array,
-        options?: {
-            algorithm?: SigningAlgorithm
-            /**
-             * Whether to include the ed25519 signature along with the PQC signature, when
-             * signing with unlinked PQC keypairs (i.e. PQC keypairs not linked to your ed25519 address on the network).
-             */
-            dual_sign?: boolean
-        },
+        options?: WalletConnectionOptions,
     ) {
         if (!masterSeed) {
             throw new Error(
@@ -336,8 +466,6 @@ export class Demos {
         }
 
         let seed: Uint8Array = null
-        this.algorithm = options?.algorithm || "ed25519"
-        this.dual_sign = options?.dual_sign || false
         // TODO: Convert masterSeed to 128 bytes
 
         if (
@@ -349,17 +477,28 @@ export class Demos {
             )
         }
 
+        // BIP39 seed bytes are 64 bytes; service keys and the 128-byte
+        // prehashed master-seed path are not mnemonic restoration inputs.
+        if (masterSeed instanceof Uint8Array && masterSeed.length === 64) {
+            warnLegacySeedPath("bytes")
+        }
+
         let hashable: string | Uint8Array = null
 
         if (typeof masterSeed === "string") {
             masterSeed = masterSeed.trim()
 
-            if (!bip39.validateMnemonic(masterSeed, wordList)) {
+            if (!checkRecoveryPhrase(masterSeed)) {
                 hashable = bip39.mnemonicToSeedSync(masterSeed)
             } else {
                 hashable = masterSeed
             }
         }
+
+        // Set only after the seed checks above, so a refused call leaves the
+        // connected wallet's algorithm and dual signing untouched.
+        this.algorithm = options?.algorithm || "ed25519"
+        this.dual_sign = options?.dual_sign || false
 
         // NOTE: Reverted this bug to keep generating the same keypair
         // with the same mnemonic for mnemonics added to testnet during the incentives campaign.
@@ -389,9 +528,9 @@ export class Demos {
     /**
      * Connect a wallet from a hex-encoded key instead of a mnemonic.
      *
-     * `connectWallet(<string>)` treats a non-mnemonic string as a BIP-39
-     * *passphrase* (PBKDF2), so passing a raw hex key there silently derives an
-     * unexpected identity. This method decodes the hex to bytes and feeds them to
+     * `connectWallet(<string>)` refuses a string that is not a valid BIP-39
+     * mnemonic, so a raw hex key cannot be passed there. This method decodes the
+     * hex to bytes and feeds them to
      * `connectWallet` as the master seed — a deterministic identity from the key,
      * on the exact same derivation path as `connectWallet(<bytes>)`. Existing
      * derivation is unchanged.
@@ -424,7 +563,7 @@ export class Demos {
                 "connectWalletFromPrivateKey: expected a 32-byte key as 64 hex chars (optionally 0x-prefixed).",
             )
         }
-        return await this.connectWallet(hexToUint8Array(clean), options)
+        return await this.connectWallet(hexToUint8Array(clean) as string | Uint8Array, options)
     }
 
     /**
@@ -844,7 +983,14 @@ export class Demos {
             raw_tx.content.from = "0x" + raw_tx.content.from
         }
 
-        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx)
+        // Only seat txs depend on nftValidatorGating, so no other type waits
+        // on the fork lookup.
+        const nftValidatorGating =
+            VALIDATOR_SEAT_TX_TYPES.has(raw_tx.content.type) &&
+            (await this._isNftValidatorGatingActiveCached())
+        raw_tx.content.gcr_edits = await GCRGeneration.generate(raw_tx, false, {
+            nftValidatorGating,
+        })
 
         // Node is source of truth for governance-driven fees; edits-derived
         // calc kicks in only if RPC is unreachable or endpoint is missing.
@@ -1184,6 +1330,15 @@ export class Demos {
      * Retry-After response header (numeric seconds, or HTTP-date) overrides
      * the computed backoff for that attempt.
      *
+     * Each attempt has a wall-clock deadline (`timeoutMs`, default
+     * {@link _RPC_TIMEOUT_MS}) and a reply size cap (`maxResponseBytes`,
+     * default {@link _RPC_MAX_RESPONSE_BYTES}). A missed deadline fails with
+     * code ECONNABORTED and is not retried: the node may already have the
+     * request, so the outcome is unknown. An oversize reply fails with code
+     * ERR_BAD_RESPONSE, no `response` and a message starting
+     * `maxContentLength size of`; HTTP 5xx replies share the code but carry a
+     * `response`.
+     *
      * On terminal failure, throws a TransportError carrying the underlying
      * cause and the total number of attempts. Callers that need the legacy
      * "never throws, returns {result: 500, response: error}" behavior should
@@ -1193,10 +1348,32 @@ export class Demos {
         url: string,
         request: any,
         headers: Record<string, string | undefined>,
-        opts: { retries?: number; baseSleepMs?: number } = {},
+        opts: {
+            retries?: number
+            baseSleepMs?: number
+            timeoutMs?: number
+            maxResponseBytes?: number
+            /**
+             * Send a string body as these exact bytes. A body-bound
+             * signature covers them, and axios would otherwise reparse
+             * and trim a JSON string.
+             */
+            rawBody?: boolean
+        } = {},
     ): Promise<{ data: T }> {
         const maxRetries = opts.retries ?? 4
         const baseSleepMs = opts.baseSleepMs ?? 250
+        // An override that is not a usable limit (0, negative, NaN, or past
+        // the largest timer delay, which Node clamps to 1 ms) would fail every
+        // call, so it falls back to the default.
+        const t = opts.timeoutMs
+        const timeoutMs =
+            Number.isFinite(t) && t > 0 && t <= 2 ** 31 - 1
+                ? t
+                : Demos._RPC_TIMEOUT_MS
+        const b = opts.maxResponseBytes
+        const maxResponseBytes =
+            Number.isFinite(b) && b > 0 ? b : Demos._RPC_MAX_RESPONSE_BYTES
         const RETRYABLE_CODES = new Set([
             "ECONNRESET",
             "ECONNREFUSED",
@@ -1211,10 +1388,59 @@ export class Demos {
 
         // attempt 0 is the initial try; we then retry up to maxRetries times.
         for (; attempt <= maxRetries; attempt++) {
+            // The deadline is ours rather than axios' `timeout`: on Node that
+            // is a socket idle timer a node can hold open by trickling bytes,
+            // and the fetch adapter reports it as ETIMEDOUT, which the loop
+            // below retries as if the request never reached the node.
+            const controller = new AbortController()
+            let stopped: { message: string; code: string } | null = null
+            const stop = (message: string, code: string) => {
+                stopped = stopped ?? { message, code }
+                controller.abort()
+            }
+            const timer = setTimeout(
+                () =>
+                    stop(
+                        `timeout of ${timeoutMs}ms exceeded`,
+                        AxiosError.ECONNABORTED,
+                    ),
+                timeoutMs,
+            )
             try {
-                const response = await axios.post<T>(url, request, { headers })
+                const response = await axios
+                    .post<T>(url, request, {
+                        headers,
+                        signal: controller.signal,
+                        ...(opts.rawBody
+                            ? { transformRequest: [(data: unknown) => data] }
+                            : {}),
+                        // Enforced by the Node http and fetch adapters. The
+                        // browser XHR adapter ignores it, so the progress
+                        // check below covers that one.
+                        maxContentLength: maxResponseBytes,
+                        onDownloadProgress: ({ loaded }) => {
+                            if (
+                                maxResponseBytes > 0 &&
+                                loaded > maxResponseBytes
+                            ) {
+                                stop(
+                                    `maxContentLength size of ${maxResponseBytes} exceeded`,
+                                    AxiosError.ERR_BAD_RESPONSE,
+                                )
+                            }
+                        },
+                    })
+                    .finally(() => clearTimeout(timer))
                 return { data: response.data }
-            } catch (error: any) {
+            } catch (caught: any) {
+                const error = stopped
+                    ? new AxiosError(
+                          stopped.message,
+                          stopped.code,
+                          caught?.config,
+                          caught?.request,
+                      )
+                    : caught
                 lastError = error
 
                 const code: string | undefined = error?.code
@@ -1472,6 +1698,159 @@ export class Demos {
         return this.call("nodeCall", message, args)
     }
 
+    /**
+     * A nodeCall signed over its exact body and naming the connected node as
+     * its audience. Nodes require this form for calls that hand the signer
+     * something only they may hold, such as `requestTLSNproxy`: with the
+     * plain `nodeCall` form, captured headers could carry any body.
+     *
+     * It is signed with the account's ed25519 key, the key its address and
+     * transactions are under, and sent once: the node refuses a resend of
+     * the same signed bytes as a replay.
+     *
+     * @param message - The nodeCall message
+     * @param data - The nodeCall data
+     * @returns The node's RPC response; a handler refusal comes back as its
+     *   `result` code and `response` body.
+     * @throws when no wallet is connected, the node does not serve its
+     *   public key or genesis block, or the node refuses the request itself
+     *   (for example HTTP 401 for a signature it does not accept).
+     */
+    async bodyBoundNodeCall(
+        message: string,
+        data: Record<string, unknown> = {},
+    ): Promise<RPCResponse> {
+        required(this.walletConnected, "Wallet not connected")
+        required(this.rpc_url, "Not connected to a node")
+        const rpcUrl = this.rpc_url
+        const [audience, genesisHash] = await Promise.all([
+            this._nodePublicKey(rpcUrl),
+            this._genesisHash(rpcUrl),
+        ])
+        const { publicKey } = await this.crypto.getIdentity("ed25519")
+        const identity = "ed25519:" + uint8ArrayToHex(publicKey as Uint8Array)
+        const body = JSON.stringify({
+            method: "nodeCall",
+            params: [{ message, data }],
+        })
+        const headers = await bodyBoundAuthHeaders({
+            genesisHash,
+            identity,
+            body,
+            audience,
+            sign: async bytes =>
+                (await this.crypto.sign("ed25519", bytes)).signature,
+        })
+
+        try {
+            const response = await this._doPost<RPCResponse>(
+                rpcUrl,
+                body,
+                { "Content-Type": "application/json", ...headers },
+                { retries: 0, rawBody: true },
+            )
+            return response.data
+        } catch (error) {
+            const reply = (error as any)?.cause?.response
+            // A node reset at the same URL has a new genesis; read it again
+            // next time instead of failing every call.
+            if (reply?.status === 401) this._genesisHashCache = null
+            // The auth middleware answers `{ error, details }`, the RPC
+            // route `{ result, response }`.
+            const body = reply?.data
+            const reason =
+                body?.response ??
+                ([body?.error, body?.details].filter(Boolean).join(": ") ||
+                    (error as Error)?.message)
+            throw new Error(
+                `${message} failed${reply?.status ? ` (HTTP ${reply.status})` : ""}: ` +
+                    (typeof reason === "string" ? reason : JSON.stringify(reason)),
+            )
+        }
+    }
+
+    /**
+     * The public key the node serves, which a body-bound call names as its
+     * audience. Read for every call rather than cached: the node behind a URL
+     * can change, and a stale key makes every call fail as meant for another
+     * node.
+     */
+    private async _nodePublicKey(rpcUrl: string): Promise<string> {
+        const res = await this._boundedGet(
+            `${rpcUrl.replace(/\/+$/, "")}/publickey`,
+        )
+        const key = res.data as unknown
+        if (
+            res.status !== 200 ||
+            typeof key !== "string" ||
+            !/^(0x)?[0-9a-fA-F]{64}$/.test(key)
+        ) {
+            throw new Error(
+                `${rpcUrl} did not serve its public key (HTTP ${res.status})`,
+            )
+        }
+        return audienceKey(key)
+    }
+
+    /**
+     * A GET with a hard deadline and a reply size cap. axios' `timeout` is a
+     * socket idle timer on Node, so a node trickling bytes could otherwise
+     * hold a call that a paid attestation waits on open indefinitely.
+     */
+    private async _boundedGet(
+        url: string,
+        maxResponseBytes = 1024 * 1024,
+    ): Promise<{ status: number; data: unknown }> {
+        const controller = new AbortController()
+        let stopped: string | null = null
+        const stop = (reason: string) => {
+            stopped = stopped ?? reason
+            controller.abort()
+        }
+        const timer = setTimeout(
+            () => stop(`timeout of ${Demos._RPC_TIMEOUT_MS}ms exceeded`),
+            Demos._RPC_TIMEOUT_MS,
+        )
+        try {
+            const res = await axios.get(url, {
+                signal: controller.signal,
+                validateStatus: () => true,
+                maxContentLength: maxResponseBytes,
+                // The browser XHR adapter ignores maxContentLength.
+                onDownloadProgress: ({ loaded }) => {
+                    if (loaded > maxResponseBytes) {
+                        stop(`maxContentLength size of ${maxResponseBytes} exceeded`)
+                    }
+                },
+            })
+            return { status: res.status, data: res.data }
+        } catch (error) {
+            throw new Error(
+                `GET ${url} failed: ${stopped ?? (error as Error)?.message}`,
+            )
+        } finally {
+            clearTimeout(timer)
+        }
+    }
+
+    /** The genesis block hash the node serves, which names its network. */
+    private async _genesisHash(rpcUrl: string): Promise<string> {
+        if (this._genesisHashCache?.rpcUrl === rpcUrl) {
+            return this._genesisHashCache.hash
+        }
+        const res = await this._boundedGet(
+            `${rpcUrl.replace(/\/+$/, "")}/genesisBlock`,
+        )
+        const hash = (res.data as { hash?: unknown } | null)?.hash
+        if (res.status !== 200 || typeof hash !== "string" || !hash) {
+            throw new Error(
+                `${rpcUrl} did not serve its genesis block (HTTP ${res.status})`,
+            )
+        }
+        this._genesisHashCache = { rpcUrl, hash }
+        return hash
+    }
+
     // SECTION Predefined nodeCall methods
 
     /**
@@ -1653,25 +2032,61 @@ export class Demos {
      * For dependent sends see {@link waitForNonce} or {@link enableAutoNonce}.
      *
      * @param address - The address
-     * @returns The confirmed nonce, or 0 when the node reports none.
+     * @returns The confirmed nonce, including 0 for a fresh account.
+     * @throws When the lookup fails (transport error, node error reply) or the
+     * reply is not a non-negative integer. Defaulting to 0 there would make
+     * every builder sign with nonce 1.
      */
     async getAddressNonce(address: string): Promise<number> {
         const nonceValue = await this.nodeCall("getAddressNonce", {
             address,
         })
 
-        if (typeof nonceValue === "number" && Number.isFinite(nonceValue)) {
+        if (Number.isSafeInteger(nonceValue) && nonceValue >= 0) {
             return nonceValue
         }
 
-        if (typeof nonceValue === "string") {
-            const parsed = Number.parseInt(nonceValue, 10)
-            if (Number.isFinite(parsed)) {
+        if (typeof nonceValue === "string" && /^(?:0|[1-9]\d*)$/.test(nonceValue)) {
+            const parsed = Number(nonceValue)
+            if (Number.isSafeInteger(parsed)) {
                 return parsed
             }
         }
 
-        return 0
+        throw new Error(
+            `getAddressNonce: node returned no valid nonce for ${describeNonceReply(address)}: ${describeNonceReply(nonceValue)}`,
+        )
+    }
+
+    /**
+     * The nonce of the last private transfer `address` settled in the L2PS
+     * subnet `l2psUid`; the next transfer there signs this + 1.
+     *
+     * Private transfers settle against this per-subnet nonce, never against
+     * the L1 nonce of {@link getAddressNonce}, so an L1 send does not wait for
+     * a private transfer to settle and the two counters move independently.
+     * It is consensus state, so any node answers it, member of the subnet or
+     * not. It advances when the transfer's batch settles, not when the subnet
+     * accepts the transfer.
+     *
+     * @param address - The account address (hex)
+     * @param l2psUid - The subnet uid
+     * @returns The settled L2PS nonce, 0 for an account that never settled there.
+     * @throws When the lookup fails or the reply is not a non-negative integer.
+     */
+    async getL2PSNonce(address: string, l2psUid: string): Promise<number> {
+        const nonceValue = await this.nodeCall("getL2PSNonce", {
+            l2psUid,
+            address,
+        })
+
+        if (Number.isSafeInteger(nonceValue) && nonceValue >= 0) {
+            return nonceValue
+        }
+
+        throw new Error(
+            `getL2PSNonce: node returned no valid L2PS nonce for ${describeNonceReply(address)} in ${describeNonceReply(l2psUid)}: ${describeNonceReply(nonceValue)}`,
+        )
     }
 
     /**
@@ -1936,11 +2351,14 @@ export class Demos {
     /**
      * Reseed the local nonce counter for `address` (or every address) from the
      * node on the next send. Call after a nonce-rejection, or when the same
-     * key may have sent from another client.
+     * key may have sent from another client. With `l2psUid`, reseeds the
+     * private-transfer counter of that subnet instead of the L1 one.
      */
-    resetNonce(address?: string): void {
+    resetNonce(address?: string, l2psUid?: string): void {
         if (address === undefined) {
             this._nonceManager.resetAll()
+        } else if (l2psUid !== undefined) {
+            this._nonceManager.reset(l2psNonceKey(address, l2psUid))
         } else {
             this._nonceManager.reset(address)
         }
@@ -1974,6 +2392,26 @@ export class Demos {
     }
 
     /**
+     * The `_nonceReserver` of private transfers in one subnet: its own counter,
+     * seeded from {@link getL2PSNonce}, because the L1 counter does not
+     * sequence them. Only the next nonce settles there, so a client sending
+     * several private transfers before their batch settles needs this local
+     * counter to keep them distinct.
+     *
+     * @internal
+     */
+    _l2psNonceReserver(address: string, l2psUid: string): (() => Promise<number>) | undefined {
+        if (!this._autoNonce) {
+            return undefined
+        }
+        return () =>
+            this._nonceManager.reserve(
+                l2psNonceKey(address, l2psUid),
+                async () => (await this.getL2PSNonce(address, l2psUid)) + 1,
+            )
+    }
+
+    /**
      * Get a validator's current record (stake, status, unstake timestamps).
      * Returns null if the address is not (and never was) a validator.
      */
@@ -1992,6 +2430,16 @@ export class Demos {
         return ((await this.nodeCall("getValidators", {
             blockNumber,
         })) ?? []) as ValidatorInfo[]
+    }
+
+    /**
+     * The validator whose seat a Solana NFT mint currently backs, active or
+     * unstaking. Returns null when the mint is free to back a new seat.
+     */
+    async getValidatorByMint(mint: string): Promise<ValidatorInfo | null> {
+        return (await this.nodeCall("getValidatorByMint", {
+            mint,
+        })) as ValidatorInfo | null
     }
 
     /**
@@ -2224,6 +2672,20 @@ export class Demos {
 
     /**
      * @internal
+     * Whether the node backs validator seats with NFTs, which makes seat txs
+     * gasless. `false` when the node cannot be read: a node that predates the
+     * fork still expects the gas edit.
+     */
+    private async _isNftValidatorGatingActiveCached(): Promise<boolean> {
+        try {
+            return isNftValidatorGatingActive(await this.getNetworkInfo())
+        } catch {
+            return false
+        }
+    }
+
+    /**
+     * @internal
      * The chain id the signature binds to, from the same cached call. Only
      * read when the fork is active, where the node always reports one — a
      * node with no chain id cannot activate the fork.
@@ -2319,32 +2781,25 @@ export class Demos {
 
     // ANCHOR TLSNotary
     /**
-     * Create a TLSNotary instance for HTTPS attestation.
+     * Create a TLSNotary instance with the notary endpoints of the connected
+     * node, for verifying presentations.
      *
-     * This method discovers the notary endpoints from the connected node
-     * and returns an initialized TLSNotary instance.
+     * The instance has no proxy session, so it cannot attest on its own:
+     * nodes open a proxy only for a signed request from the account that
+     * paid for the `tlsn_request`. Attest through
+     * `TLSNotaryService.createTLSNotary`, or pass the `proxyUrl` from
+     * `TLSNotaryService.requestAttestation` as `websocketProxyUrl` in an
+     * explicit config.
      *
      * @param config - Optional explicit configuration (overrides discovery)
      * @returns Initialized TLSNotary instance
      *
      * @example
      * ```typescript
-     * // Option 1: Auto-discovery from connected node (preferred)
-     * const demos = new Demos({ rpc: 'https://node.demos.sh' });
-     * await demos.connect();
+     * const demos = new Demos();
+     * await demos.connect(rpcUrl);
      * const tlsn = await demos.tlsnotary();
-     *
-     * // Option 2: Explicit configuration
-     * const tlsn = await demos.tlsnotary({
-     *   notaryUrl: 'wss://other-node.demos.sh:7047',
-     *   websocketProxyUrl: 'wss://other-node.demos.sh:55688',
-     * });
-     *
-     * // Attest an HTTPS request
-     * const result = await tlsn.attest({
-     *   url: 'https://api.github.com/users/octocat',
-     * });
-     * console.log('Verified server:', result.verification.serverName);
+     * const verification = await tlsn.verify(presentation);
      * ```
      */
     async tlsnotary(config?: TLSNotaryConfig): Promise<TLSNotary> {
@@ -2373,22 +2828,13 @@ export class Demos {
                 )
             }
 
-            const info = (await this.nodeCall(
-                "tlsnotary.getInfo",
-            )) as TLSNotaryDiscoveryInfo
-
-            if (!info || !info.notaryUrl) {
-                throw new Error(
-                    "Node does not support TLSNotary or tlsnotary.getInfo failed. " +
-                        "Provide explicit config or use a node with TLSNotary enabled.",
-                )
-            }
+            // Mainnet uses the notary pinned in the SDK, not the key an RPC
+            // reports; other networks use the node's tlsnotary.getInfo.
+            const notary = await resolveNotary(this)
 
             tlsnConfig = {
-                notaryUrl: info.notaryUrl,
-                rpcUrl: this.rpc_url,
-                notaryPublicKey: info.publicKey,
-                // Note: websocketProxyUrl is deprecated - proxies are now requested dynamically
+                notaryUrl: notary.notaryUrl,
+                trustedNotaryKeys: notary.trustedNotaryKeys,
             }
         }
 

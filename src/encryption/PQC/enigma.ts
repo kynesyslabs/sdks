@@ -15,6 +15,11 @@ import { ml_kem768 } from "@noble/post-quantum/ml-kem"
 import { ml_dsa65 } from "@noble/post-quantum/ml-dsa"
 import { sha3_256 } from "@noble/hashes/sha3"
 import * as crypto from "crypto"
+import {
+    hideSecretFields,
+    INSPECT_CUSTOM,
+    redactedInspect,
+} from "../secretFields"
 import { Falcon } from "./falconts"
 import { randomBytes } from "crypto"
 
@@ -41,7 +46,27 @@ export class Enigma {
     // ml-kem-aes parameters
     ml_kem_aes_parameters: string = null
 
-    constructor() {}
+    constructor() {
+        hideSecretFields(this, [
+            "ml_dsa_signing_keypair",
+            "falcon_signing_keypair",
+            "ml_kem_encryption_keypair",
+            "ml_kem_aes_parameters",
+        ])
+    }
+
+    /** Serialises without key material. Read the keypair fields by name to export them. */
+    toJSON() {
+        return {
+            hasMlDsaKeypair: !!this.ml_dsa_signing_keypair,
+            hasFalconKeypair: !!this.falcon_signing_keypair,
+            hasMlKemKeypair: !!this.ml_kem_encryption_keypair,
+        }
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("Enigma", this.toJSON())
+    }
 
     // Static methods
 

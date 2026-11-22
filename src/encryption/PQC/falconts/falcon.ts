@@ -1,4 +1,5 @@
 import { getKernel } from 'falcon-sign';
+import { hideSecretFields, INSPECT_CUSTOM, redactedInspect } from '../../secretFields';
 
 // Define interfaces for the types we observed
 interface FalconKernel {
@@ -27,10 +28,20 @@ export default class Falcon {
     private algid: string;
 
     constructor(algid?: string) {
+        hideSecretFields(this, ["keypair"]);
         if (algid && (algid !== 'falcon512_n3_v1' && algid !== 'falcon1024_n3_v1')) {
             throw new Error(`Invalid algorithm ID: ${algid}\nSupported algorithms: falcon512_n3_v1, falcon1024_n3_v1\nLeave blank for default: falcon512_n3_v1`);
         }
         this.algid = algid || 'falcon512_n3_v1';
+    }
+
+    /** Serialises without key material. Use getPrivateKey() to export the key. */
+    toJSON() {
+        return { algid: this.algid, hasKeypair: !!this.keypair };
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("Falcon", this.toJSON());
     }
 
     async init(): Promise<void> {

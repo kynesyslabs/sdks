@@ -3,7 +3,10 @@
  * `content.from`'s signature over what `Demos.sign` signs.
  */
 import { describe, expect, it, jest } from "@jest/globals"
+import forge from "node-forge"
 
+import { Cryptography } from "@/encryption/Cryptography"
+import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { Demos } from "@/websdk"
 import L2PS from "@/l2ps/l2ps"
 import type { SigningAlgorithm, Transaction } from "@/types"
@@ -83,9 +86,14 @@ describe("L2PS.decryptTx inner signature", () => {
         )
     })
 
+    // Content is left as is: decryptTx checks the content against the hash first.
     it("refuses a signature by a key other than the sender's", async () => {
         const inner = await signedTx("ed25519")
-        inner.content.from = "0x" + "cd".repeat(32)
+        const other = forge.pki.ed25519.generateKeyPair()
+        inner.signature = {
+            type: "ed25519",
+            data: uint8ArrayToHex(Cryptography.sign(inner.hash, other.privateKey)),
+        }
 
         await expect(roundTrip(inner)).rejects.toThrow(
             "Decryption failed: Decrypted transaction signature does not verify",

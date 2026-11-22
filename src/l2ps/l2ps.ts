@@ -10,14 +10,24 @@
  */
 
 import { UnifiedCrypto, hexToUint8Array } from "@/encryption/unifiedCrypto";
+import { serializeTransactionContent } from "@/denomination/serializerGate";
 import forge from "node-forge";
 import { Hashing } from "@/encryption/Hashing";
+import { hideSecretFields, INSPECT_CUSTOM, redactedInspect } from "@/encryption/secretFields";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
 import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
 import { txSignaturePreimage } from "@/websdk/utils/txSignaturePreimage";
 
-/** Plaintexts are padded to a multiple of this many characters before encryption. */
+/** Plaintexts are padded to a multiple of this many UTF-8 bytes before encryption. */
 export const L2PS_PLAINTEXT_BUCKET = 1024;
+
+/**
+ * sha256 of a string's UTF-8 bytes, as hex: the node hashes transaction
+ * content with `crypto.createHash("sha256").update(str)`, which is UTF-8.
+ */
+export function sha256Utf8(text: string): string {
+    return forge.md.sha256.create().update(forge.util.encodeUtf8(text), "raw").digest().toHex();
+}
 
 /**
  * Configuration interface for L2PS instances.
@@ -130,10 +140,21 @@ export default class L2PS {
             throw new Error('Private key and IV are required');
         }
 
+        hideSecretFields(this, ["privateKey", "iv"]);
         this.privateKey = privateKey;
         this.iv = iv;
-        this.id = Hashing.sha256(privateKey);
+        // privateKey is forge binary bytes, not text
+        this.id = Hashing.sha256(privateKey, "raw");
         L2PS.instances.set(this.id, this);
+    }
+
+    /** Serialises without the AES key and IV; `id` is a hash of the key, not the key. */
+    toJSON() {
+        return { id: this.id, config: this.config ?? null };
+    }
+
+    [INSPECT_CUSTOM]() {
+        return redactedInspect("L2PS", this.toJSON());
     }
 
     /**
@@ -227,7 +248,8 @@ export default class L2PS {
             // AES-GCM ciphertext is as long as the plaintext, so an unpadded
             // transfer leaks the digit count of its amount. JSON.parse ignores
             // trailing whitespace, so decryptors of any version accept this.
-            const json = JSON.stringify(tx);
+            // UTF-8 bytes, as decryptTx decodes them; ASCII is unchanged.
+            const json = forge.util.encodeUtf8(JSON.stringify(tx));
             const txString = json.padEnd(
                 Math.ceil((json.length + 1) / L2PS_PLAINTEXT_BUCKET) * L2PS_PLAINTEXT_BUCKET,
                 " ",
@@ -389,6 +411,31 @@ export default class L2PS {
                 throw new Error('Decrypted transaction hash mismatch');
             }
 
+            // The `.hash` field is data the sender chose, so also recompute
+            // it from the decrypted content with the node's two
+            // `Transaction.checkCoherence` forms, each hashed as UTF-8: raw
+            // `JSON.stringify` before the osDenomination fork, the post-fork
+            // serializer after it. The payload does not record the fork
+            // state, so accept either. The pre-fork serializer is never used:
+            // it turns OS strings into DEM by integer division, so different
+            // content would match one hash. A form that throws or gives no
+            // string (no content) counts as no match, as in the node.
+            const hashForms = [
+                () => JSON.stringify(originalTx.content),
+                () => serializeTransactionContent(originalTx.content, true),
+            ];
+            const recomputesToHash = hashForms.some((form) => {
+                try {
+                    const text = form();
+                    return typeof text === "string" && sha256Utf8(text) === encryptedPayload.original_hash;
+                } catch {
+                    return false;
+                }
+            });
+            if (!recomputesToHash) {
+                throw new Error('Decrypted transaction content does not match its hash');
+            }
+
             if (!originalTx.signature?.data) {
                 throw new Error('Decrypted transaction is not signed');
             }
@@ -473,7 +520,7 @@ export default class L2PS {
      * @returns Promise resolving to a 16-character fingerprint string
      */
     async getKeyFingerprint(): Promise<string> {
-        return Hashing.sha256(this.privateKey).substring(0, 16);
+        return Hashing.sha256(this.privateKey, "raw").substring(0, 16);
     }
 
     /**

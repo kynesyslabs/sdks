@@ -82,6 +82,14 @@ await demos.run.pay(to, amount, { maxFee: 25 })
 await demos.run.pay(to, amount, { maxFee: null })
 ```
 
+**What `maxFee` covers.** `maxFee` covers only the fee fields in the confirm
+response (`network_fee + rpc_fee + additional_fee`, from `gas_operation.fees`,
+else the transaction's `transaction_fee`). Transaction types that the node
+charges for beyond these (for example the storage burn on a storage
+transaction) can cost more than `maxFee`. If the confirm response carries
+neither, the fee counts as `0` and the cap always passes. Check the node's
+charges for the transaction type yourself before relying on the cap.
+
 ## Confirmation strategies (`confirm`)
 
 ```ts

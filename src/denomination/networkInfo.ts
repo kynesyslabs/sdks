@@ -52,6 +52,28 @@ export interface NetworkInfo {
          * preimage.
          */
         signatureDomain?: ForkStatus
+        /**
+         * Nodes refuse TLSNotary identity links they cannot verify. Optional
+         * like every fork added after the field was introduced.
+         */
+        tlsnProofEnforcement?: ForkStatus
+        /**
+         * Nodes verify TLSNotary presentations against the notary keys of
+         * the fork payload, so TLSN identity links and stored proofs are
+         * accepted again, bound to their sender.
+         */
+        tlsnVerified?: ForkStatus
+        /**
+         * Nodes link GitHub, Discord and Twitter accounts through TLSNotary
+         * only and refuse the web2 proof-URL path for them.
+         */
+        keylessWeb2Identity?: ForkStatus
+        /**
+         * Validator seats are backed by a Solana node NFT instead of bonded
+         * DEM: a stake carries amount 0 and an NFT proof, seat transactions
+         * pay no gas, and `validatorChallenge` evicts a seat whose NFT moved.
+         */
+        nftValidatorGating?: ForkStatus
     }
     /**
      * Network identity from the node's genesis. Bound into the signature
@@ -94,4 +116,9 @@ export class SubDemPrecisionError extends Error {
         this.amountOs = amountOs
         this.subDemRemainderOs = subDemRemainderOs
     }
+}
+
+/** Whether the network backs validator seats with NFTs (`nftValidatorGating`). */
+export function isNftValidatorGatingActive(info: NetworkInfo | null | undefined): boolean {
+    return info?.forks?.nftValidatorGating?.activated === true
 }

@@ -5,6 +5,7 @@ import { SOLANA } from "@/multichain/core"
 import { SolanarunProgramParams as SolanaRunAnchorProgramParams } from "@/multichain/core/types/interfaces"
 import { SOLANA as SC } from "@/multichain/localsdk"
 import { BN } from "@project-serum/anchor"
+import { legacySeed } from "../utils/legacySeed"
 import { wallets } from "../utils/wallets"
 import chainProviders from "./chainProviders"
 import { Demos, prepareXMPayload, prepareXMScript } from "@/websdk"
@@ -64,7 +65,9 @@ describe("SOLANA CHAIN TESTS", () => {
     beforeAll(async () => {
         await demos.connect("http://localhost:53550")
         await demos.connectWallet(
-            "polar scale globe beauty stock employ rail exercise goat into sample embark",
+            legacySeed(
+                "polar scale globe beauty stock employ rail exercise goat into sample embark",
+            ),
         )
 
         const connected = await instance.connect()

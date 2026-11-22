@@ -19,12 +19,23 @@ export {
     prepareXMScript,
 } from "./XMTransactions"
 
-export { GCRGeneration, HandleNativeOperations } from "./GCRGeneration"
+export {
+    GCRGeneration,
+    HandleNativeOperations,
+    VALIDATOR_SEAT_TX_TYPES,
+    isGaslessTxType,
+} from "./GCRGeneration"
+export type { GCRGenerationOptions } from "./GCRGeneration"
 // Utils
 export { sha256 } from "./utils/sha256"
 export { bufferize } from "./utils/bufferizer"
 export { required, _required } from "./utils/required"
 export { forgeToString, stringToForge } from "./utils/forge_converter"
+export {
+    bodyBoundAuthHeaders,
+    httpAuthMessage,
+    audienceKey,
+} from "./utils/bodyBoundAuth"
 export {
     personalMessagePreimage,
     DEMOS_MESSAGE_PREFIX,

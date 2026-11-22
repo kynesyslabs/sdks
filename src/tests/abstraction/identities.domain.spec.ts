@@ -1,5 +1,6 @@
 import { Demos } from "@/websdk"
 import { Identities } from "@/abstraction"
+import { legacySeed } from "../utils/legacySeed"
 
 const MNEMONIC =
     "polar scale globe beauty stock employ rail exercise goat into sample embark"
@@ -14,7 +15,7 @@ describe("Domain Identities (offline SDK logic)", () => {
     const identities = new Identities()
 
     beforeAll(async () => {
-        await demos.connectWallet(MNEMONIC) // local crypto only, no node
+        await demos.connectWallet(legacySeed(MNEMONIC)) // local crypto only, no node
     })
 
     test("createDomainProofPayload signs a host+sender-bound message", async () => {
@@ -104,6 +105,7 @@ describe("Domain Identities (offline SDK logic)", () => {
 
     test("addDomainIdentity builds the correct web2/domain request", async () => {
         const payload = await identities.createDomainProofPayload(demos, "example.com")
+        jest.spyOn(demos, "getAddressNonce").mockResolvedValue(0)
 
         let proofUrlSeen: string | null = null
         let signedTx: any = null

@@ -410,7 +410,6 @@ export class EVM extends DefaultChain implements IEVMDefaultChain {
     // SECTION Not implemented methods
 
     async getContractInstance(address: string, abi: string): Promise<Contract> {
-        console.log(this)
         if (!this.provider) {
             throw new Error("Provider not connected")
         }

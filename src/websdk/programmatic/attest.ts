@@ -604,13 +604,15 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          *     revealedRecv,
          *     "octocat",
          *     583231,
-         *     undefined,
-         *     { legacy: true },
          * )
          * ```
          *
-         * Networks with `tlsnProofEnforcement` active, mainnet among them,
-         * refuse TLSN links, so the call throws unless `opts.legacy` is set.
+         * Accepted on networks with `tlsnVerified` active, mainnet among
+         * them, where the node verifies the notary signature and the
+         * `X-Demos-Bind` header (attest through
+         * `TLSNotaryService.createTLSNotary({ purpose: context })`). The
+         * telegram context is refused there. On a network without
+         * `tlsnVerified` the call throws unless `opts.legacy` is set.
          *
          * @param context - The platform context ("github", "discord", or
          *                   "telegram").
@@ -622,8 +624,8 @@ export function createAttestNamespace(ctx: ProgrammaticContext) {
          * @param userId - The user id from the proven response.
          * @param referralCode - Optional referral code for incentive points.
          * @param opts - Fee ceiling / confirmation strategy / wait behaviour,
-         *               and `legacy: true` for a network without
-         *               `tlsnProofEnforcement`.
+         *               and `legacy: true` for a network with neither
+         *               `tlsnVerified` nor `tlsnProofEnforcement`.
          */
         tlsn: (
             context: TLSNIdentityContext,

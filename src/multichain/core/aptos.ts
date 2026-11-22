@@ -11,6 +11,7 @@ import {
 import { generateSignedTransaction } from "@aptos-labs/ts-sdk";
 
 import { DefaultChain } from "./types/defaultChain"
+import { hideSecretFields } from "@/encryption/secretFields"
 import { IPayParams, XmTransactionResponse } from "./types/interfaces"
 import { required } from "./utils"
 import { XMScript } from "@/types"
@@ -114,6 +115,8 @@ export class APTOS extends DefaultChain implements AptosDefaultChain {
 
     constructor(rpc_url: string = "", network: Network = Network.DEVNET) {
         super(rpc_url)
+        // The connected Account holds the private key.
+        hideSecretFields(this, ["account"])
         this.name = "aptos"
         this.network = network
 
