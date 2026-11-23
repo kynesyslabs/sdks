@@ -67,6 +67,14 @@
   audience, as nodes require for `requestTLSNproxy`. `bodyBoundAuthHeaders`,
   `httpAuthMessage` and `audienceKey` (exported from `websdk`) build the
   same headers as the node's `peerHttpAuth.ts`.
+- `@demosnetwork/demos-native`: finality and storage proof reads (nodes from
+  v1.0.0-rc.14): `getChainIdentity`, `getFinalizedHead`, `getBlockSegment`,
+  `getValidatorSet`, `getTransactionStatus`, `getTransactionProof`,
+  `getStorageProof` and `getStorageProgramLimits`, with their answer types.
+  They return what the connected RPC claims; they are not verified yet. A
+  node refusal (e.g. `404 no_result_commitment`) throws the new exported
+  `NodeCallError` with the result code, `extra.reason` and body; `nodeCall`
+  and `call` are unchanged.
 
 ### Deprecated
 - Mnemonic wallets have one documented path: `Demos.connectWallet(mnemonic)`.

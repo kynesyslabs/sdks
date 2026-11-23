@@ -21,12 +21,20 @@ import {
 import type {
   AddressInfo,
   Amount,
+  BlockSegment,
+  ChainIdentity,
+  FinalizedHead,
   GcrEdit,
   NetworkInfo,
   RpcResponse,
+  StorageProgramLimits,
   StorageProgramResponse,
+  StorageProof,
   Transaction,
   TransactionContent,
+  TransactionProof,
+  TransactionStatus,
+  ValidatorSet,
   ValidityResponse,
 } from "./types.js";
 
@@ -392,6 +400,38 @@ class Ed25519Authority {
 interface RpcRequest {
   method: string;
   params: unknown[];
+}
+
+/**
+ * A node call the node answered with a result other than 200, such as
+ * `404 no_result_commitment` from `getTransactionProof`. Thrown by the typed
+ * finality and storage proof reads; `nodeCall` and `call` keep returning
+ * the bare response body.
+ */
+export class NodeCallError extends Error {
+  /** The node call message, e.g. "getTransactionProof". */
+  readonly method: string;
+  /** The node's result code, e.g. 404, 409, 410 or 503. */
+  readonly result: number;
+  /** The node's `extra.reason`, e.g. "not_found"; undefined when it gives none. */
+  readonly reason: string | undefined;
+  /** The response body, which can still carry data (e.g. `checkedThroughBlock`). */
+  readonly response: unknown;
+  readonly extra: unknown;
+
+  constructor(method: string, reply: RpcResponse) {
+    const reason = isRecord(reply.extra) && typeof reply.extra.reason === "string"
+      ? reply.extra.reason
+      : undefined;
+    const error = isRecord(reply.response) ? reply.response.error : reply.response;
+    super(`${method} refused with ${reply.result}: ${reason ?? String(error ?? "no reason")}`);
+    this.name = "NodeCallError";
+    this.method = method;
+    this.result = reply.result;
+    this.reason = reason;
+    this.response = reply.response;
+    this.extra = reply.extra;
+  }
 }
 
 interface Web2StartOptions {
@@ -836,6 +876,73 @@ export class Demos {
   /** Run an unauthenticated, read-only node call. */
   async nodeCall(message: string, args: Record<string, unknown> = {}): Promise<unknown> {
     return await this.call("nodeCall", message, args);
+  }
+
+  /**
+   * A node call that keeps the node's verdict: the body on result 200, a
+   * `NodeCallError` with the result code and `extra.reason` otherwise.
+   * Transport failures throw as they occur instead of becoming a 500 body.
+   */
+  private async nodeCallAnswer<T>(message: string, data: Record<string, unknown> = {}): Promise<T> {
+    // The node reads only `message` and `data` of a nodeCall.
+    const reply = await this.post({ method: "nodeCall", params: [{ message, data }] }, false);
+    if (!isRecord(reply) || typeof reply.result !== "number") {
+      throw new TypeError(`Demos RPC returned no valid ${message} reply`);
+    }
+    if (reply.result !== 200) throw new NodeCallError(message, reply);
+    if (!isRecord(reply.response)) {
+      throw new TypeError(`Demos RPC returned no valid ${message} answer`);
+    }
+    return reply.response as T;
+  }
+
+  // Finality and storage proof reads (kynesyslabs/node v1.0.0-rc.14 and
+  // later). Each returns what the connected RPC claims; nothing here checks
+  // a signature, hash or Merkle path. A refusal throws `NodeCallError`.
+
+  /** The chain id and genesis hashes the node enforces. */
+  async getChainIdentity(): Promise<ChainIdentity> {
+    return await this.nodeCallAnswer("getChainIdentity");
+  }
+
+  /** The node's finalized head with its signatures; `nodeSynced` says if it lags. */
+  async getFinalizedHead(): Promise<FinalizedHead> {
+    return await this.nodeCallAnswer("getFinalizedHead");
+  }
+
+  /** Signed headers `from..to`; the answer's `to` is the last one served. */
+  async getBlockSegment(from: number, to: number): Promise<BlockSegment> {
+    return await this.nodeCallAnswer("getBlockSegment", { from, to });
+  }
+
+  /** The validator set after block `blockNumber`. */
+  async getValidatorSet(blockNumber: number): Promise<ValidatorSet> {
+    return await this.nodeCallAnswer("getValidatorSet", { blockNumber });
+  }
+
+  /**
+   * A transaction's state, the height searched and, after the finalityProofs
+   * fork, the block committing its result. A hash the node does not hold
+   * throws `NodeCallError` 404 not_found (503 node_not_synced while behind);
+   * its `response.checkedThroughBlock` is the height searched.
+   */
+  async getTransactionStatus(hash: string): Promise<TransactionStatus> {
+    return await this.nodeCallAnswer("getTransactionStatus", { hash });
+  }
+
+  /** A transaction's result leaf, audit path and the blocks it ties to. */
+  async getTransactionProof(hash: string): Promise<TransactionProof> {
+    return await this.nodeCallAnswer("getTransactionProof", { hash });
+  }
+
+  /** Sparse Merkle proofs for 1-16 storage programs at a recent block (default the head). */
+  async getStorageProof(storageAddresses: string[], blockNumber?: number): Promise<StorageProof> {
+    return await this.nodeCallAnswer("getStorageProof", { storageAddresses, blockNumber });
+  }
+
+  /** The storage size, depth, pricing and proof limits the node enforces. */
+  async getStorageProgramLimits(): Promise<StorageProgramLimits> {
+    return await this.nodeCallAnswer("getStorageProgramLimits");
   }
 
   /** Read a block by its non-negative height. */
