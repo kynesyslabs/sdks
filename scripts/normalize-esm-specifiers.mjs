@@ -34,7 +34,7 @@ async function resolveSpecifier(sourceFile, specifier) {
 // import/export-from declarations, side-effect imports, import() calls and
 // declaration `import("...")` types. Strings, comments and template text that
 // merely look like imports are data and stay byte for byte.
-function specifierLiterals(ast, source) {
+function specifierLiterals(ast) {
     const literals = []
     const visit = node => {
         let literal
@@ -45,9 +45,8 @@ function specifierLiterals(ast, source) {
             literal = node.argument.literal
         }
         if (literal && ts.isStringLiteral(literal)) {
-            const start = literal.getStart(ast) + 1
             const end = literal.end - 1
-            literals.push({ start, end, specifier: literal.text })
+            literals.push({ end, specifier: literal.text })
         }
         ts.forEachChild(node, visit)
     }
@@ -100,7 +99,7 @@ async function rewriteSpecifiers(sourceFile, source) {
     let output = source
     const insertions = []
 
-    for (const { start, end, specifier } of specifierLiterals(ast, source).sort((a, b) => b.start - a.start)) {
+    for (const { end, specifier } of specifierLiterals(ast).sort((a, b) => b.end - a.end)) {
         const resolved = await resolveSpecifier(sourceFile, specifier)
         if (resolved === specifier) continue
         if (!resolved.startsWith(specifier)) throw new Error(`Rewrite of ${specifier} in ${sourceFile} is not an append`)
