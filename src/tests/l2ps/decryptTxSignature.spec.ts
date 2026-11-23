@@ -31,6 +31,8 @@ async function signedTx(
 ): Promise<Transaction> {
     const demos = new Demos()
     jest.spyOn(demos, "getNetworkInfo").mockResolvedValue(networkInfo as never)
+    // sign() reads the chain height for the signed reference block
+    jest.spyOn(demos, "getLastBlockNumber").mockResolvedValue(100)
     await demos.connectWallet(MNEMONIC, { algorithm })
     return demos.pay(TO, 1_000_000_000n, { nonce: 1 })
 }
