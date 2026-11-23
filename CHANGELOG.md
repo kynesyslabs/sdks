@@ -130,6 +130,20 @@
     false;
   - `sha3_512(trimmed)`, over its UTF-8 bytes, in every other case.
 
+  When both the trimmed string's JavaScript `length` and its UTF-8 byte length
+  differ from 128, the following also recovers a wallet previously opened with
+  that exact phrase. Keep its original spelling and Unicode characters.
+
+  ```ts
+  const trimmed = phrase.trim()
+  await demos.connectWallet(new TextEncoder().encode(trimmed))
+  ```
+
+  These lengths can differ for multibyte text. Use the digest recipe above
+  when either length is 128, because the legacy path for a string with
+  JavaScript length 128 differs and a 128-byte array is treated as a prehashed
+  master seed.
+
   These recipes reproduce the derivation used from 2.3.16 (commit `1d90dba`)
   to 4.0.21; earlier builds derived differently.
 - RPC calls no longer hang on a node that accepts a request and never

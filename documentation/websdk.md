@@ -89,6 +89,22 @@ The old 128-byte prehashed master-seed input is also preserved. For the UTF-8
 encoding of the unprefixed SHA3-512 hex digest of this phrase, it matches the
 supported phrase address. A BIP39 seed is 64 bytes and is a different input.
 
+For an existing wallet opened with SDK 2.3.16 through 4.0.21 using a phrase
+that the string API now refuses, the following also recovers its original
+address when both `phrase.trim().length` and its UTF-8 byte length differ from
+128. Keep the original spelling and Unicode characters when supplying `phrase`.
+
+```ts
+const trimmed = phrase.trim()
+await demos.connectWallet(new TextEncoder().encode(trimmed))
+```
+
+The two length checks are distinct for multibyte text. A string with JavaScript
+length 128 took a different legacy derivation path, and a 128-byte array is interpreted as
+a prehashed master seed. For either boundary, use the SHA3-512 recovery recipe
+in the [CHANGELOG upgrade note](../CHANGELOG.md). Earlier SDK versions derived
+wallets differently.
+
 > [!TIP]
 > You can get the address of the connected wallet using the `demos.getAddress()` method.
 
