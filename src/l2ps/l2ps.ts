@@ -358,9 +358,7 @@ export default class L2PS {
         }
 
         try {
-            if (options?.chainId !== undefined && !(Number.isSafeInteger(options.chainId) && options.chainId >= 0)) {
-                throw new Error('Invalid chainId');
-            }
+            L2PS.assertValidChainId(options?.chainId);
 
             const [dataType, payload] = encryptedTx.content.data;
             if (dataType !== "l2psEncryptedTx") {
@@ -418,45 +416,69 @@ export default class L2PS {
             const decryptedString = decipher.output.toString();
             const originalTx = JSON.parse(decryptedString) as Transaction;
 
-            if (originalTx.hash !== encryptedPayload.original_hash) {
-                throw new Error('Decrypted transaction hash mismatch');
-            }
-
-            // The `.hash` field is data the sender chose, so also recompute
-            // it from the decrypted content with the node's two
-            // `Transaction.checkCoherence` forms, each hashed as UTF-8: raw
-            // `JSON.stringify` before the osDenomination fork, the post-fork
-            // serializer after it. The payload does not record the fork
-            // state, so accept either. The pre-fork serializer is never used:
-            // it turns OS strings into DEM by integer division, so different
-            // content would match one hash. A form that throws or gives no
-            // string (no content) counts as no match, as in the node.
-            const hashForms = [
-                () => JSON.stringify(originalTx.content),
-                () => serializeTransactionContent(originalTx.content, true),
-            ];
-            const recomputesToHash = hashForms.some((form) => {
-                try {
-                    const text = form();
-                    return typeof text === "string" && sha256Utf8(text) === encryptedPayload.original_hash;
-                } catch {
-                    return false;
-                }
-            });
-            if (!recomputesToHash) {
-                throw new Error('Decrypted transaction content does not match its hash');
-            }
-
-            if (!originalTx.signature?.data) {
-                throw new Error('Decrypted transaction is not signed');
-            }
-            if (!(await L2PS.signedBySender(originalTx, options?.chainId))) {
-                throw new Error('Decrypted transaction signature does not verify');
-            }
+            await L2PS.assertDecryptedTxAuthentic(originalTx, encryptedPayload.original_hash, options?.chainId);
 
             return originalTx;
         } catch (error: any) {
             throw new Error(`Decryption failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Throws `Invalid chainId` unless `chainId` is undefined or a
+     * non-negative safe integer.
+     */
+    private static assertValidChainId(chainId: number | undefined): void {
+        if (chainId !== undefined && !(Number.isSafeInteger(chainId) && chainId >= 0)) {
+            throw new Error('Invalid chainId');
+        }
+    }
+
+    /**
+     * The checks `decryptTx` runs on the parsed inner transaction, in order:
+     * its `hash` equals the payload's `original_hash`, its content recomputes
+     * to that hash, and it is signed by the key in `content.from`. Throws on
+     * the first that fails.
+     */
+    private static async assertDecryptedTxAuthentic(
+        originalTx: Transaction,
+        originalHash: string,
+        chainId: number | undefined,
+    ): Promise<void> {
+        if (originalTx.hash !== originalHash) {
+            throw new Error('Decrypted transaction hash mismatch');
+        }
+
+        // The `.hash` field is data the sender chose, so also recompute
+        // it from the decrypted content with the node's two
+        // `Transaction.checkCoherence` forms, each hashed as UTF-8: raw
+        // `JSON.stringify` before the osDenomination fork, the post-fork
+        // serializer after it. The payload does not record the fork
+        // state, so accept either. The pre-fork serializer is never used:
+        // it turns OS strings into DEM by integer division, so different
+        // content would match one hash. A form that throws or gives no
+        // string (no content) counts as no match, as in the node.
+        const hashForms = [
+            () => JSON.stringify(originalTx.content),
+            () => serializeTransactionContent(originalTx.content, true),
+        ];
+        const recomputesToHash = hashForms.some((form) => {
+            try {
+                const text = form();
+                return typeof text === "string" && sha256Utf8(text) === originalHash;
+            } catch {
+                return false;
+            }
+        });
+        if (!recomputesToHash) {
+            throw new Error('Decrypted transaction content does not match its hash');
+        }
+
+        if (!originalTx.signature?.data) {
+            throw new Error('Decrypted transaction is not signed');
+        }
+        if (!(await L2PS.signedBySender(originalTx, chainId))) {
+            throw new Error('Decrypted transaction signature does not verify');
         }
     }
 
