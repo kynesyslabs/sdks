@@ -332,10 +332,12 @@ export default class L2PS {
      *   signature made after the node's `signatureDomain` fork, which covers
      *   `demos-tx:v1:<chainId>:<hash>`. A signature over the legacy (bare-hash)
      *   form is accepted even when `chainId` is given; which form a network
-     *   requires is enforced by the node.
+     *   requires is enforced by the node. A non-negative safe integer; any
+     *   other value throws.
      * @returns Promise resolving to the original decrypted Transaction
      * 
-     * @throws {Error} If transaction is not l2psEncryptedTx type, wrong L2PS UID, 
+     * @throws {Error} If `options.chainId` is invalid, transaction is not
+     *                 l2psEncryptedTx type, wrong L2PS UID,
      *                 authentication fails, hash mismatch, or the original
      *                 transaction is unsigned or its signature does not verify
      * 
@@ -356,6 +358,10 @@ export default class L2PS {
         }
 
         try {
+            if (options?.chainId !== undefined && !(Number.isSafeInteger(options.chainId) && options.chainId >= 0)) {
+                throw new Error('Invalid chainId');
+            }
+
             const [dataType, payload] = encryptedTx.content.data;
             if (dataType !== "l2psEncryptedTx") {
                 throw new Error('Invalid encrypted transaction data type');

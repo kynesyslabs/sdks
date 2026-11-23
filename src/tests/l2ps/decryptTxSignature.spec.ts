@@ -88,6 +88,18 @@ describe("L2PS.decryptTx inner signature", () => {
         )
     })
 
+    // Without the check, a legacy signature would still be accepted for these.
+    it("refuses an invalid chain id", async () => {
+        const l2ps = await L2PS.create()
+        const encrypted = await l2ps.encryptTx(await signedTx("ed25519"))
+
+        for (const chainId of [null, -1] as unknown as number[]) {
+            await expect(l2ps.decryptTx(encrypted, { chainId })).rejects.toThrow(
+                "Decryption failed: Invalid chainId",
+            )
+        }
+    })
+
     it("refuses a tampered signature", async () => {
         const inner = await signedTx("ed25519")
         const last = inner.signature.data.slice(-2) === "00" ? "01" : "00"
