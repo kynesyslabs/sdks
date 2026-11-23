@@ -3,6 +3,17 @@
 ## Unreleased
 
 ### Breaking
+- Signed reference block. `sign()` reads the chain height from the connected
+  node and writes it to `content.reference_block` before hashing, so it is
+  covered by the transaction hash and signature. A node that enforces it
+  refuses a transaction without the field, so transactions from older SDK
+  versions are refused. A transaction is valid for the node's reference-block
+  window counted from the height it was signed at, not from when it is
+  confirmed: one that is signed and held past the window must be signed again.
+  `sign()` throws when the node returns no block height. The deprecated
+  `DemosTransactions.sign` cannot read the height and now requires
+  `options.referenceBlock`. `L2PS.encryptTx` returns an unsigned wrapper; pass
+  the transaction that carries it through `sign()`.
 - TLSNotary at launch (`tlsnVerified`). `addWeb2IdentityViaTLSN` no longer
   needs `{ legacy: true }` on a network where `tlsnVerified` is active; it
   refuses the `telegram` context there (use `addTelegramIdentity`). On a

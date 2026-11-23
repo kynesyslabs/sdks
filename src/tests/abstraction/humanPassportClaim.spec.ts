@@ -22,7 +22,9 @@ const CLAIM: HumanPassportClaim = {
 async function signingDemos(): Promise<{ demos: Demos; signed: any[] }> {
     const demos = new Demos()
     ;(demos as any).nodeCall = async (message: string) =>
-        message === "getAddressNonce" ? 3 : null
+        message === "getLastBlockNumber"
+            ? 100
+            : message === "getAddressNonce" ? 3 : null
     await demos.connectWallet(demos.newMnemonic())
 
     const signed: any[] = []

@@ -29,7 +29,9 @@ async function signingDemos(
         chainId: 1,
     }
     ;(demos as any).nodeCall = async (message: string) =>
-        message === "getAddressNonce"
+        message === "getLastBlockNumber"
+            ? 100
+            : message === "getAddressNonce"
             ? 3
             : message === "getNetworkInfo"
               ? (networkInfo ?? null)

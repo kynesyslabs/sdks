@@ -271,6 +271,8 @@ async function connectedDemos(rpcUrl: string) {
                         tlsnVerified: { activated: true, activationHeight: 0, currentHeight: 10 },
                     },
                 }
+            case "getLastBlockNumber":
+                return 100
             case "getAddressNonce":
                 return 4
             case "getTransactionStatus":

@@ -181,6 +181,7 @@ function emptyTransaction(): Transaction {
         additional_fee: 0,
         rpc_address: null,
       },
+      reference_block: 0,
     },
     signature: null,
     hash: "",
@@ -1030,6 +1031,15 @@ export class Demos {
     } else {
       this.applyFallbackFee(transaction);
     }
+    // Read for every signature: the node counts the transaction's lifetime
+    // from this signed height and refuses a transaction without one.
+    const head = await this.nodeCall("getLastBlockNumber");
+    if (!Number.isSafeInteger(head) || (head as number) < 0) {
+      throw new TypeError(
+        "Demos block height is unavailable; refusing to sign",
+      );
+    }
+    transaction.content.reference_block = head as number;
     const serialized = serializeTransactionContent(
       transaction.content,
       activated,

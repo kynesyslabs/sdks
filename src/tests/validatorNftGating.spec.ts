@@ -328,6 +328,7 @@ async function demosSeeing(gating: boolean | "unreachable") {
         } as never)
     }
     jest.spyOn(demos, "getAddressNonce").mockResolvedValue(7)
+    jest.spyOn(demos, "getLastBlockNumber").mockResolvedValue(100)
     ;(demos as any)._getNetworkParametersCached = async () => ({ networkFee: 1, rpcFee: 0 })
     await demos.connectWallet(MNEMONIC, { algorithm: "ed25519" })
     const sign = jest.spyOn(demos, "sign")

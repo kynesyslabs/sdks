@@ -80,6 +80,8 @@ async function connectedDemos(options: NodeOptions = {}) {
             switch (message) {
                 case "getNetworkInfo":
                     return networkInfo
+                case "getLastBlockNumber":
+                    return 100
                 case "getAddressNonce":
                     return 4
                 case "getTransactionStatus":

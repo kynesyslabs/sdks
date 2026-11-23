@@ -122,12 +122,19 @@ export interface TransactionContent {
     nonce: number // Increments every time a transaction is sent from the same account
     timestamp: number // Is the registered unix timestamp when the transaction was sent the first time
     transaction_fee: TxFee // Is the signed message where the sender locks X tokens until the tx is confirmed
+    /**
+     * Chain height the transaction was signed against. The node counts the
+     * transaction's lifetime from it and refuses a transaction without one.
+     * Set by `sign()`.
+     */
+    reference_block?: number
     // REVIEW: Phase 9 - Custom charges for variable-cost operations (IPFS, compute, etc.)
     // Client includes this BEFORE signing to specify maximum cost they agree to pay
     custom_charges?: CustomCharges
 }
 
 export interface TransactionAttrs {
+    /** Copy of `content.reference_block` written by the node. */
     reference_block: number
     expectedNonce?: number
     actualNonce?: number
