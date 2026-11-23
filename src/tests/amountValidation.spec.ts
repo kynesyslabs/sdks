@@ -37,6 +37,7 @@ function stubNetwork(
                 },
             }
         }
+        if (message === "getLastBlockNumber") return 100
         if (message === "getAddressNonce") {
             return 0
         }

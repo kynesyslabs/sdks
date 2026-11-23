@@ -1018,6 +1018,10 @@ export class Demos {
             }
         }
 
+        // Read for every signature and never kept from the caller: the node
+        // counts the transaction's lifetime from this signed height.
+        raw_tx.content.reference_block = await this._signingReferenceBlock()
+
         // P4 commit 3: route hashing through the dual-format serializerGate
         // with the cached fork status. The first `sign()` call after
         // `connect()` triggers `getNetworkInfo`; subsequent signs reuse
@@ -1858,6 +1862,23 @@ export class Demos {
      */
     async getLastBlockNumber(): Promise<number> {
         return (await this.nodeCall("getLastBlockNumber")) as number
+    }
+
+    /**
+     * The chain head a transaction is signed against.
+     *
+     * @throws When the node gives no non-negative integer height: a
+     * transaction without a valid reference block is refused, so nothing is
+     * signed.
+     */
+    private async _signingReferenceBlock(): Promise<number> {
+        const head: unknown = await this.getLastBlockNumber()
+        if (Number.isSafeInteger(head) && (head as number) >= 0) {
+            return head as number
+        }
+        throw new Error(
+            "sign: the node returned no valid block height, so the transaction's reference block cannot be set",
+        )
     }
 
     /**

@@ -39,6 +39,7 @@ function stubNetwork(
                 },
             }
         }
+        if (message === "getLastBlockNumber") return 100
         if (message === "getAddressNonce") {
             return 0
         }
@@ -233,6 +234,7 @@ describe("Post-fork wire shape", () => {
             "transaction_fee",
             "from_ed25519_address",
             "gcr_edits",
+            "reference_block",
         ])
     })
 })

@@ -292,6 +292,9 @@ export const DemosTransactions = {
      * @param options.algorithm - The algorithm related to the keypair.
      * @param options.chainId - The network id to bind the signature to. Omit
      *   for the legacy preimage, which only pre-fork nodes accept.
+     * @param options.referenceBlock - The current chain height, from
+     *   `getLastBlockNumber`. Required: this signer cannot read it, and the
+     *   node refuses a transaction signed without one.
      * @returns A Promise that resolves to the signed transaction.
      */
     sign: async function (
@@ -300,14 +303,21 @@ export const DemosTransactions = {
         options: {
             algorithm: SigningAlgorithm
             chainId?: number
+            referenceBlock: number
         },
     ): Promise<Transaction> {
         required(keypair, "Private key not provided")
 
-        if (!options || !options.algorithm) {
-            options = {
-                algorithm: "ed25519",
-            }
+        const referenceBlock = options?.referenceBlock
+        if (!Number.isSafeInteger(referenceBlock) || referenceBlock < 0) {
+            throw new Error(
+                "sign: options.referenceBlock must be the current chain height",
+            )
+        }
+        raw_tx.content.reference_block = referenceBlock
+
+        if (!options.algorithm) {
+            options = { ...options, algorithm: "ed25519" }
         }
 
         // REVIEW If for some reason the tx timestamp is not set, we set it to the current time

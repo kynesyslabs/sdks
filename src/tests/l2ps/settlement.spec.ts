@@ -129,6 +129,7 @@ async function connectedDemos(confirmedNonce = 6, l2psNonce = 2) {
     const demos = new Demos()
     jest.spyOn(demos, "getNetworkInfo").mockResolvedValue(NETWORK_INFO as never)
     jest.spyOn(demos, "getAddressNonce").mockResolvedValue(confirmedNonce)
+    jest.spyOn(demos, "getLastBlockNumber").mockResolvedValue(100)
     jest.spyOn(demos, "getL2PSNonce").mockResolvedValue(l2psNonce)
     const internals = demos as unknown as { _getNetworkParametersCached: () => Promise<unknown> }
     jest.spyOn(internals, "_getNetworkParametersCached").mockResolvedValue({
