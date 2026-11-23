@@ -1374,6 +1374,8 @@ export class Demos {
              * and trim a JSON string.
              */
             rawBody?: boolean
+            /** Stops the attempt in flight (ERR_CANCELED) and any retry. */
+            signal?: AbortSignal
         } = {},
     ): Promise<{ data: T }> {
         const maxRetries = opts.retries ?? 4
@@ -1421,6 +1423,9 @@ export class Demos {
                     ),
                 timeoutMs,
             )
+            const onAbort = () => stop("canceled", AxiosError.ERR_CANCELED)
+            opts.signal?.addEventListener("abort", onAbort)
+            if (opts.signal?.aborted) onAbort()
             try {
                 const response = await axios
                     .post<T>(url, request, {
@@ -1445,7 +1450,10 @@ export class Demos {
                             }
                         },
                     })
-                    .finally(() => clearTimeout(timer))
+                    .finally(() => {
+                        clearTimeout(timer)
+                        opts.signal?.removeEventListener("abort", onAbort)
+                    })
                 return { data: response.data }
             } catch (caught: any) {
                 const error = stopped
@@ -1526,6 +1534,7 @@ export class Demos {
         retries = 0,
         sleepTime = 250,
         allowedErrorCodes: number[] = [],
+        options: { signal?: AbortSignal } = {},
     ): Promise<RPCResponse> {
         let publicKey = ""
         let signature = ""
@@ -1570,7 +1579,7 @@ export class Demos {
                 this.rpc_url,
                 request,
                 headers,
-                { baseSleepMs: sleepTime },
+                { baseSleepMs: sleepTime, signal: options.signal },
             )
 
             if (
@@ -1588,6 +1597,7 @@ export class Demos {
                     retries - 1,
                     sleepTime,
                     allowedErrorCodes,
+                    options,
                 )
             }
 
@@ -1614,6 +1624,7 @@ export class Demos {
         extra: any = "",
         sender: any = null,
         receiver: any = null,
+        options: { signal?: AbortSignal } = {},
     ) {
         // NOTE: Didn't tear apart the transmission object during the http
         // rewrite just in case we need to come back to it.
@@ -1682,6 +1693,7 @@ export class Demos {
                     signature: pubkey_signature,
                     timestamp: auth_timestamp,
                 },
+                { signal: options.signal },
             )
 
             if (method == "nodeCall") {

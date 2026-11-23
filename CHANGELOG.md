@@ -74,12 +74,14 @@
   They return what the connected RPC claims; the SDK does not verify them yet.
   A node refusal (e.g. `404 no_result_commitment`) throws the new
   `NodeCallError` with the result code, `extra.reason` and body; `nodeCall`
-  and `call` are unchanged.
+  and `call` return what they did before. `call` and `rpcCall` take an
+  optional trailing `{ signal }` (an `AbortSignal`) that cancels their
+  request: the attempt in flight stops and no retry is sent.
 - `broadcastAndWait({ waitForResultCommitment: true })` also waits for
   `status.resultCommittedInBlock`. Off by default. The wait stops at
   `timeoutMs` and throws `BroadcastTimeoutError` (last seen state `included`
-  or `failed`) if no commitment arrived by then. The
-  `status` type gains optional `code`, `message`, `checkedThroughBlock` and
+  or `failed`) if no commitment arrived by then; a status read still running
+  at that moment is cancelled. The `status` type gains optional `code`, `message`, `checkedThroughBlock` and
   `resultCommittedInBlock`; existing fields are unchanged.
 
 ### Deprecated

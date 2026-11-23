@@ -62,7 +62,7 @@ const answer = (_req, _body, res: http.ServerResponse) =>
     res.end(JSON.stringify(NODE_REPLY))
 const neverAnswer = () => undefined
 
-function doPost(url: string, opts: Record<string, number> = {}) {
+function doPost(url: string, opts: Record<string, unknown> = {}) {
     return (new Demos() as any)._doPost(
         url,
         { method: "nodeCall", params: [] },
@@ -251,6 +251,88 @@ describe.each(["http", "fetch"])(
                 doPost(node.url, { timeoutMs: 0, maxResponseBytes: -1 }),
             ).resolves.toEqual({ data: NODE_REPLY })
         }, 8_000)
+
+        describe("with an abort signal", () => {
+            const unavailable: Handler = (_req, _body, res) => {
+                res.statusCode = 503
+                res.end("unavailable")
+            }
+
+            it("stops the attempt in flight when aborted, and does not retry", async () => {
+                const ctl = new AbortController()
+                // The first post gets a retryable 503; the retry is held open
+                // and aborted once it arrives.
+                const node = await startNode((req, body, res) => {
+                    if (node.posts === 1) return unavailable(req, body, res)
+                    ctl.abort()
+                })
+                const started = Date.now()
+
+                const err = await doPost(node.url, {
+                    signal: ctl.signal,
+                    retries: 4,
+                    baseSleepMs: 10,
+                    timeoutMs: 30_000,
+                }).catch(e => e)
+
+                expect(err).toBeInstanceOf(TransportError)
+                expect(err.cause.code).toBe("ERR_CANCELED")
+                expect(err.attempts).toBe(2)
+                expect(Date.now() - started).toBeLessThan(3_000)
+                await new Promise(r => setTimeout(r, 200))
+                expect(node.posts).toBe(2)
+            }, 8_000)
+
+            it("sends nothing more when aborted between retries", async () => {
+                const ctl = new AbortController()
+                const node = await startNode((req, body, res) => {
+                    unavailable(req, body, res)
+                    // Abort while _doPost sleeps before its retry.
+                    setTimeout(() => ctl.abort(), 100)
+                })
+
+                const err = await doPost(node.url, {
+                    signal: ctl.signal,
+                    retries: 4,
+                    baseSleepMs: 400,
+                }).catch(e => e)
+
+                expect(err).toBeInstanceOf(TransportError)
+                expect(err.cause.code).toBe("ERR_CANCELED")
+                await new Promise(r => setTimeout(r, 200))
+                expect(node.posts).toBe(1)
+            }, 8_000)
+
+            it("throws at once, sending nothing, when already aborted", async () => {
+                const node = await startNode(answer)
+                const ctl = new AbortController()
+                ctl.abort()
+
+                const err = await doPost(node.url, {
+                    signal: ctl.signal,
+                }).catch(e => e)
+
+                expect(err).toBeInstanceOf(TransportError)
+                expect(err.cause.code).toBe("ERR_CANCELED")
+                expect(node.posts).toBe(0)
+            }, 8_000)
+
+            it("leaves no abort listener behind once the call settles", async () => {
+                const node = await startNode(answer)
+                const ctl = new AbortController()
+                const add = jest.spyOn(ctl.signal, "addEventListener")
+                const remove = jest.spyOn(ctl.signal, "removeEventListener")
+
+                await expect(
+                    doPost(node.url, { signal: ctl.signal }),
+                ).resolves.toEqual({ data: NODE_REPLY })
+                expect(add).toHaveBeenCalledTimes(1)
+                expect(remove).toHaveBeenCalledWith(
+                    "abort",
+                    add.mock.calls[0][1],
+                )
+            }, 8_000)
+        })
     },
 )
 
@@ -303,6 +385,58 @@ describe("_doPost size cap on an adapter that ignores maxContentLength", () => {
         await expect(doPost("http://127.0.0.1:9")).resolves.toEqual({
             data: NODE_REPLY,
         })
+    }, 8_000)
+})
+
+describe("a signal passed to call and rpcCall", () => {
+    // The node holds each post open and aborts the caller's signal once it
+    // arrives, so only the signal can end the call before the deadline.
+    async function heldOpen() {
+        const ctl = new AbortController()
+        const node = await startNode(() => ctl.abort())
+        ;(Demos as any)._RPC_TIMEOUT_MS = 2_000
+        const demos = new Demos()
+        ;(demos as any).rpc_url = node.url
+        return { ctl, node, demos }
+    }
+
+    it("cancels a call() request", async () => {
+        const { ctl, node, demos } = await heldOpen()
+
+        const envelope: any = await demos.call(
+            "nodeCall",
+            "getTransactionStatus",
+            { hash: "a".repeat(64) },
+            "",
+            null,
+            null,
+            { signal: ctl.signal },
+        )
+
+        expect(envelope.result).toBe(500)
+        expect(envelope.response).toBeInstanceOf(TransportError)
+        expect(envelope.response.cause.code).toBe("ERR_CANCELED")
+        expect(node.posts).toBe(1)
+    }, 8_000)
+
+    it("cancels an rpcCall() request", async () => {
+        const { ctl, node, demos } = await heldOpen()
+        const log = jest.spyOn(console, "error").mockImplementation(() => {})
+
+        const envelope: any = await demos.rpcCall(
+            { method: "nodeCall", params: [] },
+            false,
+            0,
+            250,
+            [],
+            { signal: ctl.signal },
+        )
+        log.mockRestore()
+
+        expect(envelope.result).toBe(500)
+        expect(envelope.response).toBeInstanceOf(TransportError)
+        expect(envelope.response.cause.code).toBe("ERR_CANCELED")
+        expect(node.posts).toBe(1)
     }, 8_000)
 })
 

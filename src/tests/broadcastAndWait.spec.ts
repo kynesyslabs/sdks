@@ -1,5 +1,7 @@
 import { readFileSync } from "fs"
 import { join } from "path"
+import axios, { AxiosAdapter, CanceledError } from "axios"
+import { Demos } from "@/websdk"
 import { DemosTransactions } from "@/websdk/DemosTransactions"
 import { BroadcastTimeoutError } from "@/websdk/BroadcastTimeoutError"
 
@@ -308,6 +310,63 @@ describe("broadcastAndWait stops the commitment wait at its timeout", () => {
         expect(at).toBe(60)
         // The deadline timer raced against the poll is cleared once it answers.
         expect(timers).toBe(0)
+    })
+
+    describe("over the real transport", () => {
+        const defaultAdapter = axios.defaults.adapter
+        afterEach(() => {
+            axios.defaults.adapter = defaultAdapter
+        })
+
+        it("cancels the status read the deadline cut off, and sends no other", async () => {
+            // A real Demos reads the status through a stand-in axios adapter:
+            // the first read is answered, the next one stalls until aborted.
+            const signals: AbortSignal[] = []
+            const adapter: AxiosAdapter = config => {
+                signals.push(config.signal as AbortSignal)
+                if (signals.length > 1) {
+                    return new Promise((_resolve, reject) =>
+                        config.signal?.addEventListener?.("abort", () =>
+                            reject(
+                                new CanceledError(undefined, undefined, config),
+                            ),
+                        ),
+                    )
+                }
+                return Promise.resolve({
+                    data: { result: 200, response: awaiting },
+                    status: 200,
+                    statusText: "OK",
+                    headers: {},
+                    config,
+                })
+            }
+            axios.defaults.adapter = adapter
+            const node = new Demos()
+            ;(node as any).rpc_url = "http://127.0.0.1:9"
+            const demos = {
+                call: jest.fn(async (method: string, ...rest: any[]) =>
+                    method === "execute"
+                        ? { result: 200, response: "ok" }
+                        : (node as any).call(method, ...rest),
+                ),
+            } as any
+
+            const { value, error } = await settle(demos, {
+                timeoutMs: 25,
+                pollIntervalMs: 1,
+            })
+
+            expect(value).toBeUndefined()
+            expect(error).toBeInstanceOf(BroadcastTimeoutError)
+            expect(error.lastSeenState).toBe("included")
+            // The stalled read's request was aborted at the deadline ...
+            expect(signals).toHaveLength(2)
+            expect(signals[1].aborted).toBe(true)
+            // ... and in the 5 s run after it no retry or later read was sent,
+            // and no request deadline timer was left running.
+            expect(jest.getTimerCount()).toBe(0)
+        })
     })
 
     it.each([Infinity, 2 ** 32])(

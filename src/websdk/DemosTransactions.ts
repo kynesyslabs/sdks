@@ -606,9 +606,15 @@ export const DemosTransactions = {
             // then never observed `state` and timed out even though
             // the tx was on chain. Pass the action name as `message`
             // so the handler resolves.
-            const poll = demos.call("nodeCall", "getTransactionStatus", {
-                hash: txHash,
-            })
+            const ctl = new AbortController()
+            const poll = demos.call(
+                "nodeCall",
+                "getTransactionStatus",
+                { hash: txHash },
+                ...(awaitedState
+                    ? (["", null, null, { signal: ctl.signal }] as const)
+                    : ([] as const)),
+            )
             let timer: ReturnType<typeof setTimeout> | undefined
             // setTimeout runs a delay past 2^31 - 1 ms at once, so a deadline
             // that far off is left to the clock check below.
@@ -625,6 +631,7 @@ export const DemosTransactions = {
                 awaitedState &&
                 (statusRes === TIMED_OUT || Date.now() - start >= timeout)
             ) {
+                ctl.abort() // cancels the read if it is still running
                 break
             }
 
