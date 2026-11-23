@@ -159,6 +159,22 @@ test("a refusal whose error is an object names it as JSON", async () => {
   });
 });
 
+test("a handler crash names the cause the node's dispatcher gives", async () => {
+  const demos = await connected();
+  // The node's dispatcher reply to a handler crash (node rpcDispatch.ts:151-160 at 4877499a).
+  const reply = { result: 500, response: "Error in nodeCall: ", extra: { error: "chain head not loaded" } };
+  queue.push({ status: 200, text: JSON.stringify(reply) });
+  await assert.rejects(demos.getFinalizedHead(), (error) => {
+    assert.ok(error instanceof NodeCallError);
+    assert.equal(error.result, 500);
+    assert.equal(error.reason, undefined);
+    assert.equal(error.response, "Error in nodeCall: ");
+    assert.deepEqual(error.extra, { error: "chain head not loaded" });
+    assert.match(error.message, /refused with 500: Error in nodeCall: +\(chain head not loaded\)$/);
+    return true;
+  });
+});
+
 test("nodeCall still returns the bare body of the same refusal", async () => {
   const demos = await connected();
   queue.push("transactionProofNoResultCommitment");

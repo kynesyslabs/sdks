@@ -427,7 +427,13 @@ export class NodeCallError extends Error {
     const detail = typeof error === "string"
       ? error
       : error === undefined || error === null ? "no reason" : JSON.stringify(error);
-    super(`${method} refused with ${reply.result}: ${reason ?? detail}`);
+    // The node's dispatcher answers a handler crash with
+    // `{result: 500, response: "Error in nodeCall: ", extra: {error: cause}}`.
+    const cause =
+      reason === undefined && isRecord(reply.extra) && typeof reply.extra.error === "string"
+        ? ` (${reply.extra.error})`
+        : "";
+    super(`${method} refused with ${reply.result}: ${reason ?? detail}${cause}`);
     this.name = "NodeCallError";
     this.method = method;
     this.result = reply.result;
