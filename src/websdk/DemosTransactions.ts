@@ -500,10 +500,11 @@ export const DemosTransactions = {
      * @param opts.waitForResultCommitment - If true, keep polling past
      *   `included`/`failed` until the node reports `resultCommittedInBlock`
      *   (the block committing the result, which `getTransactionProof` can then
-     *   prove), within the same timeout; the returned status is then the
-     *   node's full answer. A terminal status without the field means no block
-     *   commits this result (before the finalityProofs fork, or an older node)
-     *   and is returned as it is. A timeout while waiting reports the terminal
+     *   prove); the returned status is then the node's full answer. A terminal
+     *   status without the field means no block commits this result (before
+     *   the finalityProofs fork, or an older node) and is returned as it is.
+     *   The commitment wait stops at `timeoutMs`: if no commitment has
+     *   arrived by then, it throws `BroadcastTimeoutError` with the terminal
      *   state as `lastSeenState`. Defaults to false.
      *
      * @returns The transaction hash, the original broadcast response, and the
@@ -574,6 +575,11 @@ export const DemosTransactions = {
         const start = Date.now()
         let attempt = 0
         let lastState: string = "unknown"
+        // Set once a terminal state arrives without its commitment. From then
+        // on no sleep or poll runs past the deadline and no reply is taken
+        // after it.
+        let awaitedState: string | undefined
+        const TIMED_OUT = Symbol("timedOut")
 
         // 2. Poll until terminal state or timeout. Mirrors KeyServerClient's
         //    pollOAuth pattern: skip the initial sleep on the first attempt
@@ -582,8 +588,13 @@ export const DemosTransactions = {
             attempt++
 
             if (attempt > 1) {
-                await new Promise(r => setTimeout(r, pollInterval))
+                const sleep = awaitedState
+                    ? Math.min(pollInterval, timeout - (Date.now() - start))
+                    : pollInterval
+                await new Promise(r => setTimeout(r, sleep))
             }
+            const remaining = timeout - (Date.now() - start)
+            if (awaitedState && remaining <= 0) break
 
             // demos.call signature: (method, message, data, extra). The
             // node's rpcDispatch routes by `method`, then
@@ -595,11 +606,27 @@ export const DemosTransactions = {
             // then never observed `state` and timed out even though
             // the tx was on chain. Pass the action name as `message`
             // so the handler resolves.
-            const statusRes = await demos.call(
-                "nodeCall",
-                "getTransactionStatus",
-                { hash: txHash },
-            )
+            const poll = demos.call("nodeCall", "getTransactionStatus", {
+                hash: txHash,
+            })
+            let timer: ReturnType<typeof setTimeout> | undefined
+            // setTimeout runs a delay past 2^31 - 1 ms at once, so a deadline
+            // that far off is left to the clock check below.
+            const statusRes =
+                awaitedState && remaining < 2 ** 31
+                    ? await Promise.race([
+                          poll,
+                          new Promise<typeof TIMED_OUT>(r => {
+                              timer = setTimeout(() => r(TIMED_OUT), remaining)
+                          }),
+                      ]).finally(() => clearTimeout(timer))
+                    : await poll
+            if (
+                awaitedState &&
+                (statusRes === TIMED_OUT || Date.now() - start >= timeout)
+            ) {
+                break
+            }
 
             // `Demos.call("nodeCall", ...)` normally returns the inner
             // `response` payload directly (e.g. `{ state, blockNumber? }`).
@@ -640,13 +667,14 @@ export const DemosTransactions = {
                                 : { state, blockNumber: full.blockNumber },
                         }
                     }
+                    awaitedState = state
                 }
             }
         }
 
         throw new BroadcastTimeoutError({
             txHash,
-            lastSeenState: lastState,
+            lastSeenState: awaitedState ?? lastState,
             elapsedMs: Date.now() - start,
         })
     },

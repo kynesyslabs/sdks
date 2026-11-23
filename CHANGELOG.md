@@ -75,8 +75,10 @@
   A node refusal (e.g. `404 no_result_commitment`) throws the new
   `NodeCallError` with the result code, `extra.reason` and body; `nodeCall`
   and `call` are unchanged.
-- `broadcastAndWait({ waitForResultCommitment: true })` also waits, within the
-  same timeout, for `status.resultCommittedInBlock`. Off by default. The
+- `broadcastAndWait({ waitForResultCommitment: true })` also waits for
+  `status.resultCommittedInBlock`. Off by default. The wait stops at
+  `timeoutMs` and throws `BroadcastTimeoutError` (last seen state `included`
+  or `failed`) if no commitment arrived by then. The
   `status` type gains optional `code`, `message`, `checkedThroughBlock` and
   `resultCommittedInBlock`; existing fields are unchanged.
 
