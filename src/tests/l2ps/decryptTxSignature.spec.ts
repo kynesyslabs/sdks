@@ -6,8 +6,9 @@ import { describe, expect, it, jest } from "@jest/globals"
 import forge from "node-forge"
 
 import { Cryptography } from "@/encryption/Cryptography"
-import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
+import { UnifiedCrypto, uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { Demos } from "@/websdk"
+import { txSignaturePreimage } from "@/websdk/utils/txSignaturePreimage"
 import L2PS from "@/l2ps/l2ps"
 import type { SigningAlgorithm, Transaction } from "@/types"
 
@@ -56,6 +57,17 @@ describe("L2PS.decryptTx inner signature", () => {
         const inner = await signedTx("ed25519", POST_FORK)
 
         expect((await roundTrip(inner, CHAIN_ID)).hash).toBe(inner.hash)
+    })
+
+    // Once the fork is active every new transaction is domain-bound, so that form goes first.
+    it("checks the domain-bound form first when given a chain id", async () => {
+        const inner = await signedTx("ed25519", POST_FORK)
+        const verify = jest.spyOn(UnifiedCrypto.prototype, "verify")
+
+        expect((await roundTrip(inner, CHAIN_ID)).hash).toBe(inner.hash)
+        expect(verify).toHaveBeenCalledTimes(1)
+        expect(verify.mock.calls[0][0].message).toEqual(txSignaturePreimage(inner.hash, CHAIN_ID, true))
+        verify.mockRestore()
     })
 
     // Documented limit: which preimage a network requires is left to the node.

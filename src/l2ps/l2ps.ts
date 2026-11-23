@@ -458,12 +458,14 @@ export default class L2PS {
      * Whether `tx.signature` is `tx.content.from`'s signature over the bytes
      * `Demos.sign` and `DemosTransactions.sign` sign (`txSignaturePreimage`),
      * checked with `UnifiedCrypto.verify` for `tx.signature.type`.
+     * With `chainId`, the domain-bound form is tried first, because once
+     * `signatureDomain` is active every new transaction uses it.
      */
     private static async signedBySender(tx: Transaction, chainId?: number): Promise<boolean> {
-        const preimages = [txSignaturePreimage(tx.hash, 0, false)];
-        if (chainId !== undefined) {
-            preimages.push(txSignaturePreimage(tx.hash, chainId, true));
-        }
+        const legacy = txSignaturePreimage(tx.hash, 0, false);
+        const preimages = chainId === undefined
+            ? [legacy]
+            : [txSignaturePreimage(tx.hash, chainId, true), legacy];
         try {
             const signature = hexToUint8Array(tx.signature.data);
             const publicKey = hexToUint8Array(tx.content.from);
