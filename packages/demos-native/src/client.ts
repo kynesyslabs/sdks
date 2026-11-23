@@ -403,14 +403,17 @@ interface RpcRequest {
 }
 
 /**
- * Node text as it goes into a `NodeCallError` message: control characters
- * become spaces and the text is cut to 200 characters. The error's fields
- * keep the node's values unchanged.
+ * Node text as it goes into a `NodeCallError` message: control characters,
+ * line separators and bidirectional controls become spaces, and the text is
+ * cut to 200 characters without splitting a surrogate pair. The error's
+ * fields keep the node's values unchanged.
  */
 function messagePart(value: string): string {
   // eslint-disable-next-line no-control-regex
-  const clean = value.replace(/[\u0000-\u001f\u007f]/g, " ");
-  return clean.length > 200 ? `${clean.slice(0, 200)}…` : clean;
+  const clean = value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, " ");
+  if (clean.length <= 200) return clean;
+  const end = /[\ud800-\udbff]/.test(clean.charAt(199)) ? 199 : 200;
+  return `${clean.slice(0, end)}…`;
 }
 
 /**

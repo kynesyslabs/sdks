@@ -224,6 +224,34 @@ test("node text in the message is cleaned and cut, the fields keep it whole", as
   });
 });
 
+test("C1 controls, line separators and bidirectional controls are cleaned from the message", async () => {
+  const demos = await connected();
+  // U+0085 next line (C1), U+2028 line separator, U+202E right-to-left override.
+  const reason = "not_found\u0085[INFO] x\u2028y\u202ez";
+  queue.push({ status: 200, text: JSON.stringify({ result: 404, response: {}, extra: { reason } }) });
+  await assert.rejects(demos.getFinalizedHead(), (error) => {
+    assert.ok(error instanceof NodeCallError);
+    assert.doesNotMatch(error.message, /[\u0085\u2028\u202e]/);
+    assert.match(error.message, /refused with 404: not_found \[INFO\] x y z$/);
+    assert.equal(error.reason, reason);
+    return true;
+  });
+});
+
+test("cutting the message does not split a surrogate pair", async () => {
+  const demos = await connected();
+  // The emoji's high surrogate is the 200th code unit, where the cut falls.
+  const reason = `${"a".repeat(199)}\u{1F600}tail`;
+  queue.push({ status: 200, text: JSON.stringify({ result: 404, response: {}, extra: { reason } }) });
+  await assert.rejects(demos.getFinalizedHead(), (error) => {
+    assert.ok(error instanceof NodeCallError);
+    assert.doesNotMatch(error.message, /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/);
+    assert.match(error.message, /refused with 404: a{199}…$/);
+    assert.equal(error.reason, reason);
+    return true;
+  });
+});
+
 test("nodeCall still returns the bare body of the same refusal", async () => {
   const demos = await connected();
   queue.push("transactionProofNoResultCommitment");
