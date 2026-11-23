@@ -13,19 +13,19 @@ replace them. The companion spec is in
 
 ## TL;DR
 
-- **Pass `bigint` (OS) to public APIs.** `number` (DEM) is still
-  accepted as a deprecated convenience; it auto-converts to OS via
-  `OS_PER_DEM`.
+- **Pass `bigint` (OS) to public APIs.** The published SDK v4.0.23 also
+  accepts legacy `number` (DEM) inputs and converts them to OS.
 - **Read `bigint` (OS) from public APIs.** `getAddressInfo(...).balance`
   is `bigint` in OS. Use `denomination.osToDem(balance)` for display.
 - **Sub-DEM precision is rejected against pre-fork nodes.** If your
   amount carries `OS % OS_PER_DEM !== 0`, the SDK throws
   `SubDemPrecisionError` before signing. Either round to whole DEM or
   upgrade the target node.
-- **No code change is needed for fork detection.** The SDK auto-detects
-  fork status via `getNetworkInfo` and caches the result for the
-  instance's lifetime. The first failed detection emits one
-  `console.warn`; the SDK then assumes pre-fork.
+- **Fork detection is automatic.** The SDK caches status per RPC URL.
+  Fully activated answers remain valid; answers with pending forks are
+  refreshed after 30 seconds. If a lookup fails, a prior successful answer
+  for that URL is retained; only a URL with no successful answer uses the
+  pre-fork fallback.
 - **Multi-chain (XM) amounts are unchanged.** Lamports (Solana), drops
   (XRP), octas (Aptos), wei (EVM) etc. stay in their chain-native
   units.
@@ -72,7 +72,7 @@ await demos.transfer("0x...", denomination.demToOs(100))  // 100 DEM
 await demos.transfer("0x...", denomination.demToOs("1.5")) // 1.5 DEM
 await demos.transfer("0x...", 1_500_000_000n)              // raw OS
 
-// v3 (still works, deprecated — auto-converts to OS)
+// Legacy DEM-number input remains supported and converts to OS.
 await demos.transfer("0x...", 100)            // 100 DEM (treated as DEM)
 ```
 
@@ -103,7 +103,7 @@ await wallet.transfer(to, 100, demos)
 import { denomination } from "@kynesyslabs/demosdk"
 await wallet.transfer(to, denomination.demToOs(100), demos)
 await wallet.transfer(to, 1_500_000_000n, demos)         // raw OS
-await wallet.transfer(to, 100, demos)                     // legacy DEM (deprecated)
+await wallet.transfer(to, 100, demos)                     // legacy DEM input remains supported
 ```
 
 ### `EscrowTransaction.sendToIdentity`
@@ -168,18 +168,18 @@ remains a JS number in DEM.
 
 ## Sub-DEM precision against pre-fork nodes
 
-The pre-fork wire shape is a JS `number` in DEM. JavaScript `number`
-cannot represent values smaller than 1 DEM, so the SDK throws
-`SubDemPrecisionError` when a caller sends an amount with sub-DEM
-precision against a pre-fork node:
+The pre-fork wire shape carries DEM as a JavaScript `number`; it cannot
+preserve arbitrary integer OS amounts and their sub-DEM remainder. The
+SDK throws `SubDemPrecisionError` rather than let a pre-fork node silently
+truncate that remainder:
 
 ```ts
-import { SubDemPrecisionError } from "@kynesyslabs/demosdk"
+import { denomination } from "@kynesyslabs/demosdk"
 
 try {
     await demos.transfer(to, 1_234_567_890n) // 1.234... DEM
 } catch (err) {
-    if (err instanceof SubDemPrecisionError) {
+    if (err instanceof denomination.SubDemPrecisionError) {
         // Either round to whole DEM, or upgrade the target node.
         // err.amountOs = 1_234_567_890n
         // err.subDemRemainderOs = 234_567_890n
@@ -206,14 +206,20 @@ Do **not** call `denomination.demToOs` on these. They are not DEM.
 
 ## Fork detection — automatic
 
-The SDK calls the node's `getNetworkInfo` RPC on the first `sign()`
-after `connect()`, then caches the result on the `Demos` instance for
-the instance's lifetime. To re-fetch (e.g. after the connected node
-upgraded), construct a fresh `Demos`.
+The SDK queries the node's `getNetworkInfo` RPC and caches its answer by
+RPC URL. An answer where every reported fork is already active stays valid
+for that URL; an answer with a pending fork is refreshed after 30 seconds
+so a long-lived instance can observe activation. Switching RPC URLs drops
+the previous answer and performs a new lookup.
 
-If the node is too old to expose `getNetworkInfo` (or the RPC returns
-malformed data, or the network call fails), the SDK assumes pre-fork
-wire format and emits one `console.warn` per `Demos` instance:
+If `getNetworkInfo` fails or returns malformed data, the SDK uses the last
+successful answer from that same RPC URL, if one exists. It returns `null`
+and falls back to pre-fork wire format only when that URL has never
+returned a valid answer. A failure is memoized for 30 seconds before the
+SDK retries, so a temporary outage does not discard a known fork status.
+The warning below is the retained cold-cache warning text; its statement
+that the fallback “will be removed in v4” is historical v3 wording and is
+not an accurate timeline for published v4.0.23:
 
 > getNetworkInfo unavailable on target node — assuming pre-fork wire
 > format. Upgrade the node to a post-fork-aware version (>= the version
@@ -242,10 +248,14 @@ If you have code that reaches into `tx.content.amount` / `transaction_fee.*`
 pre-existing 10^9× under-charging bug; the post-fork node will charge
 the corrected fee.
 
-## Removal timeline
+## Version context and compatibility
 
-- **v3.0.0-rc.1** (this release): both shapes accepted. `bigint` is
-  preferred; `number` paths warn in JSDoc.
-- **v3.0.0** (stable): unchanged surface from rc.1.
-- **v4.0.0**: `number` overloads removed. The "pre-fork node — assuming
-  legacy wire" fallback path is removed; SDK requires a post-fork node.
+The migration notes above describe the v3 transition from DEM-number
+amounts to OS-bigint amounts and preserve that historical context. They
+do not describe a completed v4 removal: the published `@kynesyslabs/demosdk`
+v4.0.23 declarations still type `pay` and `transfer` amounts as
+`number | bigint`. In that release, `number` remains the legacy DEM input
+path, while `bigint` is the OS input path. The v4.0.23 implementation also
+retains the pre-fork wire-format fallback when fork detection is
+unavailable. This guide does not claim a removal version or schedule for
+either compatibility path.
