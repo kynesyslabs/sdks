@@ -410,7 +410,7 @@ interface RpcRequest {
  */
 function messagePart(value: string): string {
   // eslint-disable-next-line no-control-regex
-  const clean = value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, " ");
+  const clean = value.replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, " ");
   if (clean.length <= 200) return clean;
   const end = /[\ud800-\udbff]/.test(clean.charAt(199)) ? 199 : 200;
   return `${clean.slice(0, end)}…`;
@@ -927,7 +927,8 @@ export class Demos {
 
   // Finality and storage proof reads (kynesyslabs/node v1.0.0-rc.14 and
   // later). Each returns what the connected RPC claims; nothing here checks
-  // a signature, hash or Merkle path. A refusal throws `NodeCallError`.
+  // a signature, hash or Merkle path, or the shape of the answer. A refusal
+  // throws `NodeCallError`.
 
   /** The chain id and genesis hashes the node enforces. */
   async getChainIdentity(): Promise<ChainIdentity> {

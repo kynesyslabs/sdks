@@ -48,11 +48,11 @@ Nodes from v1.0.0-rc.14 serve finality and storage proof reads:
 `getValidatorSet(blockNumber)`, `getTransactionStatus(hash)`,
 `getTransactionProof(hash)`, `getStorageProof(addresses, blockNumber?)` and
 `getStorageProgramLimits()`. Each returns what the connected RPC claims; this
-package does not check the signatures, hashes or Merkle paths in them. When
-the node refuses, they throw `NodeCallError` with the node's `result` code,
-its `reason` (for example `no_result_commitment` for a transaction whose
-result no block commits) and the response body. `nodeCall()` keeps returning
-only the response body.
+package does not check the signatures, hashes or Merkle paths in them, or the
+shape of the answer. When the node refuses, they throw `NodeCallError` with the
+node's `result` code, its `reason` (for example `no_result_commitment` for a
+transaction whose result no block commits) and the response body. `nodeCall()`
+keeps returning only the response body.
 
 Amounts passed to `transfer()` are OS `bigint` values (1 DEM = 10^9 OS).
 Transactions retain the current pre-/post-denomination-fork wire serializer and

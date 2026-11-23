@@ -226,13 +226,14 @@ test("node text in the message is cleaned and cut, the fields keep it whole", as
 
 test("C1 controls, line separators and bidirectional controls are cleaned from the message", async () => {
   const demos = await connected();
-  // U+0085 next line (C1), U+2028 line separator, U+202E right-to-left override.
-  const reason = "not_found\u0085[INFO] x\u2028y\u202ez";
+  // U+0085 next line (C1), U+2028 line separator, U+202E right-to-left override,
+  // U+061C Arabic letter mark, U+200E left-to-right mark, U+200F right-to-left mark.
+  const reason = "not_found\u0085[INFO] x\u2028y\u202ez\u061cu\u200ev\u200fw";
   queue.push({ status: 200, text: JSON.stringify({ result: 404, response: {}, extra: { reason } }) });
   await assert.rejects(demos.getFinalizedHead(), (error) => {
     assert.ok(error instanceof NodeCallError);
-    assert.doesNotMatch(error.message, /[\u0085\u2028\u202e]/);
-    assert.match(error.message, /refused with 404: not_found \[INFO\] x y z$/);
+    assert.doesNotMatch(error.message, /[\u0085\u2028\u202e\u061c\u200e\u200f]/);
+    assert.match(error.message, /refused with 404: not_found \[INFO\] x y z u v w$/);
     assert.equal(error.reason, reason);
     return true;
   });
