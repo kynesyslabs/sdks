@@ -76,7 +76,8 @@
   `NodeCallError` with the result code, `extra.reason` and body; `nodeCall`
   and `call` return what they did before. `call` and `rpcCall` take an
   optional trailing `{ signal }` (an `AbortSignal`) that cancels their
-  request: the attempt in flight stops and no retry is sent.
+  request: the attempt in flight stops, a pending wait before a retry ends at
+  once, and no retry is sent.
 - `broadcastAndWait({ waitForResultCommitment: true })` also waits for
   `status.resultCommittedInBlock`. Off by default. The wait stops at
   `timeoutMs` and throws `BroadcastTimeoutError` (last seen state `included`

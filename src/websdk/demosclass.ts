@@ -106,8 +106,16 @@ import {
 } from "@/storage"
 import { StorageProgramResponse } from "@/storage/StorageProgram"
 
-async function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms))
+async function sleep(ms: number, signal?: AbortSignal) {
+    return new Promise<void>(resolve => {
+        const done = () => {
+            clearTimeout(timer)
+            signal?.removeEventListener("abort", done)
+            resolve()
+        }
+        const timer = setTimeout(done, signal?.aborted ? 0 : ms)
+        signal?.addEventListener("abort", done)
+    })
 }
 
 /**
@@ -1450,10 +1458,7 @@ export class Demos {
                             }
                         },
                     })
-                    .finally(() => {
-                        clearTimeout(timer)
-                        opts.signal?.removeEventListener("abort", onAbort)
-                    })
+                    .finally(() => clearTimeout(timer))
                 return { data: response.data }
             } catch (caught: any) {
                 const error = stopped
@@ -1509,7 +1514,9 @@ export class Demos {
                     }
                 }
 
-                await sleep(waitMs)
+                await sleep(waitMs, opts.signal)
+            } finally {
+                opts.signal?.removeEventListener("abort", onAbort)
             }
         }
 
@@ -1590,7 +1597,7 @@ export class Demos {
             }
 
             if (retries > 0) {
-                await sleep(sleepTime)
+                await sleep(sleepTime, options.signal)
                 return await this.rpcCall(
                     request,
                     isAuthenticated,
@@ -2480,8 +2487,7 @@ export class Demos {
 
     // SECTION Finality and storage proof reads (kynesyslabs/node
     // v1.0.0-rc.14 and later). Each returns what the connected RPC claims;
-    // nothing here checks a signature, hash or Merkle path. A refusal throws
-    // `NodeCallError` with the node's result code and `extra.reason`.
+    // nothing here checks a signature, hash or Merkle path.
 
     /**
      * A node call that keeps the node's verdict: the body on result 200, a

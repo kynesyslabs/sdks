@@ -1,6 +1,6 @@
 import http from "http"
 import type { AddressInfo } from "net"
-import axios, { AxiosAdapter, CanceledError } from "axios"
+import axios, { AxiosAdapter, AxiosError, CanceledError } from "axios"
 import { Demos, TransportError } from "@/websdk"
 import { DemosTransactions } from "@/websdk/DemosTransactions"
 
@@ -438,6 +438,116 @@ describe("a signal passed to call and rpcCall", () => {
         expect(envelope.response.cause.code).toBe("ERR_CANCELED")
         expect(node.posts).toBe(1)
     }, 8_000)
+})
+
+describe("an abort during a retry wait", () => {
+    // On a fake clock, a stand-in adapter answers each post at once. The read
+    // then waits 5 s before its retry, and the abort comes 1 s into that wait.
+    let posts = 0
+    const reply = (config, data: unknown) => ({
+        data,
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config,
+    })
+    const refused = (config): never => {
+        throw new AxiosError("connect ECONNREFUSED", "ECONNREFUSED", config)
+    }
+
+    beforeEach(() => {
+        posts = 0
+        jest.useFakeTimers()
+    })
+    afterEach(() => jest.useRealTimers())
+
+    it("ends _doPost's backoff at once, and sends no retry", async () => {
+        // Every post fails with a retryable connection error.
+        axios.defaults.adapter = async config => {
+            posts++
+            return refused(config)
+        }
+        const ctl = new AbortController()
+        let err: any
+        void doPost("http://127.0.0.1:9", {
+            signal: ctl.signal,
+            retries: 4,
+            baseSleepMs: 5_000,
+        }).catch(e => (err = e))
+        await jest.advanceTimersByTimeAsync(1_000)
+        expect(posts).toBe(1)
+        expect(err).toBeUndefined()
+
+        ctl.abort()
+        await jest.advanceTimersByTimeAsync(5)
+
+        expect(err).toBeInstanceOf(TransportError)
+        expect(err.cause.code).toBe("ERR_CANCELED")
+        expect(posts).toBe(1)
+        expect(jest.getTimerCount()).toBe(0)
+    })
+
+    it("ends rpcCall's retry wait at once, and sends no retry", async () => {
+        // Every post gets a non-200 result, which rpcCall retries itself.
+        axios.defaults.adapter = async config => {
+            posts++
+            return reply(config, {
+                result: 400,
+                response: "busy",
+                require_reply: false,
+                extra: null,
+            })
+        }
+        const log = jest.spyOn(console, "error").mockImplementation(() => {})
+        const demos = new Demos()
+        ;(demos as any).rpc_url = "http://127.0.0.1:9"
+        const ctl = new AbortController()
+        let envelope: any
+        void demos
+            .rpcCall({ method: "nodeCall", params: [] }, false, 3, 5_000, [], {
+                signal: ctl.signal,
+            })
+            .then(e => (envelope = e))
+        await jest.advanceTimersByTimeAsync(1_000)
+        expect(posts).toBe(1)
+        expect(envelope).toBeUndefined()
+
+        ctl.abort()
+        await jest.advanceTimersByTimeAsync(5)
+        log.mockRestore()
+
+        expect(envelope?.result).toBe(500)
+        expect(envelope.response).toBeInstanceOf(TransportError)
+        expect(envelope.response.cause.code).toBe("ERR_CANCELED")
+        expect(posts).toBe(1)
+        expect(jest.getTimerCount()).toBe(0)
+    })
+
+    it("leaves no listener or timer behind when the wait runs out", async () => {
+        // The first post fails with a retryable error, the retry is answered.
+        axios.defaults.adapter = async config =>
+            ++posts === 1 ? refused(config) : reply(config, NODE_REPLY)
+        const ctl = new AbortController()
+        const add = jest.spyOn(ctl.signal, "addEventListener")
+        const remove = jest.spyOn(ctl.signal, "removeEventListener")
+
+        const read = doPost("http://127.0.0.1:9", {
+            signal: ctl.signal,
+            retries: 4,
+            baseSleepMs: 5_000,
+        })
+        await jest.advanceTimersByTimeAsync(5_000)
+
+        await expect(read).resolves.toEqual({ data: NODE_REPLY })
+        expect(posts).toBe(2)
+        // One listener per attempt and one for the wait between them.
+        const added = add.mock.calls.map(call => call[1])
+        expect(added).toHaveLength(3)
+        expect(remove.mock.calls.map(call => call[1])).toEqual(
+            expect.arrayContaining(added),
+        )
+        expect(jest.getTimerCount()).toBe(0)
+    })
 })
 
 describe("the default deadline on public calls", () => {
