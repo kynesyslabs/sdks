@@ -403,6 +403,17 @@ interface RpcRequest {
 }
 
 /**
+ * Node text as it goes into a `NodeCallError` message: control characters
+ * become spaces and the text is cut to 200 characters. The error's fields
+ * keep the node's values unchanged.
+ */
+function messagePart(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  const clean = value.replace(/[\u0000-\u001f\u007f]/g, " ");
+  return clean.length > 200 ? `${clean.slice(0, 200)}…` : clean;
+}
+
+/**
  * A node call the node answered with a result other than 200, such as
  * `404 no_result_commitment` from `getTransactionProof`. Thrown by the typed
  * finality and storage proof reads; `nodeCall` and `call` keep returning
@@ -424,16 +435,22 @@ export class NodeCallError extends Error {
       ? reply.extra.reason
       : undefined;
     const error = isRecord(reply.response) ? reply.response.error : reply.response;
-    const detail = typeof error === "string"
-      ? error
-      : error === undefined || error === null ? "no reason" : JSON.stringify(error);
+    let detail = typeof error === "string" ? error : "no reason";
+    if (typeof error !== "string" && error !== undefined && error !== null) {
+      try {
+        detail = JSON.stringify(error);
+      } catch {
+        // e.g. RangeError on a very deeply nested value.
+        detail = "unprintable error";
+      }
+    }
     // The node's dispatcher answers a handler crash with
     // `{result: 500, response: "Error in nodeCall: ", extra: {error: cause}}`.
     const cause =
       reason === undefined && isRecord(reply.extra) && typeof reply.extra.error === "string"
-        ? ` (${reply.extra.error})`
+        ? ` (${messagePart(reply.extra.error)})`
         : "";
-    super(`${method} refused with ${reply.result}: ${reason ?? detail}${cause}`);
+    super(`${method} refused with ${reply.result}: ${messagePart(reason ?? detail)}${cause}`);
     this.name = "NodeCallError";
     this.method = method;
     this.result = reply.result;

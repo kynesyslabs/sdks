@@ -175,6 +175,55 @@ test("a handler crash names the cause the node's dispatcher gives", async () => 
   });
 });
 
+test("an error too deeply nested to print still becomes a NodeCallError", async () => {
+  const demos = await connected();
+  // JSON.stringify of this value throws RangeError, so the reply is written by hand.
+  const depth = 200_000;
+  const text = `{"result":500,"response":{"error":${"[".repeat(depth)}${"]".repeat(depth)}}}`;
+  queue.push({ status: 200, text });
+  await assert.rejects(demos.getFinalizedHead(), (error) => {
+    assert.ok(error instanceof NodeCallError);
+    assert.equal(error.result, 500);
+    assert.match(error.message, /refused with 500: unprintable error$/);
+    return true;
+  });
+});
+
+test("node text in the message is cleaned and cut, the fields keep it whole", async () => {
+  const demos = await connected();
+  const multiline = "not_found\n[INFO] x";
+  queue.push({ status: 200, text: JSON.stringify({ result: 404, response: {}, extra: { reason: multiline } }) });
+  await assert.rejects(demos.getFinalizedHead(), (error) => {
+    assert.ok(error instanceof NodeCallError);
+    assert.doesNotMatch(error.message, /[\r\n]/);
+    assert.match(error.message, /refused with 404: not_found \[INFO\] x$/);
+    assert.equal(error.reason, multiline);
+    return true;
+  });
+
+  const long = "r".repeat(10_000);
+  queue.push({ status: 200, text: JSON.stringify({ result: 404, response: {}, extra: { reason: long } }) });
+  await assert.rejects(demos.getFinalizedHead(), (error) => {
+    assert.ok(error instanceof NodeCallError);
+    assert.ok(error.message.length <= 300, `message is ${error.message.length} characters`);
+    assert.match(error.message, /r…$/);
+    assert.equal(error.reason, long);
+    assert.deepEqual(error.extra, { reason: long });
+    return true;
+  });
+
+  const cause = `chain head\u0000not loaded ${"c".repeat(500)}`;
+  queue.push({ status: 200, text: JSON.stringify({ result: 500, response: "Error in nodeCall: ", extra: { error: cause } }) });
+  await assert.rejects(demos.getFinalizedHead(), (error) => {
+    assert.ok(error instanceof NodeCallError);
+    assert.equal(error.message.includes("\u0000"), false);
+    assert.match(error.message, /\(chain head not loaded c+…\)$/);
+    assert.ok(error.message.length <= 300, `message is ${error.message.length} characters`);
+    assert.deepEqual(error.extra, { error: cause });
+    return true;
+  });
+});
+
 test("nodeCall still returns the bare body of the same refusal", async () => {
   const demos = await connected();
   queue.push("transactionProofNoResultCommitment");
