@@ -144,6 +144,21 @@ test("a node that does not serve the call refuses without a reason", async () =>
   });
 });
 
+test("a refusal whose error is an object names it as JSON", async () => {
+  const demos = await connected();
+  const reply = { result: 500, response: { error: { code: 7 } } };
+  queue.push({ status: 200, text: JSON.stringify(reply) });
+  await assert.rejects(demos.getFinalizedHead(), (error) => {
+    assert.ok(error instanceof NodeCallError);
+    assert.equal(error.result, 500);
+    assert.equal(error.reason, undefined);
+    assert.deepEqual(error.response, { error: { code: 7 } });
+    assert.match(error.message, /refused with 500: \{"code":7\}/);
+    assert.doesNotMatch(error.message, /\[object Object\]/);
+    return true;
+  });
+});
+
 test("nodeCall still returns the bare body of the same refusal", async () => {
   const demos = await connected();
   queue.push("transactionProofNoResultCommitment");
