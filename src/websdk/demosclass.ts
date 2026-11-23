@@ -13,6 +13,7 @@ import {
 } from "./utils/txSignaturePreimage"
 import { personalMessagePreimage } from "./utils/personalMessage"
 import { TransportError } from "./TransportError"
+import { NodeCallError } from "./NodeCallError"
 
 // NOTE Including custom libraries from Demos
 import { DemosTransactions } from "./DemosTransactions"
@@ -36,6 +37,16 @@ import type {
     NetworkUpgradeProposal,
     ProposalVoteInfo,
 } from "@/types/blockchain/NetworkParameters"
+import type {
+    BlockSegment,
+    ChainIdentity,
+    FinalizedHead,
+    StorageProgramLimits,
+    StorageProof,
+    TransactionProof,
+    TransactionStatus,
+    ValidatorSet,
+} from "@/types/blockchain/finality"
 import {
     RPCRequest,
     RPCResponse,
@@ -882,6 +893,9 @@ export class Demos {
      * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
      * @param opts.failFastOnBroadcastError - Reject immediately if the broadcast
      *   RPC errors, instead of polling for a terminal status.
+     * @param opts.waitForResultCommitment - Also wait, within the same timeout,
+     *   until the node reports the block committing the result
+     *   (`status.resultCommittedInBlock`). Defaults to false.
      * @returns `{ hash, broadcast, status }` — the transaction hash, the
      *   broadcast RPC response and the terminal on-chain status.
      */
@@ -891,6 +905,7 @@ export class Demos {
             timeoutMs?: number
             pollIntervalMs?: number
             failFastOnBroadcastError?: boolean
+            waitForResultCommitment?: boolean
         },
     ) {
         return DemosTransactions.broadcastAndWait(validationData, this, opts)
@@ -2449,6 +2464,90 @@ export class Demos {
     async getStakedAmount(address: string): Promise<string> {
         const v = await this.nodeCall("getStakedAmount", { address })
         return typeof v === "string" ? v : "0"
+    }
+
+    // SECTION Finality and storage proof reads (kynesyslabs/node
+    // v1.0.0-rc.14 and later). Each returns what the connected RPC claims;
+    // nothing here checks a signature, hash or Merkle path. A refusal throws
+    // `NodeCallError` with the node's result code and `extra.reason`.
+
+    /**
+     * A node call that keeps the node's verdict: the body on result 200, a
+     * `NodeCallError` otherwise. Transport failures throw `TransportError`
+     * instead of becoming a 500 body, so they never read as a refusal.
+     */
+    private async _nodeCallAnswer<T>(
+        message: string,
+        data: Record<string, unknown> = {},
+    ): Promise<T> {
+        required(this.rpc_url, "Not connected to a node")
+        // The node reads only `message` and `data` of a nodeCall, as
+        // `bodyBoundNodeCall` sends it.
+        const { data: reply } = await this._doPost<RPCResponse>(
+            this.rpc_url,
+            { method: "nodeCall", params: [{ message, data }] },
+            { "Content-Type": "application/json" },
+        )
+        if (typeof reply?.result !== "number") {
+            throw new TypeError(`Demos RPC returned no valid ${message} reply`)
+        }
+        if (reply.result !== 200) throw new NodeCallError(message, reply)
+        const body = reply.response
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+            throw new TypeError(`Demos RPC returned no valid ${message} answer`)
+        }
+        return body as T
+    }
+
+    /** The chain id and genesis hashes the node enforces. */
+    async getChainIdentity(): Promise<ChainIdentity> {
+        return this._nodeCallAnswer("getChainIdentity")
+    }
+
+    /** The node's finalized head with its signatures; `nodeSynced` says if it lags. */
+    async getFinalizedHead(): Promise<FinalizedHead> {
+        return this._nodeCallAnswer("getFinalizedHead")
+    }
+
+    /** Signed headers `from..to`; the answer's `to` is the last one served. */
+    async getBlockSegment(from: number, to: number): Promise<BlockSegment> {
+        return this._nodeCallAnswer("getBlockSegment", { from, to })
+    }
+
+    /** The validator set after block `blockNumber`. */
+    async getValidatorSet(blockNumber: number): Promise<ValidatorSet> {
+        return this._nodeCallAnswer("getValidatorSet", { blockNumber })
+    }
+
+    /**
+     * A transaction's state, the height searched and, after the finalityProofs
+     * fork, the block committing its result. A hash the node does not hold
+     * throws `NodeCallError` 404 not_found (503 node_not_synced while behind);
+     * its `response.checkedThroughBlock` is the height searched.
+     */
+    async getTransactionStatus(hash: string): Promise<TransactionStatus> {
+        return this._nodeCallAnswer("getTransactionStatus", { hash })
+    }
+
+    /** A transaction's result leaf, audit path and the blocks it ties to. */
+    async getTransactionProof(hash: string): Promise<TransactionProof> {
+        return this._nodeCallAnswer("getTransactionProof", { hash })
+    }
+
+    /** Sparse Merkle proofs for 1-16 storage programs at a recent block (default the head). */
+    async getStorageProof(
+        storageAddresses: string[],
+        blockNumber?: number,
+    ): Promise<StorageProof> {
+        return this._nodeCallAnswer("getStorageProof", {
+            storageAddresses,
+            blockNumber,
+        })
+    }
+
+    /** The storage size, depth, pricing and proof limits the node enforces. */
+    async getStorageProgramLimits(): Promise<StorageProgramLimits> {
+        return this._nodeCallAnswer("getStorageProgramLimits")
     }
 
     // SECTION Governance (stackable-genesis, Phase 1)

@@ -1,3 +1,5 @@
+import { readFileSync } from "fs"
+import { join } from "path"
 import { DemosTransactions } from "@/websdk/DemosTransactions"
 import { BroadcastTimeoutError } from "@/websdk/BroadcastTimeoutError"
 
@@ -100,6 +102,89 @@ describe("broadcastAndWait returns the transaction hash", () => {
                 pollIntervalMs: 1,
             }),
         ).rejects.toThrow()
+    })
+})
+
+describe("broadcastAndWait with waitForResultCommitment", () => {
+    // Status bodies as kynesyslabs/node v1.0.0-rc.14 answers them, shared
+    // with the demos-native tests.
+    const { replies } = JSON.parse(
+        readFileSync(
+            join(
+                __dirname,
+                "../../packages/demos-native/test/fixtures/node-proof-calls.json",
+            ),
+            "utf8",
+        ),
+    )
+    const status = (name: string) =>
+        structuredClone(replies[name].reply.response)
+
+    it("is off by default: the status is the old two fields at once", async () => {
+        const { demos } = mockDemos([status("statusIncludedAwaitingCommitment")])
+
+        const res = await DemosTransactions.broadcastAndWait(
+            validityData(),
+            demos,
+            { pollIntervalMs: 1 },
+        )
+
+        expect(res.status).toEqual({ state: "included", blockNumber: 529_478 })
+    })
+
+    it("polls past included until the result is committed", async () => {
+        const { demos, calls } = mockDemos([
+            { state: "pending" },
+            status("statusIncludedAwaitingCommitment"),
+            status("statusIncludedCommitted"),
+        ])
+
+        const res = await DemosTransactions.broadcastAndWait(
+            validityData(),
+            demos,
+            { pollIntervalMs: 1, waitForResultCommitment: true },
+        )
+
+        expect(res.hash).toBe(TX_HASH)
+        expect(res.status).toEqual(status("statusIncludedCommitted"))
+        expect(res.status.resultCommittedInBlock).toBe(529_479)
+        expect(calls.filter(c => c === "nodeCall:getTransactionStatus")).toHaveLength(3)
+    })
+
+    it("returns at once when no block commits the result (before the fork)", async () => {
+        const { demos } = mockDemos([status("statusFailedPreFork")])
+
+        const res = await DemosTransactions.broadcastAndWait(
+            validityData(),
+            demos,
+            { pollIntervalMs: 1, waitForResultCommitment: true },
+        )
+
+        expect(res.status).toEqual(status("statusFailedPreFork"))
+        expect("resultCommittedInBlock" in res.status).toBe(false)
+    })
+
+    it("times out with the terminal state when the commitment never comes", async () => {
+        const awaiting = status("statusIncludedAwaitingCommitment")
+        const demos = {
+            call: jest.fn(async (method: string) =>
+                method === "execute"
+                    ? { result: 200, response: "ok" }
+                    : structuredClone(awaiting),
+            ),
+        } as any
+
+        await expect(
+            DemosTransactions.broadcastAndWait(validityData(), demos, {
+                timeoutMs: 20,
+                pollIntervalMs: 1,
+                waitForResultCommitment: true,
+            }),
+        ).rejects.toMatchObject({
+            name: "BroadcastTimeoutError",
+            txHash: TX_HASH,
+            lastSeenState: "included",
+        })
     })
 })
 

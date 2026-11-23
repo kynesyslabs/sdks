@@ -67,6 +67,18 @@
   audience, as nodes require for `requestTLSNproxy`. `bodyBoundAuthHeaders`,
   `httpAuthMessage` and `audienceKey` (exported from `websdk`) build the
   same headers as the node's `peerHttpAuth.ts`.
+- Finality and storage proof reads on the websdk `Demos` (nodes from
+  v1.0.0-rc.14): `getChainIdentity`, `getFinalizedHead`, `getBlockSegment`,
+  `getValidatorSet`, `getTransactionStatus`, `getTransactionProof`,
+  `getStorageProof` and `getStorageProgramLimits`, with their answer types.
+  They return what the connected RPC claims; the SDK does not verify them yet.
+  A node refusal (e.g. `404 no_result_commitment`) throws the new
+  `NodeCallError` with the result code, `extra.reason` and body; `nodeCall`
+  and `call` are unchanged.
+- `broadcastAndWait({ waitForResultCommitment: true })` also waits, within the
+  same timeout, for `status.resultCommittedInBlock`. Off by default. The
+  `status` type gains optional `code`, `message`, `checkedThroughBlock` and
+  `resultCommittedInBlock`; existing fields are unchanged.
 
 ### Deprecated
 - Mnemonic wallets have one documented path: `Demos.connectWallet(mnemonic)`.

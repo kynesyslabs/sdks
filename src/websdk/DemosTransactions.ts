@@ -12,6 +12,7 @@ import * as skeletons from "./utils/skeletons"
 import type { SigningAlgorithm, Transaction } from "@/types"
 import type { L2PSHashPayload } from "@/types/blockchain/TransactionSubtypes/L2PSHashTransaction"
 import type { NetworkParameters } from "@/types/blockchain/NetworkParameters"
+import type { TransactionStatus } from "@/types/blockchain/finality"
 import { IKeyPair } from "./types/KeyPair"
 import { GCRGeneration, isSolanaBase58 } from "./GCRGeneration"
 import { _required as required } from "./utils/required"
@@ -496,6 +497,14 @@ export const DemosTransactions = {
      * @param opts.pollIntervalMs - Delay between status polls. Defaults to 500.
      * @param opts.failFastOnBroadcastError - If true, throw `BroadcastFailedError`
      *   immediately when the broadcast can't contact the node. Defaults to false.
+     * @param opts.waitForResultCommitment - If true, keep polling past
+     *   `included`/`failed` until the node reports `resultCommittedInBlock`
+     *   (the block committing the result, which `getTransactionProof` can then
+     *   prove), within the same timeout; the returned status is then the
+     *   node's full answer. A terminal status without the field means no block
+     *   commits this result (before the finalityProofs fork, or an older node)
+     *   and is returned as it is. A timeout while waiting reports the terminal
+     *   state as `lastSeenState`. Defaults to false.
      *
      * @returns The transaction hash, the original broadcast response, and the
      *   terminal status. The hash is the node-recalculated one the status polls
@@ -509,15 +518,19 @@ export const DemosTransactions = {
             timeoutMs?: number
             pollIntervalMs?: number
             failFastOnBroadcastError?: boolean
+            waitForResultCommitment?: boolean
         },
     ): Promise<{
         hash: string
         broadcast: RPCResponse
-        status: { state: "included" | "failed"; blockNumber?: number }
+        status: Omit<TransactionStatus, "state"> & {
+            state: "included" | "failed"
+        }
     }> {
         const timeout = opts?.timeoutMs ?? 60_000
         const pollInterval = opts?.pollIntervalMs ?? 500
         const failFast = opts?.failFastOnBroadcastError ?? false
+        const waitForCommitment = opts?.waitForResultCommitment ?? false
 
         // Extract the tx hash from the validity data before broadcasting so
         // we can include it in any timeout error.
@@ -613,12 +626,19 @@ export const DemosTransactions = {
             if (typeof state === "string") {
                 lastState = state
                 if (state === "included" || state === "failed") {
-                    const blockNumber: number | undefined =
-                        (statusRes as any).blockNumber
-                    return {
-                        hash: txHash,
-                        broadcast: broadcastRes,
-                        status: { state, blockNumber },
+                    const full = statusRes as TransactionStatus
+                    // null: the committing block is not searched yet.
+                    if (
+                        !waitForCommitment ||
+                        full.resultCommittedInBlock !== null
+                    ) {
+                        return {
+                            hash: txHash,
+                            broadcast: broadcastRes,
+                            status: waitForCommitment
+                                ? { ...full, state }
+                                : { state, blockNumber: full.blockNumber },
+                        }
                     }
                 }
             }

@@ -220,6 +220,8 @@ export {
     type ProposalStatus,
     type ProposalVoteInfo,
 } from "./blockchain/NetworkParameters"
+// Answer types of the finality and storage proof reads (types only).
+export * from "./blockchain/finality"
 export { BridgeTradePayload } from "./bridge/bridgeTradePayload"
 export {
     ChainProviders,
