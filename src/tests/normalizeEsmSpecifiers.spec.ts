@@ -16,10 +16,14 @@ const ROOT = join(__dirname, "..", "..")
 const FILES: Record<string, string> = {
     "helper.js": "export const x = 1\n",
     "dir/index.js": "export const y = 2\n",
+    "leaf.js": "export const value = 3\n",
+    "café.js": "export const unicode = 4\n",
     "main.js": [
         `import { x } from "./helper"`,
         `import './helper'`,
         `export { y } from './dir'`,
+        `export { value } from "./le\\u0061f"`,
+        `export { unicode } from "./caf\\u00e9"`,
         `export * from "./helper.js"`,
         `import { z } from "./missing"`,
         `import pkg from "some-pkg"`,
@@ -49,6 +53,8 @@ const EXPECTED: Record<string, string> = {
         .replace(`import { x } from "./helper"`, `import { x } from "./helper.js"`)
         .replace(`import './helper'\n`, `import './helper.js'\n`)
         .replace(`export { y } from './dir'`, `export { y } from './dir/index.js'`)
+        .replace(`export { value } from "./le\\u0061f"`, `export { value } from "./le\\u0061f.js"`)
+        .replace(`export { unicode } from "./caf\\u00e9"`, `export { unicode } from "./caf\\u00e9.js"`)
         .replace("await import(\"./helper\")", "await import(\"./helper.js\")")
         .replace(`import( "./dir/" )`, `import( "./dir/index.js" )`),
     "types.d.ts": FILES["types.d.ts"]
@@ -91,7 +97,7 @@ describe("normalize-esm-specifiers", () => {
     it("rewrites only specifiers in code positions", () => {
         const { first, after } = runNormalizer(FILES)
         expect(after).toEqual(EXPECTED)
-        expect(first).toBe("Normalized 7 relative ESM specifiers in 2 build files\nShifted 0 source maps")
+        expect(first).toBe("Normalized 9 relative ESM specifiers in 2 build files\nShifted 0 source maps")
     })
 
     it("leaves a string that looks like an import alone", () => {
@@ -152,12 +158,68 @@ describe("normalize-esm-specifiers", () => {
     })
 
     it("keeps CRLF and non-ASCII declarations byte for byte apart from the specifier", () => {
-        const dts = `import type { X } from "./helper";\r\n// é — "./helper"\r\nexport declare const s: "import('./helper') ✓";\r\nexport type H = typeof import("./helper");\r\nexport {};\r\n`
-        const { after, afterSecond } = runNormalizer({ "helper.js": "export const x = 1\n", "types.d.ts": dts })
+        const dts = `import type { X } from "./helper";\r\nimport type { Value } from "./le\\u0061f";\r\n// é — "./helper"\r\nexport declare const s: "import('./helper') ✓";\r\nexport type H = typeof import("./helper");\r\nexport {};\r\n`
+        const { after, afterSecond } = runNormalizer({
+            "helper.js": "export const x = 1\n",
+            "leaf.js": "export const value = 1\n",
+            "types.d.ts": dts,
+        })
         expect(after["types.d.ts"]).toBe(
-            dts.replace(`from "./helper";`, `from "./helper.js";`).replace(`import("./helper");`, `import("./helper.js");`),
+            dts.replace(`from "./helper";`, `from "./helper.js";`)
+                .replace(`from "./le\\u0061f";`, `from "./le\\u0061f.js";`)
+                .replace(`import("./helper");`, `import("./helper.js");`),
         )
         expect(afterSecond).toEqual(after)
+    })
+
+    it("normalizes a real TypeScript escaped import for Node without changing its raw escape", () => {
+        const workspace = mkdtempSync(join(tmpdir(), "normalize-esm-consumer-"))
+        try {
+            mkdirSync(join(workspace, "scripts"))
+            mkdirSync(join(workspace, "src"))
+            copyFileSync(
+                join(ROOT, "scripts", "normalize-esm-specifiers.mjs"),
+                join(workspace, "scripts", "normalize-esm-specifiers.mjs"),
+            )
+            symlinkSync(join(ROOT, "node_modules"), join(workspace, "node_modules"), "dir")
+            writeFileSync(join(workspace, "src", "index.ts"), `export { value } from "./le\\u0061f";\n`)
+            writeFileSync(join(workspace, "src", "leaf.ts"), `export const value = "works";\n`)
+            execFileSync(process.execPath, [
+                join(workspace, "node_modules", "typescript", "bin", "tsc"),
+                "--target", "ES2022", "--module", "ES2022", "--moduleResolution", "bundler",
+                "--skipLibCheck", "--sourceMap", "--outDir", "build", "src/index.ts", "src/leaf.ts",
+            ], { cwd: workspace, encoding: "utf8" })
+            const emitted = readFileSync(join(workspace, "build", "index.js"), "utf8")
+            expect(emitted).toContain(`"./le\\u0061f"`)
+            execFileSync(process.execPath, [join(workspace, "scripts", "normalize-esm-specifiers.mjs")], {
+                cwd: workspace,
+                encoding: "utf8",
+            })
+            const normalized = readFileSync(join(workspace, "build", "index.js"), "utf8")
+            expect(normalized).toContain(`"./le\\u0061f.js"`)
+            const consumer = execFileSync(process.execPath, [
+                "--input-type=module", "-e",
+                `import { value } from "./build/index.js"; process.stdout.write(value)`,
+            ], { cwd: workspace, encoding: "utf8" })
+            expect(consumer).toBe("works")
+        } finally {
+            rmSync(workspace, { recursive: true, force: true })
+        }
+    })
+
+    it("preserves escaped specifier spelling and later same-line source-map columns", () => {
+        const plain = emit(`import { value } from "./le\\u0061f"; export const after = value\n`)
+        const { after } = runNormalizer({
+            "leaf.js": `export const value = "ok"\n`,
+            "main.js": plain.js,
+            "main.js.map": plain.map,
+        })
+        expect(after["main.js"]).toContain(`"./le\\u0061f.js"`)
+        const got = decode(JSON.parse(after["main.js.map"]).mappings)
+        const want = decode(JSON.parse(emit(`import { value } from "./le\\u0061f.js"; export const after = value\n`).map).mappings)
+        const orig = decode(JSON.parse(plain.map).mappings)
+        expect(got.map(line => line.map(s => s[0]))).toEqual(want.map(line => line.map(s => s[0])))
+        expect(got.map(line => line.map(s => s.slice(1)))).toEqual(orig.map(line => line.map(s => s.slice(1))))
     })
 
     it("does not touch a map a second run", () => {
@@ -206,6 +268,7 @@ describe("normalize-esm-specifiers", () => {
     it.each([
         ["sourceMappingURL without its map", { "main.js": mapped.js }, /main\.js\.map is missing/],
         ["a map without sourceMappingURL", { "main.js": mapped.js.replace(/\/\/# sourceMappingURL=.*$/, ""), "main.js.map": mapped.map }, /found none/],
+        ["an inline source map", { "main.js": mapped.js.replace(/\/\/# sourceMappingURL=.*$/, "//# sourceMappingURL=data:application/json;base64,AA==") }, /expected sourceMappingURL=main\.js\.map, found data:/],
         ["sourceMappingURL naming another map", { "main.js": mapped.js.replace("main.js.map", "other.js.map"), "main.js.map": mapped.map, "other.js.map": mapped.map }, /found other\.js\.map/],
         ["a map that is not JSON", { "main.js": mapped.js, "main.js.map": "{" }, /not valid JSON/],
         ["a file that does not parse", { "main.js": `import { x } from "./helper"\nexport const = ;\n` }, /main\.js:2: cannot parse/],

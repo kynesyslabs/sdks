@@ -47,8 +47,7 @@ function specifierLiterals(ast, source) {
         if (literal && ts.isStringLiteral(literal)) {
             const start = literal.getStart(ast) + 1
             const end = literal.end - 1
-            // Only rewrite plain literals whose source text is the specifier.
-            if (source.slice(start, end) === literal.text) literals.push({ start, end, specifier: literal.text })
+            literals.push({ start, end, specifier: literal.text })
         }
         ts.forEachChild(node, visit)
     }
@@ -106,8 +105,9 @@ async function rewriteSpecifiers(sourceFile, source) {
         if (resolved === specifier) continue
         if (!resolved.startsWith(specifier)) throw new Error(`Rewrite of ${specifier} in ${sourceFile} is not an append`)
 
-        output = `${output.slice(0, start)}${resolved}${output.slice(end)}`
-        insertions.push({ position: end, length: resolved.length - specifier.length })
+        const suffix = resolved.slice(specifier.length)
+        output = `${output.slice(0, end)}${suffix}${output.slice(end)}`
+        insertions.push({ position: end, length: suffix.length })
     }
     if (insertions.length === 0) return { output, changes: 0 }
     // Files that need no rewrite are never judged, so reruns and vendored
