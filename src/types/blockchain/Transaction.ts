@@ -139,6 +139,13 @@ export interface TransactionAttrs {
     expectedNonce?: number
     actualNonce?: number
     code?: string
+    /**
+     * Set by the node on native send confirmation: the fee it will charge,
+     * as a decimal string in ledger units (OS once the `osDenomination`
+     * fork is active, whole DEM before). Only valid for the state it was
+     * quoted on; older nodes don't set it.
+     */
+    total_fee?: string
 }
 
 export interface Transaction {

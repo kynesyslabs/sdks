@@ -117,6 +117,15 @@
 - Web2 identity proof URLs must be ASCII; percent-encode non-ASCII path and
   query characters and use the punycode (`xn--`) form for hostnames.
 
+### Changed
+- **Behaviour change:** `demos.run.*` / `runProgrammaticTx` now refuse,
+  without broadcasting, already-confirmed validity data for a native send
+  that carries `attrs.total_fee` (#174). Nodes with kynesyslabs/node#1174
+  quote every valid native send, so
+  `runProgrammaticTx(demos, await demos.confirm(nativeSendTx))` throws
+  there: pass the transaction (or a thunk returning it) so the runner
+  confirms it.
+
 ### Fixed
 - Objects that hold seeds or private keys no longer expose them through
   `JSON.stringify`, `console.log`/`util.inspect`, object spread,
@@ -210,6 +219,18 @@
   running the `nonceEnforcement` upgrade requires (confirmed + 1 + pending)
   and no longer quote error strings; tests drive a DAHR request and cover the
   nonce lag until it is included.
+- `demos.run.*` reports (`feeOs` / `feeDem`) and checks `maxFee` against the
+  fee the node says it will charge for a native send,
+  `transaction.attrs.total_fee`, when the confirm response carries it; nodes
+  without it keep the summed `transaction_fee` fields (#174). A `total_fee`
+  on anything other than a native send (including `tlsn_request` and
+  `tlsn_store`) is ignored. A native send quote that is not a base-10
+  integer string throws, and so does one whose echoed `network_fee` is
+  neither a number nor a string (its unit, DEM or OS, is told from that
+  field's type). A fee field sent as a string without a decimal point must
+  match the same base-10 pattern as sent, untrimmed: hex, signed, zero-padded,
+  space-padded and blank forms throw instead of being read by `BigInt` (a
+  blank one was read as zero).
 
 ## 4.0.17
 
