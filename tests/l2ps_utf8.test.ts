@@ -3,10 +3,16 @@ import * as forge from "node-forge"
 import L2PS, { L2PS_PLAINTEXT_BUCKET } from "@/l2ps/l2ps"
 import type { Transaction } from "@/types/blockchain/Transaction"
 import { Hashing } from "@/encryption/Hashing"
+import { Cryptography } from "@/encryption/Cryptography"
+import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 
 // `L2PS.decryptTx` decodes the plaintext as UTF-8, so `L2PS.encryptTx`
 // must encode it as UTF-8. ASCII-only transactions keep the exact
 // plaintext bytes older SDKs produced.
+
+// decryptTx only returns transactions signed by the key in `content.from`.
+const sender = forge.pki.ed25519.generateKeyPair()
+const SENDER = uint8ArrayToHex(sender.publicKey)
 
 // decryptTx recomputes the hash from the decrypted content, so the
 // fixture carries the real UTF-8 content hash.
@@ -14,9 +20,9 @@ function makeTx(memo: string): Transaction {
     const tx = {
         content: {
             type: "native",
-            from: "0x" + "a".repeat(64),
+            from: SENDER,
             to: "0x" + "b".repeat(64),
-            from_ed25519_address: "0x" + "a".repeat(64),
+            from_ed25519_address: SENDER,
             amount: "100",
             data: [
                 "native",
@@ -43,6 +49,10 @@ function makeTx(memo: string): Transaction {
         blockNumber: null,
     } as unknown as Transaction
     tx.hash = Hashing.sha256(JSON.stringify(tx.content))
+    tx.signature = {
+        type: "ed25519",
+        data: uint8ArrayToHex(Cryptography.sign(tx.hash, sender.privateKey)),
+    }
     return tx
 }
 

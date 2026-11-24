@@ -9,13 +9,14 @@
  * @version 1.0.0
  */
 
-import { UnifiedCrypto } from "@/encryption/unifiedCrypto";
+import { UnifiedCrypto, hexToUint8Array } from "@/encryption/unifiedCrypto";
 import { serializeTransactionContent } from "@/denomination/serializerGate";
 import forge from "node-forge";
 import { Hashing } from "@/encryption/Hashing";
 import { hideSecretFields, INSPECT_CUSTOM, redactedInspect } from "@/encryption/secretFields";
 import { L2PSTransaction, Transaction, TransactionContent } from "@/types";
 import { L2PSTransactionContent } from "@/types/blockchain/Transaction";
+import { txSignaturePreimage } from "@/websdk/utils/txSignaturePreimage";
 
 /** Plaintexts are padded to a multiple of this many UTF-8 bytes before encryption. */
 export const L2PS_PLAINTEXT_BUCKET = 1024;
@@ -106,7 +107,8 @@ export interface L2PSEncryptedBytes {
  * const encryptedTx = await l2ps.encryptTx(originalTransaction);
  * 
  * // Decrypt a transaction
- * const decryptedTx = await l2ps.decryptTx(encryptedTx);
+ * // chainId: the network's chain id; needed once the signatureDomain fork is active
+ * const decryptedTx = await l2ps.decryptTx(encryptedTx, { chainId });
  * ```
  */
 export default class L2PS {
@@ -319,27 +321,45 @@ export default class L2PS {
      * 
      * Validates that the transaction is of type "l2psEncryptedTx", extracts the encrypted payload,
      * verifies the L2PS UID matches, performs AES-GCM decryption with authentication,
-     * and validates the original transaction hash for integrity.
-     * 
+     * validates the original transaction hash for integrity, and checks that the
+     * original transaction is signed by the key in `content.from`.
+     * `content.from_ed25519_address` and `ed25519_signature` are not checked by
+     * `decryptTx`. A caller that needs the account address must check that it
+     * matches `content.from` itself, as the node does.
+     *
      * @param encryptedTx - Transaction object containing encrypted data
+     * @param options.chainId - The network's chain id. Needed to accept a
+     *   signature made after the node's `signatureDomain` fork, which covers
+     *   `demos-tx:v1:<chainId>:<hash>`. A signature over the legacy (bare-hash)
+     *   form is accepted even when `chainId` is given; which form a network
+     *   requires is enforced by the node. A non-negative safe integer; any
+     *   other value throws.
      * @returns Promise resolving to the original decrypted Transaction
      * 
-     * @throws {Error} If transaction is not l2psEncryptedTx type, wrong L2PS UID, 
-     *                 authentication fails, or hash mismatch
+     * @throws {Error} If `options.chainId` is invalid, transaction is not
+     *                 l2psEncryptedTx type, wrong L2PS UID,
+     *                 authentication fails, hash mismatch, or the original
+     *                 transaction is unsigned or its signature does not verify
      * 
      * @example
      * ```typescript
      * const encryptedTx: Transaction = {  encrypted transaction  };
-     * const originalTx = await l2ps.decryptTx(encryptedTx);
+     * // chainId: the network's chain id; needed once the signatureDomain fork is active
+     * const originalTx = await l2ps.decryptTx(encryptedTx, { chainId });
      * // originalTx is now the original transaction before encryption
      * ```
      */
-    async decryptTx(encryptedTx: L2PSTransaction): Promise<Transaction> {
+    async decryptTx(
+        encryptedTx: L2PSTransaction,
+        options?: { chainId?: number },
+    ): Promise<Transaction> {
         if (!encryptedTx || encryptedTx.content.type !== "l2psEncryptedTx") {
             throw new Error('Transaction must be of type l2psEncryptedTx');
         }
 
         try {
+            L2PS.assertValidChainId(options?.chainId);
+
             const [dataType, payload] = encryptedTx.content.data;
             if (dataType !== "l2psEncryptedTx") {
                 throw new Error('Invalid encrypted transaction data type');
@@ -350,8 +370,6 @@ export default class L2PS {
             if (encryptedPayload.l2ps_uid !== (this.config?.uid || this.id)) {
                 throw new Error('Transaction encrypted for different L2PS');
             }
-
-            // TODO Verify the signature of the encrypted transaction
 
             const encryptedData = forge.util.createBuffer(forge.util.decode64(encryptedPayload.encrypted_data));
             const tag = forge.util.createBuffer(forge.util.decode64(encryptedPayload.tag));
@@ -398,39 +416,104 @@ export default class L2PS {
             const decryptedString = decipher.output.toString();
             const originalTx = JSON.parse(decryptedString) as Transaction;
 
-            if (originalTx.hash !== encryptedPayload.original_hash) {
-                throw new Error('Decrypted transaction hash mismatch');
-            }
-
-            // The `.hash` field is data the sender chose, so also recompute
-            // it from the decrypted content with the node's two
-            // `Transaction.checkCoherence` forms, each hashed as UTF-8: raw
-            // `JSON.stringify` before the osDenomination fork, the post-fork
-            // serializer after it. The payload does not record the fork
-            // state, so accept either. The pre-fork serializer is never used:
-            // it turns OS strings into DEM by integer division, so different
-            // content would match one hash. A form that throws or gives no
-            // string (no content) counts as no match, as in the node.
-            const hashForms = [
-                () => JSON.stringify(originalTx.content),
-                () => serializeTransactionContent(originalTx.content, true),
-            ];
-            const recomputesToHash = hashForms.some((form) => {
-                try {
-                    const text = form();
-                    return typeof text === "string" && sha256Utf8(text) === encryptedPayload.original_hash;
-                } catch {
-                    return false;
-                }
-            });
-            if (!recomputesToHash) {
-                throw new Error('Decrypted transaction content does not match its hash');
-            }
+            await L2PS.assertDecryptedTxAuthentic(originalTx, encryptedPayload.original_hash, options?.chainId);
 
             return originalTx;
         } catch (error: any) {
             throw new Error(`Decryption failed: ${error.message}`);
         }
+    }
+
+    /**
+     * Throws `Invalid chainId` unless `chainId` is undefined or a
+     * non-negative safe integer.
+     */
+    private static assertValidChainId(chainId: number | undefined): void {
+        if (chainId !== undefined && !(Number.isSafeInteger(chainId) && chainId >= 0)) {
+            throw new Error('Invalid chainId');
+        }
+    }
+
+    /**
+     * The checks `decryptTx` runs on the parsed inner transaction, in order:
+     * its `hash` equals the payload's `original_hash`, its content recomputes
+     * to that hash, and it is signed by the key in `content.from`. Throws on
+     * the first that fails.
+     */
+    private static async assertDecryptedTxAuthentic(
+        originalTx: Transaction,
+        originalHash: string,
+        chainId: number | undefined,
+    ): Promise<void> {
+        if (originalTx.hash !== originalHash) {
+            throw new Error('Decrypted transaction hash mismatch');
+        }
+
+        // The `.hash` field is data the sender chose, so also recompute
+        // it from the decrypted content with the node's two
+        // `Transaction.checkCoherence` forms, each hashed as UTF-8: raw
+        // `JSON.stringify` before the osDenomination fork, the post-fork
+        // serializer after it. The payload does not record the fork
+        // state, so accept either. The pre-fork serializer is never used:
+        // it turns OS strings into DEM by integer division, so different
+        // content would match one hash. A form that throws or gives no
+        // string (no content) counts as no match, as in the node.
+        const hashForms = [
+            () => JSON.stringify(originalTx.content),
+            () => serializeTransactionContent(originalTx.content, true),
+        ];
+        const recomputesToHash = hashForms.some((form) => {
+            try {
+                const text = form();
+                return typeof text === "string" && sha256Utf8(text) === originalHash;
+            } catch {
+                return false;
+            }
+        });
+        if (!recomputesToHash) {
+            throw new Error('Decrypted transaction content does not match its hash');
+        }
+
+        if (!originalTx.signature?.data) {
+            throw new Error('Decrypted transaction is not signed');
+        }
+        if (!(await L2PS.signedBySender(originalTx, chainId))) {
+            throw new Error('Decrypted transaction signature does not verify');
+        }
+    }
+
+    /**
+     * Whether `tx.signature` is `tx.content.from`'s signature over the bytes
+     * `Demos.sign` and `DemosTransactions.sign` sign (`txSignaturePreimage`),
+     * checked with `UnifiedCrypto.verify` for `tx.signature.type`.
+     * With `chainId`, the domain-bound form is tried first, because once
+     * `signatureDomain` is active every new transaction uses it.
+     */
+    private static async signedBySender(tx: Transaction, chainId?: number): Promise<boolean> {
+        const legacy = txSignaturePreimage(tx.hash, 0, false);
+        const preimages = chainId === undefined
+            ? [legacy]
+            : [txSignaturePreimage(tx.hash, chainId, true), legacy];
+        try {
+            const signature = hexToUint8Array(tx.signature.data);
+            const publicKey = hexToUint8Array(tx.content.from);
+            for (const message of preimages) {
+                // `verify` reads no keys of its own, so the default instance serves.
+                const verified = await UnifiedCrypto.getInstance().verify({
+                    algorithm: tx.signature.type,
+                    signature,
+                    publicKey,
+                    message,
+                });
+                if (verified) {
+                    return true;
+                }
+            }
+        } catch {
+            // Any error here counts as "not verified": malformed hex, a wrong-length key or signature, an unknown algorithm,
+            // or a fault inside the verifier itself (for example a PQC module that fails to load).
+        }
+        return false;
     }
 
     /**

@@ -9,12 +9,24 @@ import L2PS, { sha256Utf8 } from "@/l2ps/l2ps"
 import { buildSettledL2PSTransfer } from "@/l2ps"
 import { Demos } from "@/websdk"
 import { Hashing } from "@/encryption/Hashing"
+import { Cryptography } from "@/encryption/Cryptography"
+import { uint8ArrayToHex } from "@/encryption/unifiedCrypto"
 import { serializeTransactionContent } from "@/denomination/serializerGate"
 
 const MNEMONIC = "test test test test test test test test test test test junk"
 const TO = "0x" + "AB".repeat(32)
 const UID = "binding_subnet"
+const CHAIN_ID = 4242
 const MISMATCH = /content does not match its hash/
+
+// decryptTx also requires the sender's signature, checked after the hash.
+const sender = forge.pki.ed25519.generateKeyPair()
+const SENDER = uint8ArrayToHex(sender.publicKey)
+
+/** SENDER's signature over `hash`, in the legacy bare-hash form. */
+function senderSignature(hash: string) {
+    return { type: "ed25519" as const, data: uint8ArrayToHex(Cryptography.sign(hash, sender.privateKey)) }
+}
 
 async function newL2ps() {
     const l2ps = await L2PS.create()
@@ -27,7 +39,7 @@ async function signedInner(postFork = true) {
     const demos = new Demos()
     jest.spyOn(demos, "getNetworkInfo").mockResolvedValue({
         forks: { osDenomination: { activated: postFork }, signatureDomain: { activated: true } },
-        chainId: 4242,
+        chainId: CHAIN_ID,
     } as never)
     jest.spyOn(demos, "getAddressNonce").mockResolvedValue(6)
     jest.spyOn(demos, "getLastBlockNumber").mockResolvedValue(100)
@@ -49,7 +61,7 @@ async function signedInner(postFork = true) {
 function preForkInner() {
     const content = {
         type: "native",
-        from: "0x" + "11".repeat(32),
+        from: SENDER,
         to: "0x" + "22".repeat(32),
         amount: 3,
         data: ["native", { nativeOperation: "send", args: [] }],
@@ -58,7 +70,7 @@ function preForkInner() {
                 type: "balance",
                 operation: "remove",
                 isRollback: false,
-                account: "0x" + "11".repeat(32),
+                account: SENDER,
                 amount: 3 as number | string,
                 txhash: "",
             },
@@ -67,11 +79,12 @@ function preForkInner() {
         timestamp: 1700000000000,
         transaction_fee: { network_fee: 1 as number | string, rpc_fee: 1, additional_fee: 0 },
     }
+    const hash = Hashing.sha256(serializeTransactionContent(content as never, false))
     return {
         content,
-        signature: null,
+        signature: senderSignature(hash),
         ed25519_signature: null,
-        hash: Hashing.sha256(serializeTransactionContent(content as never, false)),
+        hash,
         status: "pending",
         blockNumber: null,
     }
@@ -83,11 +96,12 @@ function preForkInner() {
  */
 function nodeHashedInner<T extends object>(content: T, postFork: boolean) {
     const hashed = postFork ? serializeTransactionContent(content as never, true) : JSON.stringify(content)
+    const hash = sha256Utf8(hashed)
     return {
         content,
-        signature: null,
+        signature: senderSignature(hash),
         ed25519_signature: null,
-        hash: sha256Utf8(hashed),
+        hash,
         status: "pending",
         blockNumber: null,
     }
@@ -113,7 +127,7 @@ async function encryptUtf8(l2ps: L2PS, tx: { hash: string }, carrier: object = t
 function nodeMessagingContent() {
     return {
         type: "l2psInstantMessaging",
-        from: "0x" + "11".repeat(32),
+        from: SENDER,
         to: "0x" + "22".repeat(32),
         amount: 0,
         data: ["l2psInstantMessaging", { messageId: "m1" }],
@@ -133,7 +147,7 @@ describe("L2PS decryptTx content binding", () => {
     it("decrypts an untouched post-fork inner transaction", async () => {
         const l2ps = await newL2ps()
         const tx = await signedInner()
-        const out = await l2ps.decryptTx(await l2ps.encryptTx(tx))
+        const out = await l2ps.decryptTx(await l2ps.encryptTx(tx), { chainId: CHAIN_ID })
         expect(out.hash).toBe(tx.hash)
         expect(out.content).toEqual(tx.content)
     })
@@ -151,7 +165,7 @@ describe("L2PS decryptTx content binding", () => {
         const l2ps = await newL2ps()
         const tx = await signedInner(false)
         expect(tx.content.amount).toBe(5)
-        const out = await l2ps.decryptTx(await l2ps.encryptTx(tx))
+        const out = await l2ps.decryptTx(await l2ps.encryptTx(tx), { chainId: CHAIN_ID })
         expect(out.hash).toBe(tx.hash)
         expect(out.content).toEqual(tx.content)
     })
@@ -197,7 +211,7 @@ describe("L2PS decryptTx content binding", () => {
         expect(serializeTransactionContent(dem.content, true)).toBe(
             serializeTransactionContent(tx.content, true),
         )
-        const out = await l2ps.decryptTx(await l2ps.encryptTx(dem))
+        const out = await l2ps.decryptTx(await l2ps.encryptTx(dem), { chainId: CHAIN_ID })
         expect(out.content).toEqual(dem.content)
     })
 
@@ -255,13 +269,15 @@ describe("L2PS decryptTx content binding", () => {
         await expect(l2ps.decryptTx(await encryptUtf8(l2ps, tx, preForkInner()))).rejects.toThrow(MISMATCH)
     })
 
-    // The node's pre-fork `checkCoherence` hashes `JSON.stringify(null)`, which is "null".
-    it("decrypts a pre-fork inner transaction with null content", async () => {
+    // The node's pre-fork `checkCoherence` hashes `JSON.stringify(null)`, which is "null",
+    // so the hash check passes; with no content there is no sender whose signature it is.
+    it("passes the hash check for a pre-fork inner transaction with null content, then refuses it", async () => {
         const l2ps = await newL2ps()
-        const tx = { content: null, hash: sha256Utf8("null"), signature: null }
-        const out = await l2ps.decryptTx(await encryptUtf8(l2ps, tx, preForkInner()))
-        expect(out.hash).toBe(tx.hash)
-        expect(out.content).toBeNull()
+        const hash = sha256Utf8("null")
+        const tx = { content: null, hash, signature: senderSignature(hash) }
+        await expect(l2ps.decryptTx(await encryptUtf8(l2ps, tx, preForkInner()))).rejects.toThrow(
+            /Decrypted transaction signature does not verify/,
+        )
     })
 
     it("still refuses a payload whose original_hash differs from the inner .hash", async () => {

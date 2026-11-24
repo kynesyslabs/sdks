@@ -211,7 +211,7 @@ describe("buildSettledL2PSTransfer", () => {
         l2ps.setConfig({ uid: UID, config: { created_at_block: 0, known_rpcs: [] } })
         const encrypted = await l2ps.encryptTx(tx)
         expect(encrypted.content.nonce).toBe(tx.content.nonce)
-        const decrypted = await l2ps.decryptTx(encrypted)
+        const decrypted = await l2ps.decryptTx(encrypted, { chainId: CHAIN_ID })
         expect(payloadOf(decrypted).settlement).toEqual(payloadOf(tx).settlement)
     })
 
@@ -236,7 +236,9 @@ describe("buildSettledL2PSTransfer", () => {
         expect(small.content.data[1].encrypted_data.length).toBe(
             outer.content.data[1].encrypted_data.length,
         )
-        expect(payloadOf(await l2ps.decryptTx(outer)).args[1]).toBe(amount.toString())
+        expect(
+            payloadOf(await l2ps.decryptTx(outer, { chainId: CHAIN_ID })).args[1],
+        ).toBe(amount.toString())
     })
 
     it("uses a given nonce, fee and chain id", async () => {

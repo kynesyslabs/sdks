@@ -59,6 +59,20 @@
   Do not use the fixed `TLSNOTARY_PROXY_PORT` (55688) or the `proxyUrl` from
   `tlsnotary.getInfo`: nodes still report it for old clients but no longer
   listen on it.
+- `L2PS.decryptTx` refuses an inner transaction that is unsigned or is not
+  signed by the key in `content.from` over the transaction hash.
+  `content.from_ed25519_address` and `ed25519_signature` are not checked by
+  `decryptTx`. A caller that needs the account address must check that it
+  matches `content.from` itself, as the node does.
+  - Unsigned inner transactions are now refused: sign them before `encryptTx`.
+  - On a network with the node's `signatureDomain` fork, pass
+    `decryptTx(tx, { chainId })`; legacy bare-hash signatures need no option.
+  - An inner transaction signed by a key other than `content.from` is
+    refused. The node's L2PS instant-messaging envelopes (`from` is the
+    client's key; the node signs the content with its own key) are built
+    this way, so a node on this SDK version can no longer read them through
+    `decryptTx`, including envelopes already stored in history. The node
+    needs a matching change when it moves to this version.
 
 ### Added
 - TLSNotary: the `X-Demos-Bind: demos-tlsn:v1:<context|store>:<sender>:<request tx hash>`
