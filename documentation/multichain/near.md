@@ -25,9 +25,8 @@ Import the SDK and create a new instance:
 import { NEAR } from "@kynesyslabs/demosdk/xm-websdk"
 
 const rpc_url = "https://rpc.testnet.near.org"
-const networkId = "testnet"
 
-const instance = await NEAR.create(rpc_url, networkId)
+const instance = await NEAR.create(rpc_url)
 ```
 
 You can then use the instance to do a read operation on near.
