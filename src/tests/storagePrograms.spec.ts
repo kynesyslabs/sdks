@@ -1,6 +1,7 @@
 import { StorageProgram } from "@/storage"
 import { Transaction } from "@/types"
 import { Demos, DemosTransactions } from "@/websdk"
+import { requireFundedMnemonic } from "./utils/requireFundedMnemonic"
 
 describe("Storage Programs", () => {
     const rpc = "http://localhost:53550"
@@ -8,15 +9,10 @@ describe("Storage Programs", () => {
     const nonce = 2
     const programName = "myProgram"
 
-    const mnemonic = process.env.FUNDED_MNEMONIC
+    const mnemonic = requireFundedMnemonic(process.env)
     const demos = new Demos()
 
     beforeAll(async () => {
-        if (!mnemonic) {
-            console.error("FUNDED_MNEMONIC is not set")
-            process.exit(0)
-        }
-
         await demos.connect(rpc)
         await demos.connectWallet(mnemonic)
     })

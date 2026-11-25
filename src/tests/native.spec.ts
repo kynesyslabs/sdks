@@ -3,8 +3,10 @@ import pprint from "@/utils/pprint"
 import { Identities } from "@/abstraction"
 import { Demos, DemosWebAuth, hexToUint8Array } from "@/websdk"
 import { sleep } from "@/utils"
+import { requireFundedMnemonic } from "./utils/requireFundedMnemonic"
 
 describe("Native transactions", () => {
+    const mnemonic = requireFundedMnemonic(process.env)
     const rpcs = [
         //  NOTE: Local testnet RPCs
         // "http://localhost:53550",
@@ -35,13 +37,6 @@ describe("Native transactions", () => {
     let demos: Demos = new Demos()
     let senderWebAuth = new DemosWebAuth()
     let recepientWebAuth = new DemosWebAuth()
-
-    const mnemonic = process.env.FUNDED_MNEMONIC
-
-    if (!mnemonic) {
-        console.error("FUNDED_MNEMONIC is not set")
-        process.exit(0)
-    }
 
     beforeAll(async () => {
         // NOTE: Replace with funded account on PROD
