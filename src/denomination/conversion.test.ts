@@ -24,6 +24,13 @@ describe("demToOs", () => {
         expect(demToOs("1.123456789")).toBe(1_123_456_789n)
     })
 
+    test("converts small numeric fractions without rounding", () => {
+        expect(demToOs(0.000000001)).toBe(1n)
+        expect(demToOs(1.23e-7)).toBe(123n)
+        expect(() => demToOs(0.0000000001)).toThrow("exceeds maximum 9 decimal places")
+        expect(() => demToOs("1e-9")).toThrow()
+    })
+
     test("rejects too many decimals", () => {
         expect(() => demToOs("0.0000000001")).toThrow(
             "exceeds maximum 9 decimal places",

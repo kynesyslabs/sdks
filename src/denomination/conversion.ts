@@ -33,10 +33,16 @@ import { OS_DECIMALS, ZERO_OS } from "./constants"
  * @returns OS amount as `bigint`.
  */
 export function demToOs(dem: number | string): bigint {
-    const str = (typeof dem === "number" ? dem.toString() : dem).replace(
-        /_/g,
-        "",
-    )
+    let str = typeof dem === "number" ? dem.toString() : dem.replace(/_/g, "")
+    if (typeof dem === "number") {
+        // Number.toString() spells small fractions like 1.23e-7. Move the
+        // decimal point without rounding away digits before the precision check.
+        const small = /^(-?)(\d)\.?(\d*)e-(\d+)$/.exec(str)
+        if (small) {
+            const [, sign, first, rest, exponent] = small
+            str = `${sign}0.${"0".repeat(Number(exponent) - 1)}${first}${rest}`
+        }
+    }
 
     // Split on decimal point. Missing fractional part defaults to "".
     const [whole, frac = ""] = str.split(".")
