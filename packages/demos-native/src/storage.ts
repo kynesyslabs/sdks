@@ -103,8 +103,8 @@ export class StorageProgram {
     programName: string,
     data: Record<string, unknown> | string,
     encoding: StorageEncoding = "json",
-    acl?: Partial<StorageProgramAcl>,
-    options?: {
+    acl: Partial<StorageProgramAcl> | undefined,
+    options: {
       nonce: number;
       salt?: string;
       metadata?: Record<string, unknown>;
