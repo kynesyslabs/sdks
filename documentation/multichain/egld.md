@@ -78,21 +78,13 @@ await instance.disconnect()
 ## Signing a message
 
 ```ts
-await instance.signMessage(message: string)
-
-returns signature: string
+const signature = await instance.signMessage(message)
 ```
 
 ## Verifying a message
 
 ```ts
-await instance.verifyMessage(
-    message: string,
-    signature: string,
-    walletAddress: string,
-)
-
-returns true or false
+const verified = await instance.verifyMessage(message, signature, walletAddress)
 ```
 
 ## Hacking
