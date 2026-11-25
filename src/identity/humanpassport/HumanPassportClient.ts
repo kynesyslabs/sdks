@@ -210,7 +210,7 @@ export class HumanPassportClient {
      */
     private handleApiError(error: unknown): HumanPassportException {
         // Type narrowing for axios errors
-        if (typeof error === 'object' && error !== null && 'response' in error) {
+        if (typeof error === 'object' && error !== null) {
             const axiosError = error as { response?: { status: number; data?: unknown }; message?: string; code?: string }
 
             if (axiosError.response) {
