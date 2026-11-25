@@ -30,7 +30,7 @@ export class CoinFinder {
         this.validateChain(sourceChain)
         this.validateChain(targetChain)
         return (
-            tokenAddresses[sourceChain].wrapped?.[targetChain]?.mainnet || false
+            tokenAddresses[sourceChain]?.wrapped?.[targetChain]?.mainnet || false
         )
     }
 
