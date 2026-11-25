@@ -17,7 +17,7 @@ import { EVM, XRPL, MULTIVERSX, IBC, ... } from '@kynesyslabs/demosdk/xm-localsd
 Create an SDK instance to interact with the chain.
 
 ```ts
-const instance = EVM.create(rpc_url)
+const instance = await EVM.create(rpc_url)
 
 // instance is connected to the rpc so you don't need to call .connect
 assert(instance.connected === true)
@@ -35,9 +35,7 @@ await instance.connect()
 Connect a private key to the sdk instance
 
 ```ts
-instance.connectWallet(privateKey, {
-    // options here
-})
+await instance.connectWallet(privateKey)
 ```
 
 > [!TIP]
@@ -56,7 +54,7 @@ const address = instance.getAddress()
 You can create and sign a transaction to transfer the _default chain currency_ to an address using `preparePay`.
 
 ```ts
-const signedTx = instance.preparePay(address, "1")
+const signedTx = await instance.preparePay(address, "1")
 ```
 
 You can create multiple transfers using `preparePays`.
@@ -73,7 +71,7 @@ const transfers = [
     },
 ]
 
-const signedTxs = instance.preparePays(transfers)
+const signedTxs = await instance.preparePays(transfers)
 ```
 
 `prepareTransfer` and `prepareTransfers` are aliases of the above methods.
