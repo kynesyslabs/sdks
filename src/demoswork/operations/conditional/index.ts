@@ -68,7 +68,6 @@ export class ConditionalOperation extends DemosWorkOperation {
         for (const work of condition.work.values()) {
             this.addWork(work)
         }
-        delete condition.work
 
         const entry = {
             operator: condition.operator,
