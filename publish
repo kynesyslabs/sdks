@@ -106,10 +106,10 @@ case "$1" in
         release_preflight
         confirm "This will create a new commit for the same version and trigger the release workflow."
 
-        git commit --allow-empty -m "release v$CURRENT_VERSION"
+        git commit --allow-empty -m "release v$CURRENT_VERSION" || exit $?
         echo -e "${GREEN}✓ Created empty commit for release v$CURRENT_VERSION${NC}"
 
-        git push origin main
+        git push origin main || exit $?
         echo -e "${GREEN}✓ Pushed to remote${NC}"
         echo -e "${BLUE}🚀 Release workflow should start shortly for v$CURRENT_VERSION${NC}"
         ;;
@@ -176,11 +176,11 @@ case "$1" in
 
         confirm "This will commit the version bump and push 'release v$NEW_VERSION' to trigger the release workflow."
 
-        git add package.json
-        git commit -m "release v$NEW_VERSION"
+        git add package.json || exit $?
+        git commit -m "release v$NEW_VERSION" || exit $?
         echo -e "${GREEN}✓ Committed version bump${NC}"
 
-        git push origin main
+        git push origin main || exit $?
         echo -e "${GREEN}✓ Pushed to remote${NC}"
         echo -e "${BLUE}🚀 Release workflow should start shortly for v$NEW_VERSION${NC}"
         ;;
