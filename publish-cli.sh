@@ -76,7 +76,7 @@ get_current_version() {
 
 bump_version() {
     local bump_type=$1
-    local current_version=$(get_current_version)
+    local current_version=$2
 
     IFS='.' read -ra VERSION_PARTS <<< "$current_version"
     local major="${VERSION_PARTS[0]}"
@@ -120,7 +120,7 @@ const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
 pkg.version = '$new_version';
 fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 4) + '\n');
-"
+" || return $?
     echo "$new_version"
 }
 
@@ -369,7 +369,7 @@ fi
 
 run_build
 
-new_version=$(bump_version "$BUMP_TYPE")
+new_version=$(bump_version "$BUMP_TYPE" "$current_version")
 echo -e "${GREEN}✓ Version bumped to v${new_version}${NC}"
 
 confirm "This will commit the version bump and push 'release v${new_version}' to trigger the release workflow."
