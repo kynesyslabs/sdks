@@ -53,24 +53,20 @@ export class DemosWork {
     // }
 
     toJSON() {
-        let script = this.script
-        // @ts-expect-error
-        // convert set to array
-        script.operationOrder = [...script.operationOrder]
-
-        // remove all step outputs
-        for (const stepUID in script.steps) {
-            console.log("stepUID", script.steps[stepUID])
-            delete script.steps[stepUID].id
+        const snapshot = {
+            ...this.script,
+            operationOrder: [...this.script.operationOrder],
+            steps: Object.fromEntries(Object.entries(this.script.steps).map(
+                ([uid, { id, ...step }]) => [uid, step],
+            )),
+            operations: Object.fromEntries(Object.entries(this.script.operations).map(
+                ([uid, { id, ...operation }]) => [uid, operation],
+            )),
         }
 
-        // remove all operation uids
-        for (const opUID in script.operations) {
-            delete script.operations[opUID].id
-        }
-
+        // @ts-expect-error DemoScript describes the builder's Set, not the wire array.
+        const script: DemoScript = snapshot
         this.validate(script)
-        // return JSON.stringify(script)
         return script
     }
 
