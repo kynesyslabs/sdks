@@ -217,7 +217,10 @@ export class EvmCoinFinder {
         const provider = await this.getRandomProvider(sourceChainId)
         const code = await provider.getCode(tokenAddress)
         if (code === "0x") {
-            throw new Error("Token contract not found on source chain")
+            throw new EvmError(
+                "Token contract not found on source chain",
+                "CONTRACT_NOT_FOUND",
+            )
         }
 
         // Get chain names for lookup
