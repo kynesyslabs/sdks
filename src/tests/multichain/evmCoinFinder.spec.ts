@@ -1,4 +1,4 @@
-import { BaseChain } from "@/abstraction/providers/CoinAddresses"
+import { BaseChain, tokenAddresses } from "@/abstraction/providers/CoinAddresses"
 import { EvmCoinFinder } from "../../abstraction/EvmCoinFinder"
 import { ethers } from "ethers"
 // Mock the JsonRpcProvider
@@ -68,6 +68,27 @@ describe("EVM COIN FINDER TESTS", () => {
         expect(result[BSC_CHAIN_ID]).toBeDefined()
         expect(result[ARBITRUM_CHAIN_ID]).toBeDefined()
         expect(result[OPTIMISM_CHAIN_ID]).toBeDefined()
+    })
+
+    test.each(["usdc", "usdt"] as const)(
+        "findTokenPairs recognizes both address spellings for %s",
+        async token => {
+            const registry = tokenAddresses[token]
+            const lower = registry.ethereum.mainnet.toLowerCase()
+            for (const address of [ethers.getAddress(lower), lower]) {
+                const pairs = await EvmCoinFinder.findTokenPairs(
+                    address, ETHEREUM_CHAIN_ID, [ETHEREUM_CHAIN_ID, BSC_CHAIN_ID],
+                )
+                expect(pairs[ETHEREUM_CHAIN_ID]).toEqual({ native: address, wrapped: false })
+                expect(pairs[BSC_CHAIN_ID]).toEqual({ native: address, wrapped: registry.bsc.mainnet })
+            }
+        },
+    )
+
+    test("findTokenPairs returns false for an unlisted token", async () => {
+        const address = "0x0000000000000000000000000000000000000001"
+        const pairs = await EvmCoinFinder.findTokenPairs(address, ETHEREUM_CHAIN_ID, [BSC_CHAIN_ID])
+        expect(pairs[BSC_CHAIN_ID]).toEqual({ native: address, wrapped: false })
     })
 
     test("findTokenPairs rejects invalid addresses", async () => {

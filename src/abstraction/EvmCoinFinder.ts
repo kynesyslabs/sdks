@@ -226,6 +226,7 @@ export class EvmCoinFinder {
             throw new Error(`Unsupported chain ID: ${sourceChainId}`)
         }
 
+        const lookupAddress = tokenAddress.toLowerCase()
         for (const targetChainId of targetChainIds) {
             // Same chain = same address
             if (targetChainId === sourceChainId) {
@@ -246,7 +247,7 @@ export class EvmCoinFinder {
             }
 
             // Check USDC mapping
-            if (tokenAddress === tokenAddresses.usdc[sourceChain]?.mainnet) {
+            if (lookupAddress === tokenAddresses.usdc[sourceChain]?.mainnet?.toLowerCase()) {
                 result[targetChainId] = {
                     native: tokenAddress,
                     wrapped: tokenAddresses.usdc[targetChain]?.mainnet || false,
@@ -255,7 +256,7 @@ export class EvmCoinFinder {
             }
 
             // Check USDT mapping
-            if (tokenAddress === tokenAddresses.usdt[sourceChain]?.mainnet) {
+            if (lookupAddress === tokenAddresses.usdt[sourceChain]?.mainnet?.toLowerCase()) {
                 result[targetChainId] = {
                     native: tokenAddress,
                     wrapped: tokenAddresses.usdt[targetChain]?.mainnet || false,
