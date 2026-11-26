@@ -41,7 +41,7 @@ tar -tzf "$tmp/out/"*.tgz >"$tmp/contents"
 for file in $targets; do
     grep -Fxq "package/$file" "$tmp/contents" || { printf 'FAIL: archive lacks %s\n' "$file" >&2; exit 1; }
 done
-grep -Fxq 'package/scripts/check-root-entrypoints.mjs' "$tmp/contents"
+if grep -Fxq 'package/scripts/check-root-entrypoints.mjs' "$tmp/contents"; then printf 'FAIL: the dev-only prepack check was packed\n' >&2; exit 1; fi
 if grep -Fxq 'package/build/omit.js' "$tmp/contents"; then exit 1; fi
 rm "$tmp/out/"*.tgz build/.npmignore
 mv build/index.node.js "$tmp/held"

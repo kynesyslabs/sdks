@@ -29,7 +29,6 @@
         "./build/tlsnotary/worker.js"
     ],
     "files": [
-        "scripts/check-root-entrypoints.mjs",
         "build/",
         "build/index.js",
         "build/index.d.ts",
