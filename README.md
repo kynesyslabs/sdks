@@ -11,7 +11,7 @@ A JavaScript/TypeScript SDK providing a unified interface for interacting with t
 
 Services that need only native DEM, Storage Programs, identity reads and DAHR
 should use the separately packaged `@demosnetwork/demos-native` client under
-[`packages/demos-native`](./packages/demos-native). Its independent manifest
+[`packages/demos-native`](https://github.com/kynesyslabs/sdks/tree/main/packages/demos-native). Its independent manifest
 does not install the multichain, PQC, bridge or TLSNotary dependency graph.
 
 ***IMPORTANT*** This SDK is built with bun and performs the best with bun
@@ -112,7 +112,7 @@ console.log("Wallet address:", address)
 For new mnemonic wallets, use `connectWallet(mnemonic)` with the phrase string.
 Converting the phrase to BIP39 seed bytes or a `DemosWebAuth` keypair derives a
 different address. Existing wallets must keep their original derivation and input
-type. See [mnemonic restoration and compatibility vectors](documentation/websdk.md#connecting-a-wallet).
+type. See [mnemonic restoration and compatibility vectors](https://github.com/kynesyslabs/sdks/blob/main/documentation/websdk.md#connecting-a-wallet).
 
 ### Native Transaction Example
 
