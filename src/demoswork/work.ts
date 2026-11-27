@@ -40,11 +40,10 @@ export class DemosWork {
         runSanityChecks(script)
     }
 
-    fromJSON(script: DemoScript) {
-        let newscript = script
-        newscript.operationOrder = new Set(script.operationOrder)
-
-        this.script = script
+    fromJSON(script: Omit<DemoScript, "operationOrder"> & {
+        operationOrder: DemoScript["operationOrder"] | readonly string[]
+    }) {
+        this.script = { ...script, operationOrder: new Set(script.operationOrder) }
         return this
     }
 
