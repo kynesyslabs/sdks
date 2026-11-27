@@ -17,8 +17,15 @@ await demos.connectWallet(process.env.DEMOS_WALLET_MNEMONIC!);
 
 const signed = await demos.transfer(recipient, 1_000_000_000n);
 const validity = await demos.confirm(signed);
-await demos.broadcast(validity);
+const broadcast = await demos.broadcast(validity);
+if (broadcast.result !== 200) {
+  throw new Error(`Broadcast not acknowledged (RPC result ${broadcast.result})`);
+}
 ```
+
+A 200 result acknowledges submission, not inclusion in a block. If the reply
+is lost, the node may still have accepted the transfer. Reconcile its status
+rather than automatically submitting it again.
 
 The package intentionally supports only Demos Ed25519 authority. It does not
 ship cross-chain adapters, Rubic, TLSNotary, PQC signers or the full
