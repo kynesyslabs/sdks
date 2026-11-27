@@ -43,6 +43,17 @@ string or hash). Set them for a `Demos` client with
 300 000 ms, because Node's `fetch` already fails a request after 300 s without
 response headers. The static `StorageProgram` reads always use the defaults.
 
+Nodes from v1.0.0-rc.14 serve finality and storage proof reads:
+`getChainIdentity()`, `getFinalizedHead()`, `getBlockSegment(from, to)`,
+`getValidatorSet(blockNumber)`, `getTransactionStatus(hash)`,
+`getTransactionProof(hash)`, `getStorageProof(addresses, blockNumber?)` and
+`getStorageProgramLimits()`. Each returns what the connected RPC claims; this
+package does not check the signatures, hashes or Merkle paths in them, or the
+shape of the answer. When the node refuses, they throw `NodeCallError` with the
+node's `result` code, its `reason` (for example `no_result_commitment` for a
+transaction whose result no block commits) and the response body. `nodeCall()`
+keeps returning only the response body.
+
 Amounts passed to `transfer()` are OS `bigint` values (1 DEM = 10^9 OS).
 Transactions retain the current pre-/post-denomination-fork wire serializer and
 property ordering. Callers remain responsible for durable nonce/effect

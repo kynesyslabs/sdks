@@ -1,0 +1,425 @@
+{
+  "_about": [
+    "Node replies to the finality and storage proof calls, as the JSON envelope kynesyslabs/node",
+    "4877499a (v1.0.0-rc.14) sends them over HTTP 200. Each entry cites the node source of its shape.",
+    "Heights, the N07 hash and the head timing are from the node's requester fixtures",
+    "(src/libs/blockchain/finality/__fixtures__ and the requesterFixtures.*.test.ts files).",
+    "Block and transaction hashes are sha256 of their contentBytes; signatures, Merkle siblings,",
+    "audit paths and roots are placeholders, so these replies do not pass a verifier."
+  ],
+  "replies": {
+    "chainIdentity": {
+      "source": "getChainIdentity.ts:40-44; chainId from data/genesis.json",
+      "reply": {
+        "result": 200,
+        "response": {
+          "chainId": 8587492,
+          "genesisHash": "9b1976ddb9c279ee257c828f9ea6de30811a12624c368e56a2e8dc1505ec4c27",
+          "genesisDataHash": "e74a2c7d1c9b790b1def9c98e162121e4f026a34e82efd0cf59ede9d7466a327"
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "finalizedHead": {
+      "source": "getFinalizedHead.ts:142-161; requesterFixtures.head.test.ts:51-67",
+      "reply": {
+        "result": 200,
+        "response": {
+          "number": 529479,
+          "hash": "5e1af55874ac0eee80ff6accbabe47b85264f235cfa525d05cf428ae96c416d2",
+          "timestamp": 1791962380,
+          "ageSeconds": 34204,
+          "nodeSynced": true,
+          "checkedThroughBlock": 529479,
+          "signatureCount": 3,
+          "signatures": {
+            "0xb696b7d5810d5acc98af283c52c51538ee8fb792a6b82ffc325c3d300b069332": "4c2a6c17a4496d38e1e122fdc3cd683749ce9d4ba08973b60f4844e423c35a24e3ec73e41b0df71e8e891db5c9b603f6d7a3c45c2a150567486d974394228104",
+            "0xf42755455b36b1efa1f5d929eeff2c7bca47ee1508811327efe39ebf7ae77f40": "eb1e91d62d5ee61b185a5b6dd39d37a3b993b73ae515c705a0a5e6f295f1e93982d3e20aa935849223a340ad80fa4b71184d7a770cf0222641ba380cd3760493",
+            "0x8da1980cdc87cab308df0875799cf6150689b2a01134634bc5d4d8b5f70dd8b0": "6ec2e5fbfc42a683c6b36d3d24422a8c2904f009c51c509a0ac8f28a5be0b27cb54028526c8740d06f63328a6956fbb5100e13e48e3610f9bc9e0a2212686693"
+          },
+          "round": 2,
+          "signedMessage": "precommit:529479:2:5e1af55874ac0eee80ff6accbabe47b85264f235cfa525d05cf428ae96c416d2",
+          "committee": [
+            "0xb696b7d5810d5acc98af283c52c51538ee8fb792a6b82ffc325c3d300b069332",
+            "0xf42755455b36b1efa1f5d929eeff2c7bca47ee1508811327efe39ebf7ae77f40",
+            "0x8da1980cdc87cab308df0875799cf6150689b2a01134634bc5d4d8b5f70dd8b0"
+          ],
+          "committeeRule": "bound_committee",
+          "threshold": 3
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "finalizedHeadNotSynced": {
+      "source": "getFinalizedHead.ts:116-134",
+      "reply": {
+        "result": 503,
+        "response": {
+          "number": null,
+          "hash": null,
+          "timestamp": null,
+          "ageSeconds": null,
+          "nodeSynced": false,
+          "checkedThroughBlock": null,
+          "signatureCount": 0,
+          "signatures": {},
+          "round": null,
+          "signedMessage": null,
+          "committee": null,
+          "committeeRule": null,
+          "threshold": null
+        },
+        "extra": {
+          "reason": "node_not_synced"
+        },
+        "require_reply": false
+      }
+    },
+    "blockSegment": {
+      "source": "getBlockSegment.ts:81-86; finalityShared.ts:127-135",
+      "reply": {
+        "result": 200,
+        "response": {
+          "from": 529478,
+          "to": 529479,
+          "head": 529479,
+          "headers": [
+            {
+              "number": 529478,
+              "hash": "28e6982cda4f169c1df4befe38c852f55609188904de4de4d05a66f75ebaaae4",
+              "contentBytes": "{\"number\":529478,\"previousHash\":\"110e507c30daeb520bacd10870865c39941fc870be4abaeaa0e672a0f4d44b53\",\"timestamp\":1791962370,\"ordered_transactions\":[\"fb3d3c85ec15423b2f592fb7290bb19e93ca0174e0391cda88da6388a349e75f\",\"872591573ccfca41c2364bb39adf6040e1b7ddc3f9f9155f05fa54b9f73880ae\",\"243028cbcd4b2f72c4a54fb56b9aa89cac8b5eaf8527c0502cb6f0a6bf847fba\"]}",
+              "round": 1,
+              "signedMessage": "precommit:529478:1:28e6982cda4f169c1df4befe38c852f55609188904de4de4d05a66f75ebaaae4",
+              "signatures": {
+                "0xb696b7d5810d5acc98af283c52c51538ee8fb792a6b82ffc325c3d300b069332": "0c88849fec15da241e9a572e40c59d9bec798c3dfc9eb84cec3d9cca70722bf5fe6887ccdd2ae94fcba97a89c6c326833e871565e5e95bc6374c6cdf568633df",
+                "0xf42755455b36b1efa1f5d929eeff2c7bca47ee1508811327efe39ebf7ae77f40": "41dbf9f775913c334482c47a1dff07b998a1ba9399aba20d4df1aea487ddbf611c426d68a52f51c8e93243b3dfe1f13c351b88200336585b300cc6b4365ba917",
+                "0x8da1980cdc87cab308df0875799cf6150689b2a01134634bc5d4d8b5f70dd8b0": "ba5654874cd72f28ae9f772ea33eb27d8ba0e0875b19316a2a9adaf8c3a2c91092b3384c2ad23754714482c7bca19b5c9bbf7c1392fd9d5a213c95ca780fade8"
+              }
+            },
+            {
+              "number": 529479,
+              "hash": "5e1af55874ac0eee80ff6accbabe47b85264f235cfa525d05cf428ae96c416d2",
+              "contentBytes": "{\"number\":529479,\"previousHash\":\"28e6982cda4f169c1df4befe38c852f55609188904de4de4d05a66f75ebaaae4\",\"timestamp\":1791962380,\"parent_results_root\":\"989a5ad80d55a876d82462d451158169890f6d61b0213083eb7b621a9d9510d1\",\"ordered_transactions\":[]}",
+              "round": 2,
+              "signedMessage": "precommit:529479:2:5e1af55874ac0eee80ff6accbabe47b85264f235cfa525d05cf428ae96c416d2",
+              "signatures": {
+                "0xb696b7d5810d5acc98af283c52c51538ee8fb792a6b82ffc325c3d300b069332": "4c2a6c17a4496d38e1e122fdc3cd683749ce9d4ba08973b60f4844e423c35a24e3ec73e41b0df71e8e891db5c9b603f6d7a3c45c2a150567486d974394228104",
+                "0xf42755455b36b1efa1f5d929eeff2c7bca47ee1508811327efe39ebf7ae77f40": "eb1e91d62d5ee61b185a5b6dd39d37a3b993b73ae515c705a0a5e6f295f1e93982d3e20aa935849223a340ad80fa4b71184d7a770cf0222641ba380cd3760493",
+                "0x8da1980cdc87cab308df0875799cf6150689b2a01134634bc5d4d8b5f70dd8b0": "6ec2e5fbfc42a683c6b36d3d24422a8c2904f009c51c509a0ac8f28a5be0b27cb54028526c8740d06f63328a6956fbb5100e13e48e3610f9bc9e0a2212686693"
+              }
+            }
+          ]
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "blockSegmentRangeTooLarge": {
+      "source": "getBlockSegment.ts:45-47",
+      "reply": {
+        "result": 400,
+        "response": {
+          "error": "range_too_large",
+          "maxBlocks": 500
+        },
+        "extra": {
+          "reason": "range_too_large"
+        },
+        "require_reply": false
+      }
+    },
+    "validatorSet": {
+      "source": "getValidatorSet.ts:52-57; ValidatorSetSnapshots.ts:15-20; status \"2\" is VALIDATOR_STATUS_ACTIVE (staking/constants.ts:23)",
+      "reply": {
+        "result": 200,
+        "response": {
+          "blockNumber": 529478,
+          "effectiveFrom": 529000,
+          "setHash": "954c538c1f61df2414ee35f1b98b92a7cd60704a6e0c4c22c6c39cfb78b41eae",
+          "validators": [
+            {
+              "identity": "0xb696b7d5810d5acc98af283c52c51538ee8fb792a6b82ffc325c3d300b069332",
+              "stake": "1000000000000",
+              "status": "2",
+              "validAt": 1000
+            },
+            {
+              "identity": "0xf42755455b36b1efa1f5d929eeff2c7bca47ee1508811327efe39ebf7ae77f40",
+              "stake": "1000000000000",
+              "status": "2",
+              "validAt": 1001
+            },
+            {
+              "identity": "0x8da1980cdc87cab308df0875799cf6150689b2a01134634bc5d4d8b5f70dd8b0",
+              "stake": "1000000000000",
+              "status": "2",
+              "validAt": 1002
+            }
+          ]
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "validatorSetHistoryUnavailable": {
+      "source": "getValidatorSet.ts:43-45",
+      "reply": {
+        "result": 410,
+        "response": {
+          "error": "history_unavailable",
+          "blockNumber": 12
+        },
+        "extra": {
+          "reason": "history_unavailable"
+        },
+        "require_reply": false
+      }
+    },
+    "statusFailedPreFork": {
+      "source": "getTransactionStatus.ts:62-72 (no resultCommittedInBlock before the fork); requesterFixtures.status.test.ts:89-99 (N07)",
+      "reply": {
+        "result": 200,
+        "response": {
+          "state": "failed",
+          "blockNumber": 480877,
+          "code": "TX_NONCE_INVALID_LOW",
+          "message": "Nonce too low",
+          "checkedThroughBlock": 529479
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "statusIncludedAwaitingCommitment": {
+      "source": "getTransactionStatus.ts:32-42 (null until block m + 1 is searched)",
+      "reply": {
+        "result": 200,
+        "response": {
+          "state": "included",
+          "blockNumber": 529478,
+          "resultCommittedInBlock": null,
+          "checkedThroughBlock": 529478
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "statusIncludedCommitted": {
+      "source": "getTransactionStatus.ts:32-42, 62-72",
+      "reply": {
+        "result": 200,
+        "response": {
+          "state": "included",
+          "blockNumber": 529478,
+          "resultCommittedInBlock": 529479,
+          "checkedThroughBlock": 529479
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "statusNotFound": {
+      "source": "getTransactionStatus.ts:74-80; requesterFixtures.status.test.ts:154-155",
+      "reply": {
+        "result": 404,
+        "response": {
+          "state": "unknown",
+          "checkedThroughBlock": 529479
+        },
+        "extra": {
+          "reason": "not_found"
+        },
+        "require_reply": false
+      }
+    },
+    "transactionProof": {
+      "source": "getTransactionProof.ts:93-104; finalityShared.ts:114-125; leaf as finalityProofCalls.test.ts:225",
+      "reply": {
+        "result": 200,
+        "response": {
+          "hash": "fb3d3c85ec15423b2f592fb7290bb19e93ca0174e0391cda88da6388a349e75f",
+          "blockNumber": 529478,
+          "leafIndex": 0,
+          "treeSize": 3,
+          "leaf": "{\"code\":null,\"hash\":\"fb3d3c85ec15423b2f592fb7290bb19e93ca0174e0391cda88da6388a349e75f\",\"status\":\"confirmed\"}",
+          "auditPath": [
+            "5da10aeadadcb39f40c2f5085551f58a519bdc0188ed3f8256eafa48e0a71949",
+            "da13ce4161e957709e51fde2d35c4830f07feae46303360dcb690a05a7ce6c2e"
+          ],
+          "committedIn": 529479,
+          "inclusionBlock": {
+            "number": 529478,
+            "hash": "28e6982cda4f169c1df4befe38c852f55609188904de4de4d05a66f75ebaaae4",
+            "contentBytes": "{\"number\":529478,\"previousHash\":\"110e507c30daeb520bacd10870865c39941fc870be4abaeaa0e672a0f4d44b53\",\"timestamp\":1791962370,\"ordered_transactions\":[\"fb3d3c85ec15423b2f592fb7290bb19e93ca0174e0391cda88da6388a349e75f\",\"872591573ccfca41c2364bb39adf6040e1b7ddc3f9f9155f05fa54b9f73880ae\",\"243028cbcd4b2f72c4a54fb56b9aa89cac8b5eaf8527c0502cb6f0a6bf847fba\"]}"
+          },
+          "commitBlock": {
+            "number": 529479,
+            "hash": "5e1af55874ac0eee80ff6accbabe47b85264f235cfa525d05cf428ae96c416d2",
+            "contentBytes": "{\"number\":529479,\"previousHash\":\"28e6982cda4f169c1df4befe38c852f55609188904de4de4d05a66f75ebaaae4\",\"timestamp\":1791962380,\"parent_results_root\":\"989a5ad80d55a876d82462d451158169890f6d61b0213083eb7b621a9d9510d1\",\"ordered_transactions\":[]}",
+            "round": 2,
+            "signedMessage": "precommit:529479:2:5e1af55874ac0eee80ff6accbabe47b85264f235cfa525d05cf428ae96c416d2",
+            "signatures": {
+              "0xb696b7d5810d5acc98af283c52c51538ee8fb792a6b82ffc325c3d300b069332": "4c2a6c17a4496d38e1e122fdc3cd683749ce9d4ba08973b60f4844e423c35a24e3ec73e41b0df71e8e891db5c9b603f6d7a3c45c2a150567486d974394228104",
+              "0xf42755455b36b1efa1f5d929eeff2c7bca47ee1508811327efe39ebf7ae77f40": "eb1e91d62d5ee61b185a5b6dd39d37a3b993b73ae515c705a0a5e6f295f1e93982d3e20aa935849223a340ad80fa4b71184d7a770cf0222641ba380cd3760493",
+              "0x8da1980cdc87cab308df0875799cf6150689b2a01134634bc5d4d8b5f70dd8b0": "6ec2e5fbfc42a683c6b36d3d24422a8c2904f009c51c509a0ac8f28a5be0b27cb54028526c8740d06f63328a6956fbb5100e13e48e3610f9bc9e0a2212686693"
+            }
+          },
+          "tx": {
+            "hash": "fb3d3c85ec15423b2f592fb7290bb19e93ca0174e0391cda88da6388a349e75f",
+            "contentBytes": "{\"type\":\"native\",\"from\":\"0x8d65fcf7d4880cd5224b36c33e43617cc519fc6514f79759f65fb571649dffab\",\"to\":\"0x811f691f5582cd2458def567575a30e643ac25eb34940858b90c4e7a63aa54d2\",\"amount\":\"1000000000\",\"nonce\":7,\"timestamp\":1791962360000}",
+            "signature": {
+              "type": "ed25519",
+              "data": "ae96442b0f6cfa1c51d239e2d4e36b751503f2a178f63b802f0179f60e86b736cb139e99265e22b88d04c2e4f9a4b6d5d2db25887058a24378f424b44a5a8970"
+            },
+            "ed25519_signature": null
+          }
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "transactionProofNoResultCommitment": {
+      "source": "getTransactionProof.ts:62-64 (block m + 1 before the finalityProofs fork; N07's block)",
+      "reply": {
+        "result": 404,
+        "response": {
+          "error": "no_result_commitment",
+          "blockNumber": 480877
+        },
+        "extra": {
+          "reason": "no_result_commitment"
+        },
+        "require_reply": false
+      }
+    },
+    "transactionProofNotYetCommitted": {
+      "source": "getTransactionProof.ts:73-75",
+      "reply": {
+        "result": 409,
+        "response": {
+          "error": "not_yet_committed",
+          "blockNumber": 529479,
+          "committedIn": null
+        },
+        "extra": {
+          "reason": "not_yet_committed"
+        },
+        "require_reply": false
+      }
+    },
+    "storageProof": {
+      "source": "getStorageProof.ts:143-148; storageRoot.ts:137-142; storageRecord.ts:62-74; sparse.ts:38-40",
+      "reply": {
+        "result": 200,
+        "response": {
+          "anchor": {
+            "number": 529479,
+            "hash": "5e1af55874ac0eee80ff6accbabe47b85264f235cfa525d05cf428ae96c416d2",
+            "contentBytes": "{\"number\":529479,\"previousHash\":\"28e6982cda4f169c1df4befe38c852f55609188904de4de4d05a66f75ebaaae4\",\"timestamp\":1791962380,\"parent_results_root\":\"989a5ad80d55a876d82462d451158169890f6d61b0213083eb7b621a9d9510d1\",\"ordered_transactions\":[]}",
+            "round": 2,
+            "signedMessage": "precommit:529479:2:5e1af55874ac0eee80ff6accbabe47b85264f235cfa525d05cf428ae96c416d2",
+            "signatures": {
+              "0xb696b7d5810d5acc98af283c52c51538ee8fb792a6b82ffc325c3d300b069332": "4c2a6c17a4496d38e1e122fdc3cd683749ce9d4ba08973b60f4844e423c35a24e3ec73e41b0df71e8e891db5c9b603f6d7a3c45c2a150567486d974394228104",
+              "0xf42755455b36b1efa1f5d929eeff2c7bca47ee1508811327efe39ebf7ae77f40": "eb1e91d62d5ee61b185a5b6dd39d37a3b993b73ae515c705a0a5e6f295f1e93982d3e20aa935849223a340ad80fa4b71184d7a770cf0222641ba380cd3760493",
+              "0x8da1980cdc87cab308df0875799cf6150689b2a01134634bc5d4d8b5f70dd8b0": "6ec2e5fbfc42a683c6b36d3d24422a8c2904f009c51c509a0ac8f28a5be0b27cb54028526c8740d06f63328a6956fbb5100e13e48e3610f9bc9e0a2212686693"
+            }
+          },
+          "anchorParent": {
+            "number": 529478,
+            "hash": "28e6982cda4f169c1df4befe38c852f55609188904de4de4d05a66f75ebaaae4",
+            "contentBytes": "{\"number\":529478,\"previousHash\":\"110e507c30daeb520bacd10870865c39941fc870be4abaeaa0e672a0f4d44b53\",\"timestamp\":1791962370,\"ordered_transactions\":[\"fb3d3c85ec15423b2f592fb7290bb19e93ca0174e0391cda88da6388a349e75f\",\"872591573ccfca41c2364bb39adf6040e1b7ddc3f9f9155f05fa54b9f73880ae\",\"243028cbcd4b2f72c4a54fb56b9aa89cac8b5eaf8527c0502cb6f0a6bf847fba\"]}"
+          },
+          "asOfBlock": 529478,
+          "proofs": [
+            {
+              "storageAddress": "stor-136af73b31a30ea1c20188264ace4030deb17f5a",
+              "record": {
+                "storageAddress": "stor-136af73b31a30ea1c20188264ace4030deb17f5a",
+                "owner": "0x8d65fcf7d4880cd5224b36c33e43617cc519fc6514f79759f65fb571649dffab",
+                "programName": "orders",
+                "encoding": "json",
+                "dataHash": "d2821cbbaa3cdf1b13c34ad6671ce483d0294594ddef23a0a24f92360290ebc2",
+                "sizeBytes": 42,
+                "aclHash": "c5cbd8269c2c3cee4b6dfeb1a9539bff159639034cd4ca059e2953d4ad3df506",
+                "metadataHash": "aa1f0e16297846d0c5eaf9f7e90bb4712244924d7cda6aeebd35149f496f6377",
+                "createdByTx": "872591573ccfca41c2364bb39adf6040e1b7ddc3f9f9155f05fa54b9f73880ae",
+                "lastModifiedByTx": "fb3d3c85ec15423b2f592fb7290bb19e93ca0174e0391cda88da6388a349e75f",
+                "isDeleted": false
+              },
+              "siblings": [
+                "cb7d52e61106fd3e2487e4127c664da795115cae8a2252a992001255f17403b0",
+                "cadaf28239c362886ac663f3907df09cbd2b5e665e3f556f6f7034189037860c"
+              ],
+              "terminal": {
+                "kind": "leaf",
+                "key": "74218ec34c83c6992ff425b4a86e825376fb5d726bc3ccbf81379ce6753199c6",
+                "valueHash": "d6bf8af76557272cd6b53a78cd74a9d5a8ab5fd76f350747f094e0b0d3757684"
+              }
+            },
+            {
+              "storageAddress": "stor-8a9e094c7840183591e182b13f5b23f71f5f2624",
+              "record": null,
+              "siblings": [
+                "09f29d8ba6a8cf6be74d43b63331fa6373b5b578044f49f78983b4a8aac7e79b"
+              ],
+              "terminal": {
+                "kind": "empty"
+              }
+            }
+          ]
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "storageProofHistoryUnavailable": {
+      "source": "getStorageProof.ts:103-109",
+      "reply": {
+        "result": 410,
+        "response": {
+          "error": "history_unavailable",
+          "blockNumber": 100,
+          "head": 529479,
+          "oldestBlock": 529416
+        },
+        "extra": {
+          "reason": "history_unavailable"
+        },
+        "require_reply": false
+      }
+    },
+    "storageProgramLimits": {
+      "source": "getStorageProgramLimits.ts:13-16, 35-45; values as finalityProofCalls.test.ts:775-785",
+      "reply": {
+        "result": 200,
+        "response": {
+          "maxAddressesPerProof": 16,
+          "historyBlocks": 64,
+          "maxDataBytes": 1048576,
+          "measuredOver": "the program's data only, not its ACL or metadata: for json, the UTF-8 byte length of JSON.stringify(data) as submitted (for a field or item write, of the whole data after the write); for binary, the decoded length of the base64 data, floor(length * 3 / 4) minus its '=' padding characters",
+          "maxJsonDepth": 64,
+          "appliesFromBlock": 0,
+          "maxProgramSizeBytes": 1048576,
+          "pricingChunkBytes": 10240,
+          "feePerChunk": "1"
+        },
+        "extra": "",
+        "require_reply": false
+      }
+    },
+    "unknownMessage": {
+      "source": "manageNodeCall.ts:38-44 (a node that does not serve the call)",
+      "reply": {
+        "result": 404,
+        "response": {
+          "error": "Unknown message",
+          "message": "getFinalizedHead"
+        },
+        "require_reply": false,
+        "extra": null
+      }
+    }
+  }
+}
