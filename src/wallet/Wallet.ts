@@ -86,10 +86,9 @@ export default class Wallet {
 
     /* SECTION nodeCalls */
 
-    async getBalance(): Promise<void> {
-        let info = await websdk.demos.getAddressInfo(this.ed25519_hex.publicKey)
-        // TODO Implement this and other nodeCalls
-        // return info.native.balance
+    async getBalance(): Promise<bigint | null> {
+        const info = await websdk.demos.getAddressInfo(this.ed25519_hex.publicKey)
+        return info?.balance ?? null
     }
 
     /* SECTION Basic writes */
