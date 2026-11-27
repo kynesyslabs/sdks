@@ -1,7 +1,8 @@
 /**
  * Thrown by `DemosTransactions.broadcastAndWait` when a broadcast tx has not
  * been observed in a terminal state (`included` or `failed`) before the
- * configured timeout elapses.
+ * configured timeout elapses, or, with `waitForResultCommitment`, when a
+ * terminal state arrived but no result commitment did.
  *
  * The broadcast itself may have succeeded - this only indicates that the
  * SDK gave up waiting. Callers can resume polling on their own using the

@@ -13,6 +13,7 @@ import {
 } from "./utils/txSignaturePreimage"
 import { personalMessagePreimage } from "./utils/personalMessage"
 import { TransportError } from "./TransportError"
+import { NodeCallError } from "./NodeCallError"
 
 // NOTE Including custom libraries from Demos
 import { DemosTransactions } from "./DemosTransactions"
@@ -36,6 +37,16 @@ import type {
     NetworkUpgradeProposal,
     ProposalVoteInfo,
 } from "@/types/blockchain/NetworkParameters"
+import type {
+    BlockSegment,
+    ChainIdentity,
+    FinalizedHead,
+    StorageProgramLimits,
+    StorageProof,
+    TransactionProof,
+    TransactionStatus,
+    ValidatorSet,
+} from "@/types/blockchain/finality"
 import {
     RPCRequest,
     RPCResponse,
@@ -95,8 +106,16 @@ import {
 } from "@/storage"
 import { StorageProgramResponse } from "@/storage/StorageProgram"
 
-async function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms))
+async function sleep(ms: number, signal?: AbortSignal) {
+    return new Promise<void>(resolve => {
+        const done = () => {
+            clearTimeout(timer)
+            signal?.removeEventListener("abort", done)
+            resolve()
+        }
+        const timer = setTimeout(done, signal?.aborted ? 0 : ms)
+        signal?.addEventListener("abort", done)
+    })
 }
 
 /**
@@ -882,6 +901,9 @@ export class Demos {
      * @param opts.pollIntervalMs - Delay between polls. Defaults to 500.
      * @param opts.failFastOnBroadcastError - Reject immediately if the broadcast
      *   RPC errors, instead of polling for a terminal status.
+     * @param opts.waitForResultCommitment - Also wait, within the same timeout,
+     *   until the node reports the block committing the result
+     *   (`status.resultCommittedInBlock`). Defaults to false.
      * @returns `{ hash, broadcast, status }` — the transaction hash, the
      *   broadcast RPC response and the terminal on-chain status.
      */
@@ -891,6 +913,7 @@ export class Demos {
             timeoutMs?: number
             pollIntervalMs?: number
             failFastOnBroadcastError?: boolean
+            waitForResultCommitment?: boolean
         },
     ) {
         return DemosTransactions.broadcastAndWait(validationData, this, opts)
@@ -1363,6 +1386,8 @@ export class Demos {
              * and trim a JSON string.
              */
             rawBody?: boolean
+            /** Stops the attempt in flight (ERR_CANCELED) and any retry. */
+            signal?: AbortSignal
         } = {},
     ): Promise<{ data: T }> {
         const maxRetries = opts.retries ?? 4
@@ -1410,6 +1435,9 @@ export class Demos {
                     ),
                 timeoutMs,
             )
+            const onAbort = () => stop("canceled", AxiosError.ERR_CANCELED)
+            opts.signal?.addEventListener("abort", onAbort)
+            if (opts.signal?.aborted) onAbort()
             try {
                 const response = await axios
                     .post<T>(url, request, {
@@ -1490,7 +1518,9 @@ export class Demos {
                     }
                 }
 
-                await sleep(waitMs)
+                await sleep(waitMs, opts.signal)
+            } finally {
+                opts.signal?.removeEventListener("abort", onAbort)
             }
         }
 
@@ -1515,6 +1545,7 @@ export class Demos {
         retries = 0,
         sleepTime = 250,
         allowedErrorCodes: number[] = [],
+        options: { signal?: AbortSignal } = {},
     ): Promise<RPCResponse> {
         let publicKey = ""
         let signature = ""
@@ -1559,7 +1590,7 @@ export class Demos {
                 this.rpc_url,
                 request,
                 headers,
-                { baseSleepMs: sleepTime },
+                { baseSleepMs: sleepTime, signal: options.signal },
             )
 
             if (
@@ -1570,13 +1601,14 @@ export class Demos {
             }
 
             if (retries > 0) {
-                await sleep(sleepTime)
+                await sleep(sleepTime, options.signal)
                 return await this.rpcCall(
                     request,
                     isAuthenticated,
                     retries - 1,
                     sleepTime,
                     allowedErrorCodes,
+                    options,
                 )
             }
 
@@ -1603,6 +1635,7 @@ export class Demos {
         extra: any = "",
         sender: any = null,
         receiver: any = null,
+        options: { signal?: AbortSignal } = {},
     ) {
         // NOTE: Didn't tear apart the transmission object during the http
         // rewrite just in case we need to come back to it.
@@ -1671,6 +1704,7 @@ export class Demos {
                     signature: pubkey_signature,
                     timestamp: auth_timestamp,
                 },
+                { signal: options.signal },
             )
 
             if (method == "nodeCall") {
@@ -2470,6 +2504,89 @@ export class Demos {
     async getStakedAmount(address: string): Promise<string> {
         const v = await this.nodeCall("getStakedAmount", { address })
         return typeof v === "string" ? v : "0"
+    }
+
+    // SECTION Finality and storage proof reads (kynesyslabs/node
+    // v1.0.0-rc.14 and later). Each returns what the connected RPC claims;
+    // nothing here checks a signature, hash or Merkle path.
+
+    /**
+     * A node call that keeps the node's verdict: the body on result 200, a
+     * `NodeCallError` otherwise. Transport failures throw `TransportError`
+     * instead of becoming a 500 body, so they never read as a refusal.
+     */
+    private async _nodeCallAnswer<T>(
+        message: string,
+        data: Record<string, unknown> = {},
+    ): Promise<T> {
+        required(this.rpc_url, "Not connected to a node")
+        // The node reads only `message` and `data` of a nodeCall, as
+        // `bodyBoundNodeCall` sends it.
+        const { data: reply } = await this._doPost<RPCResponse>(
+            this.rpc_url,
+            { method: "nodeCall", params: [{ message, data }] },
+            { "Content-Type": "application/json" },
+        )
+        if (typeof reply?.result !== "number") {
+            throw new TypeError(`Demos RPC returned no valid ${message} reply`)
+        }
+        if (reply.result !== 200) throw new NodeCallError(message, reply)
+        const body = reply.response
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+            throw new TypeError(`Demos RPC returned no valid ${message} answer`)
+        }
+        return body as T
+    }
+
+    /** The chain id and genesis hashes the node enforces. */
+    async getChainIdentity(): Promise<ChainIdentity> {
+        return this._nodeCallAnswer("getChainIdentity")
+    }
+
+    /** The node's finalized head with its signatures; `nodeSynced` says if it lags. */
+    async getFinalizedHead(): Promise<FinalizedHead> {
+        return this._nodeCallAnswer("getFinalizedHead")
+    }
+
+    /** Signed headers `from..to`; the answer's `to` is the last one served. */
+    async getBlockSegment(from: number, to: number): Promise<BlockSegment> {
+        return this._nodeCallAnswer("getBlockSegment", { from, to })
+    }
+
+    /** The validator set after block `blockNumber`. */
+    async getValidatorSet(blockNumber: number): Promise<ValidatorSet> {
+        return this._nodeCallAnswer("getValidatorSet", { blockNumber })
+    }
+
+    /**
+     * A transaction's state, the height searched and, after the finalityProofs
+     * fork, the block committing its result. A hash the node does not hold
+     * throws `NodeCallError` 404 not_found (503 node_not_synced while behind);
+     * its `response.checkedThroughBlock` is the height searched.
+     */
+    async getTransactionStatus(hash: string): Promise<TransactionStatus> {
+        return this._nodeCallAnswer("getTransactionStatus", { hash })
+    }
+
+    /** A transaction's result leaf, audit path and the blocks it ties to. */
+    async getTransactionProof(hash: string): Promise<TransactionProof> {
+        return this._nodeCallAnswer("getTransactionProof", { hash })
+    }
+
+    /** Sparse Merkle proofs for 1-16 storage programs at a recent block (default the head). */
+    async getStorageProof(
+        storageAddresses: string[],
+        blockNumber?: number,
+    ): Promise<StorageProof> {
+        return this._nodeCallAnswer("getStorageProof", {
+            storageAddresses,
+            blockNumber,
+        })
+    }
+
+    /** The storage size, depth, pricing and proof limits the node enforces. */
+    async getStorageProgramLimits(): Promise<StorageProgramLimits> {
+        return this._nodeCallAnswer("getStorageProgramLimits")
     }
 
     // SECTION Governance (stackable-genesis, Phase 1)

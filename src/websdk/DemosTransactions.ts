@@ -12,6 +12,7 @@ import * as skeletons from "./utils/skeletons"
 import type { SigningAlgorithm, Transaction } from "@/types"
 import type { L2PSHashPayload } from "@/types/blockchain/TransactionSubtypes/L2PSHashTransaction"
 import type { NetworkParameters } from "@/types/blockchain/NetworkParameters"
+import type { TransactionStatus } from "@/types/blockchain/finality"
 import { IKeyPair } from "./types/KeyPair"
 import { GCRGeneration, isSolanaBase58 } from "./GCRGeneration"
 import { _required as required } from "./utils/required"
@@ -506,6 +507,15 @@ export const DemosTransactions = {
      * @param opts.pollIntervalMs - Delay between status polls. Defaults to 500.
      * @param opts.failFastOnBroadcastError - If true, throw `BroadcastFailedError`
      *   immediately when the broadcast can't contact the node. Defaults to false.
+     * @param opts.waitForResultCommitment - If true, keep polling past
+     *   `included`/`failed` until the node reports `resultCommittedInBlock`
+     *   (the block committing the result, which `getTransactionProof` can then
+     *   prove); the returned status is then the node's full answer. A terminal
+     *   status without the field means no block commits this result (before
+     *   the finalityProofs fork, or an older node) and is returned as it is.
+     *   The commitment wait stops at `timeoutMs`: if no commitment has
+     *   arrived by then, it throws `BroadcastTimeoutError` with the terminal
+     *   state as `lastSeenState`. Defaults to false.
      *
      * @returns The transaction hash, the original broadcast response, and the
      *   terminal status. The hash is the node-recalculated one the status polls
@@ -519,15 +529,19 @@ export const DemosTransactions = {
             timeoutMs?: number
             pollIntervalMs?: number
             failFastOnBroadcastError?: boolean
+            waitForResultCommitment?: boolean
         },
     ): Promise<{
         hash: string
         broadcast: RPCResponse
-        status: { state: "included" | "failed"; blockNumber?: number }
+        status: Omit<TransactionStatus, "state"> & {
+            state: "included" | "failed"
+        }
     }> {
         const timeout = opts?.timeoutMs ?? 60_000
         const pollInterval = opts?.pollIntervalMs ?? 500
         const failFast = opts?.failFastOnBroadcastError ?? false
+        const waitForCommitment = opts?.waitForResultCommitment ?? false
 
         // Extract the tx hash from the validity data before broadcasting so
         // we can include it in any timeout error.
@@ -571,6 +585,11 @@ export const DemosTransactions = {
         const start = Date.now()
         let attempt = 0
         let lastState: string = "unknown"
+        // Set once a terminal state arrives without its commitment. From then
+        // on no sleep or poll runs past the deadline and no reply is taken
+        // after it.
+        let awaitedState: string | undefined
+        const TIMED_OUT = Symbol("timedOut")
 
         // 2. Poll until terminal state or timeout. Mirrors KeyServerClient's
         //    pollOAuth pattern: skip the initial sleep on the first attempt
@@ -579,8 +598,13 @@ export const DemosTransactions = {
             attempt++
 
             if (attempt > 1) {
-                await new Promise(r => setTimeout(r, pollInterval))
+                const sleep = awaitedState
+                    ? Math.min(pollInterval, timeout - (Date.now() - start))
+                    : pollInterval
+                await new Promise(r => setTimeout(r, sleep))
             }
+            const remaining = timeout - (Date.now() - start)
+            if (awaitedState && remaining <= 0) break
 
             // demos.call signature: (method, message, data, extra). The
             // node's rpcDispatch routes by `method`, then
@@ -592,11 +616,34 @@ export const DemosTransactions = {
             // then never observed `state` and timed out even though
             // the tx was on chain. Pass the action name as `message`
             // so the handler resolves.
-            const statusRes = await demos.call(
+            const ctl = new AbortController()
+            const poll = demos.call(
                 "nodeCall",
                 "getTransactionStatus",
                 { hash: txHash },
+                ...(awaitedState
+                    ? (["", null, null, { signal: ctl.signal }] as const)
+                    : ([] as const)),
             )
+            let timer: ReturnType<typeof setTimeout> | undefined
+            // setTimeout runs a delay past 2^31 - 1 ms at once, so a deadline
+            // that far off is left to the clock check below.
+            const statusRes =
+                awaitedState && remaining < 2 ** 31
+                    ? await Promise.race([
+                          poll,
+                          new Promise<typeof TIMED_OUT>(r => {
+                              timer = setTimeout(() => r(TIMED_OUT), remaining)
+                          }),
+                      ]).finally(() => clearTimeout(timer))
+                    : await poll
+            if (
+                awaitedState &&
+                (statusRes === TIMED_OUT || Date.now() - start >= timeout)
+            ) {
+                ctl.abort() // cancels the read if it is still running
+                break
+            }
 
             // `Demos.call("nodeCall", ...)` normally returns the inner
             // `response` payload directly (e.g. `{ state, blockNumber? }`).
@@ -623,20 +670,28 @@ export const DemosTransactions = {
             if (typeof state === "string") {
                 lastState = state
                 if (state === "included" || state === "failed") {
-                    const blockNumber: number | undefined =
-                        (statusRes as any).blockNumber
-                    return {
-                        hash: txHash,
-                        broadcast: broadcastRes,
-                        status: { state, blockNumber },
+                    const full = statusRes as TransactionStatus
+                    // null: the committing block is not searched yet.
+                    if (
+                        !waitForCommitment ||
+                        full.resultCommittedInBlock !== null
+                    ) {
+                        return {
+                            hash: txHash,
+                            broadcast: broadcastRes,
+                            status: waitForCommitment
+                                ? { ...full, state }
+                                : { state, blockNumber: full.blockNumber },
+                        }
                     }
+                    awaitedState = state
                 }
             }
         }
 
         throw new BroadcastTimeoutError({
             txHash,
-            lastSeenState: lastState,
+            lastSeenState: awaitedState ?? lastState,
             elapsedMs: Date.now() - start,
         })
     },
