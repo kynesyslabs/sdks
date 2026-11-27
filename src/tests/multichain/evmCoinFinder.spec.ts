@@ -1,11 +1,12 @@
 import { BaseChain } from "@/abstraction/providers/CoinAddresses"
 import { EvmCoinFinder } from "../../abstraction/EvmCoinFinder"
 import { ethers } from "ethers"
+const mockGetCode = jest.fn().mockResolvedValue("0x123")
 // Mock the JsonRpcProvider
 jest.mock("ethers", () => ({
     ...jest.requireActual("ethers"),
     JsonRpcProvider: jest.fn().mockImplementation(() => ({
-        getCode: jest.fn().mockResolvedValue("0x123"),
+        getCode: mockGetCode,
         getNetwork: jest.fn().mockResolvedValue({ chainId: 1 }),
     })),
     isAddress: jest.requireActual("ethers").isAddress,
@@ -76,6 +77,28 @@ describe("EVM COIN FINDER TESTS", () => {
                 BSC_CHAIN_ID,
             ]),
         ).rejects.toThrow("Invalid token address")
+    })
+
+    test("findTokenPairs reports the documented code for an address without a contract", async () => {
+        mockGetCode.mockResolvedValueOnce("0x")
+        const lookup = EvmCoinFinder.findTokenPairs(
+            USDC_ETH,
+            ETHEREUM_CHAIN_ID,
+            [BSC_CHAIN_ID],
+        )
+        await expect(lookup).rejects.toBeInstanceOf(Error)
+        await expect(lookup).rejects.toMatchObject({
+            code: "CONTRACT_NOT_FOUND",
+            message: "Token contract not found on source chain",
+        })
+    })
+
+    test("findTokenPairs preserves a provider read error", async () => {
+        const readError = new Error("Could not read code")
+        mockGetCode.mockRejectedValueOnce(readError)
+        await expect(
+            EvmCoinFinder.findTokenPairs(USDC_ETH, ETHEREUM_CHAIN_ID, [BSC_CHAIN_ID]),
+        ).rejects.toBe(readError)
     })
 
     test("getNativeForSupportedChain returns native addresses for all supported chains", () => {
