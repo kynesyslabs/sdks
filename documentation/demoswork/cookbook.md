@@ -22,10 +22,9 @@ THe process of creating a cross chain workstep to send some ETH to an address ca
 3. Create an XM step with the `XMScript`
 
 ```ts
-import { XMScript } from "@kynesyslabs/demosdk/types"
-import { EVM } from "@kynesyslabs/demosdk/multichain/websdk"
+import { EVM } from "@kynesyslabs/demosdk/xm-websdk"
 import { prepareXMStep } from "@kynesyslabs/demosdk/demoswork"
-import { prepareXMScript } from "@kynesyslabs/demosdk/websdk/XMTransactions"
+import { prepareXMScript } from "@kynesyslabs/demosdk/websdk"
 
 // 1. Getting EVM payload
 const evm_rpc = "https://rpc.ankr.com/eth_sepolia"
@@ -63,8 +62,8 @@ There are two ways to go about creating a conditional operation.
 ### 1. Using the `if`, `then` and `else` methods
 
 ```ts
-import { EVM } from "@kynesyslabs/demosdk/multichain/websdk"
-import { prepareXMScript } from "@kynesyslabs/demosdk/websdk/XMTransactions"
+import { EVM } from "@kynesyslabs/demosdk/xm-websdk"
+import { prepareXMScript } from "@kynesyslabs/demosdk/websdk"
 import {
     DemosWork,
     prepareWeb2Step,
@@ -140,8 +139,8 @@ The `value_a` and `value_b` fields can accept any of the following:
 You can create the same conditional operation as the previous example using the `Condition` class as follows:
 
 ```ts
-import { EVM } from "@kynesyslabs/demosdk/multichain/websdk"
-import { prepareXMScript } from "@kynesyslabs/demosdk/websdk/XMTransactions"
+import { EVM } from "@kynesyslabs/demosdk/xm-websdk"
+import { prepareXMScript } from "@kynesyslabs/demosdk/websdk"
 import {
     Condition,
     DemosWork,

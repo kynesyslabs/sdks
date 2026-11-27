@@ -61,8 +61,7 @@ yarn add @kynesyslabs/demosdk
 ### Basic Import
 
 ```typescript
-import { Demos } from "@kynesyslabs/demosdk/websdk"
-import { prepareXMPayload } from "@kynesyslabs/demosdk/xm-websdk"
+import { Demos, prepareXMPayload } from "@kynesyslabs/demosdk/websdk"
 import { DemosWork } from "@kynesyslabs/demosdk/demoswork"
 ```
 
