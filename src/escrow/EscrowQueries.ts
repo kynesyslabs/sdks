@@ -11,6 +11,16 @@ KyneSys Labs: https://www.kynesys.xyz/
 
 import { Demos } from "@/websdk"
 import { EscrowTransaction } from "./EscrowTransaction"
+import type { RPCRequest } from "../types/communication/rpc"
+
+async function query<T>(demos: Demos, request: RPCRequest): Promise<T> {
+    const { result, response } = await demos.rpcCall(request, false)
+    if (result !== 200) {
+        if (response instanceof Error) throw response
+        throw new Error(`${request.method} failed (RPC ${result})`)
+    }
+    return response as T
+}
 
 /**
  * Escrow balance information
@@ -98,8 +108,7 @@ export class EscrowQueries {
             params: [{ platform, username }],
         }
 
-        const result = await demos.rpcCall(request, false)
-        return result.response as EscrowBalance
+        return query<EscrowBalance>(demos, request)
     }
 
     /**
@@ -128,8 +137,7 @@ export class EscrowQueries {
             params: [{ address }],
         }
 
-        const result = await demos.rpcCall(request, false)
-        return result.response as ClaimableEscrow[]
+        return query<ClaimableEscrow[]>(demos, request)
     }
 
     /**
@@ -158,7 +166,6 @@ export class EscrowQueries {
             params: [{ sender }],
         }
 
-        const result = await demos.rpcCall(request, false)
-        return result.response as SentEscrow[]
+        return query<SentEscrow[]>(demos, request)
     }
 }
