@@ -12,6 +12,12 @@ export { DemosWebAuth } from "./DemosWebAuth"
 // Programmatic transaction system (demos.run.*): runner, options/result
 // types, FeeCapExceededError, and the facade factory.
 export * from "./programmatic"
+export type {
+    ContractABI,
+    ContractCallOptions,
+    ContractCallResult,
+    ContractDeployOptions,
+} from "../contracts/types/ContractABI"
 
 export {
     XMTransactions,
