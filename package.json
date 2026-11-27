@@ -198,6 +198,7 @@
         "rubic-sdk": "^5.57.4"
     },
     "devDependencies": {
+        "@jridgewell/sourcemap-codec": "^1.5.5",
         "@orbs-network/ton-access": "^2.3.3",
         "@types/cors": "^2.8.19",
         "@types/jest": "^29.5.14",
