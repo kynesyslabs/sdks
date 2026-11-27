@@ -44,12 +44,14 @@ An operation can be likened to a function in programming.
 This operation enables you to simply group steps or operations together in an ordered manner.
 
 ```ts
-const operation = BaseOperation()
-operation.addWork(xmStep, web2Step, someOperation, ...)
+const operation = new BaseOperation()
+operation.addWork(xmStep, web2Step, someOperation)
+```
 
-// OR
+Or pass the same items to the constructor:
 
-const operation = BaseOperation(xmStep, web2Step, someOperation, ...)
+```ts
+const operation = new BaseOperation(xmStep, web2Step, someOperation)
 ```
 
 ### Conditional operation
