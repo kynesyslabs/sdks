@@ -13,7 +13,7 @@
  * // Create add payload for transaction
  * const addPayload = ipfs.IPFSOperations.createAddPayload(
  *   Buffer.from('Hello IPFS!'),
- *   'hello.txt'
+ *   { filename: 'hello.txt' }
  * )
  *
  * // Create pin payload for existing CID
@@ -232,15 +232,12 @@ export interface PinOptionsWithCharges extends PinOptions {
  *
  * @example
  * ```typescript
- * import { ipfs, websdk } from '@kynesyslabs/demosdk'
- *
- * // Initialize Demos client
- * const demos = new websdk.Demos({ rpcUrl: 'https://rpc.demos.network' })
+ * import { ipfs } from '@kynesyslabs/demosdk'
  *
  * // Create add payload
  * const addPayload = ipfs.IPFSOperations.createAddPayload(
  *   Buffer.from('My content'),
- *   'myfile.txt'
+ *   { filename: 'myfile.txt' }
  * )
  *
  * // Build and send transaction (pseudocode - actual tx flow depends on integration)
