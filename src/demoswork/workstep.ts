@@ -43,8 +43,8 @@ export class WorkStep {
             },
         )
     }
-    get base_output() {
-        return this.output as unknown as StepOutputKey
+    get base_output(): StepOutputKey {
+        return { type: DataTypes.work, src: { self: this, key: "output" } }
     }
 }
 
