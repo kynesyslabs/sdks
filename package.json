@@ -30,6 +30,10 @@
     ],
     "files": [
         "build/",
+        "build/index.js",
+        "build/index.d.ts",
+        "build/index.node.js",
+        "build/index.node.d.ts",
         "!build/tests"
     ],
     "exports": {
@@ -80,6 +84,7 @@
         "./identity/vlei": "./build/identity/vlei/index.js"
     },
     "scripts": {
+        "prepack": "node scripts/check-root-entrypoints.mjs",
         "postinstall": "cp .github/hooks/pre-commit .git/hooks/pre-commit 2>/dev/null && chmod +x .git/hooks/pre-commit 2>/dev/null || true",
         "build": "rm -rf build && tsc --skipLibCheck && resolve-tspaths && mv build/src/* build/ && rm -rf build/src && node scripts/normalize-esm-specifiers.mjs && npm run build:copy-wasm",
         "build:copy-wasm": "mkdir -p build/tlsnotary/wasm && cp node_modules/tlsn-js/build/*.wasm build/tlsnotary/wasm/ && cp node_modules/tlsn-js/build/*.js build/tlsnotary/wasm/ && cp -r node_modules/tlsn-js/build/snippets build/tlsnotary/wasm/",
