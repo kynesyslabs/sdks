@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import {
+  cpSync,
   mkdtempSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { verifyConsumerSboms } from "./verify-consumer-sboms.mjs";
 
 const packageRoot = new URL("../", import.meta.url);
 const npmCli = process.env.npm_execpath;
@@ -52,15 +55,6 @@ for (const [location, metadata] of Object.entries(lock.packages ?? {})) {
 const audit = JSON.parse(npm(["audit", "--omit=dev", "--json"]));
 assert.equal(audit.metadata.vulnerabilities.total, 0, "production audit must be clean");
 
-for (const args of [
-  ["sbom", "--omit=dev", "--sbom-format", "cyclonedx"],
-  ["sbom", "--package-lock-only", "--omit=dev", "--sbom-format", "cyclonedx"],
-]) {
-  const sbom = JSON.parse(npm(args));
-  assert.equal(sbom.bomFormat, "CycloneDX");
-  assert.ok(Array.isArray(sbom.components));
-}
-
 const packDirectory = mkdtempSync(join(tmpdir(), "demos-native-pack-"));
 const packed = JSON.parse(npm([
   "pack",
@@ -78,15 +72,18 @@ for (const file of entry.files) {
 const consumer = mkdtempSync(join(tmpdir(), "demos-native-consumer-"));
 writeFileSync(join(consumer, "package.json"), JSON.stringify({
   name: "demos-native-release-consumer",
+  version: "0.0.0", // npm needs a version to identify the CycloneDX root component.
   private: true,
   type: "module",
 }));
 npm([
   "install",
+  "--omit=dev",
   "--engine-strict",
   "--ignore-scripts",
   join(packDirectory, entry.filename),
 ], consumer);
+verifyConsumerSboms((args) => npm(args, consumer));
 const consumerAudit = JSON.parse(npm(["audit", "--omit=dev", "--json"], consumer));
 assert.equal(consumerAudit.metadata.vulnerabilities.total, 0);
 const smokeModule = join(consumer, "smoke.mjs");
@@ -99,6 +96,13 @@ const installed = await import(smokeModule);
 assert.equal(typeof installed.Demos, "function");
 assert.equal(typeof installed.StorageProgram, "function");
 assert.equal(typeof installed.L2PSMessagingPeer, "function");
+
+const typecheck = join(consumer, "typecheck");
+cpSync(new URL("../test/packed-consumer/", import.meta.url), typecheck, { recursive: true });
+const tsc = fileURLToPath(import.meta.resolve("typescript/bin/tsc"));
+execFileSync(process.execPath, [tsc, "-p", typecheck], {
+  stdio: "inherit",
+});
 
 process.stdout.write(JSON.stringify({
   schema: "demos-native-release-verification/v1",
