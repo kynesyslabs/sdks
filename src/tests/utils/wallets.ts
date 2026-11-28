@@ -37,14 +37,6 @@ export const wallets: {
         privateKey:
             "e0a00e307c21850cde41b18bae307a492c471b463b60ce5b631fdb80503b23f7",
     },
-    ten: {
-        privateKey:
-            "0d6033655b0d2903b337dc4a7abfa3c109f8c9484f3f19869525058fd62f61bf",
-    },
-    tenAlt: {
-        privateKey:
-            "4efe8454860e1f1c2d516d274f6e43639715818af62e02126d006983deeb3ca6",
-    },
     ibc: {
         // INFO: Cosmos chain Id: "theta-testnet-001"
         privateKey:

@@ -116,6 +116,8 @@
   the optional `encoding` parameter; wrap it as `.map(s => Hashing.sha256(s))`.
 - Web2 identity proof URLs must be ASCII; percent-encode non-ASCII path and
   query characters and use the punycode (`xn--`) form for hostnames.
+- Removed the unfinished TEN chain integration (never exported), and the
+  `web3` dependency, which only that code used.
 
 ### Changed
 - **Behaviour change:** `demos.run.*` / `runProgrammaticTx` now refuse,

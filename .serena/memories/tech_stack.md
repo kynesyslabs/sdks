@@ -22,7 +22,7 @@
 ## Key Dependencies
 ### Blockchain Libraries
 - @aptos-labs/ts-sdk, @cosmjs/stargate, @multiversx/sdk-core
-- @solana/web3.js, @ton/core, ethers, web3, xrpl
+- @solana/web3.js, @ton/core, ethers, xrpl
 - bitcoinjs-lib, near-api-js
 
 ### Cryptography
