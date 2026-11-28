@@ -274,7 +274,6 @@ const combinedCondition = new Condition({
 const notCondition = new Condition({
     value_a: booleanCondition,
     operator: "not",
-    value_b: null,
     action: null,
 })
 ```
