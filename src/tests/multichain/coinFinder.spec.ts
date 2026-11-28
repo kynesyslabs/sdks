@@ -40,6 +40,15 @@ describe("NON-EVM COIN FINDER TESTS", () => {
             expect(wrappedOnBsc).toBe(tokenAddresses.xrp.wrapped.bsc.mainnet)
         })
 
+        test.each([BaseChain.BSC, BaseChain.ARBITRUM, BaseChain.OPTIMISM, BaseChain.TON])(
+            "returns false when the registry has no source entry for %s",
+            async source => {
+                await expect(
+                    CoinFinder.findWrappedToken(source, BaseChain.ETHEREUM),
+                ).resolves.toBe(false)
+            },
+        )
+
         test("should return false for unsupported chains", async () => {
             const result = await CoinFinder.findWrappedToken(
                 BaseChain.BITCOIN,
