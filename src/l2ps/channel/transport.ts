@@ -115,6 +115,20 @@ export class L2PSChannelTransport {
     private draining: Promise<void> = Promise.resolve()
     private started = false
 
+    /**
+     * An outgoing envelope that has been minted (sequence reserved, signed,
+     * encrypted) but not yet delivered to every recipient. Retained so a
+     * failed send can be re-sent byte-identically instead of burning the
+     * sequence; `deliveredTo` tracks who already has it so a retry only
+     * re-sends the ones still missing.
+     */
+    private pending: {
+        signed: ChannelMessage
+        encrypted: SerializedEncryptedMessage
+        messageHash: string
+        deliveredTo: Set<string>
+    } | null = null
+
     constructor(opts: L2PSChannelTransportOpts) {
         this.session = opts.session
         this.peer = opts.peer
@@ -146,24 +160,76 @@ export class L2PSChannelTransport {
         body: unknown
         repliesTo?: number
     }): Promise<ChannelMessage> {
-        const signed = await this.session.sendOutgoing(opts)
-
-        const encrypted = await this.encrypt(JSON.stringify(signed))
-        const messageHash = signed.signature.signature // unique per signed envelope
-        // Deliver to every recipient BEFORE committing the sequence locally.
-        // If any send rejects, the throw propagates here and appliedSeq is
-        // left untouched, so a retry re-emits the same sequence rather than
-        // skipping ahead and stranding peers behind a reorder gap. (Recipients
-        // that did receive it will drop the duplicate on resend — seq <=
-        // appliedSeq — so at-least-once delivery is safe.)
-        for (const to of this.recipients) {
-            await this.peer.send(to, encrypted, messageHash)
+        // A previously-minted envelope that has not been fully delivered
+        // still owns its sequence number. Minting a new one now would skip
+        // ahead and strand peers behind a permanent reorder gap, so the
+        // caller must finish delivering it first via resendPending().
+        if (this.pending) {
+            throw new Error(
+                "L2PSChannelTransport: a previous message is still awaiting " +
+                    "delivery — call resendPending() before sending a new one",
+            )
         }
 
-        // Our own send advances the shared per-channel counter; record it
-        // so we expect the peer's reply at appliedSeq + 1.
-        if (signed.sequence > this.appliedSeq) this.appliedSeq = signed.sequence
-        return signed
+        // Mint + sign + encrypt exactly once. The signed envelope and its
+        // ciphertext are retained so a failed delivery can be re-sent
+        // byte-identically (same sequence, signature and nonce) rather than
+        // burning the sequence and minting a divergent message that leaves
+        // the receiver waiting on a number that will never arrive.
+        const signed = await this.session.sendOutgoing(opts)
+        const encrypted = await this.encrypt(JSON.stringify(signed))
+        this.pending = {
+            signed,
+            encrypted,
+            messageHash: signed.signature.signature, // unique per signed envelope
+            deliveredTo: new Set<string>(),
+        }
+
+        return this.deliverPending()
+    }
+
+    /**
+     * Re-deliver the envelope that failed mid-send, re-using the exact same
+     * signed bytes, sequence and ciphertext — so recipients that already have
+     * it dedupe it (seq <= applied) and the node sees the same messageHash.
+     * Returns null when nothing is pending. On a repeat failure it throws and
+     * leaves the envelope pending for a further retry.
+     */
+    async resendPending(): Promise<ChannelMessage | null> {
+        if (!this.pending) return null
+        return this.deliverPending()
+    }
+
+    /** True while an outgoing envelope is minted but not fully delivered. */
+    get hasPendingSend(): boolean {
+        return this.pending !== null
+    }
+
+    /**
+     * Deliver the pending envelope to every recipient that has not yet
+     * received it. On full success the sequence is committed locally and the
+     * pending slot cleared; on failure the slot is kept (recording who already
+     * got it) so the next resend only re-tries the ones still missing.
+     */
+    private async deliverPending(): Promise<ChannelMessage> {
+        const pending = this.pending
+        if (!pending) {
+            throw new Error(
+                "L2PSChannelTransport: no pending envelope to deliver",
+            )
+        }
+        for (const to of this.recipients) {
+            if (pending.deliveredTo.has(to)) continue
+            await this.peer.send(to, pending.encrypted, pending.messageHash)
+            pending.deliveredTo.add(to)
+        }
+        // Fully delivered: advance the shared per-channel counter so we expect
+        // the peer's reply at appliedSeq + 1, and clear the slot.
+        if (pending.signed.sequence > this.appliedSeq) {
+            this.appliedSeq = pending.signed.sequence
+        }
+        this.pending = null
+        return pending.signed
     }
 
     private async ingest(payload: IncomingMessagePayload): Promise<void> {
