@@ -56,17 +56,21 @@ export class CoinFinder {
             case BaseChain.BSC:
             case BaseChain.ARBITRUM:
             case BaseChain.OPTIMISM:
-                // Validate chain ID matches the chain
                 const chainIdMap = {
-                    [BaseChain.ETHEREUM]: chainIds.eth.mainnet,
-                    [BaseChain.BSC]: chainIds.bsc.mainnet,
-                    [BaseChain.ARBITRUM]: chainIds.arbitrum.mainnet,
-                    [BaseChain.OPTIMISM]: chainIds.optimism.mainnet,
+                    [BaseChain.ETHEREUM]: {
+                        mainnet: chainIds.eth.mainnet,
+                        testnet: chainIds.eth.sepolia,
+                    },
+                    [BaseChain.BSC]: chainIds.bsc,
+                    [BaseChain.ARBITRUM]: chainIds.arbitrum,
+                    [BaseChain.OPTIMISM]: chainIds.optimism,
                 }
-                if (targetChainId !== chainIdMap[chainType]) {
+                if (targetChainId !== chainIdMap[chainType][networkType]) {
                     throw new Error(`Chain ID doesn't match ${chainType}`)
                 }
-                return tokenAddresses.ethereum[networkType]
+                return networkType === "testnet"
+                    ? tokenAddresses.ethereum.sepolia
+                    : tokenAddresses.ethereum.mainnet
 
             // Handle non-EVM chains
             case BaseChain.SOLANA:
