@@ -56,23 +56,14 @@ export class XRPL extends DefaultChain {
     }
 
     async connect(with_reconnect: boolean = true) {
-        // INFO Connects to the provider with error handling
-        let trial_index = 0
-        let maxTrials = 3
-
         const providerConnect = async () => {
-            try {
-                await this.provider.connect()
-                return true
-            } catch (error) {
-                trial_index++
-                if (trial_index == maxTrials) {
-                    // INFO: Return false if we failed to connect
-                    return false
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    await this.provider.connect()
+                    return true
+                } catch {
+                    // Try again while there are attempts left.
                 }
-
-                // INFO: Retry for the Nth time
-                await providerConnect()
             }
 
             return false
