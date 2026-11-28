@@ -11,7 +11,13 @@ on:
       - 'src/**'
       - 'scripts/verify-messaging-export.mjs'
       - '.github/workflows/test.messaging-export.yml'
+  # `branches: [main]` keeps this off feature branches. Without it the same
+  # commit ran this workflow twice -- once for the pull_request event and once
+  # for the push to the PR's own branch -- for identical paths. Only a merge to
+  # main is a new fact about main; a push to a topic branch is already covered
+  # by that branch's pull_request run.
   push:
+    branches: [main]
     paths:
       - 'package.json'
       - 'bun.lock'
