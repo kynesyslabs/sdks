@@ -53,7 +53,7 @@ jobs:
       - name: Copy docs to target repository
         run: |
           rm -rf target_repo/*
-          cp -R docs/* target_repo/
+          cp -R docs/. target_repo/
 
       - name: Commit and push changes
         working-directory: target_repo
