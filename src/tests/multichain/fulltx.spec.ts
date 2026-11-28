@@ -2,6 +2,7 @@ import { XRPL, EVM } from "@/multichain/websdk"
 import chainProviders from "./chainProviders"
 import { wallets } from "../utils/wallets"
 import { legacySeed } from "../utils/legacySeed"
+import { requireFundedMnemonic } from "../utils/requireFundedMnemonic"
 import {
     Demos,
     DemosWebAuth,
@@ -10,12 +11,7 @@ import {
 } from "@/websdk"
 
 describe("DEMOS Transaction", () => {
-    const mnemonic = process.env.FUNDED_MNEMONIC
-
-    if (!mnemonic) {
-        console.error("FUNDED_MNEMONIC is not set")
-        process.exit(0)
-    }
+    const mnemonic = requireFundedMnemonic(process.env)
 
     test("Classic XM Transaction", async () => {
         const evm = await EVM.create(chainProviders.eth.sepolia)

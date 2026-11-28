@@ -1,13 +1,9 @@
 import { Demos } from "@/websdk"
 import { DemosWebAuth } from "@/websdk"
+import { requireFundedMnemonic } from "./utils/requireFundedMnemonic"
 
 describe("Web2", () => {
-    const mnemonic = process.env.FUNDED_MNEMONIC
-
-    if (!mnemonic) {
-        console.error("FUNDED_MNEMONIC is not set")
-        process.exit(0)
-    }
+    const mnemonic = requireFundedMnemonic(process.env)
 
     test("Full Web2 Transaction", async () => {
         // 1. Initialize the demos instance
